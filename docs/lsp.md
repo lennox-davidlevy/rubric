@@ -1,4 +1,4 @@
-# Warren: the language server and the first slice
+# Rubric: the language server and the first slice
 
 Written 2026-10-30. The first thing built is one thin vertical slice through every layer, so that each layer is proven once before any of them is made good. The slice is: a directive typed in Neovim goes to Jev, Jev picks from a small premade catalog, the pick shows as ghost text, the page shows it in Hugo's preview, and the accept key writes the plain form into the file. Everything here serves that slice; what the slice does not need is listed at the end and waits.
 
@@ -30,7 +30,7 @@ In a site folder with `hugo server` running and Neovim open on a page:
 
 ## The catalog file
 
-The contract. Everything the server does is read from it, and the questions to Jev are generated from it, so the descriptions in this file are the whole of Warren's "prompting". A sketch of the slice's catalog:
+The contract. Everything the server does is read from it, and the questions to Jev are generated from it, so the descriptions in this file are the whole of Rubric's "prompting". A sketch of the slice's catalog:
 
 ```yaml
 name: slice
@@ -117,15 +117,15 @@ The ghost text is exactly the text that accepting inserts: ` -> quote size=large
 
 Every feature is a standard protocol method, so VS Code and the browser editor get them later from the same server with no server change.
 
-| Protocol method | Warren feature | In the slice |
+| Protocol method | Rubric feature | In the slice |
 | --- | --- | --- |
 | `textDocument/inlineCompletion` | Ghost text with the plain form of a live directive line. One item per candidate pick, the best first, so the editor's own "next candidate" key swaps between the top two. | yes |
 | `textDocument/publishDiagnostics` | "Nothing in the catalog fits", "could not reach Jev", "unknown part", "unknown setting", "value not allowed for size", "a directive cannot go inside a divider", "unclosed block". Warnings, never errors that block anything. | yes |
 | `textDocument/hover` | On a directive line: the pick, the two runners-up with their probabilities, and the settings read from each answer. On a plain-form token: the part or setting's description from the catalog. | yes |
 | `textDocument/completion` | After `::: ` with nothing typed: the parts, one line each. Inside a plain-form line: setting names for that part, then values for that setting. Each part is a snippet. | yes |
 | `textDocument/codeAction` | Pin without ghost text (for editors without inline completion), re-resolve from the words, send to the slow path, drop to plain form. | later |
-| `textDocument/documentColor` | A swatch beside theme values in `warren.md`. Neovim and VS Code draw these natively. | later |
-| `workspace/executeCommand` | `warren.round`, `warren.new`, `warren.draft`: the commands behind `:Warren` that hand things to the harness. | later |
+| `textDocument/documentColor` | A swatch beside theme values in `rubric.md`. Neovim and VS Code draw these natively. | later |
+| `workspace/executeCommand` | `rubric.round`, `rubric.new`, `rubric.draft`: the commands behind `:Rubric` that hand things to the harness. | later |
 | `textDocument/didOpen`, `didChange`, `didSave` | The document flow below. | yes |
 
 ## Completion and snippets
@@ -173,7 +173,7 @@ One request per live line, generated from the catalog file, with every question 
 - **Every setting of every part is asked**, speculatively, in the one request. Code reads only the answers that belong to the chosen part. Questions are cheap and run in parallel.
 - **Each question's text is generated from a template per setting type**, using the part's name and the setting's name: "What `size` does `directive` ask the `quote` to be?" A catalog can override the text for a setting when the template reads badly. The template is the only place wording lives outside the catalog.
 - **Code reads the answers through the truth table** in the plan: `fits` below 0.3 is "nothing fits"; between 0.3 and 0.7 is unsettled and the top two parts are offered; above 0.7 the top part is placed, with each setting's top value, and a setting whose Noul sits in the band is left at its default and said so in the hover.
-- **The cache key** is the catalog name and version, the page kind, and the exact directive text. The cache is a file in the site folder, `.warren/cache.json`, so a reopened site does not ask again.
+- **The cache key** is the catalog name and version, the page kind, and the exact directive text. The cache is a file in the site folder, `.rubric/cache.json`, so a reopened site does not ask again.
 - **The model is pinned** to a versioned id, read from the models page when the client is written, never an alias.
 - **An API error is a diagnostic** that says so. It is never read as "no".
 - **The probe before the server**: the resolver is run from a script against the live API on a dozen lines, with the payloads kept, before any of it is wired to an editor. That needs your permission and a small budget, and it is where the first wording is tuned.
@@ -186,23 +186,23 @@ One request per live line, generated from the catalog file, with every question 
 4. When an answer comes back, the resolver runs, the cache and the sidecar are written, the content file is written again, diagnostics are published for that line, and the inline completion for that line is now available. The server also sends a refresh request so an editor that supports it asks again without the cursor moving.
 5. The accept key inserts the ghost text. The next change notification shows the line is pinned, and the loop never asks about it again.
 
-Only the server writes to `content/`. The editor's buffer is never written by the server; the accept key is the editor inserting a completion. `hugo server` is started by hand in the slice; the `warren` command that starts both comes after.
+Only the server writes to `content/`. The editor's buffer is never written by the server; the accept key is the editor inserting a completion. `hugo server` is started by hand in the slice; the `rubric` command that starts both comes after.
 
 ## Neovim
 
 Three things, and no plugin yet:
 
 ```lua
--- lsp/warren.lua, in the lspconfig form
+-- lsp/rubric.lua, in the lspconfig form
 return {
-  cmd = { 'warren', 'lsp' },
+  cmd = { 'rubric', 'lsp' },
   filetypes = { 'markdown' },
-  root_markers = { 'warren.md' },
+  root_markers = { 'rubric.md' },
 }
 ```
 
 ```lua
-vim.lsp.enable('warren')
+vim.lsp.enable('rubric')
 vim.lsp.inline_completion.enable()
 vim.keymap.set('i', '<Tab>', function()
   if not vim.lsp.inline_completion.get() then return '<Tab>' end
@@ -210,7 +210,7 @@ end, { expr = true })
 vim.keymap.set('i', '<C-n>', function() vim.lsp.inline_completion.select() end)
 ```
 
-The root marker is what makes the server attach only inside a Warren site, and only to Markdown. The accept key is Neovim's own inline completion accept; the swap key is its own candidate cycling. When the slice works, the plugin that ships is this plus the `:Warren` commands.
+The root marker is what makes the server attach only inside a Rubric site, and only to Markdown. The accept key is Neovim's own inline completion accept; the swap key is its own candidate cycling. When the slice works, the plugin that ships is this plus the `:Rubric` commands.
 
 ## Steps
 
@@ -237,8 +237,8 @@ These feed the fifty-line gate in the plan, which is run against the real blog c
 ## Not in the slice
 
 - Themes, the root directive, and any design quality in the three parts.
-- The `warren` command, downloading Hugo, the watcher for editors without the protocol.
-- Code actions, document colours, the `:Warren` commands, the slow path, review rounds.
+- The `rubric` command, downloading Hugo, the watcher for editors without the protocol.
+- Code actions, document colours, the `:Rubric` commands, the slow path, review rounds.
 - VS Code and the browser editor. Both are clients of this server; nothing in the slice is Neovim-specific except the three lines above.
 
 ## Settled in the slice
