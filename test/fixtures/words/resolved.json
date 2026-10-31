@@ -1,0 +1,6 @@
+{
+  "a quote from the book, big and centred": "quote size=large align=centre",
+  "callout warning": "callout kind=warning",
+  "a line the catalog has since changed under": "quote colour=red",
+  "blockquote size=large": "quote size=large"
+}

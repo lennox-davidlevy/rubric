@@ -1,0 +1,43 @@
+{{- /*
+  Reads a part's settings from the shortcode call and checks them against
+  catalog.yaml. Unknown settings and disallowed values fail the build, so a bad
+  line can never render silently. Returns a dict with every setting filled in,
+  defaults included.
+
+  Usage: {{ $s := partial "rubric/settings.html" (dict "part" "quote" "sc" .) }}
+*/ -}}
+{{- $part := index hugo.Data.catalog.parts .part -}}
+{{- if not $part -}}
+  {{- errorf "rubric: %q is not a part in the catalog (%s)" .part .sc.Position -}}
+{{- end -}}
+{{- $defs := $part.settings | default dict -}}
+{{- $params := .sc.Params | default dict -}}
+{{- if reflect.IsSlice $params -}}
+  {{- errorf "rubric: %s takes key=value settings only (%s)" .part .sc.Position -}}
+{{- end -}}
+
+{{- range $key, $value := $params -}}
+  {{- $def := index $defs $key -}}
+  {{- if not $def -}}
+    {{- errorf "rubric: %s has no setting %q (%s)" $.part $key $.sc.Position -}}
+  {{- end -}}
+  {{- $allowed := slice -}}
+  {{- if eq $def.type "choice" -}}
+    {{- $allowed = $def.values -}}
+  {{- else if eq $def.type "level" -}}
+    {{- $allowed = $def.levels -}}
+  {{- else if eq $def.type "flag" -}}
+    {{- $allowed = dict "true" "" "false" "" -}}
+  {{- end -}}
+  {{- if and $allowed (not (isset $allowed (string $value))) -}}
+    {{- $names := slice -}}
+    {{- range $name, $_ := $allowed }}{{ $names = $names | append $name }}{{ end -}}
+    {{- errorf "rubric: %q is not allowed for %s.%s; allowed: %s (%s)" $value $.part $key (delimit $names ", ") $.sc.Position -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $out := dict -}}
+{{- range $key, $def := $defs -}}
+  {{- $out = merge $out (dict $key (index $params $key | default $def.default | default "")) -}}
+{{- end -}}
+{{- return $out -}}

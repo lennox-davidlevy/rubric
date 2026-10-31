@@ -1,0 +1,9 @@
+{{- $s := partial "rubric/settings.html" (dict "part" "quote" "sc" .) -}}
+<figure class="part-quote size-{{ $s.size }} align-{{ $s.align }}">
+<blockquote>
+{{ .Inner | .Page.RenderString (dict "display" "block") }}
+</blockquote>
+{{- with $s.cite }}
+<figcaption>{{ . }}</figcaption>
+{{- end }}
+</figure>

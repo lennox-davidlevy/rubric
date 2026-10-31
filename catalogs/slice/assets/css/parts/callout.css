@@ -1,0 +1,13 @@
+.part-callout {
+  margin-block: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius);
+  border-left: 4px solid var(--muted);
+  background: var(--band);
+}
+.part-callout > :first-child { margin-top: 0; }
+.part-callout > :last-child { margin-bottom: 0; }
+
+.part-callout.kind-note { border-left-color: var(--accent); }
+.part-callout.kind-aside { background: transparent; border-left-color: var(--rule); color: var(--muted); font-size: 0.95em; }
+.part-callout.kind-warning { border-left-color: #b8860b; background: #fbf3dc; }

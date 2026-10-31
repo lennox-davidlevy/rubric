@@ -2,7 +2,7 @@
 
 Written 2026-10-27, the night the idea came, as Warren. Revised 2026-10-28 after a first review. Revised 2026-10-30 after a second, and renamed Rubric the same day: Rubric is a product for other people, not a tool for my own sites; the first thing it makes is blogs; json-render was tried on as the renderer for a day and taken off again, and it stays in `reference/` to learn from. Nothing is built yet.
 
-The language server and the first vertical slice are planned in [lsp.md](lsp.md).
+The language server and the first vertical slice are planned in [lsp.md](lsp.md). The slice is built first.
 
 ## The idea
 
@@ -210,6 +210,7 @@ One language server, thin clients. The server is where the features live, writte
 
 ## Order of work
 
+0. **The slice**, in [lsp.md](lsp.md): one thin path through every layer with an ugly three-part catalog, from a line typed in Neovim to Jev to ghost text to Hugo's preview. Decided 2026-10-31. It comes first because it tests the two numbers the pitch rests on, the round trip and pick accuracy, before weeks go into a catalog, and because what Jev does with the first descriptions says how the blog catalog's descriptions should be written. It settles the catalog file's shape, the slot names, the pin format and the nested-shortcode pattern that step 1 then builds on.
 1. **The blog catalog and three themes**, drafted in a harness session and reviewed on the catalog page through review rounds, by hand. Parts as shortcodes with their assets, the catalog file, the slot names, the catalog page template, the nested-shortcode pattern settled. A page of plain prose in each theme has to be beautiful before anything else is built. This is the hard part of Rubric.
 2. **Source to page.** The scanner, the preprocessor, the validator, the sidecar, the watcher beside `hugo server`, plain form only. After this step Rubric is a usable static blog tool with no model in it.
 3. **The Jev gate.** A fixture of about fifty real directive lines against the blog catalog, including negatives, nested blocks and hard cases, each with the plain form it should resolve to, run against the live API on a small budget. Two numbers come out: the round trip, which decides whether ghost text feels like completion or like waiting, and the top-pick accuracy. If accuracy is not near-perfect the fix is in the part descriptions and the setting descriptions, made here. If the round trip is too slow for ghost text, the loop runs on save instead and the pitch changes, which is better known now.
@@ -246,7 +247,7 @@ Not repos: the TypeSafe cookbooks for function calling and intent routing (docs.
 - The theme is picked, not generated. The model never writes a colour.
 - The block body stays out of Jev's state, so the cache key and the answer agree.
 - One language server; Neovim first, VS Code second, a browser editor and the hosted version later.
-- The name is Rubric, from 2026-10-30. It was Warren, a place where many small sites are made, until the product stopped being about my sites. A rubric is the note written in red in a manuscript saying how a part should be read or set, which is exactly what the directive line is. The repo folder is still `warren` until it is renamed.
+- The name is Rubric, from 2026-10-30. It was Warren, a place where many small sites are made, until the product stopped being about my sites. A rubric is the note written in red in a manuscript saying how a part should be read or set, which is exactly what the directive line is.
 
 ## Open questions
 

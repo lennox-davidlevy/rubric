@@ -224,6 +224,8 @@ The root marker is what makes the server attach only inside a Rubric site, and o
 | 6 | Jev in the server | The six scenes in "the slice, stated exactly" all happen. |
 | 7 | Measure | Twenty lines, time to ghost text and time to preview, recorded in `docs/measurements.md` with the model id and date. |
 
+**Progress.** Step 1 done 2026-10-31: `catalogs/slice/` (the catalog as a Hugo theme module, with shortcodes that validate against `catalog.yaml`) and `sites/slice/`. Step 2 done 2026-10-31: `src/core/`, in TypeScript on Bun, with fixtures in `test/fixtures/` and a test that builds every fixture's output in Hugo (`bun test`).
+
 Steps 1 to 3 are code with no network and can be written in one session. Step 4 needs the key and the budget. Steps 5 and 6 are where the editor details get settled.
 
 ## Measurements the slice produces
@@ -245,6 +247,6 @@ These feed the fifty-line gate in the plan, which is run against the real blog c
 
 - The pin format: `->` or the trailing comment with a ranged item.
 - The debounce length, from the measurements.
-- The nested-shortcode pattern in Hugo: `.Inner | .Page.RenderString` is the expected answer.
+- ~~The nested-shortcode pattern in Hugo~~: settled 2026-10-31 in step 1. Every part renders `.Inner | .Page.RenderString (dict "display" "block")` with goldmark's `unsafe` on, so a nested part's HTML passes through the outer part's Markdown intact. Parts nest in a section with Markdown, headings and multiple paragraphs inside, all as expected.
 - Whether the inline completion refresh is needed or the editor asks often enough on its own.
 - The question text template per setting type, from the probe.

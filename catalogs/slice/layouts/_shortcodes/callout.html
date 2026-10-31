@@ -1,0 +1,4 @@
+{{- $s := partial "rubric/settings.html" (dict "part" "callout" "sc" .) -}}
+<aside class="part-callout kind-{{ $s.kind }}">
+{{ .Inner | .Page.RenderString (dict "display" "block") }}
+</aside>

@@ -1,0 +1,29 @@
+/* Prose with no parts. Reads only slot names. */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: var(--step-0)/1.6 var(--font-body);
+}
+
+main, .site-header {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 0 var(--space-2);
+}
+
+.site-header { padding-block: var(--space-3); }
+.site-header a { color: var(--ink); text-decoration: none; font-weight: bold; }
+
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.2; }
+h1 { font-size: var(--step-2); }
+a { color: var(--accent); }
+.date { color: var(--muted); }
+hr { border: 0; border-top: 1px solid var(--rule); }
+code, pre { font-family: var(--font-mono); font-size: 0.9em; }
+pre { overflow-x: auto; padding: var(--space-2); background: var(--band); border-radius: var(--radius); }
+
+.post-list { list-style: none; padding: 0; }
+.post-list li { margin-block: var(--space-1); }
