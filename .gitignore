@@ -8,3 +8,4 @@ resources/_gen/
 node_modules/
 sites/*/content/
 probe/runs/
+.rubric/

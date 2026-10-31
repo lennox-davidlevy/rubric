@@ -130,15 +130,9 @@ Every feature is a standard protocol method, so VS Code and the browser editor g
 
 ## Completion and snippets
 
-Typing `:::` and a space offers every part in the catalog, with its description as the detail. Choosing one inserts a snippet in the protocol's own grammar, so it works with any completion plugin and needs no snippet engine:
+Typing `:::` and a space offers every part in the catalog, with its description as the detail. Choosing one inserts the part's name only. The planned snippet, with every setting as a choice placeholder, was dropped in the slice: it wrote every default into the line, and the plain form leaves defaults out.
 
-```
-quote size=${1|normal,large|} align=${2|left,centre|} cite=${3}
-```
-
-Each `choice` setting becomes a choice placeholder with its values; `text` settings become plain placeholders; settings at their default are left out unless the writer tabs to them. Editors that do not draw choice lists show the first value, and completion inside the line still offers the rest.
-
-Inside a plain-form line, completion is contextual: after the part name it offers that part's settings, each with its description; after `key=` it offers that setting's values, each with its description. Typing words instead of a part name offers nothing, by design, because words are for Jev.
+Inside a plain-form line, completion is contextual: after the part name it offers that part's settings not yet given, each with its type and default; after `key=` it offers that setting's values, each with its description. After a pin's ` -> ` it works the same way. Typing words instead of a part name offers nothing, by design, because words are for Jev. Lines in code fences and front matter get nothing.
 
 ## What goes to Jev
 
@@ -203,27 +197,20 @@ Only the server writes to `content/`. The editor's buffer is never written by th
 
 ## Neovim
 
-Three things, and no plugin yet:
+A small plugin in `editors/nvim/`:
 
 ```lua
--- lsp/rubric.lua, in the lspconfig form
-return {
-  cmd = { 'rubric', 'lsp' },
-  filetypes = { 'markdown' },
-  root_markers = { 'rubric.md' },
-}
+vim.opt.runtimepath:append("/path/to/rubric/editors/nvim")
+require("rubric").setup({
+  capabilities = require("cmp_nvim_lsp").default_capabilities(),  -- if nvim-cmp is used
+})
 ```
 
-```lua
-vim.lsp.enable('rubric')
-vim.lsp.inline_completion.enable()
-vim.keymap.set('i', '<Tab>', function()
-  if not vim.lsp.inline_completion.get() then return '<Tab>' end
-end, { expr = true })
-vim.keymap.set('i', '<C-n>', function() vim.lsp.inline_completion.select() end)
-```
+It defines the server in the `vim.lsp.config` form (`bun src/cli.ts lsp`, run from the repo so Bun loads `.env`), with `root_markers = { "rubric.md" }` so it attaches only inside a Rubric site, and only to Markdown. On attach it turns on Neovim's inline completion for the buffer and maps three insert-mode keys: `<M-l>` accepts (Neovim's `inline_completion.get()`), `<M-]>` and `<M-[>` switch between the pick and the runner-up (`inline_completion.select()`). Not `<Tab>` and `<C-n>`, which completion plugins own. All three are options.
 
-The root marker is what makes the server attach only inside a Rubric site, and only to Markdown. The accept key is Neovim's own inline completion accept; the swap key is its own candidate cycling. When the slice works, the plugin that ships is this plus the `:Rubric` commands.
+Two things found in Neovim's source settle how the server answers. Neovim asks for inline completion only in insert mode, 200 ms after the cursor stops, and has no handler for the server's refresh request. So **the server holds the request open** until the line's answer arrives (up to five seconds), asking at once if the line has not been sent yet. And an item whose range is empty at the end of the line is drawn there and inserted there, which is exactly the pin.
+
+When the slice works, the plugin that ships is this plus the `:Rubric` commands.
 
 ## Steps
 
@@ -237,7 +224,7 @@ The root marker is what makes the server attach only inside a Rubric site, and o
 | 6 | Jev in the server | The six scenes in "the slice, stated exactly" all happen. |
 | 7 | Measure | Twenty lines, time to ghost text and time to preview, recorded in `docs/measurements.md` with the model id and date. |
 
-**Progress.** Step 1 done 2026-10-31: `catalogs/slice/` (the catalog as a Hugo theme module, with shortcodes that validate against `catalog.yaml`) and `sites/slice/`. Step 2 done 2026-10-31: `src/core/`, in TypeScript on Bun, with fixtures in `test/fixtures/` and a test that builds every fixture's output in Hugo (`bun test`). Steps 3 and 4 done 2026-10-31: `src/core/questions.ts`, `resolve.ts`, `cache.ts`, `src/jev.ts` and `scripts/probe.ts`; see "What the probe found".
+**Progress.** Step 1 done 2026-10-31: `catalogs/slice/` (the catalog as a Hugo theme module, with shortcodes that validate against `catalog.yaml`) and `sites/slice/`. Step 2 done 2026-10-31: `src/core/`, in TypeScript on Bun, with fixtures in `test/fixtures/` and a test that builds every fixture's output in Hugo (`bun test`). Steps 3 and 4 done 2026-10-31: `src/core/questions.ts`, `resolve.ts`, `cache.ts`, `src/jev.ts` and `scripts/probe.ts`; see "What the probe found". Step 5 done 2026-10-31: `src/server/` (the logic in `workspace.ts`, the protocol in `main.ts`, a stub resolver) and `editors/nvim/`, tested in `test/workspace.test.ts` and in a real headless Neovim driven over `--listen` (`test/nvim.test.ts`: attach, diagnostics, completion, ghost text in insert mode, the accept key, the pinned line placed). Step 6 is wired and checked by hand against live Jev: scenes 1, 2, 3, 5 and 6 happen (ghost text 214 ms after entering insert mode on a line already resolved in the background; the preview draws the pick before accepting; a bad key gives "could not reach Jev: HTTP 401 …" on each line and nothing else changes). Scene 4, the swap key, is tested with the stub but has not been seen live, since it needs a line whose top two parts are close. Step 7 remains.
 
 Steps 1 to 3 are code with no network and can be written in one session. Step 4 needs the key and the budget. Steps 5 and 6 are where the editor details get settled.
 

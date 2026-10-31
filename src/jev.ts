@@ -47,7 +47,13 @@ export async function ask(catalog: Catalog, directive: string, page: PageKind, k
   } catch {}
   const ms = performance.now() - started;
   if (!res.ok) {
-    const detail = typeof body === "object" && body !== null && "detail" in body ? JSON.stringify(body.detail) : text.slice(0, 200);
+    // Errors come as {"detail": "..."} or {"detail": {"message": "...", ...}}.
+    const d = (typeof body === "object" && body !== null ? (body as { detail?: unknown }).detail : undefined) as unknown;
+    const detail =
+      typeof d === "string" ? d
+      : typeof d === "object" && d !== null && typeof (d as { message?: unknown }).message === "string" ? (d as { message: string }).message
+      : d !== undefined ? JSON.stringify(d)
+      : text.slice(0, 200);
     return error(`could not reach Jev: HTTP ${res.status} ${detail}`, body);
   }
 

@@ -1,64 +1,63 @@
-// A dev command until the language server exists: writes a site's pages/ into
-// Hugo's content/, once or on every save, and prints what it could not place.
+#!/usr/bin/env bun
+// The rubric command.
 //
-//   bun src/cli.ts build sites/slice
-//   bun src/cli.ts watch sites/slice
+//   bun src/cli.ts lsp [--stub]     the language server, over stdio
+//   bun src/cli.ts build <site>     write pages/ into content/ once
+//   bun src/cli.ts watch <site>     the same on every save, for editors without the server
+//
+// build and watch use the cache only; words lines that are not cached stay as
+// text until an editor with the server open resolves them.
 
 import { watch } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
-import { loadCatalog, preprocess, type Catalog } from "./core/index.ts";
+import { Cache, preprocess } from "./core/index.ts";
+import { serve } from "./server/main.ts";
+import { openSite, pageKind, type Site } from "./site.ts";
 
-const [command, site] = process.argv.slice(2);
-if ((command !== "build" && command !== "watch") || !site) {
-  console.error("usage: bun src/cli.ts build|watch <site>");
+const [command, ...args] = process.argv.slice(2);
+
+if (command === "lsp") {
+  serve({ stub: args.includes("--stub") });
+} else if ((command === "build" || command === "watch") && args[0]) {
+  const site = await openSite(args[0]);
+  const cache = await Cache.load(site.cache);
+  await build(site, cache);
+  if (command === "watch") {
+    console.log(`watching ${site.pages}`);
+    watch(site.pages, { recursive: true }, async (_, name) => {
+      if (!name?.endsWith(".md")) return;
+      try {
+        await writePage(site, cache, join(site.pages, name));
+        console.log(`${new Date().toLocaleTimeString()} ${join("pages", name)}`);
+      } catch (err) {
+        // Deleted or renamed: drop its content so the preview matches.
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") await rm(join(site.content, name), { force: true });
+        else console.error(err);
+      }
+    });
+  }
+} else {
+  console.error("usage: rubric lsp [--stub] | rubric build|watch <site>");
   process.exit(2);
 }
 
-// The slice has one catalog, read from the theme the site's hugo.toml names.
-const config = await readFile(join(site, "hugo.toml"), "utf8");
-const theme = /^theme\s*=\s*"([^"]+)"/m.exec(config)?.[1];
-const themesDir = /^themesDir\s*=\s*"([^"]+)"/m.exec(config)?.[1] ?? "themes";
-if (!theme) throw new Error(`${site}/hugo.toml names no theme`);
-const catalog = await loadCatalog(join(site, themesDir, theme, "catalog.yaml"));
-
-const pages = join(site, "pages");
-const content = join(site, "content");
-
-async function writePage(catalog: Catalog, file: string): Promise<void> {
-  const rel = relative(pages, file);
-  const out = preprocess(await readFile(file, "utf8"), catalog);
-  await mkdir(dirname(join(content, rel)), { recursive: true });
-  await writeFile(join(content, rel), out.content);
+async function writePage(site: Site, cache: Cache, file: string): Promise<void> {
+  const rel = relative(site.pages, file);
+  const out = preprocess(await readFile(file, "utf8"), site.catalog, cache.resolver(site.catalog, pageKind(rel)));
+  await mkdir(dirname(join(site.content, rel)), { recursive: true });
+  await writeFile(join(site.content, rel), out.content);
   for (const d of out.diagnostics) {
     console.log(`${join("pages", rel)}:${d.line + 1}:${d.start + 1}: ${d.code}: ${d.message}`);
   }
   for (const e of out.entries) {
-    if (e.reason === "unresolved") console.log(`${join("pages", rel)}:${e.line + 1}: words, not resolved (no Jev yet): "${e.words}"`);
+    if (e.reason === "unresolved") console.log(`${join("pages", rel)}:${e.line + 1}: words, not resolved yet: "${e.words}"`);
   }
 }
 
-async function build(): Promise<void> {
-  await rm(content, { recursive: true, force: true });
-  const files = (await readdir(pages, { recursive: true })).filter((f) => f.endsWith(".md"));
-  for (const f of files) await writePage(catalog, join(pages, f));
-  console.log(`wrote ${files.length} page(s) to ${content}`);
-}
-
-await build();
-
-if (command === "watch") {
-  console.log(`watching ${pages}`);
-  watch(pages, { recursive: true }, async (_, name) => {
-    if (!name?.endsWith(".md")) return;
-    const file = join(pages, name);
-    try {
-      await writePage(catalog, file);
-      console.log(`${new Date().toLocaleTimeString()} ${join("pages", name)}`);
-    } catch (err) {
-      // Deleted or renamed: drop its content so the preview matches.
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") await rm(join(content, name), { force: true });
-      else console.error(err);
-    }
-  });
+async function build(site: Site, cache: Cache): Promise<void> {
+  await rm(site.content, { recursive: true, force: true });
+  const files = (await readdir(site.pages, { recursive: true })).filter((f) => f.endsWith(".md"));
+  for (const f of files) await writePage(site, cache, join(site.pages, f));
+  console.log(`wrote ${files.length} page(s) to ${site.content}`);
 }

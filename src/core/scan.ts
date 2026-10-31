@@ -27,6 +27,8 @@ export interface Directive {
 export interface Scan {
   directives: Directive[];
   strayClosers: number[];
+  // Lines that are never directives: front matter and code, fences included.
+  code: Set<number>;
 }
 
 const OPEN = /^(:{3,})\s*(\S.*?)\s*$/;
@@ -42,20 +44,24 @@ export function scan(text: string, catalog: Catalog): Scan {
   const src = lines(text);
   const directives: Directive[] = [];
   const strayClosers: number[] = [];
+  const code = new Set<number>();
   const open: number[] = [];
   let fence: { char: string; length: number } | undefined;
 
   let i = frontMatterEnd(src);
+  for (let j = 0; j < i; j++) code.add(j);
   for (; i < src.length; i++) {
     const line = src[i]!;
 
-    const code = CODE_FENCE.exec(line);
+    const f = CODE_FENCE.exec(line);
     if (fence) {
-      if (code && code[1]![0] === fence.char && code[1]!.length >= fence.length && code[2]!.trim() === "") fence = undefined;
+      code.add(i);
+      if (f && f[1]![0] === fence.char && f[1]!.length >= fence.length && f[2]!.trim() === "") fence = undefined;
       continue;
     }
-    if (code && !(code[1]![0] === "`" && code[2]!.includes("`"))) {
-      fence = { char: code[1]![0]!, length: code[1]!.length };
+    if (f && !(f[1]![0] === "`" && f[2]!.includes("`"))) {
+      code.add(i);
+      fence = { char: f[1]![0]!, length: f[1]!.length };
       continue;
     }
 
@@ -74,7 +80,7 @@ export function scan(text: string, catalog: Catalog): Scan {
     open.push(directives.length - 1);
   }
 
-  return { directives, strayClosers };
+  return { directives, strayClosers, code };
 }
 
 function classify(text: string, col: number, line: number, catalog: Catalog): Directive {
