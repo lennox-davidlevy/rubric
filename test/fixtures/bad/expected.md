@@ -15,7 +15,7 @@ A setting given twice.
 :::
 
 ::: quote cite="never closed
-An unterminated quote makes the line words.
+An unterminated quote is an unfinished setting, never words.
 :::
 
 :::

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CatalogError, formatPlain, parseCatalog, parsePlain, preprocess } from "../src/core/index.ts";
+import { CatalogError, formatPlain, parseCatalog, parsePlain, preprocess, scan } from "../src/core/index.ts";
 
 const sliceYaml = readFileSync(join(import.meta.dir, "../catalogs/slice/catalog.yaml"), "utf8");
 const slice = parseCatalog(sliceYaml);
@@ -85,5 +85,25 @@ describe("preprocess", () => {
   test("an unclosed front matter is not front matter", () => {
     const out = preprocess("---\n::: callout\nbody\n:::\n", slice);
     expect(out.entries[0]!.placed).toBe(true);
+  });
+});
+
+describe("scan", () => {
+  const kind = (line: string) => {
+    const [d] = scan(`${line}\n:::\n`, slice).directives;
+    return `${d!.kind}${d!.problems.map((p) => ` ${p.code}`).join("")}`;
+  };
+
+  test("a plain form being typed is never words, so never sent to Jev", () => {
+    expect(kind("::: q")).toBe("plain unfinished-part");
+    expect(kind("::: quot")).toBe("plain unfinished-part");
+    expect(kind("::: quote size=")).toBe("plain unfinished-setting");
+    expect(kind("::: quote size=large ci")).toBe("plain unfinished-setting");
+  });
+
+  test("words that start with a part name are still words", () => {
+    expect(kind("::: quote from the book")).toBe("words");
+    expect(kind("::: a raise")).toBe("words");
+    expect(kind("::: callout")).toBe("plain");
   });
 });

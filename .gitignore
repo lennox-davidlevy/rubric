@@ -7,5 +7,6 @@ resources/_gen/
 .playwright-mcp/
 node_modules/
 sites/*/content/
+testing/content/
 probe/runs/
 .rubric/

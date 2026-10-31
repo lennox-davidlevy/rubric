@@ -3,8 +3,8 @@
 // change a description, bump the version, and every live line is asked again.
 // Errors are never cached.
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { readFile } from "node:fs/promises";
+import { writeWhole } from "./write.ts";
 import type { Catalog } from "./catalog.ts";
 import { parsePlain, type PlainForm } from "./plain.ts";
 import type { PageKind } from "./questions.ts";
@@ -33,8 +33,7 @@ export class Cache {
   }
 
   async save(path: string): Promise<void> {
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, JSON.stringify(this.#entries, null, 2) + "\n");
+    await writeWhole(path, JSON.stringify(this.#entries, null, 2) + "\n");
   }
 
   get(catalog: Catalog, page: PageKind, directive: string): Cached | undefined {

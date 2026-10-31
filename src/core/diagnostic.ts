@@ -3,6 +3,8 @@
 
 export type Code =
   | "unknown-part"
+  | "unfinished-part"
+  | "unfinished-setting"
   | "unknown-setting"
   | "duplicate-setting"
   | "value-not-allowed"

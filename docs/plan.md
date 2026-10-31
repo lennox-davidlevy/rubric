@@ -1,6 +1,6 @@
 # Rubric: plan
 
-Written 2026-10-27, the night the idea came, as Warren. Revised 2026-10-28 after a first review. Revised 2026-10-30 after a second, and renamed Rubric the same day: Rubric is a product for other people, not a tool for my own sites; the first thing it makes is blogs; json-render was tried on as the renderer for a day and taken off again, and it stays in `reference/` to learn from. Nothing is built yet.
+Written 2026-10-27, the night the idea came, as Warren. Revised 2026-10-28 after a first review. Revised 2026-10-30 after a second, and renamed Rubric the same day: Rubric is a product for other people, not a tool for my own sites; the first thing it makes is blogs; json-render was tried on as the renderer for a day and taken off again, and it stays in `reference/` to learn from. Revised 2026-10-31 with the slice built: principles, functional parts, and the order settled as catalog first, review tooling after.
 
 The language server and the first vertical slice are planned in [lsp.md](lsp.md). The slice is built first.
 
@@ -30,6 +30,17 @@ For people who write and want layout to cost a sentence. The first of them keep 
 
 If Rubric is slow or its picks are wrong, people go back to one of these. Speed and pick accuracy are measured early, before anything is built on them (step 3).
 
+## Principles
+
+Four words, in the order they are judged: **fast, efficient, beautiful, simple.** Every piece below answers to them, and when two pull against each other, the earlier one wins.
+
+- **Fast.** A pick shows while you are still looking at the line. Jev answers in about 150 ms; the rest of the wait is pacing, chosen on purpose, and never more than a second or so after you stop typing. Nothing on the writing path waits for an agent.
+- **Efficient.** One request per finished line, every question in it, answered once and cached. Half-typed lines are never sent. A day of writing costs a cent.
+- **Beautiful.** A page of plain prose in any theme, with no fences, looks designed. Every part defaults to the theme, so a page with a dozen parts and no settings still looks like one thing. Beautiful is the one principle no test can check; the review rounds are its only instrument.
+- **Simple.** A part has a handful of settings, each a plain word. A line reads as what it does. The plain form is the whole format: free, offline, exact, in git.
+
+The reason to make a UI in Rubric rather than ask a coding agent for one is that here the work compounds. An agent gives a new thing each time, a minute later, in different CSS, and nobody reviews it. Rubric gives the same thing every time, in a moment, from parts a person looked at; and when nothing fits, the part drafted for you is reviewed once and then kept, for every page after and for everyone. The catalog grows from what people ask for and cannot get.
+
 ## The pieces
 
 | Piece | Role |
@@ -44,6 +55,16 @@ If Rubric is slow or its picks are wrong, people go back to one of these. Speed 
 | **An agent harness** (Claude Code, OpenCode, Codex) | The slow path: when nothing in the catalog fits, an agent drafts a new part and it goes through review before it joins. Also how catalogs and themes are drafted in the first place. Minutes, not seconds, and never on the writing path. |
 
 The renderer is a choice about who draws the parts, made per catalog behind the catalog file. If a catalog ever needs parts that share state on the page, which is the one thing a script inside a part cannot do, that catalog's parts can be drawn by something else and Rubric does not change. Nothing in sight needs it.
+
+### Functional parts
+
+Some parts do things: a picker (tabs, a filter, a theme switch), a gallery with a lightbox, a backdrop that moves, a post list that sorts. They are ordinary catalog entries with three more rules, so that "functional" never costs "beautiful" or "simple":
+
+- **Every part works with no JavaScript, and the script only improves it.** Tabs are headings and sections without it; a gallery is images; a backdrop is a colour. The script loads only on pages that use the part, the way a part's CSS does now (`.HasShortcode`).
+- **State lives in the page**: open or closed, the chosen tab, the URL hash, at most `localStorage`. Never a server, never shared between parts. The site stays static output.
+- **Motion is a setting with a quiet default.** `motion=none|subtle|lively` or a level, respected as `prefers-reduced-motion`, and `none` on a part that has no reason to move.
+
+The catalog file gains one optional field per part for its script, and nothing else changes shape: Jev's questions, validation and completion read settings the same way whether a part moves or not. The blog catalog carries one functional part from the start (`post-list` or `gallery`), so the shape of script loading is settled early instead of bolted on.
 
 ## The directive
 
@@ -211,13 +232,13 @@ One language server, thin clients. The server is where the features live, writte
 
 ## Order of work
 
-0. **The slice**, in [lsp.md](lsp.md): one thin path through every layer with an ugly three-part catalog, from a line typed in Neovim to Jev to ghost text to Hugo's preview. Decided 2026-10-31. It comes first because it tests the two numbers the pitch rests on, the round trip and pick accuracy, before weeks go into a catalog, and because what Jev does with the first descriptions says how the blog catalog's descriptions should be written. It settles the catalog file's shape, the slot names, the pin format and the nested-shortcode pattern that step 1 then builds on.
-1. **The blog catalog and three themes**, drafted in a harness session and reviewed on the catalog page through review rounds, by hand. Parts as shortcodes with their assets, the catalog file, the slot names, the catalog page template, the nested-shortcode pattern settled. A page of plain prose in each theme has to be beautiful before anything else is built. This is the hard part of Rubric.
+0. **The slice**, in [lsp.md](lsp.md): one thin path through every layer with an ugly three-part catalog, from a line typed in Neovim to Jev to ghost text to Hugo's preview. Decided 2026-10-31, and built the same day: it covers steps 2 and 4 in miniature, and the Jev numbers from it are in lsp.md. It comes first because it tests the two numbers the pitch rests on, the round trip and pick accuracy, before weeks go into a catalog, and because what Jev does with the first descriptions says how the blog catalog's descriptions should be written. It settles the catalog file's shape, the slot names, the pin format and the nested-shortcode pattern that step 1 then builds on.
+1. **The blog catalog and three themes**, drafted in a harness session and reviewed by hand, on the catalog page once it exists and on the preview before then. Parts as shortcodes with their assets, one of them functional, the catalog file, the slot names, the catalog page template. Descriptions written the way the slice found works: one plain sentence for the part, one for each value. A page of plain prose in each theme has to be beautiful before anything else is built. This is the hard part of Rubric. The catalog comes before the review tooling (step 6) on purpose: its shape, found by building and using it, is what says what a review form reviews.
 2. **Source to page.** The scanner, the preprocessor, the validator, the sidecar, the watcher beside `hugo server`, plain form only. After this step Rubric is a usable static blog tool with no model in it.
 3. **The Jev gate.** A fixture of about fifty real directive lines against the blog catalog, including negatives, nested blocks and hard cases, each with the plain form it should resolve to, run against the live API on a small budget. Two numbers come out: the round trip, which decides whether ghost text feels like completion or like waiting, and the top-pick accuracy. If accuracy is not near-perfect the fix is in the part descriptions and the setting descriptions, made here. If the round trip is too slow for ghost text, the loop runs on save instead and the pitch changes, which is better known now.
 4. **The language server and the Neovim client.** Ghost text, pinning, completion, diagnostics, code actions, cache.
 5. **The theme by words.** The root directive through the palette and pairing Choices.
-6. **The slow path.** `new`, `round`, the taste record, parts joining the shared catalog.
+6. **The slow path, and designing by rounds.** `new`, `round`, `review.yaml`, the taste record, parts joining the shared catalog; "nothing fits" becomes an offer to draft. Also the way a theme is designed iteratively: palettes and pairings go through the same page and the same rounds. On the plan from the start; built after the catalog's shape is known.
 7. **VS Code**, then more catalogs (essay, portfolio, docs), the browser editor, the hosted version.
 
 ## Reference
@@ -248,6 +269,8 @@ Not repos: the TypeSafe cookbooks for function calling and intent routing (docs.
 - The theme is picked, not generated. The model never writes a colour.
 - The block body stays out of Jev's state, so the cache key and the answer agree.
 - One language server; Neovim first, VS Code second, a browser editor and the hosted version later.
+- Catalog and functionality first, the review rounds and `new` after, so the catalog's shape instructs the design tooling rather than the other way round. Decided 2026-10-31. Iterative design of themes and catalogs stays on the plan as step 6.
+- Functional parts are ordinary parts: they work without JavaScript, keep state in the page, and move only when asked. Decided 2026-10-31.
 - The name is Rubric, from 2026-10-30. It was Warren, a place where many small sites are made, until the product stopped being about my sites. A rubric is the note written in red in a manuscript saying how a part should be read or set, which is exactly what the directive line is.
 
 ## Open questions

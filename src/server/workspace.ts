@@ -3,10 +3,10 @@
 // editor. Works from the text the editor holds, never from the saved file, and
 // only ever writes content/, .rubric/ and nothing the writer edits.
 
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
 import {
-  Cache, preprocess, scan, lines as splitLines,
+  Cache, preprocess, scan, lines as splitLines, writeWhole,
   type Diagnostic, type Directive, type Entry, type PageKind, type Resolution,
 } from "../core/index.ts";
 import { pageKind, pagePath, type Site } from "../site.ts";
@@ -40,12 +40,21 @@ interface Doc {
   text: string;
   rel: string;
   page: PageKind;
+  // The line the last edit was on, which is asked about only after a pause.
+  editing?: number;
 }
 
 export interface Options {
-  debounceMs?: number;
+  // How long the writer pauses on a words line before it is sent to Jev.
+  // Leaving the line sends it at once.
+  idleMs?: number;
   // How long a ghost text request waits for an answer before giving up.
   waitMs?: number;
+  // How long after the last change the page is drawn to content/. Drawing on
+  // every keystroke made Hugo rebuild and reload the browser for each one, and
+  // a browser still reloading misses the next reload, so it showed the page a
+  // keystroke or two behind until something else changed.
+  drawMs?: number;
 }
 
 const PIN = " -> ";
@@ -60,16 +69,19 @@ export class Workspace {
   #inflight = new Map<string, Promise<void>>();
   #errors = new Map<string, string>();
   #timers = new Map<string, ReturnType<typeof setTimeout>>();
-  #debounceMs: number;
+  #draws = new Map<string, ReturnType<typeof setTimeout>>();
+  #idleMs: number;
   #waitMs: number;
+  #drawMs: number;
 
   constructor(site: Site, cache: Cache, resolver: Resolver, publish: (file: string, notes: Note[]) => void, opts: Options = {}) {
     this.site = site;
     this.#cache = cache;
     this.#resolver = resolver;
     this.#publish = publish;
-    this.#debounceMs = opts.debounceMs ?? 300;
+    this.#idleMs = opts.idleMs ?? 1000;
     this.#waitMs = opts.waitMs ?? 5000;
+    this.#drawMs = opts.drawMs ?? 300;
   }
 
   // Writes content/ for every page on disk, from the cache only. Run once at
@@ -91,14 +103,19 @@ export class Workspace {
     if (rel === undefined) return;
     this.#docs.set(file, { text, rel, page: pageKind(rel) });
     await this.#render(file);
-    this.#schedule(file);
+    // Lines on disk are finished; ask about them now.
+    this.#askAll(file);
   }
 
   async change(file: string, text: string): Promise<void> {
     const doc = this.#docs.get(file);
     if (!doc) return this.open(file, text);
+    doc.editing = firstChangedLine(doc.text, text);
     doc.text = text;
-    await this.#render(file);
+    this.#drawSoon(file);
+    // Half-typed words are not worth an answer: the line being edited waits
+    // for a pause, and every other line has been left, so is finished.
+    this.#askAll(file, doc.editing);
     this.#schedule(file);
   }
 
@@ -109,35 +126,51 @@ export class Workspace {
     this.#docs.delete(file);
     clearTimeout(this.#timers.get(file));
     this.#timers.delete(file);
+    clearTimeout(this.#draws.get(file));
+    this.#draws.delete(file);
     try {
       await this.#write(doc.rel, doc.page, await readFile(file, "utf8"));
     } catch {}
     this.#publish(file, []);
   }
 
-  // Waits for every answer in flight. For tests and shutdown.
+  // Asks, waits for every answer in flight, and draws every pending page.
+  // For tests and shutdown.
   async settle(): Promise<void> {
     for (const t of this.#timers.values()) clearTimeout(t);
     for (const file of this.#timers.keys()) this.#askAll(file);
     this.#timers.clear();
-    while (this.#inflight.size > 0) await Promise.all(this.#inflight.values());
+    while (this.#inflight.size > 0 || this.#draws.size > 0) {
+      await Promise.all(this.#inflight.values());
+      for (const [file, t] of this.#draws) {
+        clearTimeout(t);
+        this.#draws.delete(file);
+        await this.#render(file);
+      }
+    }
   }
 
   // Ghost text for a words line: the plain form each candidate would pin,
-  // best first. Waits for the answer when it is on its way, and asks at once
-  // when it is not, since the editor has already waited for typing to stop.
+  // best first. The answer comes once the writer pauses or leaves the line,
+  // so this waits for it, but gives up if the line changes first: a pick for
+  // words that are no longer there would be pinned onto the wrong ones.
   async ghost(file: string, line: number): Promise<Ghost[]> {
     const doc = this.#docs.get(file);
-    const d = doc && this.#directiveAt(doc, line);
-    if (!doc || !d || d.kind !== "words" || d.words === undefined) return [];
+    const words = () => {
+      const d = this.#docs.get(file) && this.#directiveAt(this.#docs.get(file)!, line);
+      return d?.kind === "words" ? d.words : undefined;
+    };
+    const asked = words();
+    if (!doc || asked === undefined) return [];
 
-    let hit = this.#cache.get(this.site.catalog, doc.page, d.words);
-    if (!hit) {
-      const pending = this.#ask(doc.page, d.words);
-      await Promise.race([pending, new Promise((r) => setTimeout(r, this.#waitMs))]);
-      hit = this.#cache.get(this.site.catalog, doc.page, d.words);
+    const key = this.#key(doc.page, asked);
+    const lookup = () => this.#cache.get(this.site.catalog, doc.page, asked);
+    let hit = lookup();
+    for (const end = Date.now() + this.#waitMs; !hit && Date.now() < end; hit = lookup()) {
+      if (words() !== asked || (this.#errors.has(key) && !this.#inflight.has(key))) return [];
+      await new Promise((r) => setTimeout(r, 25));
     }
-    if (!hit || hit.outcome === "nothing-fits") return [];
+    if (!hit || words() !== asked || hit.outcome === "nothing-fits") return [];
 
     const lineText = splitLines(doc.text)[line] ?? "";
     const end = lineText.length;
@@ -262,14 +295,14 @@ export class Workspace {
     this.#timers.set(file, setTimeout(() => {
       this.#timers.delete(file);
       this.#askAll(file);
-    }, this.#debounceMs));
+    }, this.#idleMs));
   }
 
-  #askAll(file: string): void {
+  #askAll(file: string, except?: number): void {
     const doc = this.#docs.get(file);
     if (!doc) return;
     for (const d of scan(doc.text, this.site.catalog).directives) {
-      if (d.kind === "words" && d.words !== undefined && !this.#cache.get(this.site.catalog, doc.page, d.words)) {
+      if (d.kind === "words" && d.line !== except && d.words !== undefined && !this.#cache.get(this.site.catalog, doc.page, d.words)) {
         void this.#ask(doc.page, d.words);
       }
     }
@@ -296,10 +329,20 @@ export class Workspace {
       } finally {
         this.#inflight.delete(key);
       }
-      for (const file of this.#docs.keys()) await this.#render(file);
+      for (const file of this.#docs.keys()) this.#drawSoon(file);
     })();
     this.#inflight.set(key, done);
     return done;
+  }
+
+  // Draws the page once changes pause, so a burst of keystrokes is one
+  // rebuild and one reload, not one each.
+  #drawSoon(file: string): void {
+    clearTimeout(this.#draws.get(file));
+    this.#draws.set(file, setTimeout(() => {
+      this.#draws.delete(file);
+      void this.#render(file);
+    }, this.#drawMs));
   }
 
   async #render(file: string): Promise<void> {
@@ -311,15 +354,17 @@ export class Workspace {
 
   async #write(rel: string, page: PageKind, text: string) {
     const out = preprocess(text, this.site.catalog, this.#cache.resolver(this.site.catalog, page));
+    // Renders overlap (a keystroke, an answer arriving), so each file is
+    // written whole and in order, through a folder Hugo does not watch.
+    const tmp = join(this.site.root, ".rubric/tmp");
     const target = join(this.site.content, rel);
-    if (this.#written.get(target) !== out.content) {
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, out.content);
-      this.#written.set(target, out.content);
-    }
     const sidecar = join(this.site.root, ".rubric/sidecar", `${rel}.json`);
-    await mkdir(dirname(sidecar), { recursive: true });
-    await writeFile(sidecar, JSON.stringify(out.entries, null, 2) + "\n");
+    const writes = [writeWhole(sidecar, JSON.stringify(out.entries, null, 2) + "\n", tmp)];
+    if (this.#written.get(target) !== out.content) {
+      this.#written.set(target, out.content);
+      writes.push(writeWhole(target, out.content, tmp));
+    }
+    await Promise.all(writes);
     return out;
   }
 
@@ -343,3 +388,13 @@ export class Workspace {
   }
 }
 
+// The first line that differs between two versions of a page: where the edit
+// was. Enter at the end of a line puts it on the new line, which leaves the
+// line above.
+function firstChangedLine(before: string, after: string): number {
+  const a = splitLines(before);
+  const b = splitLines(after);
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  return i;
+}

@@ -3,7 +3,7 @@
 // completion and hover.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Cache } from "../src/core/index.ts";
@@ -22,7 +22,7 @@ beforeAll(async () => {
   cpSync(join(repo, "sites/slice"), dir, { recursive: true, filter: (src) => !/\/(content|\.rubric)(\/|$)/.test(src) });
   writeFileSync(join(dir, "hugo.toml"), readFileSync(join(dir, "hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(repo, "catalogs"))}`));
   const site = await openSite(dir);
-  ws = new Workspace(site, await Cache.load(site.cache), stubResolver(site.catalog, 5), (f, n) => notes.set(f, n), { debounceMs: 5, waitMs: 1000 });
+  ws = new Workspace(site, await Cache.load(site.cache), stubResolver(site.catalog, 5), (f, n) => notes.set(f, n), { idleMs: 5, waitMs: 1000, drawMs: 5 });
   page = join(dir, "pages/posts/test.md");
   writeFileSync(page, "on disk\n");
 });
@@ -65,7 +65,7 @@ describe("the document flow", () => {
     expect(codes()).toEqual(["15:value-not-allowed"]);
   });
 
-  test("words lines are resolved after the debounce, and the page is drawn again", async () => {
+  test("words lines on disk are asked at once, and the page is drawn again", async () => {
     await ws.settle();
     expect(content().split("\n")[6]).toBe(`{{< quote size="large" >}}`);
     expect(content().split("\n")[8]).toBe(`{{< /quote >}}`);
@@ -77,7 +77,7 @@ describe("the document flow", () => {
 
   test("an edit is drawn at once, and a resolved line is never asked again", async () => {
     let asked = 0;
-    const counting = new Workspace(ws.site, await Cache.load(ws.site.cache), async (d, p) => (asked++, stubResolver(ws.site.catalog, 1)(d, p)), () => {}, { debounceMs: 1 });
+    const counting = new Workspace(ws.site, await Cache.load(ws.site.cache), async (d, p) => (asked++, stubResolver(ws.site.catalog, 1)(d, p)), () => {}, { idleMs: 1 });
     await counting.open(page, text.replace("Plain form.", "Edited."));
     await counting.settle();
     expect(content()).toContain("Edited.");
@@ -103,7 +103,7 @@ describe("ghost text", () => {
     await ws.change(page, text);
   });
 
-  test("a new line is asked at once and waited for", async () => {
+  test("a new line is asked after a pause and waited for", async () => {
     await ws.change(page, text.replace("::: a spreadsheet of my taxes", "::: a slow callout"));
     expect((await ws.ghost(page, 9))[0]!.text).toBe(" -> callout");
     await ws.change(page, text);
@@ -155,5 +155,70 @@ describe("hover", () => {
   test("a plain form explains its part and settings", () => {
     expect(ws.hover(page, 3)).toContain("**callout**");
     expect(ws.hover(page, 3)).toContain("`kind=warning`: something that could go wrong");
+  });
+});
+
+describe("when Jev is asked", () => {
+  const counting = async (idleMs: number) => {
+    const asked: string[] = [];
+    const resolver = stubResolver(ws.site.catalog, 1);
+    const w = new Workspace(ws.site, await Cache.load(join(dir, "no-cache.json")), async (d, p) => (asked.push(d), resolver(d, p)), () => {}, { idleMs, waitMs: 1000 });
+    return { w, asked };
+  };
+  const draft = (line: string) => ["intro", `::: ${line}`, "body", ":::", ""].join("\n");
+
+  test("the line being typed waits for a pause, and only its last version is sent", async () => {
+    const { w, asked } = await counting(50);
+    await w.open(page, draft("a"));
+    for (const words of ["a b", "a bi", "a big", "a big quote"]) await w.change(page, draft(words));
+    expect(asked).toEqual(["a"]);
+    await Bun.sleep(120);
+    expect(asked).toEqual(["a", "a big quote"]);
+    await w.close(page);
+  });
+
+  test("leaving the line sends it at once", async () => {
+    const { w, asked } = await counting(10_000);
+    await w.open(page, draft("a"));
+    await w.change(page, draft("a big quote"));
+    await w.change(page, draft("a big quote").replace("body", "body, edited"));
+    expect(asked).toEqual(["a", "a big quote"]);
+    await w.close(page);
+  });
+
+  test("ghost text gives up when the line changes while it waits", async () => {
+    const { w } = await counting(10_000);
+    await w.open(page, draft("a big quote"));
+    await w.change(page, draft("a big quote please"));
+    const ghost = w.ghost(page, 1);
+    await w.change(page, draft("a big quote please now"));
+    expect(await ghost).toEqual([]);
+    await w.close(page);
+  });
+
+  test("a burst of keystrokes is drawn once, after it pauses", async () => {
+    const asked: string[] = [];
+    const w = new Workspace(ws.site, await Cache.load(join(dir, "no-cache.json")), async (d, p) => (asked.push(d), stubResolver(ws.site.catalog, 1)(d, p)), () => {}, { idleMs: 10_000, waitMs: 1000, drawMs: 60 });
+    await w.open(page, draft("x"));
+    const before = statSync(join(dir, "content/posts/test.md")).mtimeMs;
+    for (const body of ["Hello", "Hello w", "Hello wo", "Hello world"]) {
+      await w.change(page, draft("x").replace("body", body));
+      await Bun.sleep(20);
+    }
+    expect(content()).not.toContain("Hello");
+    expect(statSync(join(dir, "content/posts/test.md")).mtimeMs).toBe(before);
+    await Bun.sleep(100);
+    expect(content()).toContain("\nHello world\n");
+    expect(statSync(join(dir, "content/posts/test.md")).mtimeMs).toBeGreaterThan(before);
+    await w.close(page);
+  });
+
+  test("overlapping renders leave the newest text in content/", async () => {
+    const { w } = await counting(10_000);
+    await w.open(page, draft("x"));
+    await Promise.all(Array.from({ length: 20 }, (_, i) => w.change(page, draft("x").replace("body", `body ${i}`))));
+    await w.settle();
+    expect(content()).toContain("body 19");
+    await w.close(page);
   });
 });

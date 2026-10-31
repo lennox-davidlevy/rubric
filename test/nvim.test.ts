@@ -34,10 +34,17 @@ test.skipIf(!nvim)("Neovim: attach, diagnostics, completion, ghost text, accept,
     expect(await until(() => expr("RubricTest.attached()") === "true")).toBe(true);
     expect(await until(() => expr("RubricTest.codes()") === "nothing-fits,value-not-allowed")).toBe(true);
 
-    // Typing a new line: completion offers the parts after "::: ".
+    // Typing a new line: "::: " adds its closer below, and completion offers
+    // the parts.
     keys("Go::: <Esc>");
+    expect(await until(() => expr("RubricTest.line(10)") === ":::")).toBe(true);
     await Bun.sleep(400);
     expect(expr("RubricTest.complete(8, 4)")).toBe("callout,quote,section");
+    keys("2dd");
+    // A bare closer gets nothing added.
+    keys("Go:::<Esc>");
+    await Bun.sleep(200);
+    expect(expr("RubricTest.line(10)")).toBe("");
     keys("dd");
 
     // Insert mode at the end of the words line: the ghost text appears, and

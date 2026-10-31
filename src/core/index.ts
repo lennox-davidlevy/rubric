@@ -6,3 +6,4 @@ export * from "./preprocess.ts";
 export * from "./questions.ts";
 export * from "./resolve.ts";
 export * from "./cache.ts";
+export * from "./write.ts";

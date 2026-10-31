@@ -101,7 +101,26 @@ function classify(text: string, col: number, line: number, catalog: Catalog): Di
 
   const plain = parsePlain(text, col);
   if (isPlain(plain, catalog)) return { line, kind: "plain", plain, problems: validatePlain(plain, catalog, line) };
+  const unfinished = unfinishedPlain(text, col, line, catalog);
+  if (unfinished) return { line, kind: "plain", problems: [unfinished] };
   return { line, kind: "words", words: text, problems: [] };
+}
+
+// A plain form still being typed: `quot`, or `quote size=large ci`. It is not
+// words, so it is never sent to Jev. Words may start with a part name ("quote
+// from the book"), so only a setting's "=" or a lone part-name prefix count.
+function unfinishedPlain(text: string, col: number, line: number, catalog: Catalog): Diagnostic | undefined {
+  const names = Object.keys(catalog.parts);
+  const tokens = text.split(/\s+/);
+  const first = tokens[0]!;
+  const whole = { line, start: col, end: col + text.length };
+  if (tokens.length === 1 && names.some((n) => n.startsWith(first))) {
+    return { ...whole, code: "unfinished-part", message: `"${first}" is not a part; the parts are ${names.join(", ")}` };
+  }
+  if (Object.hasOwn(catalog.parts, first) && tokens.some((t) => t.includes("="))) {
+    return { ...whole, code: "unfinished-setting", message: "each setting is key=value, with a value that has spaces in double quotes" };
+  }
+  return undefined;
 }
 
 // Front matter is the writer's metadata, never page content.

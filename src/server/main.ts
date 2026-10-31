@@ -3,6 +3,7 @@
 //
 //   bun src/cli.ts lsp [--stub]
 
+import { appendFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   CompletionItemKind, createConnection, DiagnosticSeverity, MarkupKind, ProposedFeatures, TextDocuments, TextDocumentSyncKind,
@@ -79,6 +80,8 @@ export function serve(opts: { stub: boolean }): void {
   documents.onDidChangeContent(({ document }) => {
     const f = file(document.uri);
     if (f && workspace) void workspace.change(f, document.getText());
+    // RUBRIC_TRACE=<file> appends every text the server holds, to compare with the editor.
+    if (process.env.RUBRIC_TRACE) appendFileSync(process.env.RUBRIC_TRACE, JSON.stringify({ t: Date.now(), v: document.version, text: document.getText() }) + "\n");
   });
   documents.onDidClose(({ document }) => {
     const f = file(document.uri);
