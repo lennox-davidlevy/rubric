@@ -3,3 +3,6 @@ export * from "./diagnostic.ts";
 export * from "./plain.ts";
 export * from "./scan.ts";
 export * from "./preprocess.ts";
+export * from "./questions.ts";
+export * from "./resolve.ts";
+export * from "./cache.ts";

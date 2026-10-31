@@ -1,0 +1,43 @@
+# Directive lines for the probe, each with the plain form a person would want,
+# or "nothing" when no part in the slice catalog fits. Includes hard and
+# negative cases on purpose.
+- directive: a quote from the book, big and centred
+  want: quote size=large align=centre
+- directive: a pull quote
+  want: quote size=large
+- directive: a quote
+  want: quote
+- directive: the words of my grandmother, set apart from the rest
+  want: quote
+- directive: something the reader should know before they start
+  want: callout
+- directive: a warning that this might break your setup
+  want: callout kind=warning
+- directive: a quick tangent the reader can skip
+  want: callout kind=aside
+- directive: a dark band across the page
+  want: section tone=dark
+- directive: a box that floats above the page with a strong shadow
+  want: section surface=raised shadow=deep
+- directive: a tinted strip to set this part apart
+  want: section tone=tint
+- directive: heads up
+  want: callout
+- directive: a spreadsheet of my taxes
+  want: nothing
+- directive: a photo gallery of my trip
+  want: nothing
+- directive: centred
+  want: nothing
+# Added after the first held-out check showed fits too strict on quotes and
+# notes that do not say "set off". New lines, not the held-out ones.
+- directive: the line my father always repeated
+  want: quote
+- directive: an excerpt from the letter
+  want: quote
+- directive: a tip for beginners
+  want: callout
+- directive: a note on which browser this needs
+  want: callout
+- directive: a light grey background behind this list
+  want: section tone=tint

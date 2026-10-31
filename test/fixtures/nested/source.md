@@ -2,7 +2,7 @@
 title: Nested blocks
 ---
 
-::: section tone=band
+::: section tone=tint
 ## A band
 
 ::: quote size=large

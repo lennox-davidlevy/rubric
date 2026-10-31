@@ -104,7 +104,8 @@ The questions are generated from the catalog file. Nothing is hand-written per p
 | In the catalog | Becomes |
 | --- | --- |
 | The parts, each with its description | One Choice: which part does the line ask for? The descriptions are the criteria. |
-| The same, always | One Noul: does any part in the catalog fit what the line asks for? A Choice always picks something, so this is what tells code when nothing does. |
+| Each part, with its description | One Noul per part: does the line ask for this part? A Choice always picks something, so the picked part's Noul is what tells code when nothing fits. One Noul over the whole catalog did not separate in the probe; see [lsp.md](lsp.md). |
+| Each setting with a fixed set of values or levels | One Noul: does the line ask for any value other than the default, with those values described? A Choice or Score picks a value even when the line never mentions the setting. |
 | A setting with a fixed set of values, each described | A Choice among the values |
 | A setting that is yes or no, with true and false described | A Noul |
 | A setting that is a level, with each level described as a situation | A Score |

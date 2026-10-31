@@ -1,4 +1,4 @@
-5-23 | plain | placed | section tone=band |
+5-23 | plain | placed | section tone=tint |
 8-12 | plain | placed | quote size=large |
 14-20 | plain | placed | section tone=dark shadow=deep |
 17-19 | plain | placed | callout kind=aside |

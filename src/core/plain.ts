@@ -107,7 +107,7 @@ export function validatePlain(form: PlainForm, catalog: Catalog, line: number): 
 }
 
 // The plain form as text, with values quoted only where they need it.
-export function formatPlain(form: Pick<PlainForm, "part" | "settings">): string {
+export function formatPlain(form: { part: string; settings: readonly { key: string; value: string }[] }): string {
   return [form.part, ...form.settings.map((s) => `${s.key}=${/^[^\s"]+$/.test(s.value) ? s.value : `"${s.value}"`}`)].join(" ");
 }
 

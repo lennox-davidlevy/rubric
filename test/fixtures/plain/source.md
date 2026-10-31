@@ -16,7 +16,7 @@ All that is gold does not glitter.
 A callout at its defaults.
 :::
 
-:::: section   tone=band surface=raised
+:::: section   tone=tint surface=raised
 A section opened and closed with four colons.
 ::::
 

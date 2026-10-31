@@ -19,7 +19,7 @@ All that is gold does not glitter.
 **Mind the gap.** A callout with *Markdown* inside it, and a [link](/).
 :::
 
-::: section tone=band
+::: section tone=tint
 ## A band
 
 A section with a heading and two paragraphs, and parts nested inside it.

@@ -178,6 +178,19 @@ One request per live line, generated from the catalog file, with every question 
 - **An API error is a diagnostic** that says so. It is never read as "no".
 - **The probe before the server**: the resolver is run from a script against the live API on a dozen lines, with the payloads kept, before any of it is wired to an editor. That needs your permission and a small budget, and it is where the first wording is tuned.
 
+## What the probe found
+
+Step 4, run 2026-10-31 against `jev-1.14.0`: `bun scripts/probe.ts` over `probe/lines.yaml` (19 lines, tuned on) and `probe/holdout.yaml` (12 lines, checked against). The request sketch above changed in two ways, and the catalog's descriptions changed more than the code did.
+
+- **Round trip: median 140 ms, p90 182 ms, max 292 ms** over 93 calls of 16 questions each. Ghost text can feel like completion; the debounce, not the network, will set the pace.
+- **One `fits` Noul for the whole catalog did not separate.** "heads up" scored 0.67 and "a photo gallery" 0.63. It is now one Noul per part, `fits:<part>`, and the resolver reads the one for the part the Choice picked.
+- **A Choice or Score sets settings nobody asked for.** "a pull quote" came back `align=centre`, "a dark band" `shadow=deep`. Each choice and level setting now has a `said:<part>:<setting>` Noul: does the line ask for any value other than the default, with those values listed and described. Below 0.3 the setting stays at its default; in the band it stays at its default and is named as unsettled. Asking "what tone" without the values failed the human test: `tone` is jargon.
+- **Descriptions are the prompt, and literal.** "Words quoted from someone else, set off from the prose" missed "an excerpt from the letter" (0.51), because the line says neither "quoted" nor "set off". "A quotation of words someone said or wrote" scores 0.83. The section's "a run of the page set apart" let a gallery fit at 0.44. Write each description as what the part *is*, in the words a writer would use, with no qualifier the writer would not say.
+- **Value names are sent to the model.** `tone=band` lost to `dark` on "a dark band", because every section is a band; the value is now `tint`. Name a value for what it does.
+- **Answers vary a little between runs** (0.67 then 0.62 on the same line). A line on a threshold can flip. The cache makes a line stable after its first answer.
+- **Results:** tuning set 19/19 in each of three runs. Held-out 10/12 in each of three runs. The two misses fail safely: "a note about the version this was written for" leaves the line plain with callout and section offered (callout fits 0.62), and "a shaded band behind the next few paragraphs" places a section with tone left at its default and named (said 0.65, value `tint` at 0.92). Both are cases for the fifty-line gate, not for more tuning against lines already seen.
+- **The TypeSafe SDK 0.7.0 does not work under Bun**: it locks a reader on the response body, which Bun counts as using it ("Body already used"). Rubric calls the HTTP API with `fetch` (`src/jev.ts`) and keeps the SDK for its types. Worth reporting to TypeSafe.
+
 ## The document flow inside the server
 
 1. On open and on every change, the server scans the buffer: code fences tracked, directive lines found, blocks matched to their closers, each line classified as pinned, plain or words.
@@ -224,7 +237,7 @@ The root marker is what makes the server attach only inside a Rubric site, and o
 | 6 | Jev in the server | The six scenes in "the slice, stated exactly" all happen. |
 | 7 | Measure | Twenty lines, time to ghost text and time to preview, recorded in `docs/measurements.md` with the model id and date. |
 
-**Progress.** Step 1 done 2026-10-31: `catalogs/slice/` (the catalog as a Hugo theme module, with shortcodes that validate against `catalog.yaml`) and `sites/slice/`. Step 2 done 2026-10-31: `src/core/`, in TypeScript on Bun, with fixtures in `test/fixtures/` and a test that builds every fixture's output in Hugo (`bun test`).
+**Progress.** Step 1 done 2026-10-31: `catalogs/slice/` (the catalog as a Hugo theme module, with shortcodes that validate against `catalog.yaml`) and `sites/slice/`. Step 2 done 2026-10-31: `src/core/`, in TypeScript on Bun, with fixtures in `test/fixtures/` and a test that builds every fixture's output in Hugo (`bun test`). Steps 3 and 4 done 2026-10-31: `src/core/questions.ts`, `resolve.ts`, `cache.ts`, `src/jev.ts` and `scripts/probe.ts`; see "What the probe found".
 
 Steps 1 to 3 are code with no network and can be written in one session. Step 4 needs the key and the budget. Steps 5 and 6 are where the editor details get settled.
 

@@ -4,10 +4,14 @@
 import { readFile } from "node:fs/promises";
 import { parse } from "yaml";
 
+// Choice, level and flag settings are asked of Jev; `question` overrides the
+// generated wording when it reads badly. Choice and level need a default,
+// because an unsettled answer falls back to it. Text and number settings are
+// never asked; they come from the plain form.
 export type Setting =
-  | { type: "choice"; default?: string; values: Record<string, string> }
-  | { type: "level"; default?: string; levels: Record<string, string> }
-  | { type: "flag"; default?: boolean; true?: string; false?: string }
+  | { type: "choice"; default: string; values: Record<string, string>; question?: string }
+  | { type: "level"; default: string; levels: Record<string, string>; question?: string }
+  | { type: "flag"; default?: boolean; true?: string; false?: string; question?: string }
   | { type: "text"; default?: string }
   | { type: "number"; default?: number };
 
@@ -64,6 +68,7 @@ export function parseCatalog(text: string): Catalog {
 
 function setting(raw: unknown, at: string): Setting {
   const s = record(raw, at);
+  const question = s.question === undefined ? {} : { question: string(s.question, `${at}.question`) };
   switch (s.type) {
     case "choice":
     case "level": {
@@ -75,18 +80,19 @@ function setting(raw: unknown, at: string): Setting {
         named(v, `${at}.${key}.${v}`);
         string(values[v], `${at}.${key}.${v}`);
       }
-      if (s.default !== undefined && !names.includes(String(s.default))) {
+      if (s.default === undefined || !names.includes(String(s.default))) {
         throw new CatalogError(`${at}.default must be one of ${names.join(", ")}`);
       }
-      const def = s.default === undefined ? {} : { default: String(s.default) };
+      const def = String(s.default);
       return s.type === "choice"
-        ? { type: "choice", ...def, values: values as Record<string, string> }
-        : { type: "level", ...def, levels: values as Record<string, string> };
+        ? { type: "choice", default: def, values: values as Record<string, string>, ...question }
+        : { type: "level", default: def, levels: values as Record<string, string>, ...question };
     }
     case "flag": {
       if (s.default !== undefined && typeof s.default !== "boolean") throw new CatalogError(`${at}.default must be true or false`);
       return {
         type: "flag",
+        ...question,
         ...(s.default === undefined ? {} : { default: s.default }),
         ...(s.true === undefined ? {} : { true: string(s.true, `${at}.true`) }),
         ...(s.false === undefined ? {} : { false: string(s.false, `${at}.false`) }),

@@ -1,11 +1,11 @@
 name: slice
-version: 1
+version: 6
 
 slots: [paper, ink, accent, muted, rule, band]
 
 parts:
   section:
-    description: A run of the page set apart from what is around it, as a box or a band.
+    description: A box or a band across the page that sets the writing inside it apart from the rest of the page.
     children: true
     settings:
       tone:
@@ -13,8 +13,8 @@ parts:
         default: theme
         values:
           theme: the page's own colours
-          band: a tinted band across the page
-          dark: inverted, ink on paper becomes paper on ink
+          tint: a light tint of colour behind the writing
+          dark: a dark background with light writing
       surface:
         type: choice
         default: flat
@@ -29,7 +29,7 @@ parts:
           soft: a faint shadow, barely there
           deep: a strong shadow, clearly floating
   quote:
-    description: Words quoted from someone else, set off from the prose.
+    description: A quotation of words someone said or wrote.
     children: true
     settings:
       size:
@@ -47,7 +47,7 @@ parts:
       cite:
         type: text
   callout:
-    description: A short aside the reader should notice, beside the main line of the prose.
+    description: A short note for the reader, set off from the main prose, such as a tip, an aside or a warning.
     children: true
     settings:
       kind:
