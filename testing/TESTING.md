@@ -4,14 +4,13 @@ You start with an empty post, `testing/pages/posts/test.md`, and build it up one
 
 This file is kept up to date as Rubric changes.
 
-Last updated: 2026-11-01, after the stale-preview fix and the quicker preview.
+Last updated: 2026-11-01, after the nested closer, completion after deleting, and the Jev count.
 
 **New since the last test:**
 
-- The preview is quicker: about a third of a second after you stop typing, down from about half a second.
-- The preview should never be left a step behind (`my grandm` for `my grandma`). The cause was Hugo's dev server, not timing, and it's fixed.
-- Picture addresses complete from the site's own pictures, and a wrong address gets a warning (step 3).
-- Earlier today: the blog catalog (eleven parts, Paper theme), the gallery opening pictures large, and the play terminal printing every call to Jev.
+- Typing `::: ` inside another block now adds its own closer, even when the outer block's `:::` is right below (step 11).
+- Deleting a setting's value brings the menu back with the allowed values; before, it came back only after you typed a letter (step 10).
+- The play terminal numbers each Jev call (`── Jev #3`) and prints the session's total when you stop it with Ctrl-C.
 
 ## How to read what you see
 
@@ -240,7 +239,7 @@ A tangent.
 :::
 ```
 
-**Should happen:** a warning on `aside`, and `<leader>e` lists the allowed values (note, tip, warning). The page shows the raw lines. Delete `aside`, and completion offers the three values. Choose one and the callout appears.
+**Should happen:** a warning on `aside`, and `<leader>e` lists the allowed values (note, tip, warning). The page shows the raw lines. Delete `aside` with backspace, and completion offers the three values straight away. Choose one and the callout appears.
 
 ## 11. One part inside another
 
@@ -254,7 +253,7 @@ Nobody walks this way after dark.
 :::
 ```
 
-Type it top to bottom, and watch what the auto-closer does on the inner `::: `.
+Type it top to bottom, and watch what the auto-closer does on the inner `::: `. Also try it the other way: write the band first, then go back inside it, onto the line directly above its closing `:::`, and type `::: a quote`. Either way, the quote gets its own closer.
 
 **Should happen:**
 
@@ -299,6 +298,8 @@ Make the browser window narrow, about phone width.
 **Should happen:** nothing scrolls sideways, the gallery still fits, and the dark band still runs edge to edge.
 
 ## Afterwards
+
+- **Stop the play server with Ctrl-C.** The last line says how many calls went to Jev this session, how many failed, and their average time.
 
 - **Any line you liked or didn't:** the words, what it became, and what you expected. The `── Jev` block for it shows why.
 - **Your own words:** try saying the same thing differently from these steps ("a quote, really big, in the middle", "shade the next bit", "hide the rest"). The misses are what tunes the catalog's descriptions.

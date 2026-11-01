@@ -23,9 +23,33 @@ local defaults = {
   close = true,
 }
 
+-- How many blocks are open above `row` (1-based, exclusive): each ":::"
+-- opener adds one and each bare ":::" closes the innermost. Code fences are
+-- skipped, as the server skips them.
+local function open_blocks(bufnr, row)
+  local depth, fence = 0, nil
+  for _, l in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, row - 1, false)) do
+    local f = l:match("^%s*(```+)") or l:match("^%s*(~~~+)")
+    if fence then
+      if f and f:sub(1, 1) == fence:sub(1, 1) and #f >= #fence and l:match("^%s*[`~]+%s*$") then
+        fence = nil
+      end
+    elseif f then
+      fence = f
+    elseif l:match("^%s*:::+%s*$") then
+      depth = math.max(depth - 1, 0)
+    elseif l:match("^%s*:::+%s*%S") then
+      depth = depth + 1
+    end
+  end
+  return depth
+end
+
 -- After "::: " is typed on a line of its own, put ":::" on the line below,
--- at the same indent, unless one is already there. The space is the trigger
--- because a closer is a bare ":::" and never gets one.
+-- at the same indent, unless the ":::" already there is free to close it.
+-- Inside another block, a ":::" right below is that block's closer, so the new
+-- one still gets its own. The space is the trigger because a closer is a bare
+-- ":::" and never gets one.
 local function close_directive(bufnr)
   vim.keymap.set("i", " ", function()
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
@@ -37,12 +61,38 @@ local function close_directive(bufnr)
       return
     end
     local lines = { line .. " " }
-    if vim.api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1] ~= indent .. ":::" then
+    local below = vim.api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1]
+    if below ~= indent .. ":::" or open_blocks(bufnr, row) > 0 then
       table.insert(lines, indent .. ":::")
     end
     vim.api.nvim_buf_set_lines(bufnr, row - 1, row, false, lines)
     vim.api.nvim_win_set_cursor(0, { row, col + 1 })
   end, { buffer = bufnr, desc = "Rubric: close a directive" })
+end
+
+-- nvim-cmp opens its menu when a character is typed, never when one is
+-- deleted, so backspacing over "aside" in "kind=aside" left no menu until the
+-- next letter. After a deletion on a ":::" line, ask the server again; it
+-- offers only what fits where the cursor is, and nothing for words.
+local function reopen_completion(bufnr)
+  local ok, cmp = pcall(require, "cmp")
+  if not ok then
+    return
+  end
+  local last = {}
+  vim.api.nvim_create_autocmd("TextChangedI", {
+    group = vim.api.nvim_create_augroup("RubricReopen" .. bufnr, { clear = true }),
+    buffer = bufnr,
+    callback = function()
+      local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+      local line = vim.api.nvim_get_current_line()
+      local deleted = last.row == row and #line < last.len
+      last = { row = row, len = #line }
+      if deleted and not cmp.visible() and line:sub(1, col):match("^%s*:::") then
+        cmp.complete({ config = { sources = { { name = "nvim_lsp" } } } })
+      end
+    end,
+  })
 end
 
 -- The repository root, from where this file sits.
@@ -76,6 +126,7 @@ function M.setup(opts)
       if opts.close then
         close_directive(event.buf)
       end
+      reopen_completion(event.buf)
       local function map(lhs, rhs, desc)
         vim.keymap.set("i", lhs, rhs, { buffer = event.buf, desc = desc })
       end

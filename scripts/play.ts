@@ -51,13 +51,30 @@ const p = (n: number) => n.toFixed(2).replace(/^0/, "");
 // A probability, brighter the surer it is.
 const prob = (n: number) => (n >= 0.7 ? bold(p(n)) : n >= 0.3 ? p(n) : dim(p(n)));
 
+// This run's calls, for the count on each block and the summary at the end.
+const session = { calls: 0, errors: 0, ms: 0, started: Date.now() };
+
+function summary(): string {
+  const { calls, errors, ms, started } = session;
+  const secs = Math.round((Date.now() - started) / 1000);
+  const took = secs < 60 ? `${secs} s` : `${Math.round(secs / 60)} min`;
+  // Failed calls are left out of the average: a timeout is not Jev's speed.
+  const ok = calls - errors;
+  const avg = ok ? `, ${Math.round(ms / ok)} ms on average` : "";
+  return `${bold(`${calls} call${calls === 1 ? "" : "s"} to Jev`)} this session${errors ? `, ${red(`${errors} failed`)}` : ""}${avg}, over ${took}.`;
+}
+
 function print(c: Call): void {
+  session.calls++;
+  if (c.resolution.outcome === "error") session.errors++;
+  else session.ms += c.ms;
   const time = new Date(c.t).toLocaleTimeString("en-GB");
   const { directive, page } = c.request.state;
   const ids = Object.keys(c.request.questions);
   const count = (prefix: string) => ids.filter((id) => id.startsWith(prefix)).length;
   const out: string[] = [];
-  out.push("", cyan(`── Jev ${time} ${"─".repeat(48)}`));
+  const head = `── Jev #${session.calls} ${time} `;
+  out.push("", cyan(head + "─".repeat(Math.max(4, 64 - head.length))));
   out.push(`${bold("sent")}      ${JSON.stringify(directive)}  ${dim(`page=${page}  model=${c.request.model}`)}`);
   out.push(dim(`          ${ids.length} questions: part, ${count("fits:")} fits, ${count("setting:")} setting, ${count("said:")} said`));
 
@@ -127,5 +144,11 @@ watch(log, drain);
 // A watch can miss an event; a slow poll catches it.
 setInterval(drain, 1000);
 
-process.on("SIGINT", () => { hugo.kill(); process.exit(0); });
-process.exit(await hugo.exited);
+// Ctrl-C reaches Hugo too; the summary prints once it has gone.
+const finish = (code: number) => {
+  drain();
+  console.log(`\n${summary()}`);
+  process.exit(code);
+};
+process.on("SIGINT", () => { hugo.kill(); });
+finish(await hugo.exited);

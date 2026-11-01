@@ -46,6 +46,20 @@ test.skipIf(!nvim)("Neovim: attach, diagnostics, completion, ghost text, accept,
     await Bun.sleep(200);
     expect(expr("RubricTest.line(10)")).toBe("");
     keys("dd");
+    // Inside a block, the ":::" right below is the outer block's closer, so
+    // the new one still gets its own.
+    keys("Go::: outer<Esc>");
+    expect(await until(() => expr("RubricTest.line(10)") === ":::")).toBe(true);
+    keys(":call cursor(9, 1)<CR>o::: <Esc>");
+    expect(await until(() => expr("RubricTest.line(12)") === ":::")).toBe(true);
+    expect(expr("RubricTest.line(11)")).toBe(":::");
+    keys(":9,12d<CR>");
+    // At the top level, a free ":::" right below is used as the closer.
+    keys("Go:::<Esc>O::: <Esc>");
+    await Bun.sleep(200);
+    expect(expr("RubricTest.line(10)")).toBe(":::");
+    expect(expr("RubricTest.line(11)")).toBe("");
+    keys(":9,10d<CR>");
 
     // Insert mode at the end of the words line: the ghost text appears, and
     // the plugin's accept key pins the line.
