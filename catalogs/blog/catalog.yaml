@@ -57,7 +57,7 @@ parts:
           left: aligned with the writing
           centre: centred on the page
       image:
-        type: text
+        type: image
 
   quote:
     description: A quotation of words someone said or wrote.

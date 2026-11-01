@@ -23,4 +23,5 @@ Writers put `::: words` directives in Markdown; Jev (TypeSafe's model) picks a p
 - The server works from the editor's text, never the saved file, and writes only `content/` and `.rubric/`. Files are written whole, through `src/core/write.ts`.
 - Diagnostics carry a `Code` from `src/core/diagnostic.ts`; add to that union before using a new one.
 - The Neovim plugin is `editors/nvim/`, loaded by the user's dotfiles from this path. Do not edit the dotfiles repo without being asked.
+- `testing/TESTING.md` is the user's live-test checklist. Update it in the same change as anything they could test by hand: what is new, what to try, what should happen.
 - The user tests by hand in Neovim and writes findings in `notes-on-test.md`. Reproduce a reported problem through the real config before theorising; `scripts/live-repro.ts` is the pattern.

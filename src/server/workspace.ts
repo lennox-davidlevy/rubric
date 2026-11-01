@@ -10,6 +10,7 @@ import {
   type Diagnostic, type Directive, type Entry, type PageKind, type Resolution,
 } from "../core/index.ts";
 import { pageKind, pagePath, type Site } from "../site.ts";
+import { fileExists, isSiteAddress, pictures } from "./files.ts";
 
 export type Resolver = (directive: string, page: PageKind) => Promise<{ resolution: Resolution; model: string }>;
 
@@ -29,12 +30,18 @@ export interface Ghost {
 export interface Completion {
   label: string;
   detail: string;
-  kind: "part" | "setting" | "value";
+  kind: "part" | "setting" | "value" | "file";
   // Replaces [start, end) on the line.
   start: number;
   end: number;
   newText: string;
+  // What the editor matches the typed text against, when not newText.
+  filterText?: string;
 }
+
+// A Markdown picture up to the cursor, with its address so far: ![alt](/ima
+const PICTURE_BEFORE = /!\[[^\]]*\]\(\s*<?([^)\s>]*)$/;
+const PICTURES = /!\[[^\]]*\]\(\s*<?([^)\s>]+)/g;
 
 interface Doc {
   text: string;
@@ -50,10 +57,12 @@ export interface Options {
   idleMs?: number;
   // How long a ghost text request waits for an answer before giving up.
   waitMs?: number;
-  // How long after the last change the page is drawn to content/. Drawing on
-  // every keystroke made Hugo rebuild and reload the browser for each one, and
-  // a browser still reloading misses the next reload, so it showed the page a
-  // keystroke or two behind until something else changed.
+  // How long after the last change the page is drawn to content/, so a burst
+  // of keystrokes is one write. Hugo and the browser add about 215 ms after
+  // the write. This was 300 ms while a stale preview was blamed on drawing
+  // too often; the real cause was Hugo's dev server answering a reload with
+  // 304 when two builds fell in the same second, fixed by the site's no-store
+  // header (testing/hugo.toml).
   drawMs?: number;
 }
 
@@ -81,7 +90,7 @@ export class Workspace {
     this.#publish = publish;
     this.#idleMs = opts.idleMs ?? 1000;
     this.#waitMs = opts.waitMs ?? 5000;
-    this.#drawMs = opts.drawMs ?? 300;
+    this.#drawMs = opts.drawMs ?? 100;
   }
 
   // Writes content/ for every page on disk, from the cache only. Run once at
@@ -180,12 +189,15 @@ export class Workspace {
 
   // Completion of the plain form, on a line starting with ::: and after a pin's
   // arrow: the parts, then a part's settings, then a setting's values. Words
-  // get nothing, by design: words are for Jev.
+  // get nothing, by design: words are for Jev. An image setting's value, and
+  // the address in a Markdown picture, get the site's pictures.
   complete(file: string, line: number, character: number): Completion[] {
     const doc = this.#docs.get(file);
     if (!doc) return [];
     if (scan(doc.text, this.site.catalog).code.has(line)) return [];
     const lineText = splitLines(doc.text)[line] ?? "";
+    const picture = PICTURE_BEFORE.exec(lineText.slice(0, character));
+    if (picture) return this.#pictures(picture[1]!, character - picture[1]!.length, character, false);
     const colons = /^:{3,}/.exec(lineText);
     if (!colons || character < colons[0].length) return [];
 
@@ -229,6 +241,7 @@ export class Workspace {
     const key = token.slice(0, eq);
     const typed = token.slice(eq + 1);
     const def = Object.hasOwn(part.settings, key) ? part.settings[key] : undefined;
+    if (def?.type === "image") return this.#pictures(typed, tokenStart + eq + 1, character, true);
     const values =
       def?.type === "choice" ? def.values
       : def?.type === "level" ? def.levels
@@ -237,6 +250,18 @@ export class Workspace {
     return Object.entries(values)
       .filter(([v]) => v.startsWith(typed))
       .map(([v, description]) => ({ label: v, detail: description, kind: "value", start: tokenStart + eq + 1, end: character, newText: v }));
+  }
+
+  // The site's pictures whose address starts with what is typed. A setting's
+  // value is quoted, so a value with a space in it still reads as one.
+  #pictures(typed: string, start: number, end: number, quote: boolean): Completion[] {
+    const prefix = typed.replace(/^"/, "");
+    return pictures(this.site)
+      .filter((p) => p.startsWith(prefix))
+      .map((p) => {
+        const newText = quote ? `"${p}"` : p;
+        return { label: p, detail: "picture", kind: "file" as const, start, end, newText, ...(quote && !typed.startsWith('"') ? { filterText: p } : {}) };
+      });
   }
 
   // Markdown for the line under the cursor: what a words line became and why,
@@ -349,7 +374,11 @@ export class Workspace {
     const doc = this.#docs.get(file);
     if (!doc) return;
     const { entries, diagnostics } = await this.#write(doc.rel, doc.page, doc.text);
-    this.#publish(file, [...diagnostics.map((d): Note => ({ ...d, severity: "warning" })), ...this.#wordsNotes(doc, entries)]);
+    this.#publish(file, [
+      ...diagnostics.map((d): Note => ({ ...d, severity: "warning" })),
+      ...this.#wordsNotes(doc, entries),
+      ...this.#fileNotes(doc),
+    ].sort((a, b) => a.line - b.line || a.start - b.start));
   }
 
   async #write(rel: string, page: PageKind, text: string) {
@@ -366,6 +395,37 @@ export class Workspace {
     }
     await Promise.all(writes);
     return out;
+  }
+
+  // A picture address at the site's root that no static file answers, in an
+  // image setting or a Markdown picture. The page still draws; the picture
+  // is just missing from it.
+  #fileNotes(doc: Doc): Note[] {
+    const s = scan(doc.text, this.site.catalog);
+    const src = splitLines(doc.text);
+    const notes: Note[] = [];
+    const check = (line: number, start: number, address: string) => {
+      if (isSiteAddress(address) && !fileExists(this.site, address)) {
+        notes.push({ line, start, end: start + address.length, code: "missing-file", severity: "warning", message: `no file at ${address} in static/` });
+      }
+    };
+    const fences = new Set<number>();
+    for (const d of s.directives) {
+      fences.add(d.line);
+      if (d.close !== undefined) fences.add(d.close);
+      const part = d.plain && Object.hasOwn(this.site.catalog.parts, d.plain.part) ? this.site.catalog.parts[d.plain.part]! : undefined;
+      for (const set of d.plain?.settings ?? []) {
+        if (part?.settings[set.key]?.type !== "image") continue;
+        // A quoted value's span includes its quotes.
+        const quoted = src[d.line]![set.valueSpan.start] === '"';
+        check(d.line, set.valueSpan.start + (quoted ? 1 : 0), set.value);
+      }
+    }
+    src.forEach((text, line) => {
+      if (s.code.has(line) || fences.has(line)) return;
+      for (const m of text.matchAll(PICTURES)) check(line, m.index + m[0].length - m[1]!.length, m[1]!);
+    });
+    return notes;
   }
 
   // What Jev said about each words line, as a note on the line.

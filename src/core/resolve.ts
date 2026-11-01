@@ -99,6 +99,7 @@ function candidate(answers: Answers, catalog: Catalog, part: string, probability
       }
       case "text":
       case "number":
+      case "image":
         break;
     }
     if (value !== undefined) settings.push({ key: name, value });

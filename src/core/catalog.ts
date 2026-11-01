@@ -6,14 +6,17 @@ import { parse } from "yaml";
 
 // Choice, level and flag settings are asked of Jev; `question` overrides the
 // generated wording when it reads badly. Choice and level need a default,
-// because an unsettled answer falls back to it. Text and number settings are
-// never asked; they come from the plain form.
+// because an unsettled answer falls back to it. Text, number and image
+// settings are never asked; they come from the plain form. An image is a
+// picture's address on the site, such as /images/walk.jpg, which the editor
+// completes from the site's static files and checks.
 export type Setting =
   | { type: "choice"; default: string; values: Record<string, string>; question?: string }
   | { type: "level"; default: string; levels: Record<string, string>; question?: string }
   | { type: "flag"; default?: boolean; true?: string; false?: string; question?: string }
   | { type: "text"; default?: string }
-  | { type: "number"; default?: number };
+  | { type: "number"; default?: number }
+  | { type: "image"; default?: string };
 
 export interface Part {
   description: string;
@@ -105,11 +108,13 @@ function setting(raw: unknown, at: string): Setting {
     }
     case "text":
       return { type: "text", ...(s.default === undefined ? {} : { default: string(s.default, `${at}.default`) }) };
+    case "image":
+      return { type: "image", ...(s.default === undefined ? {} : { default: string(s.default, `${at}.default`) }) };
     case "number":
       if (s.default !== undefined && typeof s.default !== "number") throw new CatalogError(`${at}.default must be a number`);
       return { type: "number", ...(s.default === undefined ? {} : { default: s.default }) };
     default:
-      throw new CatalogError(`${at}.type must be choice, level, flag, text or number`);
+      throw new CatalogError(`${at}.type must be choice, level, flag, text, number or image`);
   }
 }
 

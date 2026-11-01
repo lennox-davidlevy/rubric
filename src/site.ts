@@ -12,6 +12,9 @@ export interface Site {
   pages: string;
   content: string;
   cache: string;
+  // Where Hugo serves files from at the site's root: the site's static/ first,
+  // then the theme's. /images/walk.jpg is static/images/walk.jpg in either.
+  static: string[];
   catalog: Catalog;
 }
 
@@ -21,12 +24,14 @@ export async function openSite(root: string): Promise<Site> {
   const theme = /^theme\s*=\s*"([^"]+)"/m.exec(config)?.[1];
   const themesDir = /^themesDir\s*=\s*"([^"]+)"/m.exec(config)?.[1] ?? "themes";
   if (!theme) throw new Error(`${root}/hugo.toml names no theme`);
+  const themeDir = resolve(root, themesDir, theme);
   return {
     root,
     pages: join(root, "pages"),
     content: join(root, "content"),
     cache: join(root, ".rubric/cache.json"),
-    catalog: await loadCatalog(resolve(root, themesDir, theme, "catalog.yaml")),
+    static: [join(root, "static"), join(themeDir, "static")],
+    catalog: await loadCatalog(join(themeDir, "catalog.yaml")),
   };
 }
 

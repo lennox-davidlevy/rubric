@@ -99,6 +99,7 @@ function settingQuestion(part: string, name: string, s: Setting): Question | und
       };
     case "text":
     case "number":
+    case "image":
       return undefined;
   }
 }

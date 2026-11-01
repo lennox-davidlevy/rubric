@@ -222,3 +222,61 @@ describe("when Jev is asked", () => {
     await w.close(page);
   });
 });
+
+describe("pictures", () => {
+  let bdir: string;
+  let bw: Workspace;
+  let bpage: string;
+  const bnotes = new Map<string, Note[]>();
+
+  beforeAll(async () => {
+    bdir = mkdtempSync(join(tmpdir(), "rubric-pics-"));
+    cpSync(join(repo, "sites/blog"), bdir, { recursive: true, filter: (src) => !/\/(content|\.rubric)(\/|$)/.test(src) });
+    writeFileSync(join(bdir, "hugo.toml"), readFileSync(join(bdir, "hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(repo, "catalogs"))}`));
+    const site = await openSite(bdir);
+    bw = new Workspace(site, await Cache.load(site.cache), stubResolver(site.catalog, 5), (f, n) => bnotes.set(f, n), { idleMs: 5, waitMs: 1000, drawMs: 5 });
+    bpage = join(bdir, "pages/posts/pics.md");
+  });
+
+  afterAll(() => rmSync(bdir, { recursive: true, force: true }));
+
+  const doc = (lines: string[]) => ["---", "title: Pics", "---", ...lines, ""].join("\n");
+  const at = async (line: string) => {
+    await bw.open(bpage, doc([line]));
+    return bw.complete(bpage, 3, line.length);
+  };
+
+  test("an image setting's value offers the site's pictures, quoted, and nothing from the theme's fonts", async () => {
+    const all = await at("::: hero image=");
+    expect(all.map((c) => c.newText)).toContain('"/images/placeholder-field.jpg"');
+    expect(all.every((c) => c.kind === "file" && !c.label.includes("fonts"))).toBe(true);
+    const some = await at('::: a big opening -> hero image="/images/gal');
+    expect(some.length).toBeGreaterThan(0);
+    expect(some.every((c) => c.label.startsWith("/images/gallery/"))).toBe(true);
+    expect(some[0]!.start).toBe('::: a big opening -> hero image='.length);
+  });
+
+  test("a Markdown picture's address offers them too, unquoted", async () => {
+    const c = await at("Look: ![a field](/images/pl");
+    expect(c.map((x) => x.newText)).toEqual(["/images/placeholder-field.jpg"]);
+  });
+
+  test("an address with no file behind it is a warning, in a setting and in Markdown", async () => {
+    await bw.open(bpage, doc([
+      '::: hero image="/image/sample.jpg"',         // 3: missing
+      "# Title",                                     // 4
+      ":::",                                         // 5
+      "![ok](/images/placeholder-field.jpg)",        // 6: there
+      "![gone](/images/nowhere.png) and ![far](https://example.com/x.png)", // 7: one missing, one not ours
+      "```",                                         // 8
+      "![in code](/nope.png)",                       // 9: code, ignored
+      "```",                                         // 10
+    ]));
+    await bw.settle();
+    const missing = (bnotes.get(bpage) ?? []).filter((n) => n.code === "missing-file");
+    expect(missing.map((n) => [n.line, n.start, n.message])).toEqual([
+      [3, 16, "no file at /image/sample.jpg in static/"],
+      [7, 8, "no file at /images/nowhere.png in static/"],
+    ]);
+  });
+});

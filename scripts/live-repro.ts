@@ -35,9 +35,16 @@ const type = async (s: string) => {
     await Bun.sleep(perKey);
   }
 };
+// What Hugo serves, and whether a browser could keep an older copy. Hugo's
+// dev server dates pages to the second, so when two builds land in the same
+// second a reloading browser asks If-Modified-Since, gets 304, and keeps the
+// older page: the "Hello wor" preview. The site's no-store header stops the
+// browser asking. A race that needs two builds in one second is rarely caught
+// by sampling, so the header itself is checked.
 const served = async () => {
-  const html = await (await fetch(`http://localhost:${process.env.RUBRIC_PORT ?? 1415}/posts/playground/`)).text();
-  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  const res = await fetch(`http://localhost:${process.env.RUBRIC_PORT ?? 1415}/posts/playground/`);
+  const text = (await res.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  return { text, stale: !/no-store/.test(res.headers.get("cache-control") ?? "") };
 };
 const serverText = () => {
   const l = readFileSync(trace, "utf8").trim().split("\n");
@@ -72,12 +79,13 @@ const check = async (label: string, body?: string) => {
   const buf = expr('join(getline(1, "$"), "\\n")');
   const server = serverText().replace(/\n$/, "");
   const file = readFileSync(content, "utf8").replace(/\n$/, "");
-  const html = await served();
+  const { text: html, stale } = await served();
   const problems = [];
   if (server !== buf) problems.push(`server text differs from buffer: ${contentMatches(buf, server)}`);
   const c = contentMatches(buf, file);
   if (c) problems.push(`content/ differs: ${c}`);
   if (body && !html.includes(body)) problems.push(`hugo lacks "${body}"`);
+  if (stale) problems.push("no Cache-Control: no-store, so a browser can keep an older page (see testing/hugo.toml)");
   if (problems.length) failures++;
   console.log(`${problems.length ? "FAIL" : "ok  "} ${label}${problems.map((p) => `\n       ${p}`).join("")}`);
 };

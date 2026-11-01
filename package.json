@@ -5,7 +5,7 @@
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "play": "bun src/cli.ts build testing && hugo server -s testing --port 1415"
+    "play": "bun scripts/play.ts"
   },
   "dependencies": {
     "vscode-languageserver": "11.0.0",

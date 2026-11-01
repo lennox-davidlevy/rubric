@@ -3,7 +3,9 @@
 //
 //   bun src/cli.ts lsp [--stub]
 
-import { appendFileSync } from "node:fs";
+import { appendFileSync, existsSync } from "node:fs";
+import { appendFile } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   CompletionItemKind, createConnection, DiagnosticSeverity, MarkupKind, ProposedFeatures, TextDocuments, TextDocumentSyncKind,
@@ -25,7 +27,7 @@ export function serve(opts: { stub: boolean }): void {
     information: DiagnosticSeverity.Information,
     hint: DiagnosticSeverity.Hint,
   };
-  const kinds = { part: CompletionItemKind.Class, setting: CompletionItemKind.Property, value: CompletionItemKind.EnumMember };
+  const kinds = { part: CompletionItemKind.Class, setting: CompletionItemKind.Property, value: CompletionItemKind.EnumMember, file: CompletionItemKind.File };
   const file = (uri: string) => (uri.startsWith("file:") ? fileURLToPath(uri) : undefined);
 
   connection.onInitialize(async (params) => {
@@ -38,6 +40,13 @@ export function serve(opts: { stub: boolean }): void {
         ? stubResolver(site.catalog)
         : async (directive, page) => {
             const asked = await ask(site.catalog, directive, page);
+            // `bun run play` creates .rubric/jev.jsonl and prints each call
+            // from it. A log is appended a line at a time, not written whole;
+            // nothing but that printer reads it.
+            const log = join(site.root, ".rubric/jev.jsonl");
+            if (existsSync(log)) {
+              void appendFile(log, JSON.stringify({ t: Date.now(), ...asked }) + "\n").catch(() => {});
+            }
             return { resolution: asked.resolution, model: asked.model ?? "unknown" };
           };
       workspace = new Workspace(site, cache, resolver, (f, notes) => {
@@ -56,7 +65,7 @@ export function serve(opts: { stub: boolean }): void {
     return {
       capabilities: {
         textDocumentSync: TextDocumentSyncKind.Incremental,
-        completionProvider: { triggerCharacters: [" ", "="] },
+        completionProvider: { triggerCharacters: [" ", "=", "/", "(", '"'] },
         hoverProvider: true,
         inlineCompletionProvider: true,
       },
@@ -106,6 +115,7 @@ export function serve(opts: { stub: boolean }): void {
       label: c.label,
       kind: kinds[c.kind],
       detail: c.detail,
+      ...(c.filterText === undefined ? {} : { filterText: c.filterText }),
       textEdit: { range: { start: { line, character: c.start }, end: { line, character: c.end } }, newText: c.newText },
     }));
   });
