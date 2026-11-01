@@ -1,5 +1,5 @@
 name: slice
-version: 6
+version: 7
 
 slots: [paper, ink, accent, muted, rule, band]
 
@@ -12,8 +12,8 @@ parts:
         type: choice
         default: theme
         values:
-          theme: the page's own colours
-          tint: a light tint of colour behind the writing
+          theme: the page's own colors
+          tint: a light tint of color behind the writing
           dark: a dark background with light writing
       surface:
         type: choice
@@ -43,7 +43,7 @@ parts:
         default: left
         values:
           left: aligned with the prose
-          centre: centred on the page
+          center: centered on the page
       cite:
         type: text
   callout:

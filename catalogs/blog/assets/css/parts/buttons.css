@@ -8,7 +8,7 @@
   list-style: none;
 }
 .part-buttons li { margin: 0; }
-.part-buttons.align-centre > :is(p, ul) { justify-content: center; }
+.part-buttons.align-center > :is(p, ul) { justify-content: center; }
 .part-buttons a {
   display: inline-flex;
   align-items: center;

@@ -48,7 +48,7 @@ describe("parseCatalog", () => {
     ["no parts", "name: x\nversion: 1\nparts: {}\n", "parts must name at least one part"],
     ["bad version", "name: x\nversion: one\nparts: { a: { description: d } }\n", "version"],
     ["bad part name", "name: x\nversion: 1\nparts: { Big: { description: d } }\n", "parts.Big"],
-    ["unknown type", "name: x\nversion: 1\nparts: { a: { description: d, settings: { s: { type: colour } } } }\n", "parts.a.settings.s.type"],
+    ["unknown type", "name: x\nversion: 1\nparts: { a: { description: d, settings: { s: { type: color } } } }\n", "parts.a.settings.s.type"],
     ["default not a value", "name: x\nversion: 1\nparts: { a: { description: d, settings: { s: { type: choice, default: c, values: { a: x, b: y } } } } }\n", "parts.a.settings.s.default"],
     ["one value", "name: x\nversion: 1\nparts: { a: { description: d, settings: { s: { type: choice, values: { a: x } } } } }\n", "at least two"],
   ])("%s", (_, yaml, message) => {

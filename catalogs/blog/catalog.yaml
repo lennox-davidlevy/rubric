@@ -1,8 +1,8 @@
 name: blog
-version: 1
+version: 2
 
 # The names every theme fills and every part reads. A part never uses a
-# literal colour, font or size.
+# literal color, font or size.
 slots:
   [paper, ink, accent, muted, rule, tint, dark-paper, dark-ink,
    font-body, font-display, font-mono,
@@ -22,8 +22,8 @@ parts:
         type: choice
         default: theme
         values:
-          theme: the page's own colours
-          tint: a light tint of colour behind the writing
+          theme: the page's own colors
+          tint: a light tint of color behind the writing
           dark: a dark background with light writing
       width:
         type: choice
@@ -55,7 +55,7 @@ parts:
         default: left
         values:
           left: aligned with the writing
-          centre: centred on the page
+          center: centered on the page
       image:
         type: image
 
@@ -74,7 +74,7 @@ parts:
         default: left
         values:
           left: aligned with the prose
-          centre: centred on the page
+          center: centered on the page
       cite:
         type: text
 
@@ -146,7 +146,7 @@ parts:
         default: left
         values:
           left: aligned with the writing
-          centre: centred on the page
+          center: centered on the page
 
   divider:
     description: A break between parts of the writing.

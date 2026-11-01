@@ -9,7 +9,7 @@ The language server and the first vertical slice are planned in [lsp.md](lsp.md)
 You write words on a page. Where a part of the page should look a certain way, you open a block and say so in your own words:
 
 ```markdown
-::: a quote from the book, big and centred
+::: a quote from the book, big and centered
 
 Not all those who wander are lost.
 
@@ -46,7 +46,7 @@ The reason to make a UI in Rubric rather than ask a coding agent for one is that
 | Piece | Role |
 | --- | --- |
 | **The catalog file** | The contract everything else depends on. For one kind of site, every part Rubric can place: a name, a one-line description, typed settings with their values described, whether it takes children, and which assets it brings. Jev's questions, validation, completion, the catalog page and the review rounds read this file and nothing else. Nothing outside the site's catalog can appear on a page. |
-| **The parts** | How each entry in the catalog is drawn. A part owns its own HTML, CSS and, when it needs it, JavaScript, loaded only on pages that use it. An animated backdrop is an ordinary part. Parts are written against the theme's slot names, never a literal colour. |
+| **The parts** | How each entry in the catalog is drawn. A part owns its own HTML, CSS and, when it needs it, JavaScript, loaded only on pages that use it. An animated backdrop is an ordinary part. Parts are written against the theme's slot names, never a literal color. |
 | **Hugo** | The first renderer and the whole blog: posts, pages, feeds, dates, drafts, tags, image resizing, a 404, static output with no runtime. A part is a shortcode plus its assets. `hugo server` rebuilds in milliseconds and live-reloads the preview, and it is the published build, so preview and site cannot differ. Rubric downloads a pinned binary on first run; writers never see it. |
 | **A theme** | Named values the parts read: `paper`, `ink`, `accent`, `muted`, `rule`, `band`, three font slots, a type scale, a spacing scale, a measure, radii, shadow levels. Several designed themes ship with each catalog, as CSS files that fill the slots. Every catalog reads the same slot names, which is what lets a theme move between catalogs. |
 | **Jev** (TypeSafe) | Reads a directive line and answers typed questions about it: which part, which settings, whether anything fits. Judgments from Jev, decisions in code. The model version is pinned, because an alias can change answers without a change to the code, and that would break the cache and the promise that the same words give the same page. |
@@ -60,7 +60,7 @@ The renderer is a choice about who draws the parts, made per catalog behind the 
 
 Some parts do things: a picker (tabs, a filter, a theme switch), a gallery with a lightbox, a backdrop that moves, a post list that sorts. They are ordinary catalog entries with three more rules, so that "functional" never costs "beautiful" or "simple":
 
-- **Every part works with no JavaScript, and the script only improves it.** Tabs are headings and sections without it; a gallery is images; a backdrop is a colour. The script loads only on pages that use the part, the way a part's CSS does now (`.HasShortcode`).
+- **Every part works with no JavaScript, and the script only improves it.** Tabs are headings and sections without it; a gallery is images; a backdrop is a color. The script loads only on pages that use the part, the way a part's CSS does now (`.HasShortcode`).
 - **State lives in the page**: open or closed, the chosen tab, the URL hash, at most `localStorage`. Never a server, never shared between parts. The site stays static output.
 - **Motion is a setting with a quiet default.** `motion=none|subtle|lively` or a level, respected as `prefers-reduced-motion`, and `none` on a part that has no reason to move.
 
@@ -78,7 +78,7 @@ A directive is a rubric: a note beside the words saying how they should be set. 
 
 - **Detection is free, with one rule.** A line starting with `:::` is a directive, unless it is inside a fenced code block, where it is code. The scanner tracks code fences. No model call to find out, and an essay heading like "Warm places" is never mistaken for one.
 - **Boundaries are explicit.** The block ends at its closing fence. Blocks nest; the innermost open block closes first. Heading levels stay the writer's.
-- **Plain form and words are the same line in two states.** `::: quote size=large align=centre` is what the words resolve to. A line is plain form when its first token is a part in the catalog and every remaining token is `key=value`. Anything else is words. Plain form is the source of truth: free, offline, exact.
+- **Plain form and words are the same line in two states.** `::: quote size=large align=center` is what the words resolve to. A line is plain form when its first token is a part in the catalog and every remaining token is `key=value`. Anything else is words. Plain form is the source of truth: free, offline, exact.
 - **The site-wide directive** lives in `rubric.md` at the site root, not in pages.
 
 A directive that resolves to nothing is left as plain text in the output, and Rubric says why beside it in the editor. Nothing is guessed.
@@ -108,9 +108,9 @@ Pinned lines never go to the network. Cached lines do not either. Over time most
 
 ## Ghost text and pinning
 
-The language server shows the resolved plain form as grey text at the end of the directive line, the way completion plugins show a suggestion. It is not in the file.
+The language server shows the resolved plain form as gray text at the end of the directive line, the way completion plugins show a suggestion. It is not in the file.
 
-- **Accept** with a key, and the plain form is written into the source. The line is now pinned: it works offline, never changes, and is in git. The words are kept as a trailing comment, since they record intent and are what re-resolution reads if the catalog changes: `::: quote size=large align=centre  <!-- a quote from the book, big and centred -->`.
+- **Accept** with a key, and the plain form is written into the source. The line is now pinned: it works offline, never changes, and is in git. The words are kept as a trailing comment, since they record intent and are what re-resolution reads if the catalog changes: `::: quote size=large align=center  <!-- a quote from the book, big and centered -->`.
 - **Do not accept**, and the words stay live. Jev re-reads the line when it is edited and the pick can change.
 - **Unsettled** picks show the top two and a key chooses between them.
 
@@ -160,9 +160,9 @@ A directive nested inside a part that takes no children is left plain with a war
 
 ## Themes
 
-"Same colour as the theme" only works if the theme is named values. Every catalog reads the same slots, every theme fills them, and every part is written against them.
+"Same color as the theme" only works if the theme is named values. Every catalog reads the same slots, every theme fills them, and every part is written against them.
 
-The root directive in `rubric.md` is answered the same way as any other line: a Choice among the designed palettes, a Choice among the type pairings, and Scores for spacing and contrast that code maps to the scale values. The model never invents a colour. A dozen good palettes and a few pairings are a weekend of taste and they are what make every site look finished. The result is written into the site's Hugo config, and a site can override a value in plain form (`accent=#9a6512`) for the one person in ten who wants to.
+The root directive in `rubric.md` is answered the same way as any other line: a Choice among the designed palettes, a Choice among the type pairings, and Scores for spacing and contrast that code maps to the scale values. The model never invents a color. A dozen good palettes and a few pairings are a weekend of taste and they are what make every site look finished. The result is written into the site's Hugo config, and a site can override a value in plain form (`accent=#9a6512`) for the one person in ten who wants to.
 
 ## Catalogs
 
@@ -188,7 +188,7 @@ Rounds repeat until everything is kept. Kept items never move, so it converges. 
 
 ## The blog, as the MVP
 
-A site has a home page, posts, a few pages (about), an RSS feed and a 404. Dates, drafts and tags come from front matter. Nothing else, and all of it is Hugo's default behaviour.
+A site has a home page, posts, a few pages (about), an RSS feed and a 404. Dates, drafts and tags come from front matter. Nothing else, and all of it is Hugo's default behavior.
 
 The blog catalog, about a dozen parts:
 
@@ -256,7 +256,7 @@ Repos cloned into `reference/`, which is ignored by git, and what each is for. R
 | `artempyanykh/marksman` | A Markdown language server: attach rules, diagnostics and completion inside Markdown. | step 4 |
 | `zbirenbaum/copilot.lua` and Neovim's `runtime/lua/vim/lsp/inline_completion.lua` | Ghost text mechanics in Neovim, accept keys, how the suggestion is shown and cleared. | step 4 |
 | `fenneclab/hugo-bin` | Downloading a pinned Hugo binary from an npm package. | step 2 |
-| `tailwindlabs/tailwindcss-intellisense` | Completion items that carry a colour swatch, for theme and tone values. | step 4 |
+| `tailwindlabs/tailwindcss-intellisense` | Completion items that carry a color swatch, for theme and tone values. | step 4 |
 
 Not repos: the TypeSafe cookbooks for function calling and intent routing (docs.typesafe.ai), and Hugo's own documentation on shortcodes, `RenderString` and modules.
 
@@ -266,7 +266,7 @@ Not repos: the TypeSafe cookbooks for function calling and intent routing (docs.
 - The catalog file is the contract. Parts own their assets. The renderer is chosen per catalog behind it.
 - Hugo is the first renderer and the blog. json-render is out of the end result and in `reference/`.
 - Catalogs are several designed templates, drafted by an LLM and reviewed by a person, then frozen. Not generated per site.
-- The theme is picked, not generated. The model never writes a colour.
+- The theme is picked, not generated. The model never writes a color.
 - The block body stays out of Jev's state, so the cache key and the answer agree.
 - One language server; Neovim first, VS Code second, a browser editor and the hosted version later.
 - Catalog and functionality first, the review rounds and `new` after, so the catalog's shape instructs the design tooling rather than the other way round. Decided 2026-10-31. Iterative design of themes and catalogs stays on the plan as step 6.

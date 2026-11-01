@@ -1,7 +1,7 @@
 # Held out: never used while tuning wording. Run only to check that a change
 # made on lines.yaml generalizes.
-- directive: a big centred line from the interview
-  want: quote size=large align=centre
+- directive: a big centered line from the interview
+  want: quote size=large align=center
 - directive: what my teacher used to say
   want: quote
 - directive: a note about the version this was written for

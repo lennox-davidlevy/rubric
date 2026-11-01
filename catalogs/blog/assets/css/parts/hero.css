@@ -32,8 +32,8 @@
 .part-hero.size-tall { min-height: 80svh; padding-block: var(--space-5); }
 .part-hero.size-tall .part-hero-image { aspect-ratio: auto; height: 50svh; }
 
-.part-hero.align-centre { text-align: center; }
-.part-hero.align-centre .part-hero-text > * { margin-inline: auto; }
+.part-hero.align-center { text-align: center; }
+.part-hero.align-center .part-hero-text > * { margin-inline: auto; }
 
 @media (max-width: 40rem) {
   .part-hero-image { grid-column: full; border-radius: 0; aspect-ratio: 4 / 3; }

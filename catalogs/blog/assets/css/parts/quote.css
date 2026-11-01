@@ -34,8 +34,8 @@
 .part-quote.size-large blockquote > p:last-child::after { content: "\201D"; color: var(--accent); }
 .part-quote.size-large figcaption { padding-left: 0; }
 
-.part-quote.align-centre { text-align: center; }
-.part-quote.align-centre blockquote { padding: 0; border: 0; }
-.part-quote.align-centre figcaption { padding-left: 0; }
-.part-quote.align-centre.size-normal blockquote { font-style: italic; }
-.part-quote.align-centre.size-large blockquote > p:first-child::before { position: static; }
+.part-quote.align-center { text-align: center; }
+.part-quote.align-center blockquote { padding: 0; border: 0; }
+.part-quote.align-center figcaption { padding-left: 0; }
+.part-quote.align-center.size-normal blockquote { font-style: italic; }
+.part-quote.align-center.size-large blockquote > p:first-child::before { position: static; }

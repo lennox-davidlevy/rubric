@@ -82,7 +82,7 @@ function answers(over: {
   const base: Record<string, Answer> = {
     [PART]: choice(over.parts ?? { quote: 0.9, callout: 0.06, section: 0.04 }),
     [settingId("quote", "size")]: choice({ normal: 0.9, large: 0.1 }),
-    [settingId("quote", "align")]: choice({ left: 0.9, centre: 0.1 }),
+    [settingId("quote", "align")]: choice({ left: 0.9, center: 0.1 }),
     [settingId("callout", "kind")]: choice({ note: 0.9, aside: 0.05, warning: 0.05 }),
     [settingId("section", "tone")]: choice({ theme: 0.9, tint: 0.05, dark: 0.05 }),
     [settingId("section", "surface")]: choice({ flat: 0.9, raised: 0.1 }),
@@ -136,20 +136,20 @@ describe("the truth table", () => {
   test("fits, clear part, one setting unsettled: placed with that setting at its default, and named", () => {
     const r = resolve(answers({ settings: {
       [settingId("quote", "size")]: choice({ normal: 0.5, large: 0.5 }),
-      [settingId("quote", "align")]: choice({ left: 0.1, centre: 0.9 }),
+      [settingId("quote", "align")]: choice({ left: 0.1, center: 0.9 }),
     } }), catalog);
     expect(r.outcome).toBe("placed");
     if (r.outcome !== "placed") return;
     expect(r.candidates).toHaveLength(1);
-    expect(r.candidates[0]).toMatchObject({ plain: "quote align=centre", unsettled: ["size"] });
+    expect(r.candidates[0]).toMatchObject({ plain: "quote align=center", unsettled: ["size"] });
   });
 
   test("fits, everything clear: placed with the settings the answers give", () => {
     const r = resolve(answers({ settings: {
       [settingId("quote", "size")]: choice({ normal: 0.1, large: 0.9 }),
-      [settingId("quote", "align")]: choice({ left: 0.1, centre: 0.9 }),
+      [settingId("quote", "align")]: choice({ left: 0.1, center: 0.9 }),
     } }), catalog);
-    expect(r.outcome === "placed" && r.candidates[0]).toMatchObject({ plain: "quote size=large align=centre", unsettled: [] });
+    expect(r.outcome === "placed" && r.candidates[0]).toMatchObject({ plain: "quote size=large align=center", unsettled: [] });
   });
 
   test("settings at their default are left out of the plain form", () => {
@@ -174,7 +174,7 @@ describe("the truth table", () => {
 
   test("a setting the line does not mention stays at its default, whatever value its question picked", () => {
     const r = resolve(answers({
-      settings: { [settingId("quote", "align")]: choice({ left: 0.05, centre: 0.95 }) },
+      settings: { [settingId("quote", "align")]: choice({ left: 0.05, center: 0.95 }) },
       said: { [saidId("quote", "align")]: 0.1 },
     }), catalog);
     expect(r.outcome === "placed" && r.candidates[0]).toMatchObject({ plain: "quote", unsettled: [] });
@@ -182,7 +182,7 @@ describe("the truth table", () => {
 
   test("a setting the line may or may not mention stays at its default, and is named", () => {
     const r = resolve(answers({
-      settings: { [settingId("quote", "align")]: choice({ left: 0.05, centre: 0.95 }) },
+      settings: { [settingId("quote", "align")]: choice({ left: 0.05, center: 0.95 }) },
       said: { [saidId("quote", "align")]: 0.5 },
     }), catalog);
     expect(r.outcome === "placed" && r.candidates[0]).toMatchObject({ plain: "quote", unsettled: ["align"] });

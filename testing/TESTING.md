@@ -4,17 +4,19 @@ You start with an empty post, `testing/pages/posts/test.md`, and build it up one
 
 This file is kept up to date as Rubric changes.
 
-Last updated: 2026-11-01, after the nested closer, completion after deleting, and the Jev count.
+Last updated: 2026-11-01, after the switch to American spelling.
 
 **New since the last test:**
 
+- Everything is in American spelling now: the value is `align=center`, not `centre`. I changed the two pinned lines in your `test.md`. Any `align=centre` you type now gets a warning.
+- Both catalogs went up a version, so the first time you open a page every unpinned line goes to Jev again. That burst in the play log is expected.
 - Typing `::: ` inside another block now adds its own closer, even when the outer block's `:::` is right below (step 11).
 - Deleting a setting's value brings the menu back with the allowed values; before, it came back only after you typed a letter (step 10).
 - The play terminal numbers each Jev call (`── Jev #3`) and prints the session's total when you stop it with Ctrl-C.
 
 ## How to read what you see
 
-- **Neovim**: the ghost text after a `:::` line is Jev's pick. `<M-l>` accepts it and pins the line. Coloured underlines are notes on the line; `<leader>e` shows the message and `K` (in normal mode) explains what the line became.
+- **Neovim**: the ghost text after a `:::` line is Jev's pick. `<M-l>` accepts it and pins the line. Colored underlines are notes on the line; `<leader>e` shows the message and `K` (in normal mode) explains what the line became.
 - **The play terminal**: a `── Jev` block each time a line is sent, ending in `result`. `placed` means it's on the page. `unsettled` means Jev wasn't sure and it's waiting for you.
 - **The browser**: follows the buffer about half a second after you stop typing. You never need to save for the preview.
 - **A `:::` line shown as raw text on the page** means the line isn't placed yet: Jev hasn't answered, wasn't sure, or nothing fits. It should only last until the answer comes, or until you choose.
@@ -89,9 +91,9 @@ Notes from the same two miles, every evening for a year.
 
 Put the cursor at the end of the pinned line, after `hero`, and type a space.
 
-**Should happen:** completion offers hero's settings (`size`, `align`, `image`). Choose `align`, then after the `=` choose `centre`. The line reads `-> hero align=centre`, and the title centres in the browser.
+**Should happen:** completion offers hero's settings (`size`, `align`, `image`). Choose `align`, then after the `=` choose `center`. The line reads `-> hero align=center`, and the title centers in the browser.
 
-Now add a picture to it. Type ` image=` after `centre`.
+Now add a picture to it. Type ` image=` after `center`.
 
 **Should happen:** completion lists the site's pictures by the address the page uses: `/images/sample.jpg`, `/images/path.png`, `/images/gallery/…`. Your own pictures go in `testing/static/images/`; one added while you work shows up the next time you complete. Choosing one writes it in quotes: `image="/images/sample.jpg"`. A picture appears with the hero.
 
@@ -139,7 +141,7 @@ At the end of "The canal" section:
 
 ```markdown
 ::: a tip for the reader
-Bring a torch after October.
+Bring a flashlight after October.
 :::
 ```
 
@@ -269,7 +271,7 @@ Type it top to bottom, and watch what the auto-closer does on the inner `::: `. 
 ::: a break in the writing with a little ornament
 :::
 
-::: two buttons, read more and about, centred
+::: two buttons, read more and about, centered
 [Read more](/posts/) [About](/)
 :::
 
@@ -280,7 +282,7 @@ Type it top to bottom, and watch what the auto-closer does on the inner `::: `. 
 **Should happen:**
 
 - The divider is a small printer's mark, not a line.
-- Two buttons, centred, with the first one stronger. This line came back unsure last time; if it does again, choose as in step 7.
+- Two buttons, centered, with the first one stronger. This line came back unsure last time; if it does again, choose as in step 7.
 - The other posts show in boxes, each with a summary. The page you're on is never among them.
 
 ## 13. Close and reopen

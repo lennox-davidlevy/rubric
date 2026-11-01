@@ -2,7 +2,7 @@
 title: Words lines
 ---
 
-{{< quote size="large" align="centre" >}}
+{{< quote size="large" align="center" >}}
 Not all those who wander are lost.
 {{< /quote >}}
 
@@ -15,7 +15,7 @@ Nothing fits, so nothing is in the cache. Left as text.
 :::
 
 ::: a line the catalog has since changed under
-The cache says quote colour=red, which the catalog no longer allows.
+The cache says quote color=red, which the catalog no longer allows.
 :::
 
 {{< quote size="large" >}}

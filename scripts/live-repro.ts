@@ -69,7 +69,7 @@ const lines = [
   ["a big quo|te", "Hello world aga|in"],
   ["a box with a stro|ng shadow", "Inside the b|ox"],
   ["a warn|ing before the next step", "Mind the g|ap"],
-  ["a quote from a po|et, centred", "The woods are lov|ely"],
+  ["a quote from a po|et, centered", "The woods are lov|ely"],
 ];
 
 let failures = 0;

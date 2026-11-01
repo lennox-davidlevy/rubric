@@ -34,7 +34,7 @@ test.skipIf(!hugo)("every fixture builds in Hugo", () => {
     expect(nested).toContain(`<section class="part-section tone-dark surface-flat shadow-deep">`);
     expect(nested).toContain(`<aside class="part-callout kind-aside">`);
     const words = readFileSync(join(site, "public/posts/words/index.html"), "utf8");
-    expect(words).toContain(`<figure class="part-quote size-large align-centre">`);
+    expect(words).toContain(`<figure class="part-quote size-large align-center">`);
     expect(words).toContain("::: a spreadsheet of my taxes");
   } finally {
     rmSync(site, { recursive: true, force: true });

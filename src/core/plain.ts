@@ -1,4 +1,4 @@
-// The plain form: `quote size=large align=centre cite="J. R. R. Tolkien"`.
+// The plain form: `quote size=large align=center cite="J. R. R. Tolkien"`.
 // A part name followed by key=value settings, where a value with spaces is in
 // double quotes. Plain form is the source of truth; words resolve to it.
 

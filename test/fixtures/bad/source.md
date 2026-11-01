@@ -2,7 +2,7 @@
 title: Bad lines
 ---
 
-::: quote colour=red
+::: quote color=red
 Unknown setting.
 :::
 

@@ -1,4 +1,4 @@
-// The server's behaviour with the stub resolver, in a temporary copy of the
+// The server's behavior with the stub resolver, in a temporary copy of the
 // slice site: content follows the buffer, notes on lines, ghost text,
 // completion and hover.
 

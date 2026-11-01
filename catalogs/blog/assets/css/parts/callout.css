@@ -1,4 +1,4 @@
-/* callout: a note set off from the prose, labelled with its kind. */
+/* callout: a note set off from the prose, labeled with its kind. */
 .part-callout {
   margin-inline: calc(-1 * var(--space-3));
   padding: var(--space-3);

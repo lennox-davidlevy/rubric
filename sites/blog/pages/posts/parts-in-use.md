@@ -45,7 +45,7 @@ A quote inside a dark band.
 ## A wide picture
 
 ::: figure width=wide
-![A soft field of colour](/images/placeholder-field.jpg)
+![A soft field of color](/images/placeholder-field.jpg)
 
 A caption under the picture.
 :::

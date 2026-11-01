@@ -2,7 +2,7 @@
 title: Pinned lines
 ---
 
-::: a quote from the book, big and centred -> quote size=large align=centre
+::: a quote from the book, big and centered -> quote size=large align=center
 Not all those who wander are lost.
 :::
 

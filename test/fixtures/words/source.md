@@ -2,7 +2,7 @@
 title: Words lines
 ---
 
-::: a quote from the book, big and centred
+::: a quote from the book, big and centered
 Not all those who wander are lost.
 :::
 
@@ -15,7 +15,7 @@ Nothing fits, so nothing is in the cache. Left as text.
 :::
 
 ::: a line the catalog has since changed under
-The cache says quote colour=red, which the catalog no longer allows.
+The cache says quote color=red, which the catalog no longer allows.
 :::
 
 ::: blockquote size=large

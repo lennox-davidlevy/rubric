@@ -1,4 +1,4 @@
-7-9 | plain | placed | quote size=large align=centre |
+7-9 | plain | placed | quote size=large align=center |
 11-13 | plain | placed | quote cite="J. R. R. Tolkien" |
 15-17 | plain | placed | callout |
 19-21 | plain | placed | section tone=tint surface=raised |

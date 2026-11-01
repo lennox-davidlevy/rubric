@@ -4,7 +4,7 @@ title: Plain form
 
 Prose before.
 
-{{< quote size="large" align="centre" >}}
+{{< quote size="large" align="center" >}}
 Not all those who wander are lost.
 {{< /quote >}}
 

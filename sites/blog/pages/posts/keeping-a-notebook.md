@@ -26,7 +26,7 @@ There is one rule, and I have kept it for the whole ten years: nothing is torn o
 
 ## Why paper
 
-People expect a defence of paper over a phone, and I do not really have one. It is not that paper is better. It is that a phone is a door into every other thing, and a notebook is a door into nothing but itself.
+People expect a defense of paper over a phone, and I do not really have one. It is not that paper is better. It is that a phone is a door into every other thing, and a notebook is a door into nothing but itself.
 
 > The palest ink is better than the best memory.
 >
@@ -34,7 +34,7 @@ People expect a defence of paper over a phone, and I do not really have one. It 
 
 There is a practical side as well. A pencil works in the rain, in the cold, and on a train with no signal. It has never needed charging, and it has never once asked me to update it.[^pencil]
 
-![A soft field of colour, standing in for a photograph of an open notebook](/images/placeholder-field.jpg)
+![A soft field of color, standing in for a photograph of an open notebook](/images/placeholder-field.jpg)
 
 ## A notebook is not a diary
 

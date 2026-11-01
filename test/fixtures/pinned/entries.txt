@@ -1,4 +1,4 @@
-5-7 | pinned | placed | quote size=large align=centre | "a quote from the book, big and centred"
+5-7 | pinned | placed | quote size=large align=center | "a quote from the book, big and centered"
 9-11 | pinned | placed | quote cite="J. R. R. Tolkien" | "a quote with who said it"
 13-15 | pinned | placed | callout kind=aside | "words with -> an arrow in them"
 17-19 | pinned | left (bad-pin) | - | "a pin that is not plain form"

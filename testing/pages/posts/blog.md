@@ -7,7 +7,7 @@ Each scene below is a line in words. Put the cursor at the end of a `:::` line a
 
 ## Opening
 
-::: a big opening for the top of the page, centred
+::: a big opening for the top of the page, centered
 # The walk home
 
 Two miles past the reservoir, every evening.
@@ -27,7 +27,7 @@ I am sorry this letter is so long; I did not have time to write a short one.
 :::
 
 ::: a tip for the reader
-Bring a torch after October.
+Bring a flashlight after October.
 :::
 
 ::: warn them the path floods in winter
@@ -40,7 +40,7 @@ The lower path is under water from December to March.
 ## Pictures
 
 ::: one wide photo with a caption
-![A soft field of colour](/images/sample.jpg)
+![A soft field of color](/images/sample.jpg)
 
 The canal by the gasworks, early on a Sunday.
 :::
@@ -68,7 +68,7 @@ Forty books, most of them read on trains.
 
 ## Ending
 
-::: two buttons, read more and about, centred
+::: two buttons, read more and about, centered
 [Read more](/posts/) [About](/)
 :::
 

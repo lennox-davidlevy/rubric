@@ -19,13 +19,13 @@ A page to try Rubric on. Each block below is a scene. Edit them, break them, add
 
 ## 1. Words: Jev picks a part
 
-::: a big quote, centered on the page -> quote size=large align=centre
+::: a big quote, centered on the page -> quote size=large align=center
 HELLO how are you!
 :::
 
 Put the cursor at the end of the `:::` line and enter insert mode (`A`). The pick appears as ghost text, and the preview already shows it. `<M-l>` pins it.
 
-::: a big quote, centred on the page
+::: a big quote, centered on the page
 The best way out is always through.
 :::
 

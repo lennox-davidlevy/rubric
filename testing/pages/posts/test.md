@@ -4,7 +4,7 @@ date: 2026-11-01
 ---
 
 
-::: a big opening for the top of the page -> hero size=tall align=centre image="/images/path.png"
+::: a big opening for the top of the page -> hero size=tall align=center image="/images/path.png"
 # The Walk Home
 
 Notes from the same two miles, every evening for a year
@@ -27,7 +27,7 @@ The lower path is under water from December to March.
 Past the gasworks, where the herons wait.
 
 ::: a tip for the reader
-Bring a torch after October
+Bring a flashlight after October
 :::
 
 ::: a pull quote, large -> quote size=large cite="my grandma"
@@ -70,7 +70,7 @@ Who knows?
 ::: a break in the writing with a little ornament
 :::
 
-::: two buttons, read more and about, centered -> buttons align=centre
+::: two buttons, read more and about, centered -> buttons align=center
 [Read more](/posts/) [About](/)
 :::
 

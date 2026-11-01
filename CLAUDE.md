@@ -18,10 +18,11 @@ Writers put `::: words` directives in Markdown; Jev (TypeSafe's model) picks a p
 
 ## Rules
 
+- Write American English everywhere: code, catalog values and descriptions, CSS classes, docs, tests, sample writing, commit messages (`center`, `color`, `gray`, `behavior`, `-ize`, `flashlight`, `sidewalk`). A spelling in a catalog value or description is part of what Jev reads, so changing one bumps the catalog's version.
 - `.env` holds `TYPESAFE_API_KEY`. Never read, print or commit it. The server runs with the repo as its working directory so Bun loads it.
 - Jev is pinned to `jev-1.14.0` in `src/core/questions.ts`. Question wording and thresholds live there and nowhere else. The TypeSafe SDK is used for types only; calls go through `fetch` in `src/jev.ts` because the SDK breaks under Bun.
 - The server works from the editor's text, never the saved file, and writes only `content/` and `.rubric/`. Files are written whole, through `src/core/write.ts`.
 - Diagnostics carry a `Code` from `src/core/diagnostic.ts`; add to that union before using a new one.
 - The Neovim plugin is `editors/nvim/`, loaded by the user's dotfiles from this path. Do not edit the dotfiles repo without being asked.
 - `testing/TESTING.md` is the user's live-test checklist. Update it in the same change as anything they could test by hand: what is new, what to try, what should happen.
-- The user tests by hand in Neovim and writes findings in `notes-on-test.md`. Reproduce a reported problem through the real config before theorising; `scripts/live-repro.ts` is the pattern.
+- The user tests by hand in Neovim and writes findings in `notes-on-test.md`. Reproduce a reported problem through the real config before theorizing; `scripts/live-repro.ts` is the pattern.

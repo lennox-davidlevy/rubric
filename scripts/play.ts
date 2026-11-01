@@ -26,7 +26,7 @@ writeFileSync(log, "");
 
 const hugo = Bun.spawn(["hugo", "server", "-s", "testing", "--port", port], { cwd: repo, stdout: "inherit", stderr: "inherit" });
 
-// Colour only on a terminal.
+// Color only on a terminal.
 const tty = process.stdout.isTTY;
 const paint = (code: string) => (s: string) => (tty ? `\x1b[${code}m${s}\x1b[0m` : s);
 const bold = paint("1"), dim = paint("2"), green = paint("32"), yellow = paint("33"), red = paint("31"), cyan = paint("36");
@@ -109,11 +109,11 @@ function print(c: Call): void {
   const r = c.resolution;
   if (r.outcome === "error") out.push(`${bold("result")}    ${red("error")} ${"message" in r ? r.message : ""}`);
   else if ("candidates" in r) {
-    const colour = r.outcome === "placed" ? green : yellow;
+    const color = r.outcome === "placed" ? green : yellow;
     const [first, second] = r.candidates;
     const line = first ? `::: ${first.plain}` : "nothing fits, the line stays plain";
     const unsettled = first?.unsettled.length ? dim(`  unsettled: ${first.unsettled.join(", ")}`) : "";
-    out.push(`${bold("result")}    ${colour(r.outcome)}  ${bold(line)}${unsettled}  ${dim(`fits ${p(r.fits)}`)}`);
+    out.push(`${bold("result")}    ${color(r.outcome)}  ${bold(line)}${unsettled}  ${dim(`fits ${p(r.fits)}`)}`);
     // The resolver offers the top two for an unsettled line; a second Jev
     // gave almost nothing is not worth a line.
     if (second && second.probability >= THRESHOLDS.close) out.push(dim(`          runner-up ::: ${second.plain} (${p(second.probability)})`));

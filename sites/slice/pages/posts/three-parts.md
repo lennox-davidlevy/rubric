@@ -5,7 +5,7 @@ date: 2026-10-31
 
 This page uses all three parts of the slice catalog as directives. Plain prose first, because most of a blog has no parts at all.
 
-::: quote size=large align=centre
+::: quote size=large align=center
 Not all those who wander are lost.
 :::
 
@@ -41,7 +41,7 @@ The section's last paragraph.
 A dark, raised section with a deep shadow.
 :::
 
-::: a quote from the book, big and centred
+::: a quote from the book, big and centered
 A words line. Until Jev is wired in, it stays as text.
 :::
 

@@ -6,9 +6,9 @@ Written 2026-10-30. The first thing built is one thin vertical slice through eve
 
 In a site folder with `hugo server` running and Neovim open on a page:
 
-1. You type `::: a quote from the book, big and centred` and stop.
-2. Within a moment, grey text appears at the end of the line: `-> quote size=large align=centre`, and the preview shows the block drawn as a large centred quote.
-3. You press the accept key. The grey text becomes real text. The line is pinned and never goes to the network again.
+1. You type `::: a quote from the book, big and centered` and stop.
+2. Within a moment, gray text appears at the end of the line: `-> quote size=large align=center`, and the preview shows the block drawn as a large centered quote.
+3. You press the accept key. The gray text becomes real text. The line is pinned and never goes to the network again.
 4. You press the swap key instead, and the second pick shows, in the editor and in the preview.
 5. You type a line nothing fits, `::: a spreadsheet of my taxes`, and the editor marks it with "nothing in the catalog fits" and the preview shows the line as plain text.
 6. You stop Jev (bad key, no network) and the editor says "could not reach Jev" and nothing else changes.
@@ -47,7 +47,7 @@ parts:
         type: choice
         default: theme
         values:
-          theme: the page's own colours
+          theme: the page's own colors
           band: a tinted band across the page
           dark: inverted, ink on paper becomes paper on ink
       surface:
@@ -76,7 +76,7 @@ parts:
       align:
         type: choice
         default: left
-        values: { left: aligned with the prose, centre: centred on the page }
+        values: { left: aligned with the prose, center: centered on the page }
       cite:
         type: text
   callout:
@@ -97,21 +97,21 @@ parts:
 - `children: false` parts (a `divider`, later) are where a nested directive is an error.
 - The version is part of the cache key. Change a description, bump the version, and every live line is asked again.
 
-The shortcode for a part reads the same setting names: `{{< quote size="large" align="centre" >}}`. The validator checks a plain form against this file before the preprocessor writes it, so the shortcode can never receive a value the file does not allow.
+The shortcode for a part reads the same setting names: `{{< quote size="large" align="center" >}}`. The validator checks a plain form against this file before the preprocessor writes it, so the shortcode can never receive a value the file does not allow.
 
 ## The pin format
 
 The plan had the words kept in a trailing comment. The slice uses a simpler form, because it makes accepting the ghost text a plain insertion with no range tricks, and keeps the words visible while deciding:
 
 ```markdown
-::: a quote from the book, big and centred -> quote size=large align=centre
+::: a quote from the book, big and centered -> quote size=large align=center
 ```
 
 - A line with `->` is pinned. Left of it are the words, right of it is the plain form. Code reads only the right side. The words stay as the record of intent and are what "re-resolve" reads if the catalog changes.
 - A line with no `->` whose first token is a part and whose other tokens are `key=value` is plain form, written by hand or by completion.
 - Any other line is words, and live.
 
-The ghost text is exactly the text that accepting inserts: ` -> quote size=large align=centre` at the end of the line. Nothing else about the line changes. If the comment form turns out to read better, inline completion items carry a range and Neovim draws a ranged item as an overlay, so the whole line can be replaced on accept instead. Settled in the slice.
+The ghost text is exactly the text that accepting inserts: ` -> quote size=large align=center` at the end of the line. Nothing else about the line changes. If the comment form turns out to read better, inline completion items carry a range and Neovim draws a ranged item as an overlay, so the whole line can be replaced on accept instead. Settled in the slice.
 
 ## What the editor gets from the server
 
@@ -136,12 +136,12 @@ Inside a plain-form line, completion is contextual: after the part name it offer
 
 ## What goes to Jev
 
-One request per live line, generated from the catalog file, with every question bundled. The slice sends roughly this for `::: a quote from the book, big and centred`:
+One request per live line, generated from the catalog file, with every question bundled. The slice sends roughly this for `::: a quote from the book, big and centered`:
 
 ```json
 {
   "state": {
-    "directive": "a quote from the book, big and centred",
+    "directive": "a quote from the book, big and centered",
     "page": "post"
   },
   "questions": [
@@ -153,7 +153,7 @@ One request per live line, generated from the catalog file, with every question 
     { "id": "quote.size", "type": "choice",
       "text": "What size does `directive` ask the quote to be?",
       "options": { "normal": "the same size as the prose", "large": "noticeably larger…" } },
-    { "id": "quote.align", "type": "choice", "text": "…", "options": { "left": "…", "centre": "…" } },
+    { "id": "quote.align", "type": "choice", "text": "…", "options": { "left": "…", "center": "…" } },
     { "id": "section.tone", "type": "choice", "text": "…", "options": { "theme": "…", "band": "…", "dark": "…" } },
     { "id": "section.surface", "type": "choice", "…": "…" },
     { "id": "section.shadow", "type": "score", "levels": { "none": "…", "soft": "…", "deep": "…" } },
@@ -178,7 +178,7 @@ Step 4, run 2026-10-31 against `jev-1.14.0`: `bun scripts/probe.ts` over `probe/
 
 - **Round trip: median 140 ms, p90 182 ms, max 292 ms** over 93 calls of 16 questions each. Ghost text can feel like completion; the debounce, not the network, will set the pace.
 - **One `fits` Noul for the whole catalog did not separate.** "heads up" scored 0.67 and "a photo gallery" 0.63. It is now one Noul per part, `fits:<part>`, and the resolver reads the one for the part the Choice picked.
-- **A Choice or Score sets settings nobody asked for.** "a pull quote" came back `align=centre`, "a dark band" `shadow=deep`. Each choice and level setting now has a `said:<part>:<setting>` Noul: does the line ask for any value other than the default, with those values listed and described. Below 0.3 the setting stays at its default; in the band it stays at its default and is named as unsettled. Asking "what tone" without the values failed the human test: `tone` is jargon.
+- **A Choice or Score sets settings nobody asked for.** "a pull quote" came back `align=center`, "a dark band" `shadow=deep`. Each choice and level setting now has a `said:<part>:<setting>` Noul: does the line ask for any value other than the default, with those values listed and described. Below 0.3 the setting stays at its default; in the band it stays at its default and is named as unsettled. Asking "what tone" without the values failed the human test: `tone` is jargon.
 - **Descriptions are the prompt, and literal.** "Words quoted from someone else, set off from the prose" missed "an excerpt from the letter" (0.51), because the line says neither "quoted" nor "set off". "A quotation of words someone said or wrote" scores 0.83. The section's "a run of the page set apart" let a gallery fit at 0.44. Write each description as what the part *is*, in the words a writer would use, with no qualifier the writer would not say.
 - **Value names are sent to the model.** `tone=band` lost to `dark` on "a dark band", because every section is a band; the value is now `tint`. Name a value for what it does.
 - **Answers vary a little between runs** (0.67 then 0.62 on the same line). A line on a threshold can flip. The cache makes a line stable after its first answer.
@@ -244,7 +244,7 @@ These feed the fifty-line gate in the plan, which is run against the real blog c
 
 - Themes, the root directive, and any design quality in the three parts.
 - The `rubric` command, downloading Hugo, the watcher for editors without the protocol.
-- Code actions, document colours, the `:Rubric` commands, the slow path, review rounds.
+- Code actions, document colors, the `:Rubric` commands, the slow path, review rounds.
 - VS Code and the browser editor. Both are clients of this server; nothing in the slice is Neovim-specific except the three lines above.
 
 ## Settled in the slice

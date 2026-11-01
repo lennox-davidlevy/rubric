@@ -2,7 +2,7 @@
 title: Pinned lines
 ---
 
-{{< quote size="large" align="centre" >}}
+{{< quote size="large" align="center" >}}
 Not all those who wander are lost.
 {{< /quote >}}
 

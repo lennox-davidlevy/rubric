@@ -1,4 +1,4 @@
-5:11-16 unknown-setting: quote has no setting "colour"
+5:11-15 unknown-setting: quote has no setting "color"
 9:16-19 value-not-allowed: "huge" is not allowed for size; allowed: normal, large
 13:22-25 duplicate-setting: size is given more than once
 17:5-28 unfinished-setting: each setting is key=value, with a value that has spaces in double quotes
