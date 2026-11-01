@@ -1,0 +1,13 @@
+# The catalog page, as its own small site over the catalog module. Serve it
+# with `hugo server -s catalogs/blog/page`; each theme is a page.
+baseURL = "/"
+title = "Blog catalog"
+theme = "blog"
+themesDir = "../.."
+disableKinds = ["taxonomy", "term", "rss", "sitemap"]
+
+[markup.goldmark.renderer]
+unsafe = true
+
+[markup.highlight]
+noClasses = false

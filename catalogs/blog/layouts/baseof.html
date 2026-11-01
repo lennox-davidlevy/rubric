@@ -7,7 +7,9 @@
 {{- with .Description | default .Summary | plainify }}
 <meta name="description" content="{{ . | truncate 160 }}">
 {{- end }}
-{{- $theme := site.Params.rubric.theme | default "paper" }}
+{{- /* The catalog page sets its own theme and shows every part. */}}
+{{- $catalog := .Params.rubric.catalog | default false }}
+{{- $theme := cond $catalog (.Params.rubric.theme | default "paper") (site.Params.rubric.theme | default "paper") }}
 {{- $t := index hugo.Data.themes $theme }}
 {{- if not $t }}{{ errorf "rubric: %q is not a theme in this catalog" $theme }}{{ end }}
 {{- range $t.preload }}
@@ -18,16 +20,17 @@
 {{- $bundle := slice $theme }}
 {{- /* A part's CSS and script are loaded only on pages that use it. */}}
 {{- range $name, $part := hugo.Data.catalog.parts }}
-  {{- if $.HasShortcode $name }}
+  {{- if or $catalog ($.HasShortcode $name) }}
     {{- with resources.Get (printf "css/parts/%s.css" $name) }}
       {{- $css = $css | append . }}
       {{- $bundle = $bundle | append $name }}
     {{- end }}
     {{- if $part.script }}
-      {{- $js = $js | append (resources.Get (printf "js/parts/%s.js" $name)) }}
+      {{- with resources.Get (printf "js/parts/%s.js" $name) }}{{ $js = $js | append . }}{{ end }}
     {{- end }}
   {{- end }}
 {{- end }}
+{{- if $catalog }}{{ $css = $css | append (resources.Get "css/catalog.css") }}{{ end }}
 {{- with $css | resources.Concat (printf "css/%s.css" (delimit $bundle "-")) | minify | fingerprint }}
 <link rel="stylesheet" href="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}">
 {{- end }}

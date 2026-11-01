@@ -11,6 +11,10 @@ source = "themes.yaml"
 target = "data/themes.yaml"
 
 [[module.mounts]]
+source = "samples.yaml"
+target = "data/samples.yaml"
+
+[[module.mounts]]
 source = "layouts"
 target = "layouts"
 

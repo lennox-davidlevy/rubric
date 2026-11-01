@@ -1,0 +1,22 @@
+/* post-list: the dated style lives in base.css, since the home page uses it. */
+.post-list.style-titles li + li { margin-top: var(--space-1); }
+
+.post-list.style-cards { display: grid; gap: var(--space-2); }
+.post-list.style-cards li {
+  position: relative;
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  transition: border-color 120ms, box-shadow 120ms;
+}
+.post-list.style-cards li:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--rule)); box-shadow: var(--shadow-soft); }
+.post-list.style-cards a {
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 600;
+  line-height: 1.25;
+}
+.post-list.style-cards a::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.post-list.style-cards a:hover { text-decoration: none; color: var(--accent); }
+.post-list.style-cards p { margin: var(--space-1) 0 0; font-size: var(--step--1); color: var(--muted); }

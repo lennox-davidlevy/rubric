@@ -55,9 +55,13 @@ async function writePage(site: Site, cache: Cache, file: string): Promise<void> 
   }
 }
 
+// Rewrites content/ in place and removes only pages that are gone. Deleting
+// the folder itself would leave a running `hugo server` watching nothing.
 async function build(site: Site, cache: Cache): Promise<void> {
-  await rm(site.content, { recursive: true, force: true });
   const files = (await readdir(site.pages, { recursive: true })).filter((f) => f.endsWith(".md"));
   for (const f of files) await writePage(site, cache, join(site.pages, f));
+  const keep = new Set(files);
+  const existing = await readdir(site.content, { recursive: true }).catch(() => [] as string[]);
+  for (const f of existing) if (f.endsWith(".md") && !keep.has(f)) await rm(join(site.content, f));
   console.log(`wrote ${files.length} page(s) to ${site.content}`);
 }

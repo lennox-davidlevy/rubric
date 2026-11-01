@@ -25,6 +25,9 @@
   --muted: #6b6357;
   --rule: #e2dacb;
   --tint: #f1e9d9;
+  /* The colours of a dark section. */
+  --dark-paper: #2a2520;
+  --dark-ink: #f3ede2;
 
   --font-body: "Source Serif 4", Charter, "Iowan Old Style", Georgia, serif;
   --font-display: "Source Serif 4", Charter, "Iowan Old Style", Georgia, serif;

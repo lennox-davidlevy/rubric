@@ -1,11 +1,11 @@
 baseURL = "/"
 title = "Rubric playground"
-theme = "slice"
+theme = "blog"
 themesDir = "../catalogs"
-disableKinds = ["taxonomy", "term", "rss", "sitemap"]
+disableKinds = ["taxonomy", "term", "sitemap"]
 
 [params.rubric]
-theme = "plain"
+theme = "paper"
 
 # Nested parts hand their HTML to the outer part's RenderString.
 [markup.goldmark.renderer]

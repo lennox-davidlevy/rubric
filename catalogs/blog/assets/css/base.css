@@ -65,6 +65,18 @@ body {
 
 main.flow { padding-block: var(--space-4) var(--space-5); }
 
+/* A part's insides keep the same rhythm as the page. */
+.stack > * { margin-block: 0; }
+.stack > * + * { margin-top: 1lh; }
+.stack > * + :is(h2, h3, h4) { margin-top: calc(1lh + var(--space-2)); }
+.stack > :is(h2, h3, h4) + * { margin-top: var(--space-1); }
+
+/* Every part leaves more room around itself than a paragraph does. */
+.flow > .part { margin-block: calc(1lh + var(--space-2)); }
+.flow > .part + * { margin-top: calc(1lh + var(--space-2)); }
+.flow > :is(h2, h3, h4) + .part { margin-top: var(--space-2); }
+.stack > .part, .stack > .part + * { margin-top: calc(1lh + var(--space-1)); }
+
 /* Headings: the same face, heavier and tighter, never louder than they need. */
 h1, h2, h3, h4 {
   font-family: var(--font-display);
@@ -101,7 +113,7 @@ ol > li::marker { font-variant-numeric: lining-nums tabular-nums; }
 blockquote {
   padding-left: calc(var(--space-3) - 2px);
   border-left: 2px solid var(--rule);
-  color: color-mix(in srgb, var(--ink) 82%, var(--paper));
+  color: color-mix(in srgb, currentColor 82%, transparent);
 }
 blockquote > * { margin-block: 0; }
 blockquote > * + * { margin-top: 1lh; }
@@ -135,7 +147,9 @@ pre code { font-size: inherit; background: none; padding: 0; }
 .flow > .highlight > pre, .flow > pre { margin-inline: calc(-1 * var(--space-3)); }
 .chroma .c, .chroma .c1, .chroma .cm, .chroma .cs, .chroma .ch { color: var(--muted); font-style: italic; }
 .chroma .k, .chroma .kd, .chroma .kn, .chroma .kr, .chroma .kc, .chroma .nt { color: var(--accent); }
-.chroma .s, .chroma .s1, .chroma .s2, .chroma .sb, .chroma .se { color: color-mix(in srgb, var(--ink) 75%, var(--accent)); }
+.chroma .s, .chroma .s1, .chroma .s2, .chroma .sb, .chroma .se { color: color-mix(in srgb, currentColor 75%, var(--accent)); }
+
+figure { margin: 0; }
 
 img, svg, video { display: block; max-width: 100%; height: auto; }
 p > img { border-radius: var(--radius); }
@@ -147,7 +161,7 @@ table {
   font-variant-numeric: lining-nums tabular-nums;
 }
 th, td { padding: var(--space-1) var(--space-2) var(--space-1) 0; text-align: left; vertical-align: top; }
-th { font-weight: 600; border-bottom: 1px solid var(--ink); }
+th { font-weight: 600; border-bottom: 1px solid currentColor; }
 td { border-bottom: 1px solid var(--rule); }
 
 abbr[title] { text-decoration: underline dotted var(--muted); }

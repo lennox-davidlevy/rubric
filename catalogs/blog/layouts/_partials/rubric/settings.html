@@ -29,6 +29,9 @@
   {{- else if eq $def.type "flag" -}}
     {{- $allowed = dict "true" "" "false" "" -}}
   {{- end -}}
+  {{- if and (eq $def.type "number") (not (findRE `^[0-9]+$` (string $value))) -}}
+    {{- errorf "rubric: %q is not a number for %s.%s (%s)" $value $.part $key $.sc.Position -}}
+  {{- end -}}
   {{- if and $allowed (not (isset $allowed (string $value))) -}}
     {{- $names := slice -}}
     {{- range $name, $_ := $allowed }}{{ $names = $names | append $name }}{{ end -}}

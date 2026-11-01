@@ -5,7 +5,7 @@
 //
 //   bun scripts/live-repro.ts [blocks] [msPerKey]
 //
-// Needs `bun run play` (Hugo on 1415). Restores the page afterwards.
+// Needs `bun run play` (Hugo on 1415, or RUBRIC_PORT). Restores the page afterwards.
 
 import { copyFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -36,7 +36,7 @@ const type = async (s: string) => {
   }
 };
 const served = async () => {
-  const html = await (await fetch("http://localhost:1415/posts/playground/")).text();
+  const html = await (await fetch(`http://localhost:${process.env.RUBRIC_PORT ?? 1415}/posts/playground/`)).text();
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 };
 const serverText = () => {

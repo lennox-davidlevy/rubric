@@ -1,8 +1,15 @@
 {{- /*
   The list of posts, shared by the home page, section pages and the post-list
-  part. Takes pages, style (dated, titles, cards) and an optional count.
+  part. Takes pages, style (dated, titles, cards), an optional count and the
+  page it is on, which is left out of its own list.
+
+  A card's summary is the post's description, or the first paragraph of its
+  source. Never .Summary: that renders the post, and two posts that list each
+  other would each wait for the other to finish.
 */ -}}
-{{- $pages := .pages.ByDate.Reverse -}}
+{{- $pages := .pages -}}
+{{- with .page }}{{ $pages = where $pages "RelPermalink" "ne" .RelPermalink }}{{ end -}}
+{{- $pages = $pages.ByDate.Reverse -}}
 {{- with .count }}{{ $pages = first . $pages }}{{ end -}}
 <ul class="post-list style-{{ .style }}">
 {{- range $pages }}
@@ -12,7 +19,14 @@
   {{- end }}
   <a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>
   {{- if eq $.style "cards" }}
-  <p>{{ .Summary | plainify | truncate 180 }}</p>
+  {{- $summary := .Description }}
+  {{- if not $summary }}
+    {{- range split (.RawContent | replaceRE `(?s)\{\{[<%].*?[%>]\}\}` "") "\n\n" }}
+      {{- $p := trim . " \n" }}
+      {{- if and (not $summary) $p (not (hasPrefix $p "#")) (not (hasPrefix $p ":::")) (not (hasPrefix $p "!")) }}{{ $summary = $p }}{{ end }}
+    {{- end }}
+  {{- end }}
+  {{- with $summary }}<p>{{ . | markdownify | plainify | truncate 180 }}</p>{{ end }}
   {{- end }}
 </li>
 {{- end }}

@@ -1,0 +1,7 @@
+{{- $labels := dict "note" "Note" "tip" "Tip" "warning" "Warning" -}}
+<aside class="part part-callout kind-{{ .s.kind }}" aria-label="{{ index $labels .s.kind }}">
+<p class="part-callout-label" aria-hidden="true">{{ index $labels .s.kind }}</p>
+<div class="stack">
+{{ .inner }}
+</div>
+</aside>

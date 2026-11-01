@@ -1,6 +1,6 @@
 ### Rubric Testing Ground
 
-A live Rubric site for trying the editor by hand. It uses the slice catalog in `../catalogs/slice` and calls the real Jev with `TYPESAFE_API_KEY` from the repo's `.env`.
+A live Rubric site for trying the editor by hand. It uses the blog catalog in `../catalogs/blog`, in the Paper theme, and calls the real Jev with `TYPESAFE_API_KEY` from the repo's `.env`.
 
 1. Start the preview, from the repo root:
 
@@ -8,12 +8,12 @@ A live Rubric site for trying the editor by hand. It uses the slice catalog in `
    bun run play
    ```
 
-   That writes `testing/content/` from `testing/pages/` once and serves it at http://localhost:1415/posts/playground/.
+   That writes `testing/content/` from `testing/pages/` once and serves it at http://localhost:1415/posts/blog/ (the blog catalog's scenes) and http://localhost:1415/posts/playground/ (the older page, from the slice).
 
 2. In another pane, open the page:
 
    ```sh
-   nvim testing/pages/posts/playground.md
+   nvim testing/pages/posts/blog.md
    ```
 
    The language server rewrites `content/` 300 ms after you stop typing, so the preview follows the buffer without saving.

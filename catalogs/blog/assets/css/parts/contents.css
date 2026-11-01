@@ -1,0 +1,19 @@
+/* contents: the page's headings as a quiet list of links. */
+.part-contents {
+  padding-left: calc(var(--space-3) - 2px);
+  border-left: 2px solid var(--rule);
+  font-size: var(--step--1);
+}
+.part-contents-label {
+  margin: 0 0 var(--space-1);
+  font-size: 0.82em;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.part-contents ul { margin: 0; padding: 0; list-style: none; }
+.part-contents ul ul { padding-left: var(--space-3); }
+.part-contents li, .part-contents li + li, .part-contents li > ul { margin-top: 0.3em; }
+.part-contents a { text-decoration: none; }
+.part-contents a:hover { color: var(--accent); }
