@@ -1,0 +1,7 @@
+# The designed themes. Each fills every slot in catalog.yaml, in
+# assets/css/themes/<name>.css. `preload` names the font files the first
+# screen needs, so text is set in the right face on the first paint.
+
+paper:
+  description: warm off-white paper, near-black ink and a rust accent, set in a book serif
+  preload: [source-serif-4-normal.woff2]

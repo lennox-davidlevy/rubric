@@ -18,6 +18,9 @@ export type Setting =
 export interface Part {
   description: string;
   children: boolean;
+  // The part brings a script, loaded only on pages that use it. The part
+  // still works without it.
+  script: boolean;
   settings: Record<string, Setting>;
 }
 
@@ -54,12 +57,14 @@ export function parseCatalog(text: string): Catalog {
     const part = record(rawPart, at);
     const children = part.children ?? false;
     if (typeof children !== "boolean") throw new CatalogError(`${at}.children must be true or false`);
+    const script = part.script ?? false;
+    if (typeof script !== "boolean") throw new CatalogError(`${at}.script must be true or false`);
     const settings: Record<string, Setting> = {};
     for (const [settingName, rawSetting] of Object.entries(record(part.settings ?? {}, `${at}.settings`))) {
       named(settingName, `${at}.settings.${settingName}`);
       settings[settingName] = setting(rawSetting, `${at}.settings.${settingName}`);
     }
-    parts[partName] = { description: string(part.description, `${at}.description`), children, settings };
+    parts[partName] = { description: string(part.description, `${at}.description`), children, script, settings };
   }
   if (Object.keys(parts).length === 0) throw new CatalogError("parts must name at least one part");
 

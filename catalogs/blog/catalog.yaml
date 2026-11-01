@@ -1,0 +1,172 @@
+name: blog
+version: 1
+
+# The names every theme fills and every part reads. A part never uses a
+# literal colour, font or size.
+slots:
+  [paper, ink, accent, muted, rule, tint,
+   font-body, font-display, font-mono,
+   step--1, step-0, step-1, step-2, step-3, step-4,
+   space-1, space-2, space-3, space-4, space-5,
+   measure, wide, radius, shadow-soft, shadow-deep]
+
+# Descriptions are Jev's prompt and are read literally: say what the part is,
+# in the words a writer would use. Value names are sent too; name a value for
+# what it does.
+parts:
+  section:
+    description: A box or a band across the page that sets the writing inside it apart from the rest of the page.
+    children: true
+    settings:
+      tone:
+        type: choice
+        default: theme
+        values:
+          theme: the page's own colours
+          tint: a light tint of colour behind the writing
+          dark: a dark background with light writing
+      width:
+        type: choice
+        default: prose
+        values:
+          prose: as wide as the writing
+          wide: wider than the writing
+          full: the full width of the screen
+      edge:
+        type: choice
+        default: flat
+        values:
+          flat: no edge, it sits in the page
+          outlined: a thin line around it
+          raised: lifted off the page with a shadow
+
+  hero:
+    description: A big opening at the top of a page, with a title and a line or two under it.
+    children: true
+    settings:
+      size:
+        type: choice
+        default: normal
+        values:
+          normal: a large title with room around it
+          tall: fills most of the screen before the writing starts
+      align:
+        type: choice
+        default: left
+        values:
+          left: aligned with the writing
+          centre: centred on the page
+      image:
+        type: text
+
+  quote:
+    description: A quotation of words someone said or wrote.
+    children: true
+    settings:
+      size:
+        type: choice
+        default: normal
+        values:
+          normal: the same size as the prose
+          large: noticeably larger than the prose, a pull quote
+      align:
+        type: choice
+        default: left
+        values:
+          left: aligned with the prose
+          centre: centred on the page
+      cite:
+        type: text
+
+  callout:
+    description: A short note for the reader, set off from the main prose, such as a tip or a warning.
+    children: true
+    settings:
+      kind:
+        type: choice
+        default: note
+        values:
+          note: something worth knowing
+          tip: advice that makes something easier
+          warning: something that could go wrong
+
+  figure:
+    description: One picture with a caption under it.
+    children: true
+    settings:
+      width:
+        type: choice
+        default: prose
+        values:
+          prose: as wide as the writing
+          wide: wider than the writing
+          full: the full width of the screen
+
+  gallery:
+    description: A set of pictures shown together.
+    children: true
+    script: true
+    settings:
+      columns:
+        type: choice
+        default: three
+        values:
+          two: two pictures across
+          three: three pictures across
+          four: four pictures across
+      motion:
+        type: choice
+        default: subtle
+        values:
+          subtle: pictures open and close with a short fade
+          none: pictures open and close at once, with no movement
+
+  post-list:
+    description: A list of posts from this blog.
+    children: false
+    settings:
+      style:
+        type: choice
+        default: dated
+        values:
+          dated: each post's title with its date
+          titles: the titles alone
+          cards: each post in its own box with its summary
+      count:
+        type: number
+      tag:
+        type: text
+
+  buttons:
+    description: One or two links shown as buttons, the first one stronger.
+    children: true
+    settings:
+      align:
+        type: choice
+        default: left
+        values:
+          left: aligned with the writing
+          centre: centred on the page
+
+  divider:
+    description: A break between parts of the writing.
+    children: false
+    settings:
+      style:
+        type: choice
+        default: line
+        values:
+          line: a short thin line
+          ornament: a small printer's ornament
+          space: blank space with no mark
+
+  contents:
+    description: A table of contents for this page.
+    children: false
+
+  fold:
+    description: A section that stays closed until the reader opens it.
+    children: true
+    settings:
+      summary:
+        type: text

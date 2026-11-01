@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="{{ site.Language.Locale | default "en" }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ if .IsHome }}{{ site.Title }}{{ else }}{{ .Title }} · {{ site.Title }}{{ end }}</title>
+{{- with .Description | default .Summary | plainify }}
+<meta name="description" content="{{ . | truncate 160 }}">
+{{- end }}
+{{- $theme := site.Params.rubric.theme | default "paper" }}
+{{- $t := index hugo.Data.themes $theme }}
+{{- if not $t }}{{ errorf "rubric: %q is not a theme in this catalog" $theme }}{{ end }}
+{{- range $t.preload }}
+<link rel="preload" href="{{ printf "fonts/%s" . | relURL }}" as="font" type="font/woff2" crossorigin>
+{{- end }}
+{{- $css := slice (resources.Get (printf "css/themes/%s.css" $theme)) (resources.Get "css/base.css") }}
+{{- $js := slice }}
+{{- $bundle := slice $theme }}
+{{- /* A part's CSS and script are loaded only on pages that use it. */}}
+{{- range $name, $part := hugo.Data.catalog.parts }}
+  {{- if $.HasShortcode $name }}
+    {{- with resources.Get (printf "css/parts/%s.css" $name) }}
+      {{- $css = $css | append . }}
+      {{- $bundle = $bundle | append $name }}
+    {{- end }}
+    {{- if $part.script }}
+      {{- $js = $js | append (resources.Get (printf "js/parts/%s.js" $name)) }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- with $css | resources.Concat (printf "css/%s.css" (delimit $bundle "-")) | minify | fingerprint }}
+<link rel="stylesheet" href="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}">
+{{- end }}
+{{- range $js }}
+{{- with . | minify | fingerprint }}
+<script src="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}" defer></script>
+{{- end }}
+{{- end }}
+{{- with site.Home.OutputFormats.Get "rss" }}
+<link rel="alternate" type="application/rss+xml" href="{{ .RelPermalink }}" title="{{ site.Title }}">
+{{- end }}
+</head>
+<body>
+<a class="skip" href="#main">Skip to the writing</a>
+<header class="masthead">
+  <a class="masthead-title" href="{{ "/" | relURL }}"{{ if .IsHome }} aria-current="page"{{ end }}>{{ site.Title }}</a>
+  {{- with site.Menus.main }}
+  <nav aria-label="Site">
+    {{- range . }}
+    <a href="{{ .URL }}"{{ if $.IsMenuCurrent "main" . }} aria-current="page"{{ end }}>{{ .Name }}</a>
+    {{- end }}
+  </nav>
+  {{- end }}
+</header>
+<main id="main" class="flow">
+{{ block "main" . }}{{ end }}
+</main>
+<footer class="site-footer">
+  {{- with site.Params.footer }}<p>{{ . | markdownify }}</p>{{ end }}
+  <p>© {{ now.Year }} {{ site.Params.author | default site.Title }}{{ with site.Home.OutputFormats.Get "rss" }} · <a href="{{ .RelPermalink }}">RSS</a>{{ end }}</p>
+</footer>
+</body>
+</html>

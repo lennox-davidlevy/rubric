@@ -1,0 +1,19 @@
+{{- /*
+  The list of posts, shared by the home page, section pages and the post-list
+  part. Takes pages, style (dated, titles, cards) and an optional count.
+*/ -}}
+{{- $pages := .pages.ByDate.Reverse -}}
+{{- with .count }}{{ $pages = first . $pages }}{{ end -}}
+<ul class="post-list style-{{ .style }}">
+{{- range $pages }}
+<li>
+  {{- if eq $.style "dated" }}
+  <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2 Jan 2006" }}</time>
+  {{- end }}
+  <a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>
+  {{- if eq $.style "cards" }}
+  <p>{{ .Summary | plainify | truncate 180 }}</p>
+  {{- end }}
+</li>
+{{- end }}
+</ul>
