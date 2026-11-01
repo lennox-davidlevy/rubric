@@ -1,0 +1,33 @@
+# A palette: every color a page is drawn in. Parts never name a color; they
+# read these. `bun scripts/theme.ts check` measures every pair of text and
+# ground below and refuses one a reader would struggle with.
+description: warm off-white paper, near-black ink and a rust accent
+
+# light or dark: which way the browser draws its own controls and scrollbars.
+scheme: light
+
+paper: "#f9f6ef"    # the page
+ink: "#221e19"      # the writing
+accent: "#9a3412"   # links on hover, quote rules and marks, ornaments, labels
+muted: "#6b6357"    # bylines, captions, dates; still has to be readable
+rule: "#e2dacb"     # lines and borders
+tint: "#f1e9d9"     # behind code, callouts and a tinted box
+
+# A section with tone=dark: the band of light writing on a dark ground. Its
+# accent is separate, since the page's own accent is chosen for the page and
+# is usually too dark to read here.
+dark:
+  paper: "#2a2520"
+  ink: "#f3ede2"
+  accent: "#e5936a"
+  # Left out, so worked out from the three above:
+  # muted (ink 68% into paper), rule (20%), tint (9%), accent-tint (accent 12%).
+
+# Left out, so worked out:
+# raised: paper           the ground of a raised box
+# accent-tint: accent 8%  the ground of a warning callout
+
+# Shadows under raised boxes and cards. color defaults to ink on a light
+# palette and black on a dark one; strength scales how strong they are.
+shadow:
+  strength: 1

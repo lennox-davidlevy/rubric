@@ -7,17 +7,27 @@
 {{- with .Description | default .Summary | plainify }}
 <meta name="description" content="{{ . | truncate 160 }}">
 {{- end }}
-{{- /* The catalog page sets its own theme and shows every part. */}}
+{{- /* A page may name its own theme, as the catalog and stress pages do.
+     A theme is a palette, a pairing and a scale (themes.yaml); a site may
+     swap any one of them. */}}
 {{- $catalog := .Params.rubric.catalog | default false }}
-{{- $theme := cond $catalog (.Params.rubric.theme | default "paper") (site.Params.rubric.theme | default "paper") }}
+{{- $theme := .Params.rubric.theme | default site.Params.rubric.theme | default "paper" }}
 {{- $t := index hugo.Data.themes $theme }}
 {{- if not $t }}{{ errorf "rubric: %q is not a theme in this catalog" $theme }}{{ end }}
-{{- range $t.preload }}
+{{- $own := and (not .Params.rubric.theme) site.Params.rubric }}
+{{- $palette := cond (and $own site.Params.rubric.palette) site.Params.rubric.palette $t.palette }}
+{{- $pairing := cond (and $own site.Params.rubric.pairing) site.Params.rubric.pairing $t.pairing }}
+{{- $scale := cond (and $own site.Params.rubric.scale) site.Params.rubric.scale $t.scale }}
+{{- $css := slice }}
+{{- range slice (printf "palettes/%s" $palette) (printf "pairings/%s" $pairing) (printf "scales/%s" $scale) }}
+  {{- with resources.Get (printf "css/%s.css" .) }}{{ $css = $css | append . }}{{ else }}{{ errorf "rubric: no %s in this catalog" . }}{{ end }}
+{{- end }}
+{{- range (index hugo.Data.pairings $pairing).preload }}
 <link rel="preload" href="{{ printf "fonts/%s" . | relURL }}" as="font" type="font/woff2" crossorigin>
 {{- end }}
-{{- $css := slice (resources.Get (printf "css/themes/%s.css" $theme)) (resources.Get "css/base.css") }}
+{{- $css = $css | append (resources.Get "css/base.css") }}
 {{- $js := slice }}
-{{- $bundle := slice $theme }}
+{{- $bundle := slice $palette $pairing $scale }}
 {{- /* A part's CSS and script are loaded only on pages that use it. */}}
 {{- range $name, $part := hugo.Data.catalog.parts }}
   {{- if or $catalog ($.HasShortcode $name) }}

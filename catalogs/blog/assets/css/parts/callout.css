@@ -8,14 +8,14 @@
 .part-callout-label {
   margin: 0 0 var(--space-1);
   font-size: 0.78em;
-  font-weight: 650;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--tracking-label);
+  text-transform: var(--label-case);
   font-variant-numeric: lining-nums;
   color: var(--muted);
 }
 .part-callout.kind-tip { background: transparent; border: 1px solid var(--rule); }
-.part-callout.kind-warning { background: color-mix(in srgb, var(--accent) 8%, var(--paper)); }
+.part-callout.kind-warning { background: var(--accent-tint); }
 .part-callout.kind-warning .part-callout-label { color: var(--accent); }
 
 @media (max-width: 40rem) {

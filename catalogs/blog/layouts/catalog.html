@@ -13,7 +13,7 @@
 <p class="byline">Version {{ $cat.version }} · {{ len $cat.parts }} parts · in <strong>{{ $theme }}</strong>: {{ (index hugo.Data.themes $theme).description }}</p>
 </header>
 <nav class="catalog-nav" aria-label="Themes and parts">
-<p>{{ range $name, $_ := hugo.Data.themes }}{{ if eq $name $theme }}<strong>{{ $name }}</strong>{{ else }}<a href="{{ printf "/%s/" $name | relURL }}">{{ $name }}</a>{{ end }} {{ end }}</p>
+<p>{{ range $name, $_ := hugo.Data.themes }}{{ if eq $name $theme }}<strong>{{ $name }}</strong>{{ else }}<a href="{{ printf "/%s/" $name | relURL }}">{{ $name }}</a>{{ end }} {{ end }}· <a href="{{ printf "/stress/%s/" $theme | relURL }}">the stress page</a></p>
 <p>{{ range $name, $_ := $cat.parts }}<a href="#{{ $name }}">{{ $name }}</a> {{ end }}</p>
 </nav>
 

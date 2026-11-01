@@ -5,7 +5,7 @@ Writers put `::: words` directives in Markdown; Jev (TypeSafe's model) picks a p
 ## State
 
 - Branch `slice` holds everything built so far (plan step 0, which covers steps 2 and 4 in miniature). `main` has only the first commits.
-- Next is plan step 1: the blog catalog and three themes. The slice catalog in `catalogs/slice/` is a deliberately ugly three-part stand-in.
+- Now in plan step 1: the blog catalog and three themes. The parts are drawn; Paper is finished as the reference theme, with the theme pipeline. Then the direction changed (plan, "The universal catalog and skins"): one catalog of every website component, as contracts in `catalogs/universal/`, probed before anything is drawn; skins imported from open-source Hugo themes take the place of Studio and Night. The slice catalog in `catalogs/slice/` is a deliberately ugly three-part stand-in.
 - The principles, in order: fast, efficient, beautiful, simple (`docs/plan.md`, Principles).
 
 ## Commands
@@ -13,6 +13,7 @@ Writers put `::: words` directives in Markdown; Jev (TypeSafe's model) picks a p
 - `bun test` runs everything, including a real headless Neovim (`test/nvim.test.ts`) with the stub resolver. `UPDATE=1 bun test test/fixtures.test.ts` rewrites fixture expectations.
 - `bun run typecheck`.
 - `bun run play` builds `testing/` and serves it at http://localhost:1415, the live playground. `testing/README.md` has the keys.
+- `bun scripts/theme.ts build|check|look|new` builds a catalog's themes from their pieces in `themes/`, checks them, draws them in a browser at three widths (pictures in `catalogs/blog/shots/index.html`), and starts new pieces. Never edit `assets/css/palettes|pairings|scales/`; they are generated. Parts and `base.css` read slots only. The plan's "How a theme is made" has the design.
 - `bun scripts/probe.ts [lines.yaml]` runs lines against the live Jev API and saves each run under `probe/runs/`. Ask before running it; it costs money and uses the key.
 - `bun scripts/live-repro.ts [blocks] [msPerKey]` types blocks through the user's real Neovim config and compares the buffer, the server's text, `content/` and what Hugo serves. `RUBRIC_HOLD=<ms>` keeps the page up for a browser check.
 

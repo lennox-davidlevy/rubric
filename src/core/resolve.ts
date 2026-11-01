@@ -41,14 +41,19 @@ export function resolve(answers: Answers, catalog: Catalog): Resolution {
   if (ranked.length === 0) throw new AnswerError("the part answer names no part in the catalog");
 
   // Whether the picked part fits is its own answer: the Choice always picks.
+  // How sure the Choice is counts too: a split Choice is never placed, and a
+  // Choice that is all but certain, among many parts, needs only a fair fit.
+  // It never overrules a fit below no.
   const [top, runnerUp] = ranked;
   const fits = noul(answers, fitsId(top![0]));
+  const sure = top![1] >= THRESHOLDS.sure && Object.keys(catalog.parts).length >= THRESHOLDS.sureFrom;
   if (fits < THRESHOLDS.no) return { outcome: "nothing-fits", fits, parts, candidates: [] };
 
   const candidates = [candidate(answers, catalog, top![0], top![1])];
   if (runnerUp) candidates.push(candidate(answers, catalog, runnerUp[0], runnerUp[1]));
 
-  if (fits <= THRESHOLDS.yes) return { outcome: "unsettled", fits, parts, candidates };
+  const place = (fits > THRESHOLDS.yes && top![1] >= THRESHOLDS.majority) || (sure && fits >= THRESHOLDS.fitsWhenSure);
+  if (!place) return { outcome: "unsettled", fits, parts, candidates };
 
   const close = runnerUp !== undefined && runnerUp[1] >= THRESHOLDS.close;
   return { outcome: "placed", fits, parts, candidates: close ? candidates : candidates.slice(0, 1) };

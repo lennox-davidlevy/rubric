@@ -1,0 +1,15 @@
+# A scale: the sizes of type and space, and the widths. Sizes grow with the
+# screen, from the first `screen` width to the second, and stay put outside.
+description: 18 to 20px writing on a gentle scale, for reading
+
+screen: [360, 1240]   # px
+body: [18, 20]        # px, the writing on the smallest and largest screen
+ratio: [1.2, 1.25]    # each step of type is this much bigger than the last
+steps: [-1, 4]        # step--1 is small print, step-4 is a page title
+
+# space-1 to space-5, in rem. A pair grows with the screen.
+space: [0.5, 1, 1.5, [2, 2.5], [3, 4.5]]
+
+measure: 38rem   # the column of writing
+wide: 56rem      # a wide figure or band
+radius: 4px      # the corners of boxes, pictures and buttons

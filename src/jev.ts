@@ -6,28 +6,31 @@
 // used"), and the writing path wants one fast attempt, not retries. The SDK's
 // types are still used for the questions and answers.
 
-import { buildQuestions, buildState, MODEL, resolve, type Answers, type Catalog, type PageKind, type Resolution } from "./core/index.ts";
+import {
+  buildQuestions, buildState, detailQuestions, MODEL, PART, partQuestion, resolve,
+  type Answers, type Catalog, type PageKind, type Question, type Resolution,
+} from "./core/index.ts";
 
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 const TIMEOUT_MS = 10_000;
 
+type Request = { model: string; state: unknown; questions: Record<string, Question> };
+
 export interface Asked {
   resolution: Resolution;
-  // Kept so any result can be rerun and inspected.
-  request: { model: string; state: unknown; questions: unknown };
+  // Kept so any result can be rerun and inspected. In two steps, the second
+  // request and response are `then`.
+  request: Request;
   response?: unknown;
+  then?: { request: Request; response?: unknown; ms: number };
   model?: string;
   ms: number;
 }
 
-export async function ask(catalog: Catalog, directive: string, page: PageKind, key = process.env.TYPESAFE_API_KEY): Promise<Asked> {
-  const request = { model: MODEL, state: buildState(directive, page), questions: buildQuestions(catalog) };
-  const started = performance.now();
-  const error = (message: string, response?: unknown): Asked => ({
-    resolution: { outcome: "error", message }, request, ...(response === undefined ? {} : { response }), ms: performance.now() - started,
-  });
-  if (!key) return error("could not reach Jev: TYPESAFE_API_KEY is not set");
+type Called = { ok: true; answers: Answers; model: string; body: unknown; ms: number } | { ok: false; message: string; body?: unknown; ms: number };
 
+async function call(request: Request, key: string): Promise<Called> {
+  const started = performance.now();
   let res: Response;
   try {
     res = await fetch(ENDPOINT, {
@@ -37,9 +40,8 @@ export async function ask(catalog: Catalog, directive: string, page: PageKind, k
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (err) {
-    return error(`could not reach Jev: ${(err as Error).message}`);
+    return { ok: false, message: `could not reach Jev: ${(err as Error).message}`, ms: performance.now() - started };
   }
-
   const text = await res.text();
   let body: unknown = text;
   try {
@@ -54,13 +56,47 @@ export async function ask(catalog: Catalog, directive: string, page: PageKind, k
       : typeof d === "object" && d !== null && typeof (d as { message?: unknown }).message === "string" ? (d as { message: string }).message
       : d !== undefined ? JSON.stringify(d)
       : text.slice(0, 200);
-    return error(`could not reach Jev: HTTP ${res.status} ${detail}`, body);
+    return { ok: false, message: `could not reach Jev: HTTP ${res.status} ${detail}`, body, ms };
+  }
+  const { answers, model } = body as { answers: Answers; model: string };
+  return { ok: true, answers, model, body, ms };
+}
+
+// One step: every question in one request, whose size grows with the
+// catalog. Two steps: which part, then whether the top two fit and their
+// settings, so both requests stay small whatever the catalog's size. The
+// resolver reads the same answers either way.
+export async function ask(
+  catalog: Catalog, directive: string, page: PageKind, key = process.env.TYPESAFE_API_KEY, steps: 1 | 2 = 1,
+): Promise<Asked> {
+  const state = buildState(directive, page);
+  const request: Request = { model: MODEL, state, questions: steps === 1 ? buildQuestions(catalog) : partQuestion(catalog) };
+  const error = (message: string, ms: number, extra: Partial<Asked> = {}): Asked => ({ resolution: { outcome: "error", message }, request, ms, ...extra });
+  if (!key) return error("could not reach Jev: TYPESAFE_API_KEY is not set", 0);
+
+  const first = await call(request, key);
+  if (!first.ok) return error(first.message, first.ms, first.body === undefined ? {} : { response: first.body });
+  let answers = first.answers;
+  let ms = first.ms;
+  let then: Asked["then"];
+
+  if (steps === 2) {
+    const ranked = Object.entries(((answers[PART] as { probabilities?: Record<string, number> } | undefined)?.probabilities ?? {}))
+      .filter(([name]) => Object.hasOwn(catalog.parts, name))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([name]) => name);
+    const second: Request = { model: MODEL, state, questions: detailQuestions(catalog, ranked) };
+    const next = await call(second, key);
+    ms += next.ms;
+    then = { request: second, ...(next.body === undefined ? {} : { response: next.body }), ms: next.ms };
+    if (!next.ok) return error(next.message, ms, { response: first.body, then });
+    answers = { ...answers, ...next.answers };
   }
 
-  const { answers, model } = body as { answers: Answers; model: string };
   try {
-    return { resolution: resolve(answers, catalog), request, response: body, model, ms };
+    return { resolution: resolve(answers, catalog), request, response: first.body, ...(then ? { then } : {}), model: first.model, ms };
   } catch (err) {
-    return { ...error(`could not read Jev's answers: ${(err as Error).message}`, body), ms };
+    return error(`could not read Jev's answers: ${(err as Error).message}`, ms, { response: first.body, ...(then ? { then } : {}) });
   }
 }

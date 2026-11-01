@@ -7,7 +7,7 @@
   align-items: baseline;
   gap: var(--space-2);
   padding-block: var(--space-2);
-  font-weight: 600;
+  font-weight: var(--weight-heading);
   cursor: pointer;
   list-style: none;
 }
@@ -15,7 +15,7 @@
 .part-fold > summary::after {
   content: "+";
   color: var(--muted);
-  font-weight: 400;
+  font-weight: var(--weight-body);
   font-size: var(--step-1);
   line-height: 1;
 }

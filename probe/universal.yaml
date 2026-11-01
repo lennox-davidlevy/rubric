@@ -1,0 +1,160 @@
+# Lines for the universal catalog (catalogs/universal/catalog.yaml), each with
+# the plain form a person would want, or "nothing" when no part fits.
+# `place: site` lines are written in rubric.md and are asked only about the
+# frame parts; the rest are asked only about the parts in the writing.
+#
+# Written before any run, in the words a writer would use, with the near
+# misses on purpose: tabs and fold, cards and pricing and people and stats,
+# quote and testimonial, callout and sidenote, video and embed, section and
+# call-to-action. Not tuned against; a miss here is a finding.
+
+# section
+- { directive: a shaded box around the next few paragraphs, want: section tone=tint }
+- { directive: a dark band across the whole page, want: section tone=dark width=full }
+- { directive: put this in a box with a border, want: section edge=outlined }
+- { directive: a card that floats above the page with a shadow, want: section edge=raised }
+- { directive: set this part apart from the rest, want: section }
+
+# hero
+- { directive: a big opening for the top of the page, want: hero }
+- { directive: a huge title that fills the screen, want: hero size=tall }
+- { directive: a centered landing header with a photo behind it, want: hero align=center }
+
+# quote and testimonial
+- { directive: a pull quote, want: quote size=large }
+- { directive: an excerpt from the letter, want: quote }
+- { directive: a big centered quote from the interview, want: quote size=large align=center }
+- { directive: what our customers say about us, want: testimonial }
+- { directive: a review from a happy client with their photo, want: testimonial }
+- { directive: a quote from a user praising the app, want: testimonial }
+
+# callout and sidenote
+- { directive: a warning before the next step, want: callout kind=warning }
+- { directive: a tip for the reader, want: callout kind=tip }
+- { directive: heads up, want: callout }
+- { directive: a big red danger box about deleting your data, want: callout kind=danger }
+- { directive: a note in the margin about this sentence, want: sidenote }
+- { directive: an aside off to the side of the text, want: sidenote }
+
+# figure, gallery
+- { directive: one wide photo with a caption, want: figure width=wide }
+- { directive: a picture edge to edge, want: figure width=full }
+- { directive: a few photos from the trip, want: gallery }
+- { directive: a slideshow of the photos, want: gallery layout=slideshow }
+- { directive: a carousel of images, want: gallery layout=slideshow }
+- { directive: photos four across, want: gallery columns=four }
+
+# video, audio, embed
+- { directive: the YouTube video of the talk, want: video }
+- { directive: "a video clip, full width", want: video width=full }
+- { directive: the podcast episode, want: audio }
+- { directive: a recording of the song, want: audio }
+- { directive: a tweet, want: embed }
+- { directive: a map of where we met, want: embed }
+- { directive: my slides from the conference, want: embed }
+- { directive: the gist with the script, want: embed }
+
+# code, diagram, math, chart
+- { directive: the config file with its name on top, want: code }
+- { directive: show the code from main.go, want: code }
+- { directive: a flowchart of the signup process, want: diagram }
+- { directive: a sequence diagram of the request, want: diagram }
+- { directive: the formula for compound interest, want: math }
+- { directive: an equation, want: math }
+- { directive: a bar chart of visits per month, want: chart }
+- { directive: a line graph of my running times, want: chart kind=line }
+- { directive: a pie chart of where the money went, want: chart kind=pie }
+
+# table
+- { directive: a sortable table of the results, want: table }
+- { directive: a striped table, want: table lines=striped }
+
+# tabs and fold
+- { directive: "tabs for mac, windows and linux", want: tabs }
+- { directive: "the same example in three languages, one at a time", want: tabs }
+- { directive: an FAQ, want: fold }
+- { directive: questions and answers that open when clicked, want: fold }
+- { directive: hide the spoilers until clicked, want: fold }
+- { directive: a collapsible section, want: fold }
+- { directive: an accordion with the first one open, want: fold open=first }
+
+# columns, cards, steps, timeline, stats, pricing, people, logos
+- { directive: two columns side by side, want: columns }
+- { directive: a wide column with a narrow one beside it, want: columns split=wide-first }
+- { directive: a grid of features with icons, want: cards }
+- { directive: "my projects as cards, two across", want: cards columns=two }
+- { directive: boxes for each service we offer, want: cards }
+- { directive: step by step instructions, want: steps }
+- { directive: how to install it in three steps, want: steps }
+- { directive: the history of the company year by year, want: timeline }
+- { directive: "my career so far, by date", want: timeline }
+- { directive: some big numbers about the project, want: stats }
+- { directive: "100k downloads, 50 countries, 3 years", want: stats }
+- { directive: our plans and prices, want: pricing }
+- { directive: three pricing tiers with the middle one highlighted, want: pricing featured=middle }
+- { directive: meet the team, want: people }
+- { directive: "the people behind this, with photos", want: people }
+- { directive: logos of companies that use it, want: logos }
+- { directive: as seen in, want: logos }
+
+# call-to-action, buttons, download
+- { directive: ask them to sign up at the end, want: call-to-action }
+- { directive: "a band asking readers to try it, on dark", want: call-to-action tone=dark }
+- { directive: "two buttons, read more and about, centered", want: buttons align=center }
+- { directive: a big button to the shop, want: buttons }
+- { directive: the PDF to download, want: download }
+- { directive: a link to grab the slides as a file, want: download }
+
+# lists of posts, contents, divider
+- { directive: the latest posts as cards, want: post-list style=cards }
+- { directive: my recent writing, want: post-list }
+- { directive: a table of contents, want: contents }
+- { directive: what's on this page, want: contents }
+- { directive: a break with a little ornament, want: divider style=ornament }
+- { directive: a horizontal line, want: divider }
+
+# forms
+- { directive: a contact form, want: contact-form }
+- { directive: a way for people to message me, want: contact-form }
+- { directive: a newsletter signup, want: subscribe }
+- { directive: let people get new posts by email, want: subscribe }
+
+# nothing fits
+- { directive: a 3d model of the house, want: nothing }
+- { directive: a calendar to book a meeting, want: nothing }
+- { directive: a shopping cart, want: nothing }
+- { directive: a login box, want: nothing }
+- { directive: a game of snake, want: nothing }
+- { directive: a countdown to launch day, want: nothing }
+
+# ── place: site, written in rubric.md ──────────────────────────────────
+
+- { place: site, directive: a nav bar at the top with links, want: header }
+- { place: site, directive: a menu across the top that stays when scrolling, want: header sticky=stays }
+- { place: site, directive: the site name in the middle with links under it, want: header layout=centered }
+- { place: site, directive: an announcement strip at the very top, want: banner }
+- { place: site, directive: "a notice about the sale, above everything", want: banner }
+- { place: site, directive: a footer with the copyright, want: footer }
+- { place: site, directive: a big footer with columns of links, want: footer layout=columns }
+- { place: site, directive: a sidebar with the sections, want: sidebar }
+- { place: site, directive: a column on the right with recent posts, want: sidebar side=right }
+- { place: site, directive: breadcrumbs, want: breadcrumbs }
+- { place: site, directive: "show where the page is in the site, from home down", want: breadcrumbs }
+- { place: site, directive: the headings of the page on the side as you scroll, want: page-contents }
+- { place: site, directive: a floating table of contents, want: page-contents }
+- { place: site, directive: each post's picture across the top, want: cover }
+- { place: site, directive: the date and reading time under the title, want: post-meta }
+- { place: site, directive: "the date, reading time and author", want: post-meta shows=everything }
+- { place: site, directive: a little bio about me under each post, want: author }
+- { place: site, directive: the tags at the end of each post, want: tags }
+- { place: site, directive: previous and next links, want: pager }
+- { place: site, directive: more posts like this one, want: related }
+- { place: site, directive: comments, want: comments }
+- { place: site, directive: let readers reply under posts, want: comments }
+- { place: site, directive: share buttons, want: share }
+- { place: site, directive: a search box, want: search }
+- { place: site, directive: icons linking to my github and mastodon, want: social }
+- { place: site, directive: a dark mode toggle, want: theme-switch }
+- { place: site, directive: switch between english and french, want: languages }
+- { place: site, directive: a chat widget in the corner, want: nothing }
+- { place: site, directive: a cookie consent popup, want: nothing }

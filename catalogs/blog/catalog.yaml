@@ -2,13 +2,23 @@ name: blog
 version: 2
 
 # The names every theme fills and every part reads. A part never uses a
-# literal color, font or size.
+# literal color, font or weight. Themes are built from the pieces in themes/,
+# which fill these between them; `bun scripts/theme.ts check` holds both sides
+# to this list.
 slots:
-  [paper, ink, accent, muted, rule, tint, dark-paper, dark-ink,
+  [ # palette
+   paper, ink, accent, muted, rule, tint, raised, accent-tint,
+   dark-paper, dark-ink, dark-accent, dark-muted, dark-rule, dark-tint, dark-accent-tint,
+   shadow-soft, shadow-deep,
+   # pairing
    font-body, font-display, font-mono,
+   weight-body, weight-strong, weight-heading, weight-display,
+   leading-body, leading-heading, leading-display,
+   tracking-display, tracking-label, label-case, numerals, quote-style, ornament, code-size,
+   # scale
    step--1, step-0, step-1, step-2, step-3, step-4,
    space-1, space-2, space-3, space-4, space-5,
-   measure, wide, radius, shadow-soft, shadow-deep]
+   measure, wide, radius]
 
 # Descriptions are Jev's prompt and are read literally: say what the part is,
 # in the words a writer would use. Value names are sent too; name a value for

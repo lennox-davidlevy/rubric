@@ -1,0 +1,16 @@
+{{- /* One catalog page and one stress page for each theme in themes.yaml,
+     so a new theme has both as soon as it is added. */}}
+{{- $stress := os.ReadFile "stress.md" }}
+{{- range $name, $t := hugo.Data.themes }}
+  {{- $.AddPage (dict
+      "path" $name
+      "title" $name
+      "kind" "page"
+      "params" (dict "layout" "catalog" "rubric" (dict "theme" $name "catalog" true))) }}
+  {{- $.AddPage (dict
+      "path" (printf "stress/%s" $name)
+      "title" (printf "A page title long enough to wrap, in %s" $name)
+      "kind" "page"
+      "params" (dict "rubric" (dict "theme" $name))
+      "content" (dict "mediaType" "text/markdown" "value" $stress)) }}
+{{- end }}

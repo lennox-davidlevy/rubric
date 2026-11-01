@@ -3,7 +3,7 @@
 .part-divider.style-line { width: 4rem; margin-inline: auto; border-top: 1px solid var(--muted); }
 .part-divider.style-ornament { text-align: center; line-height: 1; }
 .part-divider.style-ornament::before {
-  content: "*\2002*\2002*";
+  content: var(--ornament);
   color: var(--accent);
   font-family: var(--font-display);
   font-size: var(--step-1);

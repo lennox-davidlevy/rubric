@@ -4,15 +4,20 @@ You start with an empty post, `testing/pages/posts/test.md`, and build it up one
 
 This file is kept up to date as Rubric changes.
 
-Last updated: 2026-11-01, after the switch to American spelling.
+Last updated: 2026-11-01, after Paper was rebuilt as the reference theme, with the theme pipeline.
 
 **New since the last test:**
 
-- Everything is in American spelling now: the value is `align=center`, not `centre`. I changed the two pinned lines in your `test.md`. Any `align=centre` you type now gets a warning.
-- Both catalogs went up a version, so the first time you open a page every unpinned line goes to Jev again. That burst in the play log is expected.
-- Typing `::: ` inside another block now adds its own closer, even when the outer block's `:::` is right below (step 11).
-- Deleting a setting's value brings the menu back with the allowed values; before, it came back only after you typed a letter (step 10).
-- The play terminal numbers each Jev call (`── Jev #3`) and prints the session's total when you stop it with Ctrl-C.
+- How Jev's answers are read changed a little. A line where Jev can't decide between two parts (neither gets a majority) now waits for you with both offered, even when one seems to fit. You may see a few more "not sure" lines, never a wrong pick where there was a right one before.
+- Paper is now made from three pieces (a palette, a pairing and a scale) by `bun scripts/theme.ts`. It should look the same as before, except:
+  - inside a dark band, links, the quote's rule and marks, the ornament and a warning's label use a lighter rust; the old one was nearly unreadable there;
+  - the largest gaps on a laptop are a little bigger (about 72px instead of 65px);
+  - a long web address or word now wraps instead of running off the edge on a phone;
+  - a wide table scrolls sideways in its own box on a phone, instead of pushing the page;
+  - a gallery with one picture fills the row.
+- Dates read "November 1, 2026", American order.
+- Everything is in American spelling: `align=center`, not `centre`. I changed the two pinned lines in your `test.md`. Both catalogs went up a version, so the first open sends every unpinned line to Jev again.
+- Restart `bun run play`: the playground's `content/` still has `centre` in it until play rewrites it.
 
 ## How to read what you see
 
@@ -298,6 +303,18 @@ Then make a change and quit *without* saving (`:q!`). The preview goes back to t
 Make the browser window narrow, about phone width.
 
 **Should happen:** nothing scrolls sideways, the gallery still fits, and the dark band still runs edge to edge.
+
+## 15. Look at Paper as a theme
+
+This one is by eye, in the browser, not in Neovim.
+
+```sh
+bun scripts/theme.ts look
+```
+
+**Should happen:** it ends `fit to ship` twice. The first is the checks on the files; the second is what was drawn in the browser. Then open `catalogs/blog/shots/index.html`: Paper's catalog page and its stress page, at phone, tablet and laptop widths, side by side.
+
+**Notice:** the stress page is the worst a writer will throw at a theme. Look for anything that reads badly even though it passes: the table on a phone, the dark band with everything in it, the long hero title, the warning callouts. Anything you'd change about Paper is cheapest to change now, before two more themes are built the same way.
 
 ## Afterwards
 

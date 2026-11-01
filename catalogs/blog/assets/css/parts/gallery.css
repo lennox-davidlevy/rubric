@@ -9,6 +9,9 @@
   list-style: none;
 }
 .part-gallery li { margin: 0; }
+/* A gallery of one picture fills the row instead of sitting in half of it. */
+.part-gallery li:only-child { grid-column: 1 / -1; }
+.part-gallery li:only-child img { aspect-ratio: 3 / 2; }
 .part-gallery.columns-two { --columns: 2; }
 .part-gallery.columns-three { --columns: 3; }
 .part-gallery.columns-four { --columns: 4; }
@@ -63,7 +66,7 @@
   min-height: 1.6em;
   padding-top: var(--space-2);
   font-size: var(--step--1);
-  color: color-mix(in srgb, var(--dark-ink) 75%, var(--dark-paper));
+  color: var(--dark-muted);
   text-align: center;
 }
 .rubric-lightbox button {
@@ -93,7 +96,7 @@
   line-height: 2.75rem;
   font-size: var(--step--1);
   font-variant-numeric: lining-nums tabular-nums;
-  color: color-mix(in srgb, var(--dark-ink) 65%, var(--dark-paper));
+  color: var(--dark-muted);
 }
 .rubric-lightbox.single .prev, .rubric-lightbox.single .next, .rubric-lightbox.single .count { display: none; }
 

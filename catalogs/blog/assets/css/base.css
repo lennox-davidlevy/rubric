@@ -15,9 +15,11 @@ body {
   color: var(--ink);
   font-family: var(--font-body);
   font-size: var(--step-0);
-  line-height: 1.6;
+  font-weight: var(--weight-body);
+  line-height: var(--leading-body);
   font-kerning: normal;
-  font-variant-numeric: oldstyle-nums proportional-nums;
+  font-variant-numeric: var(--numerals) proportional-nums;
+  overflow-wrap: break-word;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
@@ -80,13 +82,13 @@ main.flow { padding-block: var(--space-4) var(--space-5); }
 /* Headings: the same face, heavier and tighter, never louder than they need. */
 h1, h2, h3, h4 {
   font-family: var(--font-display);
-  font-weight: 600;
-  line-height: 1.2;
+  font-weight: var(--weight-heading);
+  line-height: var(--leading-heading);
   text-wrap: balance;
   font-variant-numeric: lining-nums;
 }
-h1 { font-size: var(--step-4); letter-spacing: -0.015em; line-height: 1.1; }
-h2 { font-size: var(--step-2); letter-spacing: -0.01em; }
+h1 { font-size: var(--step-4); letter-spacing: var(--tracking-display); line-height: var(--leading-display); }
+h2 { font-size: var(--step-2); letter-spacing: calc(var(--tracking-display) * 2 / 3); }
 h3 { font-size: var(--step-1); }
 h4 { font-size: var(--step-0); }
 
@@ -102,7 +104,7 @@ a {
 }
 a:hover { color: var(--accent); text-decoration-color: var(--accent); }
 
-strong { font-weight: 650; }
+strong { font-weight: var(--weight-strong); }
 
 /* Lists hang their markers in the margin, so the text stays on the line. */
 ul, ol { padding-left: 1.25em; }
@@ -128,7 +130,7 @@ hr {
 .flow > hr { margin-block: calc(1lh + var(--space-2)); }
 
 /* Code: quiet, a tint behind blocks, no color beyond the theme's own. */
-code, kbd, samp, pre { font-family: var(--font-mono); font-size: 0.82em; font-variant-numeric: normal; }
+code, kbd, samp, pre { font-family: var(--font-mono); font-size: var(--code-size); font-variant-numeric: normal; }
 :not(pre) > code {
   padding: 0.1em 0.3em;
   border-radius: 3px;
@@ -154,6 +156,11 @@ figure { margin: 0; }
 img, svg, video { display: block; max-width: 100%; height: auto; }
 p > img { border-radius: var(--radius); }
 
+/* A table wider than the screen scrolls in its own box (render-table.html),
+   never the page. */
+.table { overflow-x: auto; }
+.table > table { min-width: 32rem; }
+.flow > .table { margin-inline: calc(-1 * var(--space-3)); padding-inline: var(--space-3); }
 table {
   width: 100%;
   border-collapse: collapse;
@@ -161,7 +168,7 @@ table {
   font-variant-numeric: lining-nums tabular-nums;
 }
 th, td { padding: var(--space-1) var(--space-2) var(--space-1) 0; text-align: left; vertical-align: top; }
-th { font-weight: 600; border-bottom: 1px solid currentColor; }
+th { font-weight: var(--weight-heading); border-bottom: 1px solid currentColor; }
 td { border-bottom: 1px solid var(--rule); }
 
 abbr[title] { text-decoration: underline dotted var(--muted); }
@@ -202,7 +209,7 @@ sup a[role="doc-noteref"], .footnote-ref {
   padding-top: var(--space-4);
 }
 .masthead a { text-decoration: none; }
-.masthead-title { font-weight: 650; letter-spacing: 0.005em; }
+.masthead-title { font-weight: var(--weight-strong); letter-spacing: 0.005em; }
 .masthead nav { display: flex; gap: var(--space-3); font-size: var(--step--1); }
 .masthead nav a { color: var(--muted); }
 .masthead nav a:hover, .masthead nav a[aria-current] { color: var(--ink); }

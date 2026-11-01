@@ -7,9 +7,9 @@
 .part-contents-label {
   margin: 0 0 var(--space-1);
   font-size: 0.82em;
-  font-weight: 650;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--tracking-label);
+  text-transform: var(--label-case);
   color: var(--muted);
 }
 .part-contents ul { margin: 0; padding: 0; list-style: none; }

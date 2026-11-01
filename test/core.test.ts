@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CatalogError, formatPlain, parseCatalog, parsePlain, preprocess, scan } from "../src/core/index.ts";
+import { CatalogError, formatPlain, loadCatalog, parseCatalog, parsePlain, preprocess, scan } from "../src/core/index.ts";
 
 const sliceYaml = readFileSync(join(import.meta.dir, "../catalogs/slice/catalog.yaml"), "utf8");
 const slice = parseCatalog(sliceYaml);
@@ -42,6 +42,20 @@ describe("parseCatalog", () => {
     expect(slice.name).toBe("slice");
     expect(Object.keys(slice.parts)).toEqual(["section", "quote", "callout"]);
     expect(slice.parts.section!.settings.shadow).toMatchObject({ type: "level", default: "none" });
+    expect(slice.parts.section!.place).toBe("writing");
+  });
+
+  test("a part's place and starter body", () => {
+    const c = parseCatalog("name: x\nversion: 1\nparts:\n  header: { description: d, place: site, body: \"- [Posts](/posts/)\\n\" }\n  quote: { description: d }\n");
+    expect(c.parts.header).toMatchObject({ place: "site", body: "- [Posts](/posts/)\n" });
+    expect(c.parts.quote!.place).toBe("writing");
+    expect(c.parts.quote!.body).toBeUndefined();
+  });
+
+  test("the universal catalog", async () => {
+    const u = await loadCatalog(join(import.meta.dir, "../catalogs/universal/catalog.yaml"));
+    const where = Object.values(u.parts).map((p) => p.place);
+    expect([where.filter((p) => p === "writing").length, where.filter((p) => p === "site").length]).toEqual([34, 18]);
   });
 
   test.each([
@@ -50,6 +64,7 @@ describe("parseCatalog", () => {
     ["bad part name", "name: x\nversion: 1\nparts: { Big: { description: d } }\n", "parts.Big"],
     ["unknown type", "name: x\nversion: 1\nparts: { a: { description: d, settings: { s: { type: color } } } }\n", "parts.a.settings.s.type"],
     ["default not a value", "name: x\nversion: 1\nparts: { a: { description: d, settings: { s: { type: choice, default: c, values: { a: x, b: y } } } } }\n", "parts.a.settings.s.default"],
+    ["bad place", "name: x\nversion: 1\nparts: { a: { description: d, place: page } }\n", "parts.a.place must be writing or site"],
     ["one value", "name: x\nversion: 1\nparts: { a: { description: d, settings: { s: { type: choice, values: { a: x } } } } }\n", "at least two"],
   ])("%s", (_, yaml, message) => {
     expect(() => parseCatalog(yaml)).toThrow(CatalogError);

@@ -6,11 +6,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  AnswerError, buildQuestions, Cache, CatalogError, fitsId, loadCatalog, PART, parseCatalog, resolve, saidId, settingId,
+  AnswerError, buildQuestions, Cache, CatalogError, fitsId, loadCatalog, PART, parseCatalog, resolve, saidId, settingId, THRESHOLDS,
   type Answer, type Answers,
 } from "../src/core/index.ts";
 
-const catalog = await loadCatalog(join(import.meta.dir, "../catalogs/slice/catalog.yaml"));
+const sliceYaml = await Bun.file(join(import.meta.dir, "../catalogs/slice/catalog.yaml")).text();
+const catalog = parseCatalog(sliceYaml);
 
 describe("buildQuestions", () => {
   const q = buildQuestions(catalog);
@@ -99,7 +100,7 @@ function answers(over: {
 
 function choice(probabilities: Record<string, number>): Answer {
   const [best] = Object.entries(probabilities).sort((a, b) => b[1] - a[1])[0]!;
-  return { type: "choice", choice: best, confidence: 0.9, probabilities } as Answer;
+  return { type: "choice", choice: best, confidence: 0.9, probabilities } as unknown as Answer;
 }
 
 function score(probabilities: Record<number, number>): Answer {
@@ -109,8 +110,11 @@ function score(probabilities: Record<number, number>): Answer {
 }
 
 describe("the truth table", () => {
+  // A Choice that is not all but certain, so only the fits answer decides.
+  const unsure = { quote: 0.6, callout: 0.25, section: 0.15 };
+
   test("nothing fits: the line stays plain", () => {
-    const r = resolve(answers({ fits: 0.1 }), catalog);
+    const r = resolve(answers({ fits: 0.1, parts: unsure }), catalog);
     expect(r.outcome).toBe("nothing-fits");
   });
 
@@ -122,8 +126,32 @@ describe("the truth table", () => {
   });
 
   test("the thresholds themselves are unsettled", () => {
-    expect(resolve(answers({ fits: 0.3 }), catalog).outcome).toBe("unsettled");
-    expect(resolve(answers({ fits: 0.7 }), catalog).outcome).toBe("unsettled");
+    expect(resolve(answers({ fits: 0.3, parts: unsure }), catalog).outcome).toBe("unsettled");
+    expect(resolve(answers({ fits: 0.7, parts: unsure }), catalog).outcome).toBe("unsettled");
+  });
+
+  // A catalog large enough for the Choice's confidence to count: the slice's
+  // three parts plus filler.
+  const large = parseCatalog(sliceYaml.replace(/^parts:\n/m, `parts:\n${Array.from({ length: THRESHOLDS.sureFrom }, (_, i) => `  filler-${i}:\n    description: filler ${i}\n`).join("")}`));
+  const withFiller = (a: Answers) => ({ ...a, ...Object.fromEntries(Object.keys(large.parts).filter((p) => p.startsWith("filler")).map((p) => [fitsId(p), { type: "noul", noul: 0.1 } as Answer])) });
+
+  test("among many parts, a Choice all but certain needs only a fair fit to be placed", () => {
+    expect(resolve(withFiller(answers({ fits: 0.5 })), large).outcome).toBe("placed");
+    expect(resolve(withFiller(answers({ fits: 0.39 })), large).outcome).toBe("unsettled");
+  });
+
+  test("among few parts, a sure Choice counts for nothing: it is sure of the closest part to anything", () => {
+    expect(resolve(answers({ fits: 0.5 }), catalog).outcome).toBe("unsettled");
+  });
+
+  test("a Choice all but certain never overrules a fit below no", () => {
+    expect(resolve(withFiller(answers({ fits: 0.1 })), large).outcome).toBe("nothing-fits");
+  });
+
+  test("a split Choice is never placed, however clear the fit: both are offered", () => {
+    const r = resolve(answers({ fits: 0.95, parts: { quote: 0.45, callout: 0.4, section: 0.15 } }), catalog);
+    expect(r.outcome).toBe("unsettled");
+    expect(r.outcome === "unsettled" && r.candidates.map((c) => c.part)).toEqual(["quote", "callout"]);
   });
 
   test("fits, top two parts close: the top part is placed and the runner-up offered", () => {
@@ -168,7 +196,7 @@ describe("the truth table", () => {
   });
 
   test("fits is read from the picked part, not from any part", () => {
-    const a = { ...answers(), [fitsId("quote")]: { type: "noul", noul: 0.1 } as Answer };
+    const a = { ...answers({ parts: unsure }), [fitsId("quote")]: { type: "noul", noul: 0.1 } as Answer };
     expect(resolve(a, catalog).outcome).toBe("nothing-fits");
   });
 
@@ -200,7 +228,7 @@ describe("Cache", () => {
   test("a placed line resolves to its plain form; other outcomes resolve to nothing", () => {
     const cache = new Cache();
     cache.set(catalog, "post", "a big quote", placed, "jev-1.14.0");
-    cache.set(catalog, "post", "my taxes", resolve(answers({ fits: 0.1 }), catalog), "jev-1.14.0");
+    cache.set(catalog, "post", "my taxes", resolve(answers({ fits: 0.1, parts: { quote: 0.5, callout: 0.3, section: 0.2 } }), catalog), "jev-1.14.0");
     const lookup = cache.resolver(catalog, "post");
     expect(lookup("a big quote")?.settings.map((s) => [s.key, s.value])).toEqual([["size", "large"]]);
     expect(lookup("my taxes")).toBeUndefined();
@@ -232,5 +260,48 @@ describe("Cache", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("asking in two steps", () => {
+  // A stand-in for Jev that answers every question it is sent, and keeps
+  // the questions so the test can see what each step asked.
+  const answer = (id: string): Answer =>
+    id === PART ? { type: "choice", probabilities: { quote: 0.8, callout: 0.15, section: 0.05 } } as unknown as unknown as Answer
+    : id.startsWith("fits:") || id.startsWith("said:") ? { type: "noul", noul: id === saidId("quote", "size") ? 0.9 : id.startsWith("fits:") ? 0.9 : 0.1 } as unknown as unknown as Answer
+    : id === settingId("quote", "size") ? { type: "choice", probabilities: { normal: 0.1, large: 0.9 } } as unknown as unknown as Answer
+    : id.startsWith("setting:") && id.includes(":level") ? { type: "score", score: 0, probabilities: { "0": 1 } } as unknown as unknown as Answer
+    : { type: "choice", probabilities: { a: 1 } } as unknown as Answer;
+
+  test("asks which part, then the details of the top two only, and resolves the same way", async () => {
+    const sent: string[][] = [];
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (_url: string, init: { body: string }) => {
+      const ids = Object.keys(JSON.parse(init.body).questions);
+      sent.push(ids);
+      return new Response(JSON.stringify({ model: "jev-1.14.0", answers: Object.fromEntries(ids.map((id) => [id, answer(id)])) }));
+    }) as unknown as typeof fetch;
+    try {
+      const { ask } = await import("../src/jev.ts");
+      const asked = await ask(catalog, "a pull quote", "post", "test-key", 2);
+      expect(sent[0]).toEqual([PART]);
+      expect(sent[1]!.filter((id) => id.startsWith("fits:")).sort()).toEqual([fitsId("callout"), fitsId("quote")]);
+      expect(sent[1]!.some((id) => id.includes(":section"))).toBe(false);
+      expect(asked.resolution.outcome).toBe("placed");
+      expect(asked.resolution.outcome === "placed" && asked.resolution.candidates[0]!.plain).toBe("quote size=large");
+      expect(asked.then?.request.questions).toBeDefined();
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
+});
+
+describe("atPlace", () => {
+  test("keeps only the parts chosen in that place", async () => {
+    const { atPlace } = await import("../src/core/index.ts");
+    const u = await loadCatalog(join(import.meta.dir, "../catalogs/universal/catalog.yaml"));
+    expect(Object.keys(atPlace(u, "site").parts)).toContain("header");
+    expect(Object.keys(atPlace(u, "site").parts)).not.toContain("quote");
+    expect(Object.keys(atPlace(u, "writing").parts)).not.toContain("header");
   });
 });

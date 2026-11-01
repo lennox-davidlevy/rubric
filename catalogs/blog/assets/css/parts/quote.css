@@ -19,9 +19,9 @@
   border: 0;
   font-family: var(--font-display);
   font-size: var(--step-3);
-  font-weight: 450;
-  line-height: 1.22;
-  letter-spacing: -0.012em;
+  font-weight: var(--weight-display);
+  line-height: calc(var(--leading-heading) + 0.02);
+  letter-spacing: calc(var(--tracking-display) * 0.8);
   text-wrap: balance;
 }
 .part-quote.size-large blockquote > p:first-child { position: relative; }
@@ -37,5 +37,5 @@
 .part-quote.align-center { text-align: center; }
 .part-quote.align-center blockquote { padding: 0; border: 0; }
 .part-quote.align-center figcaption { padding-left: 0; }
-.part-quote.align-center.size-normal blockquote { font-style: italic; }
+.part-quote.align-center.size-normal blockquote { font-style: var(--quote-style); }
 .part-quote.align-center.size-large blockquote > p:first-child::before { position: static; }

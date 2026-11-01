@@ -18,8 +18,17 @@ export type Setting =
   | { type: "number"; default?: number }
   | { type: "image"; default?: string };
 
+// Where a part is chosen: in the writing, with a `:::` line, or once for the
+// whole site in rubric.md (the frame around the writing: header, footer,
+// sidebar, breadcrumbs). A page may override a site part at its top.
+export type Place = "writing" | "site";
+
 export interface Part {
   description: string;
+  place: Place;
+  // What the editor writes inside an empty block once the part is picked,
+  // so the writer sees what the part expects. Never over anything written.
+  body?: string;
   children: boolean;
   // The part brings a script, loaded only on pages that use it. The part
   // still works without it.
@@ -35,6 +44,12 @@ export interface Catalog {
 }
 
 export class CatalogError extends Error {}
+
+// The parts that can be chosen in one place: a `:::` line in a page is never
+// asked about the frame, nor a line in rubric.md about blocks.
+export function atPlace(catalog: Catalog, place: Place): Catalog {
+  return { ...catalog, parts: Object.fromEntries(Object.entries(catalog.parts).filter(([, p]) => p.place === place)) };
+}
 
 // Part, setting and value names end up in shortcode calls and CSS classes.
 export const NAME = /^[a-z][a-z0-9-]*$/;
@@ -67,7 +82,10 @@ export function parseCatalog(text: string): Catalog {
       named(settingName, `${at}.settings.${settingName}`);
       settings[settingName] = setting(rawSetting, `${at}.settings.${settingName}`);
     }
-    parts[partName] = { description: string(part.description, `${at}.description`), children, script, settings };
+    const place = part.place ?? "writing";
+    if (place !== "writing" && place !== "site") throw new CatalogError(`${at}.place must be writing or site`);
+    const body = part.body === undefined ? {} : { body: string(part.body, `${at}.body`) };
+    parts[partName] = { description: string(part.description, `${at}.description`), place, ...body, children, script, settings };
   }
   if (Object.keys(parts).length === 0) throw new CatalogError("parts must name at least one part");
 

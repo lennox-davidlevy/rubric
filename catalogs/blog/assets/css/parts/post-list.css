@@ -14,7 +14,7 @@
 .post-list.style-cards a {
   font-family: var(--font-display);
   font-size: var(--step-1);
-  font-weight: 600;
+  font-weight: var(--weight-heading);
   line-height: 1.25;
 }
 .post-list.style-cards a::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }

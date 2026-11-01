@@ -23,9 +23,12 @@
   /* The slots, redefined for writing on a dark ground. */
   --paper: var(--dark-paper);
   --ink: var(--dark-ink);
-  --muted: color-mix(in srgb, var(--dark-ink) 68%, var(--dark-paper));
-  --rule: color-mix(in srgb, var(--dark-ink) 20%, var(--dark-paper));
-  --tint: color-mix(in srgb, var(--dark-ink) 9%, var(--dark-paper));
+  --accent: var(--dark-accent);
+  --muted: var(--dark-muted);
+  --rule: var(--dark-rule);
+  --tint: var(--dark-tint);
+  --accent-tint: var(--dark-accent-tint);
+  --raised: var(--dark-paper);
   background: var(--paper);
   color: var(--ink);
 }
@@ -33,7 +36,7 @@
 
 .part-section.edge-outlined { border: 1px solid var(--rule); }
 .part-section.edge-raised {
-  background-color: var(--paper);
+  background-color: var(--raised);
   box-shadow: var(--shadow-deep);
 }
 .part-section.edge-raised.tone-tint { background-color: var(--tint); }

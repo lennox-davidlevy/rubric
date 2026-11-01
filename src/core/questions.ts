@@ -18,6 +18,24 @@ export const THRESHOLDS = {
   settled: 0.6,
   // The runner-up part is offered beside the pick when it has at least this.
   close: 0.3,
+  // How sure the part Choice itself is. A pick is placed on a clear fit only
+  // when the Choice gives it at least a majority; a split Choice means the
+  // line could be either, so both are offered. When the Choice is this sure,
+  // a weaker fit is enough to place it; a fit below `no` is still nothing.
+  // Found on the universal catalog's probe (docs/lsp.md): writers' lines
+  // rarely say every word of a description, so fits sat between 0.4 and 0.7
+  // for parts the Choice was all but certain of.
+  majority: 0.5,
+  sure: 0.9,
+  fitsWhenSure: 0.4,
+  // ...but only in a catalog with at least this many parts to choose from.
+  // In a small one the Choice is sure of the closest part even when the
+  // line asks for something the catalog lacks: against the 11-part blog
+  // catalog, a flowchart came back figure and a PDF buttons, Choice over 0.9
+  // and fit 0.4 to 0.7, the same fits as right parts held back in the
+  // universal catalog. The Choice's confidence means something only when it
+  // had many alternatives.
+  sureFrom: 15,
 };
 
 export type PageKind = "home" | "post" | "page";
@@ -39,20 +57,24 @@ export function buildState(directive: string, page: PageKind): State {
   return { directive, page };
 }
 
-// One request per directive line, every question speculative: which part,
-// whether each part fits, and for every asked setting of every part, whether
-// the line says anything about it and what. Code reads only what belongs to
-// the part it picks.
-export function buildQuestions(catalog: Catalog): Record<string, Question> {
+// Which part `directive` asks for: one Choice among the catalog's parts.
+export function partQuestion(catalog: Catalog): Record<string, Question> {
   const parts = Object.fromEntries(Object.entries(catalog.parts).map(([name, p]) => [name, p.description]));
-  const questions: Record<string, Question> = {
+  return {
     [PART]: {
       type: "choice",
       instructions: "Which part of a web page does `directive` ask for?",
       criteria: parts,
     },
   };
-  for (const [partName, part] of Object.entries(catalog.parts)) {
+}
+
+// For each of `parts`: whether it fits, and for each asked setting, whether
+// the line says anything about it and what.
+export function detailQuestions(catalog: Catalog, parts: readonly string[]): Record<string, Question> {
+  const questions: Record<string, Question> = {};
+  for (const partName of parts) {
+    const part = catalog.parts[partName]!;
     // A Choice always picks something, so whether the pick fits at all is
     // its own question, one per part.
     questions[fitsId(partName)] = {
@@ -81,6 +103,13 @@ export function buildQuestions(catalog: Catalog): Record<string, Question> {
     }
   }
   return questions;
+}
+
+// One request per directive line, every question speculative: which part,
+// and the details of every part. Code reads only what belongs to the part it
+// picks. Its size grows with the catalog; `ask` in two steps does not.
+export function buildQuestions(catalog: Catalog): Record<string, Question> {
+  return { ...partQuestion(catalog), ...detailQuestions(catalog, Object.keys(catalog.parts)) };
 }
 
 function settingQuestion(part: string, name: string, s: Setting): Question | undefined {

@@ -1,0 +1,649 @@
+name: universal
+version: 3
+
+# Every component a website needs, as contracts only: what each part is,
+# its settings and what it expects inside. Nothing here is drawn yet. Drawn
+# by default parts that read a skin's slots, or by a skin's own version
+# where it has one (docs/plan.md, "Skins").
+#
+# The list comes from counting what 637 Hugo themes are made of
+# (docs/research/hugo-themes.md): about thirty kinds of block in the
+# writing, about twenty pieces of frame around it.
+#
+# Descriptions are Jev's prompt and are read literally: say what the part
+# is, in the words a writer would use, with nothing the writer would not
+# say. Value names are sent too; name a value for what it does.
+#
+# place: writing  chosen with a `:::` line in a page (the default)
+# place: site     chosen once in rubric.md, for every page; a page may
+#                 override it at its top
+# body:           written into an empty block once the part is picked
+#
+# Left out on purpose: inline pieces (a badge, an icon, a key, an
+# abbreviation), which sit inside a sentence and need their own syntax;
+# app controls wired to data, which wait for apps; animated text.
+
+parts:
+
+  # ── Blocks in the writing ─────────────────────────────────────────────
+
+  section:
+    description: A box or a band across the page that sets the writing inside it apart from the rest of the page.
+    children: true
+    settings:
+      tone:
+        type: choice
+        default: theme
+        values:
+          theme: the page's own colors
+          tint: a light shade behind the writing, such as gray or a pale color
+          dark: a dark background with light writing
+      width:
+        type: choice
+        default: prose
+        values:
+          prose: as wide as the writing
+          wide: wider than the writing
+          full: the full width of the screen
+      edge:
+        type: choice
+        default: flat
+        values:
+          flat: no edge, it sits in the page
+          outlined: a thin line around it
+          raised: lifted off the page with a shadow
+
+  hero:
+    description: A big opening at the top of a page, usually a large title.
+    children: true
+    body: |
+      # The title
+
+      A line or two about what this is.
+    settings:
+      size:
+        type: choice
+        default: normal
+        values:
+          normal: a large title with room around it
+          tall: fills most of the screen before the writing starts
+      align:
+        type: choice
+        default: left
+        values:
+          left: aligned with the writing
+          center: centered on the page
+      image:
+        type: image
+
+  quote:
+    description: A quotation of words someone said or wrote.
+    children: true
+    settings:
+      size:
+        type: choice
+        default: normal
+        values:
+          normal: the same size as the prose
+          large: noticeably larger than the prose, a pull quote
+      align:
+        type: choice
+        default: left
+        values:
+          left: aligned with the prose
+          center: centered on the page
+      cite:
+        type: text
+
+  testimonial:
+    description: What a customer or reader said about the product or the work, with their name, role and photo.
+    children: true
+    body: |
+      What they said, in their words.
+
+      — Their name, their role
+    settings:
+      photo:
+        type: image
+
+  callout:
+    description: A short note for the reader, set off from the main prose, such as a tip or a warning.
+    children: true
+    settings:
+      kind:
+        type: choice
+        default: note
+        values:
+          note: something worth knowing
+          tip: advice that makes something easier
+          warning: something that could go wrong
+          danger: something that could cause harm or loss
+      title:
+        type: text
+
+  sidenote:
+    description: A note beside the writing, in the margin, about the sentence next to it.
+    children: true
+
+  figure:
+    description: One picture or photo on its own, maybe with a caption.
+    children: true
+    body: |
+      ![What the picture shows](/images/)
+
+      The caption.
+    settings:
+      width:
+        type: choice
+        default: prose
+        values:
+          prose: as wide as the writing
+          wide: wider than the writing
+          full: the full width of the screen
+
+  gallery:
+    description: A set of pictures shown together.
+    children: true
+    script: true
+    body: |
+      ![First picture](/images/)
+      ![Second picture](/images/)
+      ![Third picture](/images/)
+    settings:
+      layout:
+        type: choice
+        default: grid
+        values:
+          grid: the pictures in rows, all at once
+          slideshow: one picture at a time, with arrows to move between them
+      columns:
+        type: choice
+        default: three
+        values:
+          two: two pictures across
+          three: three pictures across
+          four: four pictures across
+
+  video:
+    description: A video to watch in the page, from a file or from a site like YouTube or Vimeo.
+    children: true
+    body: |
+      https://www.youtube.com/watch?v=
+    settings:
+      width:
+        type: choice
+        default: prose
+        values:
+          prose: as wide as the writing
+          wide: wider than the writing
+          full: the full width of the screen
+
+  audio:
+    description: A sound to play in the page, such as a podcast episode, a song or a recording.
+    children: true
+    body: |
+      /audio/
+
+  embed:
+    description: Something from another site shown in the page, such as a social media post, a map, presentation slides or a gist.
+    children: true
+    body: |
+      https://
+
+  code:
+    description: A block of code with the name of its file above it, or the code of a file from the site.
+    children: true
+    body: |
+      ```
+      ```
+    settings:
+      file:
+        type: text
+      lines:
+        type: text
+
+  diagram:
+    description: A diagram drawn from a short text description, such as a flowchart, a sequence of steps between people or systems, or a timeline.
+    children: true
+    script: true
+    body: |
+      flowchart LR
+        A[Start] --> B[Finish]
+
+  math:
+    description: A mathematical formula or equation.
+    children: true
+    body: |
+      E = mc^2
+
+  chart:
+    description: A chart of numbers, drawn from a small table, such as a bar chart, a line chart or a pie chart.
+    children: true
+    script: true
+    body: |
+      | Month | Visits |
+      |-------|-------:|
+      | Jan   | 120    |
+      | Feb   | 180    |
+    settings:
+      kind:
+        type: choice
+        default: bar
+        values:
+          bar: bars side by side
+          line: a line through the points
+          pie: slices of a circle
+
+  table:
+    description: A table of rows and columns.
+    children: true
+    script: true
+    body: |
+      | Name | Value |
+      |------|-------|
+      |      |       |
+    settings:
+      lines:
+        type: choice
+        default: rows
+        values:
+          rows: a thin line between rows
+          striped: every other row shaded
+
+  tabs:
+    description: Tabs, each showing its own panel in the same place, one at a time.
+    children: true
+    script: true
+    body: |
+      ## First tab
+
+      What the first tab shows.
+
+      ## Second tab
+
+      What the second tab shows.
+
+  fold:
+    description: Writing that stays closed until the reader opens it, one section or several, such as questions and their answers.
+    children: true
+    body: |
+      ## A question
+
+      Its answer.
+    settings:
+      summary:
+        type: text
+      open:
+        type: choice
+        default: closed
+        values:
+          closed: every section starts closed
+          first: the first section starts open
+
+  columns:
+    description: The writing split into columns side by side.
+    children: true
+    body: |
+      The first column.
+
+      ---
+
+      The second column.
+    settings:
+      split:
+        type: choice
+        default: even
+        values:
+          even: columns of the same width
+          wide-first: the first column wider than the rest
+          wide-last: the last column wider than the rest
+
+  cards:
+    description: A grid of boxes, each with a short title, a line of writing and maybe an icon, a picture or a link, such as features or projects.
+    children: true
+    body: |
+      ### First
+
+      A line about it.
+
+      ### Second
+
+      A line about it.
+
+      ### Third
+
+      A line about it.
+    settings:
+      columns:
+        type: choice
+        default: three
+        values:
+          two: two boxes across
+          three: three boxes across
+          four: four boxes across
+      edge:
+        type: choice
+        default: outlined
+        values:
+          flat: no edge around each box
+          outlined: a thin line around each box
+          raised: each box lifted off the page with a shadow
+
+  steps:
+    description: Numbered steps to follow in order, each with a short title.
+    children: true
+    body: |
+      ### The first step
+
+      What to do.
+
+      ### The second step
+
+      What to do next.
+
+  timeline:
+    description: Events in the order they happened, along a line, each with its date.
+    children: true
+    body: |
+      ### 2024 — What happened
+
+      A line about it.
+
+      ### 2025 — What happened next
+
+      A line about it.
+
+  stats:
+    description: A few big numbers side by side, each with a short line saying what it counts.
+    children: true
+    body: |
+      - **120** posts
+      - **8** years
+      - **3** books
+
+  pricing:
+    description: Plans or prices side by side, each with what it includes and a button to choose it.
+    children: true
+    body: |
+      ### Free
+
+      **$0**
+
+      - One thing
+      - Another thing
+
+      [Start](#)
+
+      ### Pro
+
+      **$10 a month**
+
+      - Everything in Free
+      - More
+
+      [Choose Pro](#)
+    settings:
+      featured:
+        type: choice
+        default: none
+        values:
+          none: every plan looks the same
+          last: the last plan stands out as the one to choose
+          middle: the middle plan stands out as the one to choose
+
+  people:
+    description: A grid of people, each with a photo, their name and their role, such as a team.
+    children: true
+    body: |
+      - ![Their name](/images/) **Their name**, their role
+      - ![Their name](/images/) **Their name**, their role
+
+  logos:
+    description: A row of logos of customers, partners or places the work has appeared.
+    children: true
+    body: |
+      ![A name](/images/)
+      ![A name](/images/)
+      ![A name](/images/)
+
+  call-to-action:
+    description: A short pitch that urges the reader to sign up, buy or try something, with a button to do it.
+    children: true
+    body: |
+      ## What to do
+
+      Why it is worth doing.
+
+      [Do it](#)
+    settings:
+      tone:
+        type: choice
+        default: tint
+        values:
+          tint: a light tint of color behind it
+          dark: a dark background with light writing
+          accent: the site's accent color behind it
+
+  buttons:
+    description: One or more links shown as buttons.
+    children: true
+    body: |
+      [The main thing](#) [Something else](#)
+    settings:
+      align:
+        type: choice
+        default: left
+        values:
+          left: aligned with the writing
+          center: centered on the page
+
+  download:
+    description: A file for the reader to download.
+    children: true
+    body: |
+      [The file's name](/files/)
+
+      What is in it.
+
+  post-list:
+    description: A list of posts or articles from this site, such as the latest ones.
+    children: false
+    settings:
+      style:
+        type: choice
+        default: dated
+        values:
+          dated: each post's title with its date
+          titles: the titles alone
+          cards: each post in its own box with its summary
+      count:
+        type: number
+      tag:
+        type: text
+
+  contents:
+    description: A table of contents, listing what is on this page.
+    children: false
+
+  divider:
+    description: A break between parts of the writing.
+    children: false
+    settings:
+      style:
+        type: choice
+        default: line
+        values:
+          line: a short thin line
+          ornament: a small printer's ornament
+          space: blank space with no mark
+
+  contact-form:
+    description: A form for readers to send a message, with their name, their email and the message.
+    children: false
+    settings:
+      to:
+        type: text
+
+  subscribe:
+    description: A box where readers give their email address to get new posts or a newsletter.
+    children: true
+    body: |
+      Get new posts by email.
+    settings:
+      to:
+        type: text
+
+  # ── The frame around the writing, chosen in rubric.md ─────────────────
+
+  header:
+    description: The top of every page, with the site's name and links to its main pages.
+    place: site
+    children: true
+    body: |
+      - [Posts](/posts/)
+      - [About](/about/)
+    settings:
+      layout:
+        type: choice
+        default: split
+        values:
+          split: the name on one side and the links on the other
+          centered: the name centered with the links under it
+      sticky:
+        type: choice
+        default: scrolls
+        values:
+          scrolls: scrolls away with the page
+          stays: stays at the top while the page scrolls
+
+  banner:
+    description: A thin strip above everything else with a short notice, such as news or a sale.
+    place: site
+    children: true
+    body: |
+      A short notice. [Read more](#)
+
+  footer:
+    description: The strip at the bottom of every page, with links, the copyright and small print.
+    place: site
+    children: true
+    body: |
+      - [About](/about/)
+      - [RSS](/index.xml)
+    settings:
+      layout:
+        type: choice
+        default: simple
+        values:
+          simple: one line of links and the copyright
+          columns: links in several columns under headings
+
+  sidebar:
+    description: A column beside the writing on every page, with links or lists such as the site's sections, recent posts or tags.
+    place: site
+    children: true
+    body: |
+      ### Sections
+
+      - [Posts](/posts/)
+      - [Notes](/notes/)
+    settings:
+      side:
+        type: choice
+        default: left
+        values:
+          left: on the left of the writing
+          right: on the right of the writing
+
+  breadcrumbs:
+    description: The trail of pages above this one, from the home page down to here.
+    place: site
+    children: false
+
+  page-contents:
+    description: This page's headings kept in view beside the writing as the reader scrolls, to jump between them.
+    place: site
+    children: false
+
+  cover:
+    description: A post's own picture across the top of the page, above its title.
+    place: site
+    children: false
+
+  post-meta:
+    description: A post's details next to its title, such as its date, reading time or author.
+    place: site
+    children: false
+    settings:
+      shows:
+        type: choice
+        default: date-and-time
+        values:
+          date: the date only
+          date-and-time: the date and how long it takes to read
+          everything: the date, the reading time and the author
+
+  author:
+    description: A short box about the writer, with their photo and a line or two about them.
+    place: site
+    children: true
+    body: |
+      ![Your name](/images/)
+
+      A line or two about you.
+
+  tags:
+    description: The post's tags as links, each leading to the other posts with that tag.
+    place: site
+    children: false
+
+  pager:
+    description: Links to the previous and the next post, at the end of a post.
+    place: site
+    children: false
+
+  related:
+    description: Other posts like this one, at the end of a post.
+    place: site
+    children: false
+    settings:
+      count:
+        type: number
+
+  comments:
+    description: A place for readers to leave comments under a post.
+    place: site
+    children: false
+    settings:
+      service:
+        type: text
+
+  share:
+    description: Buttons to share the page on other sites or to copy its link.
+    place: site
+    children: false
+
+  search:
+    description: A search box that finds pages on this site as the reader types.
+    place: site
+    children: false
+    script: true
+
+  social:
+    description: Links to the writer's profiles on other sites, shown as small icons.
+    place: site
+    children: true
+    body: |
+      - https://github.com/
+      - https://mastodon.social/@
+
+  theme-switch:
+    description: A switch between a light and a dark look for the site.
+    place: site
+    children: false
+    script: true
+
+  languages:
+    description: A way to switch the site to another language.
+    place: site
+    children: false

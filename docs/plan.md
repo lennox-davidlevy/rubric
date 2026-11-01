@@ -151,10 +151,14 @@ Rules that apply, from the TypeSafe guidance:
 | yes, part or setting gone | – | – | – | – | leave the line plain; warn; offer "re-resolve from the words" |
 | no | error | – | – | – | leave the line plain; show "could not reach Jev" |
 | no | ok | no (< 0.3) | – | – | leave the line plain; offer the slow path |
+| no | ok | yes (> 0.7) | split (top under 0.5) | – | leave the line plain; show the top two parts to choose from |
+| no | ok | fair (0.4 to 0.7) | all but certain (0.9 or more), in a catalog of 15 parts or more | – | place it, as for yes |
 | no | ok | unsettled | – | – | leave the line plain; show the top two parts to choose from |
 | no | ok | yes (> 0.7) | top two close | – | place the top part; ghost text shows both; a key swaps |
 | no | ok | yes | clear | one unsettled | place the part with that setting at its default; say which |
 | no | ok | yes | clear | clear | place the part with the settings the answers give |
+
+"Something fits" is the picked part's own `fits` answer; "part pick" is the part Choice. The two rows about how sure the Choice is came from the universal catalog's probe (2026-11-01, `docs/lsp.md`): writers rarely say every word of a description, so the right part's fit often sat between 0.4 and 0.7 while the Choice was all but certain; but in a small catalog the Choice is that sure of the closest part to anything, so the row applies only to large ones. The numbers live in `THRESHOLDS` in `src/core/questions.ts`.
 
 A directive nested inside a part that takes no children is left plain with a warning. Every combination gets an outcome before the code is written.
 
@@ -163,6 +167,34 @@ A directive nested inside a part that takes no children is left plain with a war
 "Same color as the theme" only works if the theme is named values. Every catalog reads the same slots, every theme fills them, and every part is written against them.
 
 The root directive in `rubric.md` is answered the same way as any other line: a Choice among the designed palettes, a Choice among the type pairings, and Scores for spacing and contrast that code maps to the scale values. The model never invents a color. A dozen good palettes and a few pairings are a weekend of taste and they are what make every site look finished. The result is written into the site's Hugo config, and a site can override a value in plain form (`accent=#9a6512`) for the one person in ten who wants to.
+
+### How a theme is made
+
+Built and settled with Paper, before any second theme, on 2026-11-01, so that each theme after it is a few files and an afternoon of taste rather than CSS.
+
+- **A theme is three pieces**, each a short commented YAML file in the catalog's `themes/`. A **palette** holds the colors: paper, ink, accent, muted, rule, tint, and a dark band's paper, ink and accent. The rest are derived and can be set by hand. A **pairing** holds the fonts and how they are set: weights, leading, tracking, the label case, numerals, the ornament, the code size. Those belong to the faces, since a sans wants heavier, tighter headings than a book serif. A **scale** holds the type sizes (from a smallest and largest body size and ratio, worked out the way Utopia does), the spaces, the measure, the wide width and the radius. `themes.yaml` names the designed combinations. A site names one, and may swap any piece. Step 5 chooses a palette and a pairing separately, which is why they are separate.
+- **Dark is a palette, not a mode.** Night will be its own theme. Every theme already carries a dark band, so dark grounds are checked from the first theme.
+- **The CSS is generated.** `bun scripts/theme.ts build` turns each piece into one file under `assets/css/`, never edited by hand, and the layout loads one of each. Parts and `base.css` read slots only. A lint refuses a literal color, font or weight in them, and refuses a slot that `catalog.yaml` doesn't list.
+- **`check` judges the pieces on paper.** Every slot filled, nothing extra; every pair of text and ground at contrast 4.5 or more, including inside a dark band, a warning callout and a filled button; grounds that must read as different (a tint, a dark band, rules); font files present, every weight used drawable by a face, the preload real. `bun test` runs it, along with a check that the generated CSS is up to date.
+- **`look` judges what is drawn.** It draws each theme's catalog page and a stress page at 360, 768 and 1280px in a real browser. The stress page holds the hard cases: long titles, a long address, a long word, a wide table, every kind of inline text, code, footnotes, nesting in a dark band, a hero with no picture, a gallery of one. `look` fails a page that scrolls sideways, writing whose contrast fails against what is really behind it, a missing file or a script error. It saves the pictures with a sheet to look at them side by side. Both layers were tested by putting Paper's old dark-band accent back: `check` and `look` each refused it.
+- **`new`** starts a palette, pairing or scale as a copy of Paper's, and adds a combination to `themes.yaml`. The catalog and stress pages for it appear by themselves (a Hugo content adapter).
+- **The test of the pipeline is the second theme.** If making Studio or Night needs a change to a part's CSS, the pipeline missed something, and the fix goes into the slots, not the part.
+
+Not done yet: fallback-font metrics (`size-adjust` and the overrides), so the page doesn't shift when the real font arrives. That needs the font's measurements read from the file.
+
+## The universal catalog and skins
+
+Decided 2026-11-01, in conversation, after Paper and the theme pipeline were done. This reshapes "one catalog per kind of site" below.
+
+- **Sites, not apps.** Rubric makes websites from writing. App interfaces (controls wired to data, parts that share state, logins) wait. The catalog says what a part is and never how it is drawn, so an app catalog with another renderer can come later without changing how anyone writes.
+- **One catalog of every component a website needs**, in `catalogs/universal/catalog.yaml`, written first as contracts only: name, one-sentence description, a few settings, and a starter body. Its list comes from counting 637 Hugo themes (`docs/research/hugo-themes.md`): 34 parts in the writing and 18 in the frame around it. Inline pieces (badges, icons, keys) need their own syntax and are left out for now.
+- **Where a part is chosen** (`place` in the catalog): parts in the writing with a `:::` line in the page; the frame (header, footer, sidebar, breadcrumbs and the like) with the same `:::` lines in `rubric.md`, for every page, which a page may override at its top. A frame part is drawn in its place in the layout, wherever its line sits.
+- **Starter bodies** (`body`): once a part is picked, the editor writes what it expects into the empty block (a list of links for a header, a question and answer for a fold), so the writer sees the shape and edits it. Never over anything already written. Parts whose content comes from the site (breadcrumbs, a post list) have none.
+- **Controls have a purpose.** No bare input or date picker: a contact form, a newsletter signup, search, a filter. The inputs inside are drawn by the skin.
+- **Asking Jev in two steps**, if the probe agrees: which part first (one Choice, whatever the catalog's size), then only the winner's and the runner-up's settings. Asked the current way, one line against the universal catalog is 81 questions. Families first (navigation, media…) only if Jev's choice gets worse with more parts. A `:::` line in a page is never asked about frame parts, nor the reverse.
+- **Skins.** A skin is how the catalog looks: tokens (palette, pairing, scale), the frame and plain writing, and, in layers, default parts that read the tokens, the theme's own version of a part where it has one, and small CSS overrides. Every part is available in every skin. Open-source Hugo themes become skins: those with no components give tokens and a frame (PaperMod first), those with many give their own parts too (Blowfish first). The slots grow to carry more of a theme's personality (border, shadow strength, density), learned from those themes' CSS. GPL themes are left out.
+- **The probe on it** (2026-11-01, `docs/lsp.md`): the top pick among 34 parts is right 109 times in 112, so no family step. Tuned the same day against three sets (`docs/lsp.md`): descriptions stripped of details a writer would not say, and the truth table now counts how sure the Choice is. Nothing placed wrongly in any set; 21 of 28 right on the last, unseen one, the rest left for the writer to choose. Two steps match one step's accuracy with about 9 questions a line instead of 81, for about 100 ms more. Jev is priced per input token ($0.042 a million), so a line costs about $0.0002 in one step and a quarter of that in two: near nothing either way, so the editor keeps one step for speed, and two steps waits for a catalog that needs it.
+- **The order:** the catalog as contracts (done), the probe on it (done), default drawings against richer slots, then PaperMod and Blowfish as the first imported skins.
 
 ## Catalogs
 
@@ -279,4 +311,6 @@ Not repos: the TypeSafe cookbooks for function calling and intent routing (docs.
 - Whether the plain form also accepts the directive spelling `::: {.quote size=large}` for portability.
 - Whether the cache is committed with the site or local only. Pinned lines make it matter little.
 - Whether a part can be site-specific without joining the shared catalog, or whether everything new goes through the pool.
+- Whether Jev can fill a text setting (`cite`) by choosing among spans of the writer's own words, since it cannot write text. To try when the catalog goes deep.
+- Whether a hero replaces the page's own title, since both show today.
 - The Jev key for writers: their own, or a proxy that comes with the hosted version.

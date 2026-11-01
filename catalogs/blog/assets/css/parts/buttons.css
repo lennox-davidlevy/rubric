@@ -17,7 +17,7 @@
   border: 1px solid color-mix(in srgb, var(--ink) 28%, transparent);
   border-radius: var(--radius);
   font-size: var(--step--1);
-  font-weight: 600;
+  font-weight: var(--weight-heading);
   line-height: 1.2;
   text-decoration: none;
   color: var(--ink);
