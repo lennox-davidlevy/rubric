@@ -29,6 +29,14 @@ describe("the blog catalog's themes", () => {
   });
 });
 
+describe("the universal catalog's themes, PaperMod's skin among them", () => {
+  test("are built and fit to ship", () => {
+    const cat = load(join(import.meta.dir, "../catalogs/universal"));
+    expect(cat.themes.papermod?.skin).toBe("papermod");
+    expect(check(cat).filter((p) => p.level === "error")).toEqual([]);
+  });
+}); 
+
 describe("checks", () => {
   const paper = { description: "d", scheme: "light", paper: "#f9f6ef", ink: "#221e19", accent: "#9a3412", muted: "#6b6357", rule: "#e2dacb", tint: "#f1e9d9" };
 
@@ -44,6 +52,25 @@ describe("checks", () => {
     expect(p.colors["dark-tint"]).toBe("#333333");
     // What Chrome draws for color-mix(in srgb, accent 8%, paper): rgb(241, 230, 221).
     expect(p.colors["accent-tint"]).toBe("#f1e6dd");
+  });
+
+  test("code colors follow the page's own on the tint, and the code's on a block of its own", () => {
+    const dark = { paper: "#2a2520", ink: "#f3ede2", accent: "#e5936a" };
+    const onTint = parsePalette("p", { ...paper, dark });
+    expect(onTint.colors["code-muted"]).toBe(paper.muted);
+    expect(onTint.colors["code-accent"]).toBe(paper.accent);
+    const block = parsePalette("p", { ...paper, dark, "code-paper": "#1c1d21", "code-ink": "#d5d5d6" });
+    expect(block.colors["code-accent"]).toBe("#d5d5d6");
+    expect(checkPalette(block).filter((x) => x.level === "error")).toEqual([]);
+  });
+
+  test("no faces is the reader's own fonts, with nothing to check or fetch", () => {
+    const p = parsePairing("x", {
+      description: "d", faces: [], preload: [], body: ["system-ui", "sans-serif"], display: "body", mono: ["monospace"],
+      weight: { body: 400, strong: 700, heading: 700, display: 700 }, leading: { body: 1.5, heading: 1.2, display: 1.1 },
+      tracking: { display: "0", label: "0" }, labels: "none", numerals: "lining", quote: "normal", ornament: "*", code: "0.9em",
+    });
+    expect(checkPairing(p, "/nowhere")).toEqual([]);
   });
 
   test("a weight no face can draw is refused", () => {

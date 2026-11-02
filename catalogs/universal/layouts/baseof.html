@@ -43,6 +43,12 @@
     {{- end }}
   {{- end }}
 {{- end }}
+{{- /* The skin's own layer last but the catalog page's: what the slots cannot
+     say, such as a header laid out the way the theme it came from does. */}}
+{{- with $t.skin }}
+  {{- with resources.Get (printf "css/skins/%s.css" .) }}{{ $css = $css | append . }}{{ else }}{{ errorf "rubric: no skin %q in this catalog" . }}{{ end }}
+  {{- $bundle = $bundle | append (printf "skin-%s" .) }}
+{{- end }}
 {{- if $catalog }}{{ $css = $css | append (resources.Get "css/catalog.css") }}{{ end }}
 {{- /* Named for the theme and a short hash of the parts: a page with many
      parts would otherwise outgrow a file name. */}}

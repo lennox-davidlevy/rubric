@@ -29,7 +29,7 @@ version: 4
 # to this list.
 slots:
   [ # palette
-   paper, ink, accent, muted, rule, tint, raised, link, heading, code-paper, code-ink,
+   paper, ink, accent, muted, rule, tint, raised, link, heading, code-paper, code-ink, code-muted, code-accent,
    positive, warning, danger, accent-tint, positive-tint, warning-tint, danger-tint,
    dark-paper, dark-ink, dark-accent, dark-muted, dark-rule, dark-tint, dark-accent-tint,
    dark-positive, dark-warning, dark-danger, dark-positive-tint, dark-warning-tint, dark-danger-tint,

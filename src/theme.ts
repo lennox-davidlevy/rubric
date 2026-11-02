@@ -107,7 +107,9 @@ export type Scale = {
   controlRadius: string;
 };
 
-export type Theme = { name: string; description: string; palette: string; pairing: string; scale: string };
+// A skin, optionally: the theme's own small CSS layer, drawn after the parts,
+// for what the slots cannot say (assets/css/skins/<skin>.css). Slots only.
+export type Theme = { name: string; description: string; palette: string; pairing: string; scale: string; skin?: string };
 
 type Raw = Record<string, unknown>;
 
@@ -166,6 +168,11 @@ export function parsePalette(name: string, raw: Raw): Palette {
     heading: () => c.ink!,
     "code-paper": () => c.tint!,
     "code-ink": () => c.ink!,
+    // Comments and keywords in code. On the tint they are the page's own
+    // muted and accent; a code block of its own color (a dark block on a
+    // light page) needs its own, or they vanish into it.
+    "code-muted": () => sameAs(c["code-paper"]!, c.tint!) ? c.muted! : mix(c["code-ink"]!, c["code-paper"]!, 0.62),
+    "code-accent": () => sameAs(c["code-paper"]!, c.tint!) ? c.accent! : c["code-ink"]!,
     // The colors of notices and marks: what went well, what to watch, what
     // could do harm. Left out, they lean on the ink and the accent.
     positive: () => c.ink!,
@@ -208,8 +215,10 @@ export function parsePalette(name: string, raw: Raw): Palette {
 
 export function parsePairing(name: string, raw: Raw): Pairing {
   const where = `pairings/${name}.yaml`;
+  // No faces is the reader's own fonts (a system font stack): nothing to
+  // fetch, so the fastest page there is.
   const facesRaw = need(raw, "faces", where);
-  if (!Array.isArray(facesRaw) || facesRaw.length === 0) throw new ThemeError(`${where}: "faces" should list the font files`);
+  if (!Array.isArray(facesRaw)) throw new ThemeError(`${where}: "faces" should list the font files, or be [] for the reader's own fonts`);
   const faces = facesRaw.map((f: Raw, i) => {
     const w = `${where} faces[${i}]`;
     const weight = typeof f.weight === "number" ? [f.weight, f.weight] as [number, number] : pair(f, "weight", w);
@@ -289,7 +298,10 @@ export function load(dir: string): Catalog {
   const themes: Record<string, Theme> = {};
   for (const [name, t] of Object.entries(themesRaw)) {
     const r = t as Raw, where = `themes.yaml ${name}`;
-    themes[name] = { name, description: str(r, "description", where), palette: str(r, "palette", where), pairing: str(r, "pairing", where), scale: str(r, "scale", where) };
+    themes[name] = {
+      name, description: str(r, "description", where), palette: str(r, "palette", where), pairing: str(r, "pairing", where), scale: str(r, "scale", where),
+      ...(r.skin === undefined ? {} : { skin: str(r, "skin", where) }),
+    };
   }
   return { dir, slots, themes, palettes: read("palettes", parsePalette), pairings: read("pairings", parsePairing), scales: read("scales", parseScale) };
 }
@@ -403,6 +415,8 @@ const TEXT_PAIRS: [string, string, string][] = [
   ["link", "paper", "links"],
   ["heading", "paper", "headings"],
   ["code-ink", "code-paper", "code blocks"],
+  ["code-muted", "code-paper", "comments in code blocks"],
+  ["code-accent", "code-paper", "keywords in code blocks"],
   ["positive", "paper", "marks for what went well"],
   ["warning", "paper", "warnings"],
   ["danger", "paper", "dangers"],
@@ -472,6 +486,7 @@ export function checkPairing(p: Pairing, fontsDir: string): Problem[] {
   }
   // A weight with no face to draw it is faked by the browser, or rounded to
   // the nearest face, and the page looks wrong in a way that is hard to see.
+  if (p.faces.length === 0) return out;
   const families = new Set(p.faces.map((f) => f.family));
   const first = (names: string[]) => names.find((n) => families.has(n));
   const uses: [string, number, "normal" | "italic"][] = [
@@ -536,6 +551,9 @@ export function check(cat: Catalog): Problem[] {
     if (!cat.palettes[t.palette]) out.push({ where, level: "error", message: `no palette "${t.palette}" in themes/palettes/` });
     if (!cat.pairings[t.pairing]) out.push({ where, level: "error", message: `no pairing "${t.pairing}" in themes/pairings/` });
     if (!cat.scales[t.scale]) out.push({ where, level: "error", message: `no scale "${t.scale}" in themes/scales/` });
+    if (t.skin && !existsSync(join(cat.dir, "assets/css/skins", `${t.skin}.css`))) {
+      out.push({ where, level: "error", message: `no skin "${t.skin}" in assets/css/skins/` });
+    }
   }
   for (const p of Object.values(cat.palettes)) out.push(...checkPalette(p));
   for (const p of Object.values(cat.pairings)) out.push(...checkPairing(p, join(cat.dir, "static/fonts")));
@@ -554,6 +572,8 @@ export function check(cat: Catalog): Problem[] {
   const cssDir = join(cat.dir, "assets/css");
   const shared: Record<string, string> = { "assets/css/base.css": readFileSync(join(cssDir, "base.css"), "utf8") };
   for (const f of readdirSync(join(cssDir, "parts")).sort()) shared[`assets/css/parts/${f}`] = readFileSync(join(cssDir, "parts", f), "utf8");
+  const skins = join(cssDir, "skins");
+  for (const f of existsSync(skins) ? readdirSync(skins).sort() : []) shared[`assets/css/skins/${f}`] = readFileSync(join(skins, f), "utf8");
   out.push(...lint(cat, shared));
 
   for (const [path, css] of Object.entries(outputs(cat))) {

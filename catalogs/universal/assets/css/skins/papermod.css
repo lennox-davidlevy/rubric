@@ -1,0 +1,66 @@
+/* PaperMod's layer (github.com/adityatelange/hugo-PaperMod, MIT): what its
+   palette, pairing and scale cannot say. Its colors, fonts and sizes are in
+   those pieces; this is layout and the shape of a few parts, read from its
+   assets/css/common/. Slots only, like every part. */
+
+/* The header: a large bold name and plain links in the ink, 60px tall. */
+.part-header-inner { max-width: calc(var(--wide) + 2 * var(--space-3)); padding-block: var(--space-1); min-height: 3.75rem; }
+.part-header-title { font-size: var(--step-1); font-weight: var(--weight-heading); }
+.part-header-nav ul { font-size: var(--step-0); gap: var(--space-1) var(--space-3); }
+.part-header-nav a { color: var(--ink); }
+.part-header-nav a[aria-current] { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.3rem; }
+.part-header.sticky-stays { border-bottom: 0; }
+
+/* Breadcrumbs in the ink at the writing's size, with a chevron between. */
+.part-breadcrumbs ol { font-size: var(--step-0); color: var(--ink); }
+.part-breadcrumbs li + li::before { content: "\203A"; color: var(--muted); }
+.part-breadcrumbs li[aria-current] { display: none; }
+
+/* A post's title at 40px, not the largest step, and the cover inside the
+   column rather than wider than it. */
+.page-header h1 { font-size: var(--step-3); }
+.flow > .part-cover { grid-column: prose; }
+
+/* A quote is a heavy rule in the ink beside upright writing; a rule is a
+   thick gray line across the column. */
+blockquote { border-left: 0.3rem solid var(--ink); padding-left: var(--space-2); color: var(--ink); }
+hr { width: 100%; border-top: 2px solid var(--rule); }
+
+/* Tags as tinted pills; previous and next as one tinted box in two halves. */
+.part-tags a { margin: 0 0.4rem 0.4rem 0; display: inline-block; padding: 0 0.9rem; line-height: 2.1rem; border: var(--border) solid var(--rule); border-radius: var(--radius); background: var(--tint); color: var(--muted); font-size: var(--step--1); text-decoration: none; }
+.part-tags a:hover { background: var(--rule); }
+.part-pager { gap: 0; border: var(--border) solid var(--rule); border-radius: var(--radius); background: var(--tint); }
+.part-pager a { padding: var(--space-2); border-top: 0; border-radius: var(--radius); color: var(--ink); }
+.part-pager a:hover { background: var(--rule); color: var(--ink); }
+.part-pager a span { font-size: var(--step--1); letter-spacing: var(--tracking-label); text-transform: var(--label-case); }
+.part-pager-earlier span::before { content: "\00AB "; }
+.part-pager-later span::after { content: " \00BB"; }
+
+/* Share links in one tinted strip. */
+.part-share { padding: var(--space-1) var(--space-2); border: var(--border) solid var(--rule); border-radius: var(--radius); background: var(--tint); justify-content: center; }
+
+/* Post lists as cards with a border, which lift a little on hover. */
+.post-list.style-dated li, .post-list.style-cards li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
+  border: var(--border) solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--raised);
+  transition: transform 0.25s ease;
+}
+.post-list li + li { margin-top: 0; }
+.post-list.style-dated li:hover, .post-list.style-cards li:hover { transform: translateY(-2px); border-color: var(--muted); box-shadow: none; }
+.post-list.style-dated a { font-size: var(--step-1); font-weight: var(--weight-heading); }
+.post-list.style-dated a::after { content: ""; position: absolute; inset: 0; }
+.post-list.style-dated time { order: 2; margin-top: var(--space-1); }
+
+/* The footer: one small centered line, with no rule above it. */
+.part-footer { border-top: 0; font-size: var(--step--1); text-align: center; }
+.part-footer-inner { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 0 var(--space-2); max-width: calc(var(--measure) + 2 * var(--space-3)); padding-block: var(--space-3); }
+.part-footer-inner > * { margin: 0; }
+.part-footer-links ul { margin: 0; }
+.part-footer-links ul, .part-social { justify-content: center; }
+.part-footer a { text-decoration: underline; text-underline-offset: 0.25rem; }

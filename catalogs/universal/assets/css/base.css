@@ -151,9 +151,9 @@ pre {
 }
 pre code { font-size: inherit; background: none; padding: 0; }
 .flow > .highlight > pre, .flow > pre { margin-inline: calc(-1 * var(--space-3)); }
-.chroma .c, .chroma .c1, .chroma .cm, .chroma .cs, .chroma .ch { color: var(--muted); font-style: italic; }
-.chroma .k, .chroma .kd, .chroma .kn, .chroma .kr, .chroma .kc, .chroma .nt { color: var(--accent); }
-.chroma .s, .chroma .s1, .chroma .s2, .chroma .sb, .chroma .se { color: color-mix(in srgb, currentColor 75%, var(--accent)); }
+.chroma .c, .chroma .c1, .chroma .cm, .chroma .cs, .chroma .ch { color: var(--code-muted); font-style: italic; }
+.chroma .k, .chroma .kd, .chroma .kn, .chroma .kr, .chroma .kc, .chroma .nt { color: var(--code-accent); }
+.chroma .s, .chroma .s1, .chroma .s2, .chroma .sb, .chroma .se { color: color-mix(in srgb, currentColor 75%, var(--code-accent)); }
 
 figure { margin: 0; }
 
@@ -297,6 +297,8 @@ sup a[role="doc-noteref"], .footnote-ref {
   --heading: var(--dark-ink);
   --code-paper: var(--dark-tint);
   --code-ink: var(--dark-ink);
+  --code-muted: var(--dark-muted);
+  --code-accent: var(--dark-accent);
   --positive: var(--dark-positive);
   --warning: var(--dark-warning);
   --danger: var(--dark-danger);

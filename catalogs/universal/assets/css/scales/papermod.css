@@ -1,0 +1,22 @@
+/* papermod: 18px writing in a 720px column, headings stepping by a third. Body 17px to 18px, ratio 1.25 to 1.333, from a 360px to a 1240px screen.
+   Made by `bun scripts/theme.ts build` from themes/scales/papermod.yaml.
+   Edit that file, not this one. */
+
+:root {
+  --step--1: clamp(0.85rem, 0.852rem + -0.011vw, 0.844rem);
+  --step-0: clamp(1.0625rem, 1.037rem + 0.114vw, 1.125rem);
+  --step-1: clamp(1.3281rem, 1.258rem + 0.312vw, 1.4996rem);
+  --step-2: clamp(1.6602rem, 1.522rem + 0.616vw, 1.999rem);
+  --step-3: clamp(2.0752rem, 1.834rem + 1.072vw, 2.6647rem);
+  --step-4: clamp(2.594rem, 2.202rem + 1.742vw, 3.552rem);
+  --space-1: 0.5rem;
+  --space-2: 1.25rem;
+  --space-3: 1.5rem;
+  --space-4: clamp(2rem, 1.795rem + 0.909vw, 2.5rem);
+  --space-5: clamp(3rem, 2.591rem + 1.818vw, 4rem);
+  --measure: 45rem;
+  --wide: 64rem;
+  --radius: 8px;
+  --border: 1px;
+  --control-radius: 8px;
+}

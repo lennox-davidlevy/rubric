@@ -2,4 +2,4 @@
 title: Universal catalog
 ---
 
-The catalog in each theme: [paper](/paper/).
+The catalog in each theme: [paper](/paper/), [papermod](/papermod/).

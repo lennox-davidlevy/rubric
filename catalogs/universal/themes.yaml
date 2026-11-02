@@ -10,3 +10,10 @@ paper:
   palette: paper
   pairing: source-serif
   scale: reading
+
+papermod:
+  description: white and near-black with no accent color, the reader's own sans, cards with a border; after PaperMod
+  palette: papermod
+  pairing: system-sans
+  scale: papermod
+  skin: papermod

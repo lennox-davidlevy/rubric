@@ -33,6 +33,8 @@
   --heading: var(--dark-ink);
   --code-paper: var(--dark-tint);
   --code-ink: var(--dark-ink);
+  --code-muted: var(--dark-muted);
+  --code-accent: var(--dark-accent);
   --positive: var(--dark-positive);
   --warning: var(--dark-warning);
   --danger: var(--dark-danger);

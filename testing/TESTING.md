@@ -4,7 +4,7 @@ The playground now runs on the universal catalog: 34 parts for the writing and 1
 
 This file is kept up to date as Rubric changes.
 
-Last updated: 2026-11-02, after your notes (pricing marks are now an asterisk, step 12): part three tests what came of them. If you already did parts one and two, restart `bun run play` and Neovim, then go straight to part three.
+Last updated: 2026-11-02, with PaperMod, the first imported theme (part four). After your notes (pricing marks are now an asterisk, step 12): part three tests what came of them. If you already did parts one and two, restart `bun run play` and Neovim, then go straight to part three.
 
 **New since the last test:**
 
@@ -266,6 +266,26 @@ Fix it either way:
 Start a new timeline, pricing, stats or chart on an empty block.
 
 **Should happen:** the starter shows the shape only: `### When — What happened`, `**The price**`, `**0** what it counts`, `| Label | Value |`. Nothing that could contradict what you asked for, like the year-by-year starter did for "month by month".
+
+## Part four: PaperMod
+
+The first theme imported from an open-source Hugo theme. To compare, the real PaperMod looks like its demo at https://adityatelange.github.io/hugo-PaperMod/.
+
+### 15. Switch the playground to it
+
+In `testing/hugo.toml`, under `[params.rubric]`, change `theme = "paper"` to:
+
+```toml
+theme = "papermod"
+```
+
+**Should happen:** after a moment, http://localhost:1415/posts/everything/ redraws as PaperMod: white page, near-black writing in your system's own sans, a large bold site name with plain links, `›` between breadcrumbs, dark code blocks, tags as gray pills, previous and next as one gray box with `PREV` / `NEXT`, a small centered footer. The home page lists posts as bordered cards. Nothing you wrote changes: the same `:::` lines, drawn another way. If it doesn't redraw, restart `bun run play`.
+
+**Then:** press ◐ for dark (PaperMod's own near-black gray), and try phone width.
+
+**Notice:** where it looks like PaperMod and where it doesn't. Known differences: "On this page" stays a column beside the writing (PaperMod puts it in a box at the top), the theme switch is ◐ rather than a moon, and social links are words rather than icons.
+
+Change it back to `theme = "paper"` when you're done, or keep it.
 
 ## Afterwards
 

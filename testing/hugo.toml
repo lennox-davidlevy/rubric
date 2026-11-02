@@ -5,7 +5,7 @@ themesDir = "../catalogs"
 disableKinds = ["taxonomy", "term", "sitemap"]
 
 [params.rubric]
-theme = "paper"
+theme = "papermod"
 
 # Nested parts hand their HTML to the outer part's RenderString.
 [markup.goldmark.renderer]

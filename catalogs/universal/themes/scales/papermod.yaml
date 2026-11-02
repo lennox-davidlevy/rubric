@@ -1,0 +1,18 @@
+# PaperMod's sizes (assets/css/core/theme-vars.css, common/*.css): 18px
+# writing, headings at 24, 32 and 40px (a ratio of about 1.33), a 720px
+# column, 8px corners.
+description: 18px writing in a 720px column, headings stepping by a third
+
+screen: [360, 1240]
+body: [17, 18]
+ratio: [1.25, 1.333]
+steps: [-1, 4]
+
+# --content-gap 20px, --gap 24px, and room around a post.
+space: [0.5, 1.25, 1.5, [2, 2.5], [3, 4]]
+
+measure: 45rem   # --main-width, 720px
+wide: 64rem      # --nav-width, 1024px
+radius: 8px      # --radius
+border: 1px
+controls: 8px
