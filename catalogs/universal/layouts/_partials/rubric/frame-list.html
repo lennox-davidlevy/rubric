@@ -1,0 +1,16 @@
+{{- /* The frame around every page, from rubric.md (content/rubric-frame/,
+     written by Rubric), less what this page hides with `hide: [...]` in its
+     front matter. Parts that belong to a post only show on dated pages. */ -}}
+{{- $p := . -}}
+{{- $all := slice -}}
+{{- with site.GetPage "/rubric-frame" }}{{ $all = .Params.frame | default slice }}{{ end -}}
+{{- $hide := $p.Params.hide | default slice -}}
+{{- $postOnly := slice "cover" "post-meta" "author" "tags" "share" "related" "pager" "comments" -}}
+{{- $isPost := and $p.IsPage (not $p.Date.IsZero) -}}
+{{- $out := slice -}}
+{{- range $all -}}
+  {{- if and (not (in $hide .part)) (or $isPost (not (in $postOnly .part))) -}}
+    {{- $out = $out | append . -}}
+  {{- end -}}
+{{- end -}}
+{{- return $out -}}

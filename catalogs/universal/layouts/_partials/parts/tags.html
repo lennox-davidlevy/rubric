@@ -1,0 +1,5 @@
+{{- with .page.GetTerms "tags" }}
+<p class="part part-tags tags">
+  {{- range . }}<a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}
+</p>
+{{- end -}}

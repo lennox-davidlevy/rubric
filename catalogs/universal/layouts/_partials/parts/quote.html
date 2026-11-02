@@ -1,0 +1,8 @@
+<figure class="part part-quote size-{{ .s.size }} align-{{ .s.align }}">
+<blockquote class="stack">
+{{ .inner }}
+</blockquote>
+{{- with .s.cite }}
+<figcaption>{{ . | markdownify }}</figcaption>
+{{- end }}
+</figure>

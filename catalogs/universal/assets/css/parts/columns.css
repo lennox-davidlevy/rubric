@@ -1,0 +1,10 @@
+/* columns: side by side on a wide screen, one after another on a phone. */
+.part-columns { --count: 2; display: grid; gap: var(--space-3) var(--space-4); }
+@media (min-width: 40rem) {
+  .part-columns { grid-template-columns: repeat(var(--count), minmax(0, 1fr)); }
+  .part-columns.split-wide-first { grid-template-columns: 2fr repeat(calc(var(--count) - 1), minmax(0, 1fr)); }
+  .part-columns.split-wide-last { grid-template-columns: repeat(calc(var(--count) - 1), minmax(0, 1fr)) 2fr; }
+}
+@media (min-width: 56rem) {
+  .flow > .part-columns { grid-column: wide; }
+}

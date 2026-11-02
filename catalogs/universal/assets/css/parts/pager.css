@@ -1,0 +1,6 @@
+/* pager: the earlier and the later post. */
+.part-pager { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); margin-top: var(--space-4) !important; font-family: var(--font-ui); }
+.part-pager a { display: grid; gap: 0.2em; padding: var(--space-2) 0; border-top: var(--border) solid var(--rule); text-decoration: none; }
+.part-pager a span { font-size: var(--step--1); color: var(--muted); }
+.part-pager a:hover { color: var(--accent); }
+.part-pager-later { grid-column: 2; text-align: right; }

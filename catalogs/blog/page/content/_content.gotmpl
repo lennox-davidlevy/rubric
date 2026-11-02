@@ -6,7 +6,8 @@
       "path" $name
       "title" $name
       "kind" "page"
-      "params" (dict "layout" "catalog" "rubric" (dict "theme" $name "catalog" true))) }}
+      "layout" "catalog"
+      "params" (dict "rubric" (dict "theme" $name "catalog" true))) }}
   {{- $.AddPage (dict
       "path" (printf "stress/%s" $name)
       "title" (printf "A page title long enough to wrap, in %s" $name)

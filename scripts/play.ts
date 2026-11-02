@@ -64,7 +64,58 @@ function summary(): string {
   return `${bold(`${calls} call${calls === 1 ? "" : "s"} to Jev`)} this session${errors ? `, ${red(`${errors} failed`)}` : ""}${avg}, over ${took}.`;
 }
 
-function print(c: Call): void {
+// The second pass: words after a pinned part's ":", asked only about it.
+interface Second {
+  t: number;
+  ms: number;
+  pass: "second";
+  part: string;
+  model?: string;
+  request: { model: string; state: { directive: string }; questions: Record<string, unknown> };
+  response?: { answers?: Record<string, Answer> } | string;
+  refined?: { settings: Record<string, string>; unsettled: string[]; beyond: number };
+  error?: string;
+}
+
+function printSecond(c: Second): void {
+  session.calls++;
+  if (c.error) session.errors++;
+  else session.ms += c.ms;
+  const time = new Date(c.t).toLocaleTimeString("en-GB");
+  const head = `── Jev #${session.calls} ${time} second pass `;
+  const out = ["", cyan(head + "─".repeat(Math.max(4, 64 - head.length)))];
+  out.push(`${bold("sent")}      ${JSON.stringify(c.request.state.directive)}  ${dim(`about ${c.part}  ${Object.keys(c.request.questions).length} questions`)}`);
+  const answers = typeof c.response === "object" ? c.response.answers : undefined;
+  if (answers) {
+    out.push(`${bold("received")}  ${dim(`${Math.round(c.ms)} ms  model=${c.model ?? "?"}`)}`);
+    for (const id of Object.keys(c.request.questions)) {
+      const m = /^setting:[^:]+:(.+)$/.exec(id);
+      if (!m) continue;
+      const a = answers[id], told = answers[`told:${c.part}:${m[1]}`];
+      const toldText = told?.type === "noul" ? `told ${prob(told.noul)}` : "";
+      const value =
+        a?.type === "choice" ? `${a.choice} ${prob(a.probabilities[a.choice] ?? 0)}`
+        : a?.type === "score" ? (() => { const [l, lp] = Object.entries(a.probabilities).sort((x, y) => y[1] - x[1])[0]!; return `${JSON.stringify(a.legend[l] ?? l)} ${prob(lp)}`; })()
+        : a?.type === "noul" ? prob(a.noul) : "?";
+      out.push(`          ${m[1]}  ${toldText}  ${dim("→")} ${value}`);
+    }
+    const beyond = answers.beyond;
+    if (beyond?.type === "noul") out.push(`          beyond its settings  ${prob(beyond.noul)}`);
+  }
+  if (c.error) out.push(`${bold("result")}    ${red("error")} ${c.error}`);
+  else if (c.refined) {
+    const said = Object.entries(c.refined.settings).map(([k, v]) => `${k}=${v}`).join(" ") || "no setting";
+    const extra = [
+      c.refined.unsettled.length ? `unsettled: ${c.refined.unsettled.join(", ")}` : "",
+      c.refined.beyond > THRESHOLDS.yes ? "asks for more than its settings" : "",
+    ].filter(Boolean).join("  ");
+    out.push(`${bold("result")}    ${green(said)}${extra ? dim(`  ${extra}`) : ""}`);
+  }
+  console.log(out.join("\n"));
+}
+
+function print(c: Call | Second): void {
+  if ("pass" in c) return printSecond(c);
   session.calls++;
   if (c.resolution.outcome === "error") session.errors++;
   else session.ms += c.ms;

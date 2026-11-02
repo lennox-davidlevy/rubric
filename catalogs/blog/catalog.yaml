@@ -7,18 +7,21 @@ version: 2
 # to this list.
 slots:
   [ # palette
-   paper, ink, accent, muted, rule, tint, raised, accent-tint,
+   paper, ink, accent, muted, rule, tint, raised, link, heading, code-paper, code-ink,
+   positive, warning, danger, accent-tint, positive-tint, warning-tint, danger-tint,
    dark-paper, dark-ink, dark-accent, dark-muted, dark-rule, dark-tint, dark-accent-tint,
+   dark-positive, dark-warning, dark-danger, dark-positive-tint, dark-warning-tint, dark-danger-tint,
    shadow-soft, shadow-deep,
    # pairing
-   font-body, font-display, font-mono,
+   font-body, font-display, font-mono, font-ui,
    weight-body, weight-strong, weight-heading, weight-display,
    leading-body, leading-heading, leading-display,
    tracking-display, tracking-label, label-case, numerals, quote-style, ornament, code-size,
+   heading-case, link-line,
    # scale
    step--1, step-0, step-1, step-2, step-3, step-4,
    space-1, space-2, space-3, space-4, space-5,
-   measure, wide, radius]
+   measure, wide, radius, border, control-radius]
 
 # Descriptions are Jev's prompt and are read literally: say what the part is,
 # in the words a writer would use. Value names are sent too; name a value for

@@ -38,7 +38,8 @@ export const THRESHOLDS = {
   sureFrom: 15,
 };
 
-export type PageKind = "home" | "post" | "page";
+// "site" is rubric.md, where the frame around every page is chosen.
+export type PageKind = "home" | "post" | "page" | "site";
 
 // A type, not an interface, so it matches the SDK's JSON object type.
 export type State = {
@@ -52,9 +53,57 @@ export const PART = "part";
 export const fitsId = (part: string) => `fits:${part}`;
 export const saidId = (part: string, setting: string) => `said:${part}:${setting}`;
 export const settingId = (part: string, setting: string) => `setting:${part}:${setting}`;
+export const toldId = (part: string, setting: string) => `told:${part}:${setting}`;
+export const BEYOND = "beyond";
 
 export function buildState(directive: string, page: PageKind): State {
   return { directive, page };
+}
+
+// The second pass: words after a pinned part's ":", such as "a bit bigger,
+// with a shadow". The part is known, so only its settings are asked, and the
+// state says which part the words are about.
+export type RefineState = {
+  directive: string;
+  page: PageKind;
+  part: string;
+};
+
+export function refineState(words: string, page: PageKind, part: string, description: string): RefineState {
+  return { directive: words, page, part: `${part}: ${description}` };
+}
+
+// Words after the ":" are read as a whole. For each setting: does the line
+// say anything about it, the default included, so "back to normal width"
+// counts; and if so, which value. Then whether the line asks for anything no
+// setting covers, which the editor says rather than quietly ignores.
+export function refineQuestions(catalog: Catalog, partName: string): Record<string, Question> {
+  const part = catalog.parts[partName]!;
+  const questions: Record<string, Question> = {};
+  const covers: Record<string, string> = {};
+  for (const [name, setting] of Object.entries(part.settings)) {
+    const q = settingQuestion(partName, name, setting);
+    if (!q) continue;
+    questions[settingId(partName, name)] = q;
+    const values =
+      setting.type === "choice" ? setting.values
+      : setting.type === "level" ? setting.levels
+      : setting.type === "flag" ? { yes: setting.true ?? `the ${partName} is ${name}`, no: setting.false ?? `the ${partName} is not ${name}` }
+      : {};
+    covers[name] = Object.values(values).join("; ");
+    questions[toldId(partName, name)] = {
+      type: "noul",
+      instructions: { question: `Does \`directive\` say how the \`part\` should be, for its ${name}?`, values },
+    };
+  }
+  questions[BEYOND] = {
+    type: "noul",
+    instructions: {
+      question: "Does `directive` ask for something about the `part` that none of these settings can do?",
+      settings: Object.keys(covers).length ? covers : { none: "it has no settings" },
+    },
+  };
+  return questions;
 }
 
 // Which part `directive` asks for: one Choice among the catalog's parts.

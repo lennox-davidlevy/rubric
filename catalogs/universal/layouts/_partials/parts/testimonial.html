@@ -1,0 +1,17 @@
+{{- /* The block is what they said; a last paragraph that starts with a dash
+     is who said it. */ -}}
+{{- $body := string .inner -}}
+{{- $who := "" -}}
+{{- $last := `(?s)<p>(?:—|&mdash;|--)\s*(.*?)</p>\s*$` -}}
+{{- with findRESubmatch $last $body 1 }}{{ $who = index (index . 0) 1 }}{{ $body = replaceRE $last "" $body }}{{ end -}}
+<figure class="part part-testimonial">
+<blockquote class="stack">
+{{ $body | safeHTML }}
+</blockquote>
+{{- if or $who .s.photo }}
+<figcaption>
+{{- with .s.photo }}<img src="{{ . | relURL }}" alt="" width="56" height="56" loading="lazy">{{ end -}}
+<span>{{ $who | safeHTML }}</span>
+</figcaption>
+{{- end }}
+</figure>

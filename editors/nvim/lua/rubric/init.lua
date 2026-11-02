@@ -115,6 +115,21 @@ function M.setup(opts)
   })
   vim.lsp.enable("rubric")
 
+  -- Accepting a refinement (words after a pin's ":") first inserts the ghost
+  -- text, which only shows what changes; this then writes the whole line,
+  -- since the pin it changes sits in the middle of it.
+  vim.lsp.commands["rubric.pin"] = function(command, ctx)
+    local arg = command.arguments and command.arguments[1]
+    if not arg then
+      return
+    end
+    vim.api.nvim_buf_set_lines(ctx.bufnr, arg.line, arg.line + 1, false, { arg.text })
+    local win = vim.fn.bufwinid(ctx.bufnr)
+    if win ~= -1 then
+      vim.api.nvim_win_set_cursor(win, { arg.line + 1, #arg.text })
+    end
+  end
+
   vim.api.nvim_create_autocmd("LspAttach", {
     group = vim.api.nvim_create_augroup("Rubric", { clear = true }),
     callback = function(event)

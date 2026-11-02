@@ -1,0 +1,4 @@
+/* audio: a player, with what it is above it. */
+.part-audio { padding: var(--space-3); border-radius: var(--radius); background: var(--tint); }
+.part-audio figcaption { margin-bottom: var(--space-2); font-family: var(--font-ui); font-weight: var(--weight-strong); }
+.part-audio audio { display: block; width: 100%; }

@@ -1,0 +1,266 @@
+# What the catalog page puts inside each part. Not part of the contract and
+# never sent to Jev: catalog.yaml says what a part is, this says what to show
+# in it. `settings` are added to every item of the part; `extra` adds items
+# beyond one per value; `pair` shows a setting together with others, for a
+# setting that cannot be seen on its own.
+
+section:
+  md: |
+    ## A few words set apart
+
+    A run of writing that belongs together and wants a little room of its own. It reads like the rest of the page, with [a link](#) in it, until the setting says otherwise.
+  pair:
+    width: { tone: tint }
+  extra:
+    - { tone: dark, width: full }
+
+hero:
+  md: |
+    # Field Notes
+
+    Notes on walking, reading and the slow work of paying attention.
+  extra:
+    - { image: images/sample.jpg }
+
+quote:
+  md: |
+    The palest ink is better than the best memory.
+  settings: { cite: "A proverb, source unknown" }
+
+callout:
+  md: |
+    The bus past the reservoir stopped running in April. The walk from the last stop is about two miles, and most of it has no sidewalk.
+
+figure:
+  md: |
+    ![A soft field of color](/images/sample.jpg)
+
+    The canal by the gasworks, early on a Sunday.
+
+gallery:
+  md: |
+    ![The canal at first light](/images/gallery/sample-1.jpg)
+    ![A gate on the reservoir path](/images/gallery/sample-2.jpg)
+    ![Reeds after rain](/images/gallery/sample-3.jpg)
+    ![The old pumping station](/images/gallery/sample-4.jpg)
+    ![A heron, too far away](/images/gallery/sample-5.jpg)
+    ![The last bus stop](/images/gallery/sample-6.jpg)
+
+post-list: {}
+
+buttons:
+  md: |
+    [Read the latest post](#) [About this blog](#)
+
+divider: {}
+
+contents:
+  toc: |
+    - [What goes in it](#)
+      - [The rule about crossing out](#)
+    - [Why paper](#)
+    - [A notebook is not a diary](#)
+    - [Keeping the index](#)
+
+fold:
+  md: |
+    ## How long is the walk?
+
+    About two miles from the last bus stop, most of it along the reservoir.
+
+    ## Is it safe after dark?
+
+    The canal path is lit as far as the gasworks. After that, bring a flashlight.
+
+    ## Can I bring a dog?
+
+    Yes, on a lead past the nature reserve.
+
+testimonial:
+  md: |
+    Working with them felt like having a second editor who never got tired of the same paragraph.
+
+    — Ruth Okafor, editor at Northfield Press
+  settings: { photo: /images/gallery/sample-2.jpg }
+
+sidenote:
+  md: |
+    A note in the margin, about the sentence beside it.
+
+video:
+  md: |
+    https://www.youtube.com/watch?v=aqz-KE-bpKQ
+
+    Big Buck Bunny, from the Blender Foundation.
+
+audio:
+  md: |
+    /audio/sample.wav
+
+    Episode 12: the walk home, read aloud.
+
+embed:
+  md: |
+    https://www.openstreetmap.org/#map=15/51.505/-0.09
+
+    Where the walk starts.
+
+code:
+  md: |
+    ```go
+    func walk(miles int) string {
+    	return fmt.Sprintf("%d miles", miles)
+    }
+    ```
+  settings: { file: walk.go }
+
+math:
+  md: |
+    \int_0^1 x^2 \, dx = \frac{1}{3}
+
+table:
+  md: |
+    | Route | Miles | Weather |
+    |-------|------:|---------|
+    | Reservoir | 2.1 | Rain |
+    | Canal | 1.4 | Clear |
+    | The long way | 3.6 | Wind |
+
+people:
+  md: |
+    - ![Ruth Okafor](/images/gallery/sample-1.jpg) **Ruth Okafor**, editor
+    - ![Sam Lee](/images/gallery/sample-2.jpg) **Sam Lee**, designer
+    - ![Ana Ruiz](/images/gallery/sample-3.jpg) **Ana Ruiz**, writer
+
+logos:
+  md: |
+    ![North](/images/logos/north.svg)
+    ![Harbor](/images/logos/harbor.svg)
+    ![Fieldwork](/images/logos/fieldwork.svg)
+
+download:
+  md: |
+    [The walk, as a picture](/images/sample.jpg)
+
+    A photograph of the reservoir path, full size.
+
+contact-form:
+  settings: { to: "https://example.com/form" }
+
+subscribe:
+  settings: { to: "https://example.com/subscribe" }
+
+pricing:
+  md: |
+    ### Reader
+
+    **Free**
+
+    - Every post
+    - The newsletter
+
+    [Start reading](#)
+
+    ### Supporter
+
+    **$5 a month**
+
+    - Everything for readers
+    - Early drafts
+    - A thank-you in the book
+
+    [Become a supporter](#)
+
+    ### Patron
+
+    **$20 a month**
+
+    - Everything for supporters
+    - A signed copy
+
+    [Become a patron](#)
+  extra:
+    # Plans marked with an asterisk at the end of their title stand out, any of them.
+    - md: |
+        ### Reader *
+
+        **Free**
+
+        - Every post
+        - The newsletter
+
+        [Start reading](#)
+
+        ### Supporter
+
+        **$5 a month**
+
+        - Everything for readers
+        - Early drafts
+
+        [Become a supporter](#)
+
+        ### Patron *
+
+        **$20 a month**
+
+        - Everything for supporters
+        - A signed copy
+
+        [Become a patron](#)
+
+chart:
+  md: |
+    | Month | Visits | Readers |
+    |-------|-------:|--------:|
+    | Jan   | 120    | 80      |
+    | Feb   | 180    | 110     |
+    | Mar   | 150    | 120     |
+    | Apr   | 240    | 160     |
+
+diagram:
+  md: |
+    flowchart LR
+      A[Write a line] --> B[Jev picks a part]
+      B --> C[Hugo draws the page]
+
+author:
+  md: |
+    ![A. Writer](/images/gallery/sample-2.jpg)
+
+    A. Writer walks the same two miles every evening and writes about it here.
+
+social:
+  md: |
+    - https://github.com/example
+    - https://mastodon.social/@example
+    - https://bsky.app/profile/example.com
+
+header:
+  md: |
+    - [Posts](/posts/)
+    - [About](/about/)
+
+sidebar:
+  md: |
+    ### Sections
+
+    - [Posts](/posts/)
+    - [About](/about/)
+
+    ### Tags
+
+    - [reading](/tags/reading/)
+    - [walking](/tags/walking/)
+
+footer:
+  md: |
+    ### Read
+
+    - [Posts](/posts/)
+    - [RSS](/index.xml)
+
+    ### About
+
+    - [The writer](/about/)
+    - [Colophon](/colophon/)

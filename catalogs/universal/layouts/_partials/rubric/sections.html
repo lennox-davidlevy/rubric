@@ -1,0 +1,19 @@
+{{- /*
+  Splits a part's rendered Markdown at one heading level, for parts made of
+  titled pieces: cards, steps, a timeline, pricing, tabs, a fold of several
+  questions. Returns a dict: "before" (what comes ahead of the first heading)
+  and "items", each with "title" (HTML), "id" and "body" (HTML).
+
+  Usage: {{ $x := partial "rubric/sections.html" (dict "html" .inner "level" 3) }}
+*/ -}}
+{{- $tag := printf "h%d" .level -}}
+{{- $chunks := split (string .html) (printf "<%s" $tag) -}}
+{{- $items := slice -}}
+{{- range after 1 $chunks -}}
+  {{- $title := replaceRE (printf `(?s)^[^>]*>(.*?)</%s>.*$` $tag) "$1" . -}}
+  {{- $id := replaceRE `(?s)^\s*id="([^"]*)".*$` "$1" . -}}
+  {{- if eq $id . }}{{ $id = "" }}{{ end -}}
+  {{- $body := replaceRE (printf `(?s)^[^>]*>.*?</%s>` $tag) "" . -}}
+  {{- $items = $items | append (dict "title" ($title | safeHTML) "id" $id "body" ($body | safeHTML)) -}}
+{{- end -}}
+{{- return dict "before" (index $chunks 0 | safeHTML) "items" $items -}}

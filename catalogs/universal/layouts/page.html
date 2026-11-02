@@ -1,0 +1,22 @@
+{{ define "main" }}
+{{ partial "rubric/frame.html" (dict "page" . "slot" "before-title") }}
+<header class="page-header">
+<h1>{{ .Title }}</h1>
+{{- if and (eq .Section "posts") (not (partial "rubric/frame-has.html" (dict "page" . "part" "post-meta"))) }}
+<p class="byline">
+  <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "January 2, 2006" }}</time>
+  <span aria-hidden="true">·</span> {{ .ReadingTime }} min read
+</p>
+{{- end }}
+{{ partial "rubric/frame.html" (dict "page" . "slot" "after-title") }}
+</header>
+{{ partial "rubric/content.html" . }}
+{{- if not (partial "rubric/frame-has.html" (dict "page" . "part" "tags")) }}
+{{- with .GetTerms "tags" }}
+<p class="tags">
+  {{- range . }}<a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}
+</p>
+{{- end }}
+{{- end }}
+{{ partial "rubric/frame.html" (dict "page" . "slot" "after-content") }}
+{{ end }}

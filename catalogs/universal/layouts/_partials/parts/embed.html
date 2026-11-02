@@ -1,0 +1,24 @@
+{{- /* The address is the block's first link or path; the rest is a caption. */ -}}
+{{- $html := string .inner -}}
+{{- $url := index (findRE `(?:https?://|/)[^"<\s]+` (replaceRE `(?s)^.*?<p>` "" $html) 1) 0 | default "" | htmlUnescape -}}
+{{- $caption := replaceRE `(?s)^\s*<p>.*?</p>` "" $html -}}
+
+{{- /* What can be shown without a script of ours is shown; anything else is
+     a card that links to it, which always works. */ -}}
+{{- $host := replaceRE `^https?://(?:www\.)?([^/]+).*$` "$1" $url -}}
+<figure class="part part-embed">
+{{- if findRE `^https://gist\.github\.com/[^/]+/[0-9a-f]+` $url }}
+<script src="{{ strings.TrimSuffix ".js" $url }}.js"></script>
+<noscript><a href="{{ $url }}">{{ $url }}</a></noscript>
+{{- else if or (findRE `google\.[a-z.]+/maps/embed` $url) (findRE `[?&]output=embed` $url) (findRE `openstreetmap\.org/export/embed` $url) }}
+<div class="part-embed-frame"><iframe src="{{ $url }}" title="A map" loading="lazy"></iframe></div>
+{{- else if $url }}
+<a class="part-embed-card" href="{{ $url }}">
+<span class="part-embed-host">{{ $host }}</span>
+<span class="part-embed-url">{{ $url }}</span>
+</a>
+{{- end }}
+{{- with trim $caption " \n" }}
+<figcaption class="stack">{{ . | safeHTML }}</figcaption>
+{{- end }}
+</figure>

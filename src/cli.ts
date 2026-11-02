@@ -11,7 +11,7 @@
 import { watch } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
-import { Cache, preprocess } from "./core/index.ts";
+import { Cache, frame, FRAME_PAGE, framePage, preprocess } from "./core/index.ts";
 import { serve } from "./server/main.ts";
 import { openSite, pageKind, type Site } from "./site.ts";
 
@@ -24,7 +24,15 @@ if (command === "lsp") {
   const cache = await Cache.load(site.cache);
   await build(site, cache);
   if (command === "watch") {
-    console.log(`watching ${site.pages}`);
+    console.log(`watching ${site.pages} and rubric.md`);
+    watch(join(site.root, "rubric.md"), async () => {
+      try {
+        await writeFrame(site, cache);
+        console.log(`${new Date().toLocaleTimeString()} rubric.md`);
+      } catch (err) {
+        console.error(err);
+      }
+    });
     watch(site.pages, { recursive: true }, async (_, name) => {
       if (!name?.endsWith(".md")) return;
       try {
@@ -55,12 +63,23 @@ async function writePage(site: Site, cache: Cache, file: string): Promise<void> 
   }
 }
 
+// rubric.md's frame, into the page Hugo reads but never publishes.
+async function writeFrame(site: Site, cache: Cache): Promise<void> {
+  const text = await readFile(join(site.root, "rubric.md"), "utf8").catch(() => "");
+  const { entries, output } = frame(text, site.catalog, cache.resolver(site.catalog, "site"));
+  await mkdir(dirname(join(site.content, FRAME_PAGE)), { recursive: true });
+  await writeFile(join(site.content, FRAME_PAGE), framePage(entries));
+  for (const d of output.diagnostics) console.log(`rubric.md:${d.line + 1}:${d.start + 1}: ${d.code}: ${d.message}`);
+  for (const e of output.entries) if (e.reason === "unresolved") console.log(`rubric.md:${e.line + 1}: words, not resolved yet: "${e.words}"`);
+}
+
 // Rewrites content/ in place and removes only pages that are gone. Deleting
 // the folder itself would leave a running `hugo server` watching nothing.
 async function build(site: Site, cache: Cache): Promise<void> {
   const files = (await readdir(site.pages, { recursive: true })).filter((f) => f.endsWith(".md"));
   for (const f of files) await writePage(site, cache, join(site.pages, f));
-  const keep = new Set(files);
+  await writeFrame(site, cache);
+  const keep = new Set([...files, FRAME_PAGE]);
   const existing = await readdir(site.content, { recursive: true }).catch(() => [] as string[]);
   for (const f of existing) if (f.endsWith(".md") && !keep.has(f)) await rm(join(site.content, f));
   console.log(`wrote ${files.length} page(s) to ${site.content}`);

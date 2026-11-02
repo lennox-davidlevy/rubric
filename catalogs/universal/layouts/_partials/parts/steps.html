@@ -1,0 +1,11 @@
+{{- $x := partial "rubric/sections.html" (dict "html" .inner "level" 3) -}}
+<ol class="part part-steps">
+{{- range $x.items }}
+<li>
+<h3>{{ .title }}</h3>
+<div class="stack">
+{{ .body }}
+</div>
+</li>
+{{- end }}
+</ol>

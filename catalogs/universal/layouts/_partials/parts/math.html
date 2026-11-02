@@ -1,0 +1,6 @@
+{{- /* Rendered when the site is built, to MathML, which browsers draw on
+     their own: no script and no stylesheet to load. */ -}}
+{{- $tex := trim .raw " \n" -}}
+<div class="part part-math">
+{{ with $tex }}{{ transform.ToMath . (dict "displayMode" true "output" "mathml" "throwOnError" false) }}{{ end }}
+</div>

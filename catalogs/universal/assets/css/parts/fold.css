@@ -1,0 +1,27 @@
+/* fold: closed until opened. A <details>, so it needs no script. */
+.part-fold { border-block: var(--border) solid var(--rule); }
+.flow > .part-fold + .part-fold { margin-top: 0; border-top: 0; }
+.part-fold > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+  font-weight: var(--weight-heading);
+  cursor: pointer;
+  list-style: none;
+}
+.part-fold > summary::-webkit-details-marker { display: none; }
+.part-fold > summary::after {
+  content: "+";
+  color: var(--muted);
+  font-weight: var(--weight-body);
+  font-size: var(--step-1);
+  line-height: 1;
+}
+.part-fold[open] > summary::after { content: "\2212"; }
+.part-fold > summary:hover::after { color: var(--accent); }
+.part-fold > .stack { padding-bottom: var(--space-3); }
+
+/* Several questions: one rule between each, none doubled. */
+.part-fold-group > .part-fold + .part-fold { border-top: 0; }

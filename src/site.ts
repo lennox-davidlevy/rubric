@@ -16,6 +16,8 @@ export interface Site {
   // then the theme's. /images/walk.jpg is static/images/walk.jpg in either.
   static: string[];
   catalog: Catalog;
+  // [params.rubric] in hugo.toml, read once when the site is opened.
+  params: Record<string, unknown>;
 }
 
 export async function openSite(root: string): Promise<Site> {
@@ -32,7 +34,17 @@ export async function openSite(root: string): Promise<Site> {
     cache: join(root, ".rubric/cache.json"),
     static: [join(root, "static"), join(themeDir, "static")],
     catalog: await loadCatalog(join(themeDir, "catalog.yaml")),
+    params: rubricParams(config),
   };
+}
+
+function rubricParams(config: string): Record<string, unknown> {
+  try {
+    const params = (Bun.TOML.parse(config) as { params?: { rubric?: unknown } }).params?.rubric;
+    return typeof params === "object" && params !== null ? (params as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
 }
 
 // The nearest folder at or above `path` that holds rubric.md.
@@ -44,12 +56,15 @@ export function findSiteRoot(path: string): string | undefined {
 }
 
 // A page's path inside pages/, or undefined when the file is not a page.
+// rubric.md, where the frame around every page is chosen, is "rubric.md".
 export function pagePath(site: Site, file: string): string | undefined {
+  if (resolve(file) === join(site.root, "rubric.md")) return "rubric.md";
   const rel = relative(site.pages, file);
   return rel.startsWith("..") || !rel.endsWith(".md") ? undefined : rel;
 }
 
 export function pageKind(rel: string): PageKind {
+  if (rel === "rubric.md") return "site";
   if (rel === "_index.md") return "home";
   return rel.split(sep)[0] === "posts" ? "post" : "page";
 }

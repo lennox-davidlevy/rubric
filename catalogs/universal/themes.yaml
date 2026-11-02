@@ -1,0 +1,12 @@
+# The designed themes. Each is one palette, one pairing and one scale, from
+# themes/. A site names one with params.rubric.theme, and may swap a piece
+# with params.rubric.palette, .pairing or .scale.
+#
+# `bun scripts/theme.ts build` writes their CSS; `check` says whether they
+# are fit to ship; `new` starts another from Paper's pieces.
+
+paper:
+  description: warm off-white paper, near-black ink and a rust accent, set in a book serif
+  palette: paper
+  pairing: source-serif
+  scale: reading

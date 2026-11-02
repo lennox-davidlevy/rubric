@@ -1,0 +1,6 @@
+{{- /* A list: each item a picture, then the name in bold and the role. */ -}}
+{{- /* "**Name**, role": the comma is for the writer; the name and role are
+     set on their own lines. */ -}}
+<div class="part part-people">
+{{ replaceRE `</strong>\s*,\s*` "</strong> " (string .inner) | safeHTML }}
+</div>

@@ -4,14 +4,14 @@
 // A directive that is not placed is left as its fence lines in plain text, so
 // it shows in the preview and nothing is silently lost.
 
-import type { Catalog } from "./catalog.ts";
+import type { Catalog, Place } from "./catalog.ts";
 import type { Diagnostic } from "./diagnostic.ts";
 import { closeShortcode, formatPlain, openShortcode, validatePlain, type PlainForm } from "./plain.ts";
 import { scan, type Kind } from "./scan.ts";
 
 // Why a directive was left as text. "unresolved" is a words line with no
 // answer yet; the others carry a diagnostic.
-export type Reason = "unresolved" | "invalid" | "bad-pin" | "unclosed" | "no-children";
+export type Reason = "unresolved" | "invalid" | "bad-pin" | "unclosed" | "no-children" | "wrong-place";
 
 // What each directive became and why: the sidecar, for the editor and for
 // re-resolving later.
@@ -34,7 +34,9 @@ export interface Output {
 // Looks up the plain form a words line resolved to: the cache, in the server.
 export type Resolve = (words: string) => PlainForm | undefined;
 
-export function preprocess(text: string, catalog: Catalog, resolve: Resolve = () => undefined): Output {
+// `place` is where the text is: a page ("writing") or rubric.md ("site"). A
+// part chosen in the other place is left as text, with a diagnostic.
+export function preprocess(text: string, catalog: Catalog, resolve: Resolve = () => undefined, place: Place = "writing"): Output {
   const { directives, strayClosers } = scan(text, catalog);
   const raw = text.split("\n");
   const out = [...raw];
@@ -61,6 +63,8 @@ export function preprocess(text: string, catalog: Catalog, resolve: Resolve = ()
     }
     forms.push(form);
 
+    const wrongPlace = form && Object.hasOwn(catalog.parts, form.part) && catalog.parts[form.part]!.place !== place;
+
     const entry: Entry = {
       line: d.line,
       ...(d.close === undefined ? {} : { close: d.close }),
@@ -77,6 +81,16 @@ export function preprocess(text: string, catalog: Catalog, resolve: Resolve = ()
     if (d.close === undefined) {
       entry.reason = "unclosed";
       diagnostics.push({ ...whole(d.line), code: "unclosed-block", message: "this block has no closing ::: line" });
+    } else if (wrongPlace) {
+      entry.reason = "wrong-place";
+      const at = d.plain ? { line: d.line, ...form!.partSpan } : whole(d.line);
+      diagnostics.push({
+        ...at,
+        code: "wrong-place",
+        message: place === "writing"
+          ? `${form!.part} is part of the frame around every page: choose it in rubric.md`
+          : `${form!.part} goes in a page; rubric.md holds the frame around every page, such as the header, footer and sidebar`,
+      });
     } else if (problems.length > 0) {
       entry.reason = problems.some((p) => p.code === "bad-pin") ? "bad-pin" : "invalid";
       diagnostics.push(...problems);

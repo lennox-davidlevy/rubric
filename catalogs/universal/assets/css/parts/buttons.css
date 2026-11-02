@@ -1,0 +1,37 @@
+/* buttons: one or two links; the first is filled, the second outlined. */
+.part-buttons > :is(p, ul) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.part-buttons li { margin: 0; }
+.part-buttons.align-center > :is(p, ul) { justify-content: center; }
+.part-buttons a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.5em 1.15em;
+  border: var(--border) solid color-mix(in srgb, var(--ink) 28%, transparent);
+  border-radius: var(--control-radius);
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  font-weight: var(--weight-heading);
+  line-height: 1.2;
+  text-decoration: none;
+  color: var(--ink);
+  transition: background-color 120ms, border-color 120ms, color 120ms;
+}
+.part-buttons a:hover { border-color: var(--ink); color: var(--ink); }
+.part-buttons :is(p > a:first-child, li:first-child > a) {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+.part-buttons :is(p > a:first-child, li:first-child > a):hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--paper);
+}

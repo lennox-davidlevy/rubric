@@ -90,3 +90,81 @@ test.skipIf(!nvim)("Neovim: attach, diagnostics, completion, ghost text, accept,
     rmSync(dir, { recursive: true, force: true });
   }
 }, 60_000);
+
+test.skipIf(!nvim)("Neovim: accepting a pick on an empty block writes the part's starter body", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "rubric-nvim-body-"));
+  const sock = join(dir, "nvim.sock");
+  cpSync(join(repo, "sites/blog"), join(dir, "site"), { recursive: true, filter: (src) => !/\/(content|\.rubric|public)(\/|$)/.test(src) });
+  const site = join(dir, "site");
+  writeFileSync(join(site, "hugo.toml"), readFileSync(join(site, "hugo.toml"), "utf8")
+    .replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(repo, "catalogs"))}`)
+    .replace(/^theme = .*$/m, `theme = "universal"`));
+  const page = join(site, "pages/posts/body.md");
+  writeFileSync(page, ["---", "title: Body", "---", "::: steps please", ":::", ""].join("\n"));
+
+  const editor = Bun.spawn([nvim!, "--headless", "--listen", sock, "-u", join(repo, "test/nvim/init.lua"), "-i", "NONE", page], {
+    cwd: site, env: { ...process.env, RUBRIC_REPO: repo }, stdout: "ignore", stderr: "ignore",
+  });
+  const remote = (flag: string, arg: string) => Bun.spawnSync([nvim!, "--server", sock, flag, arg]).stdout.toString().trim();
+  const expr = (lua: string) => remote("--remote-expr", `luaeval("${lua.replace(/"/g, '\\"')}")`);
+  const keys = (k: string) => remote("--remote-send", k);
+  const until = async (f: () => boolean, ms = 10_000) => {
+    for (const end = Date.now() + ms; Date.now() < end; await Bun.sleep(50)) if (f()) return true;
+    return false;
+  };
+  try {
+    expect(await until(() => expr("RubricTest.attached()") === "true")).toBe(true);
+    keys(":call cursor(4, 1)<CR>A");
+    await Bun.sleep(600);
+    expect(await until(() => expr("RubricTest.ghost()").startsWith("-> steps"))).toBe(true);
+    keys("<M-l>");
+    expect(await until(() => expr("RubricTest.line(4)") === "::: steps please -> steps")).toBe(true);
+    keys("<Esc>");
+    const lines = () => Array.from({ length: 9 }, (_, i) => expr(`RubricTest.line(${i + 4})`));
+    expect(await until(() => lines()[8] === ":::")).toBe(true);
+    expect(lines()).toEqual(["::: steps please -> steps", "### The first step", "", "What to do.", "", "### The second step", "", "What to do next.", ":::"]);
+  } finally {
+    keys("<Esc>:qa!<CR>");
+    await Promise.race([editor.exited, Bun.sleep(2000)]);
+    editor.kill();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, 60_000);
+
+test.skipIf(!nvim)("Neovim: accepting words after a pin's colon rewrites the pin and keeps the words", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "rubric-nvim-refine-"));
+  const sock = join(dir, "nvim.sock");
+  cpSync(join(repo, "sites/blog"), join(dir, "site"), { recursive: true, filter: (src) => !/\/(content|\.rubric|public)(\/|$)/.test(src) });
+  const site = join(dir, "site");
+  writeFileSync(join(site, "hugo.toml"), readFileSync(join(site, "hugo.toml"), "utf8")
+    .replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(repo, "catalogs"))}`)
+    .replace(/^theme = .*$/m, `theme = "universal"`));
+  const page = join(site, "pages/posts/refine.md");
+  writeFileSync(page, ["---", "title: Refine", "---", "::: a video -> video :", "https://youtu.be/x", ":::", ""].join("\n"));
+
+  const editor = Bun.spawn([nvim!, "--headless", "--listen", sock, "-u", join(repo, "test/nvim/init.lua"), "-i", "NONE", page], {
+    cwd: site, env: { ...process.env, RUBRIC_REPO: repo }, stdout: "ignore", stderr: "ignore",
+  });
+  const remote = (flag: string, arg: string) => Bun.spawnSync([nvim!, "--server", sock, flag, arg]).stdout.toString().trim();
+  const expr = (lua: string) => remote("--remote-expr", `luaeval("${lua.replace(/"/g, '\\"')}")`);
+  const keys = (k: string) => remote("--remote-send", k);
+  const until = async (f: () => boolean, ms = 10_000) => {
+    for (const end = Date.now() + ms; Date.now() < end; await Bun.sleep(50)) if (f()) return true;
+    return false;
+  };
+  try {
+    expect(await until(() => expr("RubricTest.attached()") === "true")).toBe(true);
+    keys(":call cursor(4, 1)<CR>A make it wide");
+    await Bun.sleep(600);
+    expect(await until(() => expr("RubricTest.ghost()").includes("width=wide"))).toBe(true);
+    keys("<M-l>");
+    expect(await until(() => expr("RubricTest.line(4)") === "::: a video -> video width=wide : make it wide")).toBe(true);
+    keys("<Esc>");
+    expect(expr("RubricTest.line(5)")).toBe("https://youtu.be/x");
+  } finally {
+    keys("<Esc>:qa!<CR>");
+    await Promise.race([editor.exited, Bun.sleep(2000)]);
+    editor.kill();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, 60_000);

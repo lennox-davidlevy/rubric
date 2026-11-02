@@ -1,0 +1,40 @@
+# A pairing: the fonts, and how they are set. The weights and spacing here
+# belong to the faces, so they live with them: a sans wants heavier, tighter
+# headings than a book serif does.
+description: Source Serif 4 for the writing and the headings, a book serif
+
+# Every font file the pairing uses, from static/fonts/. A variable font gives
+# a range of weights; a static one gives a single weight.
+faces:
+  - { family: Source Serif 4, file: source-serif-4-normal.woff2, style: normal, weight: [200, 900] }
+  - { family: Source Serif 4, file: source-serif-4-italic.woff2, style: italic, weight: [200, 900] }
+
+# The files the first screen needs, fetched before the CSS asks for them.
+preload: [source-serif-4-normal.woff2]
+
+# Font lists, first choice first. The rest stand in while it loads, or if it
+# fails: pick ones close in width, so the page shifts little.
+body: [Source Serif 4, Charter, Iowan Old Style, Georgia, serif]
+display: body   # the headings use the body list
+mono: [ui-monospace, SF Mono, JetBrains Mono, Menlo, Consolas, monospace]
+
+weight:
+  body: 400
+  strong: 650    # bold in the writing, the site's name, small labels
+  heading: 600   # headings, buttons, card titles
+  display: 450   # a large pull quote
+
+leading:
+  body: 1.6      # the writing
+  heading: 1.2   # h2 to h4; a large quote sits a little looser
+  display: 1.1   # h1; a hero's title sits a little tighter
+
+tracking:
+  display: -0.015em   # h1. h2 takes two thirds of it, a hero five thirds
+  label: 0.09em       # the small labels on callouts and contents
+
+labels: uppercase   # uppercase or none: how the small labels are set
+numerals: oldstyle  # oldstyle or lining: figures in the writing
+quote: italic       # italic or normal: a centered quote at normal size
+ornament: "* * *"   # a divider with style=ornament
+code: 0.82em        # code beside the writing, so the two look the same size

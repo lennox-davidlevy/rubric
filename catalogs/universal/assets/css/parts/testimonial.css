@@ -1,0 +1,22 @@
+/* testimonial: what someone said about the work, with who said it. */
+.part-testimonial blockquote {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  line-height: calc(var(--leading-heading) + 0.15);
+}
+.part-testimonial blockquote > p:first-child::before { content: "\201C"; color: var(--accent); }
+.part-testimonial blockquote > p:last-child::after { content: "\201D"; color: var(--accent); }
+.part-testimonial figcaption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+.part-testimonial figcaption img { width: 3.5rem; height: 3.5rem; border-radius: 50%; object-fit: cover; }

@@ -6,7 +6,7 @@
 import type { ChoiceResponse, NoulResponse, ScoreResponse } from "@typesafe-ai/sdk";
 import type { Catalog } from "./catalog.ts";
 import { formatPlain } from "./plain.ts";
-import { fitsId, PART, saidId, settingId, THRESHOLDS } from "./questions.ts";
+import { BEYOND, fitsId, PART, saidId, settingId, THRESHOLDS, toldId } from "./questions.ts";
 
 export type Answer = NoulResponse | ChoiceResponse | ScoreResponse;
 export type Answers = Readonly<Record<string, Answer>>;
@@ -111,6 +111,64 @@ function candidate(answers: Answers, catalog: Catalog, part: string, probability
   }
 
   return { part, probability, plain: formatPlain({ part, settings }), unsettled };
+}
+
+// What the words after a pinned part's ":" ask of it. `settings` holds every
+// setting the words speak to, at the value they ask for, a default included;
+// the rest are left as the pin has them. `unsettled` are spoken to with no
+// clear value; `beyond` is how much the words ask for what no setting does.
+export interface Refined {
+  settings: Record<string, string>;
+  unsettled: string[];
+  beyond: number;
+}
+
+export function resolveRefine(answers: Answers, catalog: Catalog, part: string): Refined {
+  const settings: Record<string, string> = {};
+  const unsettled: string[] = [];
+  for (const [name, def] of Object.entries(catalog.parts[part]!.settings)) {
+    if (def.type !== "choice" && def.type !== "level" && def.type !== "flag") continue;
+    const told = noul(answers, toldId(part, name));
+    if (told < THRESHOLDS.no) continue;
+    if (told <= THRESHOLDS.yes) {
+      unsettled.push(name);
+      continue;
+    }
+    let value: string | undefined;
+    if (def.type === "choice") {
+      const [best, p] = top(choiceAnswer(answers, settingId(part, name)).probabilities as Record<string, number>);
+      value = p >= THRESHOLDS.settled && Object.hasOwn(def.values, best) ? best : undefined;
+    } else if (def.type === "level") {
+      const [best, p] = top(scoreAnswer(answers, settingId(part, name)).probabilities as Record<string, number>);
+      value = p >= THRESHOLDS.settled ? Object.keys(def.levels)[Number(best)] : undefined;
+    } else {
+      const yes = noul(answers, settingId(part, name));
+      value = yes > THRESHOLDS.yes ? "true" : yes < THRESHOLDS.no ? "false" : undefined;
+    }
+    if (value === undefined) unsettled.push(name);
+    else settings[name] = value;
+  }
+  return { settings, unsettled, beyond: noul(answers, BEYOND) };
+}
+
+// The pin after a refinement: each setting the words speak to at its new
+// value, dropped when that is the default, and every other setting as it was.
+export function applyRefine(
+  form: { part: string; settings: readonly { key: string; value: string }[] }, refined: Refined, catalog: Catalog,
+): { part: string; settings: { key: string; value: string }[] } {
+  const defs = catalog.parts[form.part]?.settings ?? {};
+  const isDefault = (key: string, value: string) => {
+    const d = defs[key];
+    return d !== undefined && "default" in d && d.default !== undefined ? String(d.default) === value : d?.type === "flag" && value === "false";
+  };
+  const settings = form.settings.filter((s) => !Object.hasOwn(refined.settings, s.key)).map(({ key, value }) => ({ key, value }));
+  for (const [key, value] of Object.entries(refined.settings)) {
+    if (!isDefault(key, value)) settings.push({ key, value });
+  }
+  // Settings in the catalog's order, so the same pin always reads the same.
+  const order = Object.keys(defs);
+  settings.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+  return { part: form.part, settings };
 }
 
 function top(probabilities: Record<string, number>): [string, number] {

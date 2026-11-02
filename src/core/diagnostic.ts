@@ -11,7 +11,10 @@ export type Code =
   | "bad-pin"
   | "unclosed-block"
   | "stray-closer"
-  | "no-children";
+  | "no-children"
+  // A frame part (header, footer…) in a page, or a part for the writing in
+  // rubric.md: each is chosen in its own place.
+  | "wrong-place";
 
 export interface Diagnostic {
   line: number;

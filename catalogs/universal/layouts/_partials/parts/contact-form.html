@@ -1,0 +1,10 @@
+{{- /* `to` is where the form sends: a form service's address, or an email. The site may give one for every form, as `form` under [params.rubric]. */ -}}
+{{- $to := .s.to | default site.Params.rubric.form | default "" -}}
+{{- $action := cond (hasPrefix $to "http") $to (cond (ne $to "") (printf "mailto:%s" $to) "") -}}
+
+<form class="part part-contact-form" method="post"{{ with $action }} action="{{ . }}"{{ end }}>
+<p><label>Your name<input type="text" name="name" autocomplete="name" required></label></p>
+<p><label>Your email<input type="email" name="email" autocomplete="email" required></label></p>
+<p><label>Your message<textarea name="message" rows="6" required></textarea></label></p>
+<p><button type="submit">Send</button></p>
+</form>

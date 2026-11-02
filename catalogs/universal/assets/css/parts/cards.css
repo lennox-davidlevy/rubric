@@ -1,0 +1,19 @@
+/* cards: a grid of boxes, each a short title and a line or two. */
+.part-cards ul { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.part-cards li { margin: 0; padding: var(--space-3); border-radius: var(--radius); }
+.part-cards li > h3 { font-size: var(--step-1); }
+.part-cards li > p:has(> img:only-child) { order: -1; margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) 0; }
+.part-cards li > p > img:only-child { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: var(--radius) var(--radius) 0 0; }
+.part-cards li { display: flex; flex-direction: column; }
+.part-cards.edge-outlined li { border: var(--border) solid var(--rule); }
+.part-cards.edge-raised li { background: var(--raised); box-shadow: var(--shadow-soft); }
+.part-cards.edge-flat li { padding: 0; }
+.part-cards-intro { margin-bottom: var(--space-3); }
+@media (min-width: 40rem) {
+  .part-cards.columns-two ul, .part-cards.columns-three ul, .part-cards.columns-four ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 56rem) {
+  .flow > .part-cards:is(.columns-three, .columns-four) { grid-column: wide; }
+  .part-cards.columns-three ul { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .part-cards.columns-four ul { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

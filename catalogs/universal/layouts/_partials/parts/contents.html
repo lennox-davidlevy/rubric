@@ -1,0 +1,13 @@
+{{- /*
+  A shortcode cannot read its own page's table of contents while that page is
+  rendering; Hugo waits on itself. So the shortcode leaves a marker and
+  rubric/content.html, which renders .Content, puts the contents in its place.
+  The catalog page and content.html pass `toc`.
+*/ -}}
+{{- if not (isset . "toc") }}{{ "<!--rubric:contents-->" | safeHTML }}
+{{- else if .toc }}
+<div class="part part-contents">
+<p class="part-contents-label">Contents</p>
+{{ .toc }}
+</div>
+{{- end }}

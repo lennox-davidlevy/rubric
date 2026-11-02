@@ -1,0 +1,96 @@
+{{- /* Drawn when the site is built, as SVG, from the block's table: the first
+     column names each point, the others are series of numbers. No script.
+     The table stays for screen readers. */ -}}
+{{- $html := string .inner -}}
+{{- $rows := slice -}}
+{{- range findRE `(?s)<tr>.*?</tr>` $html -}}
+  {{- $r := slice -}}
+  {{- range findRE `(?s)<t[dh][^>]*>.*?</t[dh]>` . }}{{ $r = $r | append (. | plainify | htmlUnescape | strings.TrimSpace) }}{{ end -}}
+  {{- $rows = $rows | append (dict "cells" $r) -}}
+{{- end -}}
+{{- if ge (len $rows) 2 -}}
+{{- $head := (index $rows 0).cells -}}
+{{- $data := after 1 $rows -}}
+{{- $names := after 1 $head -}}
+{{- $m := len $names -}}
+{{- if eq .s.kind "pie" }}{{ $m = 1 }}{{ end -}}
+{{- $n := len $data -}}
+{{- $num := dict -}}
+{{- $max := 0.0 -}}
+{{- $total := 0.0 -}}
+{{- range $i, $row := $data -}}
+  {{- range $s := seq 0 (sub $m 1) -}}
+    {{- $v := float (replaceRE `[^0-9.\-]` "" (index $row.cells (add $s 1) | default "0") | default "0") -}}
+    {{- $num = merge $num (dict (printf "%d-%d" $s $i) $v) -}}
+    {{- if gt $v $max }}{{ $max = $v }}{{ end -}}
+    {{- if eq $s 0 }}{{ $total = add $total $v }}{{ end -}}
+  {{- end -}}
+{{- end -}}
+{{- if le $max 0.0 }}{{ $max = 1.0 }}{{ end -}}
+{{- $k := math.Pow 10 (math.Floor (div (math.Log $max) (math.Log 10))) -}}
+{{- $top := mul (math.Ceil (div $max $k)) $k -}}
+{{- $W := 640.0 }}{{ $H := 320.0 }}{{ $L := 52.0 }}{{ $T := 16.0 }}{{ $R := 16.0 }}{{ $B := 44.0 -}}
+{{- $pw := sub $W (add $L $R) }}{{ $ph := sub $H (add $T $B) -}}
+<figure class="part part-chart kind-{{ .s.kind }}">
+{{- if eq .s.kind "pie" }}
+{{- $cx := 160.0 }}{{ $cy := 150.0 }}{{ $r := 130.0 -}}
+<div class="part-chart-pie">
+<svg viewBox="0 0 320 300" role="img" aria-label="{{ index $head 0 }}">
+{{- $a := mul -0.5 math.Pi -}}
+{{- range $i, $row := $data -}}
+{{- $v := index $num (printf "0-%d" $i) -}}
+{{- $sweep := mul (div $v (cond (gt $total 0.0) $total 1.0)) (mul 2 math.Pi) -}}
+{{- $b := add $a $sweep -}}
+{{- $shade := sub 100 (mul (mod $i 5) 17) -}}
+{{- if ge $sweep (mul 1.999 math.Pi) }}
+<circle cx="{{ $cx }}" cy="{{ $cy }}" r="{{ $r }}" style="fill: color-mix(in srgb, var(--accent) {{ $shade }}%, var(--paper))"/>
+{{- else }}
+<path d="M{{ $cx }} {{ $cy }} L{{ printf "%.2f" (add $cx (mul $r (math.Cos $a))) }} {{ printf "%.2f" (add $cy (mul $r (math.Sin $a))) }} A{{ $r }} {{ $r }} 0 {{ cond (gt $sweep math.Pi) 1 0 }} 1 {{ printf "%.2f" (add $cx (mul $r (math.Cos $b))) }} {{ printf "%.2f" (add $cy (mul $r (math.Sin $b))) }} Z" style="fill: color-mix(in srgb, var(--accent) {{ $shade }}%, var(--paper))"/>
+{{- end }}
+{{- $a = $b -}}
+{{- end }}
+</svg>
+<ul class="part-chart-legend">
+{{- range $i, $row := $data }}
+<li><span class="part-chart-key" style="background: color-mix(in srgb, var(--accent) {{ sub 100 (mul (mod $i 5) 17) }}%, var(--paper))"></span>{{ index $row.cells 0 }} <span class="part-chart-value">{{ index $row.cells 1 }}</span></li>
+{{- end }}
+</ul>
+</div>
+{{- else }}
+<svg viewBox="0 0 {{ $W }} {{ $H }}" role="img" aria-label="{{ delimit $names ", " }} by {{ index $head 0 }}">
+{{- range $g := seq 0 4 }}
+{{- $y := add $T (sub $ph (mul (div (float $g) 4) $ph)) }}
+<line class="part-chart-grid" x1="{{ $L }}" x2="{{ sub $W $R }}" y1="{{ printf "%.1f" $y }}" y2="{{ printf "%.1f" $y }}"/>
+<text class="part-chart-axis" x="{{ sub $L 8 }}" y="{{ printf "%.1f" (add $y 4) }}" text-anchor="end">{{ lang.FormatNumber 0 (mul (div (float $g) 4) $top) }}</text>
+{{- end }}
+{{- $gw := div $pw (float $n) -}}
+{{- range $i, $row := $data }}
+<text class="part-chart-axis" x="{{ printf "%.1f" (add $L (mul $gw (add (float $i) 0.5))) }}" y="{{ sub $H 18 }}" text-anchor="middle">{{ index $row.cells 0 }}</text>
+{{- end }}
+{{- range $s := seq 0 (sub $m 1) }}
+{{- if eq $.s.kind "bar" }}
+{{- $bw := div (mul $gw 0.7) (float $m) -}}
+{{- range $i, $_ := $data }}
+{{- $v := index $num (printf "%d-%d" $s $i) }}
+{{- $h := mul (div $v $top) $ph }}
+<rect class="part-chart-series s{{ $s }}" x="{{ printf "%.1f" (add (add $L (mul $gw (float $i))) (add (mul $gw 0.15) (mul $bw (float $s)))) }}" y="{{ printf "%.1f" (sub (add $T $ph) $h) }}" width="{{ printf "%.1f" (mul $bw 0.92) }}" height="{{ printf "%.1f" $h }}"/>
+{{- end }}
+{{- else }}
+{{- $pts := slice -}}
+{{- range $i, $_ := $data }}{{ $v := index $num (printf "%d-%d" $s $i) }}{{ $pts = $pts | append (printf "%.1f,%.1f" (add $L (mul $gw (add (float $i) 0.5))) (sub (add $T $ph) (mul (div $v $top) $ph))) }}{{ end }}
+<polyline class="part-chart-line s{{ $s }}" points="{{ delimit $pts " " }}"/>
+{{- range $pts }}{{ $xy := split . "," }}<circle class="part-chart-dot s{{ $s }}" cx="{{ index $xy 0 }}" cy="{{ index $xy 1 }}" r="4"/>{{ end }}
+{{- end }}
+{{- end }}
+</svg>
+{{- if gt $m 1 }}
+<ul class="part-chart-legend">
+{{- range $s, $name := $names }}<li><span class="part-chart-key s{{ $s }}"></span>{{ $name }}</li>{{ end }}
+</ul>
+{{- end }}
+{{- end }}
+<div class="visually-hidden">{{ .inner }}</div>
+</figure>
+{{- else -}}
+<figure class="part part-chart">{{ .inner }}</figure>
+{{- end -}}

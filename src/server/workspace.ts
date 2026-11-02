@@ -6,13 +6,17 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  Cache, preprocess, scan, lines as splitLines, writeWhole,
-  type Diagnostic, type Directive, type Entry, type PageKind, type Resolution,
+  applyRefine, atPlace, Cache, formatPlain, frame, FRAME_PAGE, framePage, parsePlain, preprocess, refineWords, scan, lines as splitLines,
+  THRESHOLDS, writeWhole,
+  type Catalog, type Diagnostic, type Directive, type Entry, type PageKind, type Place, type Refined, type Resolution,
 } from "../core/index.ts";
 import { pageKind, pagePath, type Site } from "../site.ts";
 import { fileExists, isSiteAddress, pictures } from "./files.ts";
 
 export type Resolver = (directive: string, page: PageKind) => Promise<{ resolution: Resolution; model: string }>;
+
+// The second pass: words after a pinned part's ":", asked only about that part.
+export type Refiner = (words: string, part: string, page: PageKind) => Promise<{ refined?: Refined; error?: string; model: string }>;
 
 export type Severity = "warning" | "information" | "hint";
 export interface Note extends Omit<Diagnostic, "code"> {
@@ -25,6 +29,9 @@ export interface Ghost {
   text: string;
   line: number;
   character: number;
+  // For a refinement, the line as it should read once accepted: the editor
+  // replaces the whole line with it, since the pin it changes is mid-line.
+  replace?: string;
 }
 
 export interface Completion {
@@ -49,6 +56,9 @@ interface Doc {
   page: PageKind;
   // The line the last edit was on, which is asked about only after a pause.
   editing?: number;
+  // Refinements on the page when it was opened. Their answer is already in
+  // the pin, so they are asked only once the writer changes their words.
+  known: Set<string>;
 }
 
 export interface Options {
@@ -64,6 +74,8 @@ export interface Options {
   // 304 when two builds fell in the same second, fixed by the site's no-store
   // header (testing/hugo.toml).
   drawMs?: number;
+  // Asks the second pass; without one, words after a ":" are never asked.
+  refiner?: Refiner;
 }
 
 const PIN = " -> ";
@@ -82,6 +94,7 @@ export class Workspace {
   #idleMs: number;
   #waitMs: number;
   #drawMs: number;
+  #refiner: Refiner | undefined;
 
   constructor(site: Site, cache: Cache, resolver: Resolver, publish: (file: string, notes: Note[]) => void, opts: Options = {}) {
     this.site = site;
@@ -91,6 +104,7 @@ export class Workspace {
     this.#idleMs = opts.idleMs ?? 1000;
     this.#waitMs = opts.waitMs ?? 5000;
     this.#drawMs = opts.drawMs ?? 100;
+    this.#refiner = opts.refiner;
   }
 
   // Writes content/ for every page on disk, from the cache only. Run once at
@@ -101,6 +115,18 @@ export class Workspace {
       const file = join(this.site.pages, f);
       if (!this.#docs.has(file)) await this.#write(f, pageKind(f), await readFile(file, "utf8"));
     }
+    const rubric = join(this.site.root, "rubric.md");
+    if (!this.#docs.has(rubric)) await this.#write("rubric.md", "site", await readFile(rubric, "utf8").catch(() => ""));
+  }
+
+  // The parts a line can be in this kind of file: the frame in rubric.md,
+  // the parts for the writing in a page.
+  #place(page: PageKind): Place {
+    return page === "site" ? "site" : "writing";
+  }
+
+  #parts(page: PageKind): Catalog["parts"] {
+    return atPlace(this.site.catalog, this.#place(page)).parts;
   }
 
   isPage(file: string): boolean {
@@ -110,7 +136,8 @@ export class Workspace {
   async open(file: string, text: string): Promise<void> {
     const rel = pagePath(this.site, file);
     if (rel === undefined) return;
-    this.#docs.set(file, { text, rel, page: pageKind(rel) });
+    const known = new Set(scan(text, this.site.catalog).directives.flatMap((d) => (d.plain && d.refine ? [this.#rkey(d.plain.part, d.refine.words)] : [])));
+    this.#docs.set(file, { text, rel, page: pageKind(rel), known });
     await this.#render(file);
     // Lines on disk are finished; ask about them now.
     this.#askAll(file);
@@ -165,6 +192,8 @@ export class Workspace {
   // words that are no longer there would be pinned onto the wrong ones.
   async ghost(file: string, line: number): Promise<Ghost[]> {
     const doc = this.#docs.get(file);
+    const at = doc && this.#directiveAt(doc, line);
+    if (doc && at?.plain && at.refine) return this.#refineGhost(file, line);
     const words = () => {
       const d = this.#docs.get(file) && this.#directiveAt(this.#docs.get(file)!, line);
       return d?.kind === "words" ? d.words : undefined;
@@ -184,7 +213,61 @@ export class Workspace {
     const lineText = splitLines(doc.text)[line] ?? "";
     const end = lineText.length;
     const sep = lineText.endsWith(" ") ? PIN.trimStart() : PIN;
-    return hit.candidates.map((c) => ({ text: `${sep}${c.plain}`, line, character: end }));
+    // An empty block gets the part's starter body with the pin, so the writer
+    // sees what the part expects; a block with anything in it gets nothing.
+    const d = this.#directiveAt(doc, line);
+    const empty = d?.close !== undefined && splitLines(doc.text).slice(line + 1, d.close).every((l) => l.trim() === "");
+    return hit.candidates.map((c) => {
+      const body = empty ? this.site.catalog.parts[c.part]?.body?.replace(/\n+$/, "") : undefined;
+      return { text: `${sep}${c.plain}${body ? `\n${body}` : ""}`, line, character: end };
+    });
+  }
+
+  // Ghost text for words after a pin's ":": the settings they would change,
+  // shown at the end of the line. Accepting rewrites the pin in place and
+  // keeps the words, the record of what was asked. Nothing when the pin
+  // already says what the words ask.
+  async #refineGhost(file: string, line: number): Promise<Ghost[]> {
+    const current = () => {
+      const doc = this.#docs.get(file);
+      const d = doc && this.#directiveAt(doc, line);
+      return doc && d?.plain && d.refine && d.problems.length === 0 ? { doc, d, plain: d.plain, refine: d.refine } : undefined;
+    };
+    const first = current();
+    if (!first || refineWords(first.refine.words) === "") return [];
+    const part = first.plain.part;
+    const words = refineWords(first.refine.words);
+    const key = this.#rkey(part, words);
+    const same = () => {
+      const c = current();
+      return c !== undefined && c.plain.part === part && refineWords(c.refine.words) === words;
+    };
+    const lookup = () => this.#cache.getRefine(this.site.catalog, part, words);
+    let hit = lookup();
+    for (const end = Date.now() + this.#waitMs; !hit && Date.now() < end; hit = lookup()) {
+      if (!same() || (this.#errors.has(key) && !this.#inflight.has(key))) return [];
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    const now = current();
+    if (!hit || !now || !same()) return [];
+
+    const next = applyRefine(now.plain, hit, this.site.catalog);
+    const before = formatPlain(now.plain);
+    const after = formatPlain(next);
+    if (after === before) return [];
+    const lineText = splitLines(now.doc.text)[line] ?? "";
+    const was = new Map(now.plain.settings.map((s) => [s.key, s.value]));
+    const changes = [
+      ...next.settings.filter((s) => was.get(s.key) !== s.value).map((s) => `${s.key}=${s.value}`),
+      ...now.plain.settings.filter((s) => !next.settings.some((n) => n.key === s.key)).map((s) => `${s.key} back to default`),
+    ];
+    const sep = lineText.endsWith(" ") ? "" : " ";
+    return [{
+      text: `${sep}⇒ ${changes.join(" ")}`,
+      line,
+      character: lineText.length,
+      replace: `${lineText.slice(0, now.plain.partSpan.start)}${after} ${lineText.slice(now.refine.colon)}`,
+    }];
   }
 
   // Completion of the plain form, on a line starting with ::: and after a pin's
@@ -206,9 +289,11 @@ export class Workspace {
     const pin = before.lastIndexOf(PIN);
     if (pin >= segStart) segStart = pin + PIN.length;
     const seg = before.slice(segStart);
+    // Words after a lone ":" are for Jev, like words before the pin.
+    if (/(^|\s):(\s|$)/.test(seg)) return [];
     const body = seg.trimStart();
     const bodyStart = character - body.length;
-    const { parts } = this.site.catalog;
+    const parts = this.#parts(doc.page);
 
     // The first token: a part name.
     if (!/\s/.test(body)) {
@@ -218,7 +303,10 @@ export class Workspace {
     }
 
     const [first] = body.split(/\s+/);
-    const part = first !== undefined && Object.hasOwn(parts, first) ? parts[first] : undefined;
+    // Settings and values are offered for any part, so a part in the wrong
+    // place still reads as what it is; its diagnostic says where it goes.
+    const all = this.site.catalog.parts;
+    const part = first !== undefined && Object.hasOwn(all, first) ? all[first] : undefined;
     if (!part) return [];
 
     const token = /\S*$/.exec(body)![0];
@@ -283,7 +371,15 @@ export class Workspace {
           : undefined;
         out.push(`- \`${s.key}=${s.value}\`${meaning ? `: ${meaning}` : ""}`);
       }
-      if (d.kind === "pinned") out.push("", "Pinned: never sent to Jev.");
+      if (d.refine && refineWords(d.refine.words) !== "") {
+        const hit = this.#cache.getRefine(this.site.catalog, d.plain.part, d.refine.words);
+        const known = doc.known.has(this.#rkey(d.plain.part, d.refine.words));
+        out.push("", `After the colon, "${d.refine.words}": ${
+          hit ? `asked; ${this.#refineSummary(d.plain.part, hit)}`
+          : known ? "already in the pin; change the words to ask again"
+          : "waiting for Jev"}.`);
+      }
+      if (d.kind === "pinned") out.push("", "Pinned: the part is never sent to Jev again.");
       return out.join("\n");
     }
 
@@ -307,12 +403,37 @@ export class Workspace {
     return out.join("\n");
   }
 
+  // Settings the words may ask for but no value clearly matches: say so, with
+  // the values there are, rather than quietly keep the default.
+  #unsettledMessage(partName: string, unsettled: string[]): string {
+    const part = this.site.catalog.parts[partName];
+    const each = unsettled.map((name) => {
+      const def = part?.settings[name];
+      const values = def?.type === "choice" ? Object.keys(def.values) : def?.type === "level" ? Object.keys(def.levels) : def?.type === "flag" ? ["true", "false"] : [];
+      const at = def?.type === "choice" || def?.type === "level" ? ` (left at ${def.default})` : "";
+      return values.length ? `${name} can be ${values.join(", ")}${at}` : name;
+    });
+    return `no value clearly matches what this asks of the ${partName}: ${each.join("; ")}`;
+  }
+
   #directiveAt(doc: Doc, line: number): Directive | undefined {
     return scan(doc.text, this.site.catalog).directives.find((d) => d.line === line);
   }
 
   #key(page: PageKind, words: string): string {
     return JSON.stringify([page, words]);
+  }
+
+  #rkey(part: string, words: string): string {
+    return JSON.stringify(["refine", part, refineWords(words)]);
+  }
+
+  #refineSummary(part: string, hit: Refined): string {
+    const said = Object.entries(hit.settings).map(([k, v]) => `${k}=${v}`);
+    const out = [said.length ? `the words ask for ${said.join(" ")}` : "the words ask for no setting"];
+    if (hit.unsettled.length) out.push(this.#unsettledMessage(part, hit.unsettled));
+    if (hit.beyond > THRESHOLDS.yes) out.push(`some of it is more than a ${part} can do`);
+    return out.join("; ");
   }
 
   #schedule(file: string): void {
@@ -330,7 +451,43 @@ export class Workspace {
       if (d.kind === "words" && d.line !== except && d.words !== undefined && !this.#cache.get(this.site.catalog, doc.page, d.words)) {
         void this.#ask(doc.page, d.words);
       }
+      // Words after a ":" only once the writer has changed them, never on
+      // opening a page, and only for a pin with nothing wrong in it.
+      if (
+        this.#refiner && d.plain && d.refine && d.line !== except && d.problems.length === 0 &&
+        refineWords(d.refine.words) !== "" && Object.hasOwn(this.site.catalog.parts, d.plain.part) &&
+        !doc.known.has(this.#rkey(d.plain.part, d.refine.words)) &&
+        !this.#cache.getRefine(this.site.catalog, d.plain.part, d.refine.words)
+      ) {
+        void this.#askRefine(doc.page, d.plain.part, d.refine.words);
+      }
     }
+  }
+
+  // The second pass, one request per distinct part and words in flight.
+  #askRefine(page: PageKind, part: string, words: string): Promise<void> {
+    const key = this.#rkey(part, words);
+    const running = this.#inflight.get(key);
+    if (running) return running;
+    const done = (async () => {
+      try {
+        const { refined, error, model } = await this.#refiner!(refineWords(words), part, page);
+        if (!refined) {
+          this.#errors.set(key, error ?? "no answer");
+        } else {
+          this.#errors.delete(key);
+          this.#cache.setRefine(this.site.catalog, part, words, refined, model);
+          await this.#cache.save(this.site.cache);
+        }
+      } catch (err) {
+        this.#errors.set(key, (err as Error).message);
+      } finally {
+        this.#inflight.delete(key);
+      }
+      for (const file of this.#docs.keys()) this.#drawSoon(file);
+    })();
+    this.#inflight.set(key, done);
+    return done;
   }
 
   // One request per distinct line in flight. An answer is cached, an error is
@@ -377,11 +534,14 @@ export class Workspace {
     this.#publish(file, [
       ...diagnostics.map((d): Note => ({ ...d, severity: "warning" })),
       ...this.#wordsNotes(doc, entries),
+      ...this.#neededNotes(doc, entries),
+      ...this.#refineNotes(doc),
       ...this.#fileNotes(doc),
     ].sort((a, b) => a.line - b.line || a.start - b.start));
   }
 
   async #write(rel: string, page: PageKind, text: string) {
+    if (page === "site") return this.#writeFrame(text);
     const out = preprocess(text, this.site.catalog, this.#cache.resolver(this.site.catalog, page));
     // Renders overlap (a keystroke, an answer arriving), so each file is
     // written whole and in order, through a folder Hugo does not watch.
@@ -395,6 +555,22 @@ export class Workspace {
     }
     await Promise.all(writes);
     return out;
+  }
+
+  // rubric.md becomes the frame page, a list the layout draws around every
+  // page; Hugo reads it but never publishes it.
+  async #writeFrame(text: string) {
+    const { entries, output } = frame(text, this.site.catalog, this.#cache.resolver(this.site.catalog, "site"));
+    const tmp = join(this.site.root, ".rubric/tmp");
+    const target = join(this.site.content, FRAME_PAGE);
+    const page = framePage(entries);
+    const writes = [writeWhole(join(this.site.root, ".rubric/sidecar/rubric.md.json"), JSON.stringify(output.entries, null, 2) + "\n", tmp)];
+    if (this.#written.get(target) !== page) {
+      this.#written.set(target, page);
+      writes.push(writeWhole(target, page, tmp));
+    }
+    await Promise.all(writes);
+    return output;
   }
 
   // A picture address at the site's root that no static file answers, in an
@@ -428,6 +604,61 @@ export class Workspace {
     return notes;
   }
 
+  // A placed part missing a setting it needs, such as a form with nowhere to
+  // send: it draws, but does not work. The site's [params.rubric] may give
+  // the value for every page.
+  #neededNotes(doc: Doc, entries: Entry[]): Note[] {
+    const src = splitLines(doc.text);
+    const notes: Note[] = [];
+    for (const e of entries) {
+      const form = e.placed && e.plain ? parsePlain(e.plain) : undefined;
+      const part = form && this.site.catalog.parts[form.part];
+      if (!form || !part) continue;
+      for (const [key, def] of Object.entries(part.settings)) {
+        if (def.type !== "text" || !def.needed || def.default) continue;
+        if (form.settings.some((s) => s.key === key && s.value.trim() !== "")) continue;
+        const fromSite = def.site ? this.site.params[def.site] : undefined;
+        if (typeof fromSite === "string" && fromSite.trim() !== "") continue;
+        const where = def.site ? `, or \`${def.site} = "…"\` under [params.rubric] in hugo.toml for every page` : "";
+        notes.push({
+          line: e.line, start: 0, end: src[e.line]!.length, code: "needs-setting", severity: "warning",
+          message: `${form.part} does not work yet: ${key} is not set (${def.needed}). Set ${key}= on the line${where}`,
+        });
+      }
+    }
+    return notes;
+  }
+
+  // What the second pass found, as notes on the words after the ":": a
+  // setting the words speak to with no value that clearly matches, and a
+  // request no setting can meet.
+  #refineNotes(doc: Doc): Note[] {
+    const src = splitLines(doc.text);
+    const notes: Note[] = [];
+    for (const d of scan(doc.text, this.site.catalog).directives) {
+      if (!d.plain || !d.refine || refineWords(d.refine.words) === "") continue;
+      const at = { line: d.line, start: d.refine.start, end: src[d.line]!.length };
+      const part = d.plain.part;
+      const hit = this.#cache.getRefine(this.site.catalog, part, d.refine.words);
+      const error = this.#errors.get(this.#rkey(part, d.refine.words));
+      if (error && !hit) {
+        notes.push({ ...at, code: "jev-error", severity: "warning", message: `could not reach Jev: ${error.replace(/^could not reach Jev: /, "")}` });
+        continue;
+      }
+      if (!hit) continue;
+      if (hit.unsettled.length) notes.push({ ...at, code: "left-at-default", severity: "information", message: this.#unsettledMessage(part, hit.unsettled) });
+      if (hit.beyond > THRESHOLDS.yes) {
+        const defs = this.site.catalog.parts[part]?.settings ?? {};
+        const asked = Object.keys(defs).filter((k) => ["choice", "level", "flag"].includes(defs[k]!.type));
+        notes.push({
+          ...at, code: "beyond-part", severity: "information",
+          message: `some of this is more than a ${part} can do${asked.length ? `: its settings are ${asked.join(", ")}` : ", which has no settings"}`,
+        });
+      }
+    }
+    return notes;
+  }
+
   // What Jev said about each words line, as a note on the line.
   #wordsNotes(doc: Doc, entries: Entry[]): Note[] {
     const src = splitLines(doc.text);
@@ -441,7 +672,7 @@ export class Workspace {
       else if (hit?.outcome === "nothing-fits") notes.push({ ...at, code: "nothing-fits", severity: "warning", message: "nothing in the catalog fits" });
       else if (hit?.outcome === "unsettled") notes.push({ ...at, code: "unsettled", severity: "information", message: `not sure what this asks for: ${hit.candidates.map((c) => c.plain).join(" or ")}` });
       else if (hit?.outcome === "placed" && hit.candidates[0]!.unsettled.length) {
-        notes.push({ ...at, code: "left-at-default", severity: "hint", message: `left at the default: ${hit.candidates[0]!.unsettled.join(", ")}` });
+        notes.push({ ...at, code: "left-at-default", severity: "information", message: this.#unsettledMessage(hit.candidates[0]!.part, hit.candidates[0]!.unsettled) });
       }
     }
     return notes;

@@ -1,0 +1,20 @@
+/* table: rows and columns; lines between rows, or every other row shaded. */
+.part-table.lines-striped tbody tr:nth-child(odd) { background: var(--tint); }
+.part-table.lines-striped td { border-bottom: 0; }
+.part-table.lines-striped :is(td, th):first-child { padding-left: var(--space-2); }
+
+.part-table-sort {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: var(--weight-heading);
+  text-align: inherit;
+}
+.part-table-sort:hover { background: none; color: var(--accent); }
+.part-table-sort::after { content: "\2195"; margin-left: 0.3em; color: var(--muted); font-weight: var(--weight-body); }
+th[aria-sort="ascending"] .part-table-sort::after { content: "\2191"; color: var(--accent); }
+th[aria-sort="descending"] .part-table-sort::after { content: "\2193"; color: var(--accent); }

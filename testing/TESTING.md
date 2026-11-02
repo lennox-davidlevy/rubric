@@ -1,32 +1,26 @@
-# Live test: build a post from a blank page
+# Live test: the universal catalog and the frame
 
-You start with an empty post, `testing/pages/posts/test.md`, and build it up one step at a time, the way a writer would. Each step says what to type, what should happen, and what to notice about how it feels. Write what you find in `notes-on-test.md` at the repo root, numbered by step (for example `7. the second choice was callout, but M-n did nothing`).
+The playground now runs on the universal catalog: 34 parts for the writing and 18 for the frame around every page, all in Paper. This test has two halves. First you build the frame in `testing/rubric.md`: the header, footer and the rest that every page wears. Then you build a post from a blank page, `testing/pages/posts/everything.md`, with the new parts. Each step says what to type, what should happen, and what to notice. Write what you find in `notes-on-test.md`, numbered by step.
 
 This file is kept up to date as Rubric changes.
 
-Last updated: 2026-11-01, after Paper was rebuilt as the reference theme, with the theme pipeline.
+Last updated: 2026-11-02, after your notes (pricing marks are now an asterisk, step 12): part three tests what came of them. If you already did parts one and two, restart `bun run play` and Neovim, then go straight to part three.
 
 **New since the last test:**
 
-- How Jev's answers are read changed a little. A line where Jev can't decide between two parts (neither gets a majority) now waits for you with both offered, even when one seems to fit. You may see a few more "not sure" lines, never a wrong pick where there was a right one before.
-- Paper is now made from three pieces (a palette, a pairing and a scale) by `bun scripts/theme.ts`. It should look the same as before, except:
-  - inside a dark band, links, the quote's rule and marks, the ornament and a warning's label use a lighter rust; the old one was nearly unreadable there;
-  - the largest gaps on a laptop are a little bigger (about 72px instead of 65px);
-  - a long web address or word now wraps instead of running off the edge on a phone;
-  - a wide table scrolls sideways in its own box on a phone, instead of pushing the page;
-  - a gallery with one picture fills the row.
-- Dates read "November 1, 2026", American order.
-- Everything is in American spelling: `align=center`, not `centre`. I changed the two pinned lines in your `test.md`. Both catalogs went up a version, so the first open sends every unpinned line to Jev again.
-- Restart `bun run play`: the playground's `content/` still has `centre` in it until play rewrites it.
+- The playground uses the universal catalog. Every line you wrote before is asked again the first time you open its page, since the old answers belonged to the blog catalog. Expect a burst of Jev calls in the play log on each first open (well under a cent a page).
+- `rubric.md` is now a file you write in, with ghost text, completion and notes, like a page. Its `:::` lines choose the frame.
+- Accepting a pick on an empty block writes the part's starter body into it: what the part expects, for you to change.
+- Notices are colored by kind (tip olive, warning amber, danger brick). Dates read "November 1, 2026". Everything is in American spelling.
+- The diagram draws from a copy of Mermaid that ships with Rubric, so it works offline.
+- A page can turn frame parts off with `hide: [sidebar, comments]` in its front matter.
 
 ## How to read what you see
 
-- **Neovim**: the ghost text after a `:::` line is Jev's pick. `<M-l>` accepts it and pins the line. Colored underlines are notes on the line; `<leader>e` shows the message and `K` (in normal mode) explains what the line became.
+- **Neovim**: the ghost text after a `:::` line is Jev's pick. `<M-l>` accepts it and pins the line; on an empty block it also writes the starter body. Colored underlines are notes on the line; `<leader>e` shows the message and `K` (in normal mode) explains what the line became.
 - **The play terminal**: a `── Jev` block each time a line is sent, ending in `result`. `placed` means it's on the page. `unsettled` means Jev wasn't sure and it's waiting for you.
-- **The browser**: follows the buffer about half a second after you stop typing. You never need to save for the preview.
-- **A `:::` line shown as raw text on the page** means the line isn't placed yet: Jev hasn't answered, wasn't sure, or nothing fits. It should only last until the answer comes, or until you choose.
-
-A line you've already sent is remembered (`testing/.rubric/cache.json`), so sending the same words again is instant and prints nothing in the log.
+- **The browser**: follows the buffer about a third of a second after you stop typing. You never need to save for the preview.
+- **A `:::` line shown as raw text on the page** means the line isn't placed yet: Jev hasn't answered, wasn't sure, nothing fits, or the part belongs in the other place.
 
 ## 0. Set up
 
@@ -36,297 +30,267 @@ A line you've already sent is remembered (`testing/.rubric/cache.json`), so send
    bun run play
    ```
 
-2. In another pane:
+2. Quit Neovim completely and start it again, so it runs the new server and plugin.
 
-   ```sh
-   nvim testing/pages/posts/test.md
-   ```
+3. Open http://localhost:1415/posts/everything/ beside it. It shows the title "Everything in one walk" with the plain header and footer.
 
-   If Neovim was already open, quit it and start it again, so the language server runs the current code.
+## Part one: the frame, in rubric.md
 
-3. Open http://localhost:1415/posts/test/ beside it. It shows the title "The walk home" and nothing else.
-
-## 1. Just write
-
-Below the front matter, type a paragraph, any paragraph. For example:
-
-```markdown
-Two miles past the reservoir, every evening, whatever the weather.
+```sh
+nvim testing/rubric.md
 ```
 
-**Should happen:** the paragraph shows in the browser about half a second after you stop typing, without saving. Nothing prints in the play terminal: plain writing never goes to Jev.
+It holds one line about the look. Leave that line alone and write below it.
 
-**Notice:** whether the preview feels like it keeps up, or lags. It should show about a third of a second after you stop. Hugo needs about 0.2 s of that, so it won't be instant like a React hot reload.
+### 1. A header
 
-## 2. The opening
+Below the first line, leave an empty line, then type `::: ` and the words:
 
-Go to the empty line above your paragraph and type `::: ` (with the space).
+```markdown
+::: a nav bar at the top with links
+```
 
-**Should happen:** a closing `:::` appears below the line straight away, the way a bracket closes.
+**Should happen:**
 
-Now type the words, then stop:
+- The closer appears, as in a page.
+- The log shows a `── Jev` block ending `placed ::: header`, and the ghost text shows ` -> header`.
+- Press `<M-l>`. The line is pinned, **and the block fills with a starter list of links**:
+
+  ```markdown
+  ::: a nav bar at the top with links -> header
+  - [Posts](/posts/)
+  - [About](/about/)
+  :::
+  ```
+
+- In the browser, on every page, the plain header becomes the new one, with those links.
+
+Change the links to what you want, for example `- [Everything](/posts/everything/)`. The header follows as you type.
+
+**Notice:** whether the starter body helps or gets in the way.
+
+### 2. The rest of the frame
+
+Add these, one block each, pausing after each line. Accept each with `<M-l>`. The closer adds each block's `:::` as you type.
+
+```markdown
+::: breadcrumbs
+::: the date, reading time and author under the title
+::: a footer with the copyright
+::: a search box
+::: a dark mode toggle
+::: the headings of the page on the side as you scroll
+::: previous and next links
+::: let readers reply under posts
+```
+
+**Should happen**, on http://localhost:1415/posts/everything/:
+
+- Breadcrumbs above the title, the date and reading time under it.
+- A search box and a ◐ button in the header. The button switches the whole site to dark and back, and remembers your choice. The search finds posts as you type.
+- A footer with links and the copyright.
+- Previous and next links, and a "Comments" heading at the end of a post. It says what to set to make comments work, since this site has no email set.
+- "On this page" beside the writing, once the post has headings (part two adds some).
+
+On the home page, http://localhost:1415/, the parts that only make sense on a post (date, pager, comments) don't show.
+
+### 3. The wrong place
+
+In `rubric.md`, type:
+
+```markdown
+::: quote
+A quote does not belong in the frame.
+:::
+```
+
+**Should happen:** a note on `quote`, "quote goes in a page; rubric.md holds the frame around every page…". It isn't drawn. Delete the block.
+
+Later, in a page, `::: footer` gets the opposite note: "footer is part of the frame around every page: choose it in rubric.md".
+
+**Notice:** typing `::: ` in `rubric.md` completes only frame parts, and in a page only parts for the writing.
+
+## Part two: a post from a blank page
+
+```sh
+nvim testing/pages/posts/everything.md
+```
+
+The lists below show only each block's opening line; each one is its own block, with a blank line between. When you type the opening line, the closing `:::` is added for you, as in part one. For each one: type the line, pause until the ghost text shows, then accept with `<M-l>`. On an empty block that writes the starter body, which you then replace with your own words. If a line comes back unsure, pick with `<M-n>` / `<M-p>` and `<M-l>`.
+
+### 4. An opening and some writing
 
 ```markdown
 ::: a big opening for the top of the page
 ```
 
-**Should happen:**
+Accepting writes a title and a line into the block; change them. Then below it, write a paragraph and two `##` sections of your own, so the page has headings.
 
-- About a second after you stop, a `── Jev` block prints, ending `result placed ::: hero`.
-- The ghost text ` -> hero` appears at the end of the line.
-- The browser shows the hero, even before you accept it.
+**Should happen:** the hero, then your writing. "On this page" now lists your two headings beside the writing (on a wide window).
 
-Press `<M-l>`. The line becomes `::: a big opening for the top of the page -> hero`. That is pinned: it is never sent to Jev again.
+### 5. Parts made of pieces
 
-Inside the block, between the two `:::` lines, type:
+Try each, accept, and look at the starter body before changing it:
 
 ```markdown
-# The walk home
-
-Notes from the same two miles, every evening for a year.
-```
-
-**Should happen:** a large title with its line under it, at the top of the page.
-
-**Known gap:** the post's own title and date still show above the hero, so "The walk home" appears twice. The layout doesn't yet hand the top of the page to a hero. Say what you'd want: the hero replacing the title, or the hero kept for home and plain pages.
-
-**Notice:** how long the wait for the ghost text feels. Also, while Jev is thinking, the raw `::: a big opening…` line may show on the page for a moment.
-
-## 3. Change your mind by hand
-
-Put the cursor at the end of the pinned line, after `hero`, and type a space.
-
-**Should happen:** completion offers hero's settings (`size`, `align`, `image`). Choose `align`, then after the `=` choose `center`. The line reads `-> hero align=center`, and the title centers in the browser.
-
-Now add a picture to it. Type ` image=` after `center`.
-
-**Should happen:** completion lists the site's pictures by the address the page uses: `/images/sample.jpg`, `/images/path.png`, `/images/gallery/…`. Your own pictures go in `testing/static/images/`; one added while you work shows up the next time you complete. Choosing one writes it in quotes: `image="/images/sample.jpg"`. A picture appears with the hero.
-
-Then break it on purpose: change it to `/image/sample.jpg`. A warning appears on the address, "no file at /image/sample.jpg in static/". The page still draws, without the picture.
-
-You may also see suggestions like `config.sh` or `loader/`. Those come from your own path completion (cmp-path), which reads a leading `/` as the root of your computer, not the site. Rubric's suggestions are the ones marked as files with full `/images/…` addresses.
-
-Jev never fills `image`, `cite`, `summary`, `count` or `tag`. Those are always yours to type.
-
-**Notice:** is it clear the right of the `->` is yours to edit, and the left is just your words?
-
-## 4. Headings and a table of contents
-
-Below your paragraph, write two short sections:
-
-```markdown
-## The reservoir
-
-The water is high this year, and the path along it is soft.
-
-## The canal
-
-Past the gasworks, where the herons wait.
-```
-
-Then, on a line above `## The reservoir`, type:
-
-```markdown
-::: a table of contents
-```
-
-**Should happen:** placed as `contents`. A box headed "Contents" lists your two headings as links that jump to them. Add a third `##` heading later and it shows up in the box.
-
-## 5. Notes for the reader
-
-At the end of "The reservoir" section, type:
-
-```markdown
-::: warn them the path floods in winter
-The lower path is under water from December to March.
-:::
-```
-
-At the end of "The canal" section:
-
-```markdown
-::: a tip for the reader
-Bring a flashlight after October.
-:::
-```
-
-Leave both unpinned this time.
-
-**Should happen:** "Warning" and "Tip" boxes. An unpinned line that was placed shows on the page just the same as a pinned one. Pinning only freezes it.
-
-**Notice:** whether typing the body inside the block feels the same as typing anywhere else.
-
-## 6. A quote, with who said it
-
-```markdown
-::: a pull quote, big
-You can't be early for a tide.
-:::
+::: step by step instructions
+::: the history of the walk, year by year
+::: our plans and prices, with the middle one highlighted
+::: questions and answers that open when clicked
+::: tabs for summer and winter routes
+::: a grid of features with icons
 ```
 
 **Should happen:**
 
-- Placed as `quote size=large`, noticeably bigger than the prose.
-- There may be a faint hint on the line, "left at the default: align". That means Jev wasn't sure the words asked for an alignment, so it left it alone. `K` on the line explains.
+- Steps numbered in circles along a line; a timeline with its dates in the accent color.
+- Plans side by side; the middle one stands out once there are three `###` plans (the starter has two, so add one).
+- An FAQ: each `##` question closed until clicked.
+- Tabs that switch with a click or the arrow keys.
+- Cards in a grid, three across on a wide window.
 
-Pin it with `<M-l>`, then add ` cite="my grandmother"` after `size=large`. The name shows under the quote.
+**Notice:** whether the `###` and `##` pattern in the starter bodies is clear enough to follow without reading anything else.
 
-Then check the old stale-preview bug: change the name in two bursts, pausing about half a second in the middle (`my grand`, pause, `ma`). The page must end on the whole name, every time, without a manual reload. Try it a few times, and with the body text too.
-
-## 7. When Jev isn't sure
+### 6. Numbers, code and diagrams
 
 ```markdown
-::: a box lifted off the page
-Writing inside a raised box.
-:::
+::: some big numbers about the walk
+::: a bar chart of miles per month
+::: a flowchart of the route
+::: the formula for the distance
+::: the config file with its name on top
 ```
 
-**Should happen** (last time this line came back unsure):
+**Should happen:** big figures side by side; a bar chart drawn from the table in the block (change the numbers and the bars follow); a flowchart drawn after a moment; a formula set as math; a code block with its file name above it (add `file=config.toml` on the pinned line).
 
-- The log says `unsettled`, with a section and a callout.
-- The line gets a note, "not sure what this asks for: section edge=raised or callout".
-- The ghost text shows the first choice, and `<M-n>` / `<M-p>` switch between the two.
-- The page shows the raw `:::` lines until you pick one. Pick with `<M-l>`.
-
-If it came back `placed` instead, it shows a box with a shadow straight away. That's fine; note which one you got.
-
-**Notice:** is it obvious that this line is waiting on you, and what to do about it?
-
-## 8. Pictures
-
-One wide picture:
+### 7. Media and other sites
 
 ```markdown
-::: one wide photo with a caption
-![The canal by the gasworks](/images/sample.jpg)
-
-The canal by the gasworks, early on a Sunday.
-:::
+::: the YouTube video of the walk
+::: the podcast episode
+::: a map of where we met
+::: the PDF to download
 ```
 
-Then a set:
+Replace each starter address with a real one: a YouTube link, an `.mp3` address, a map link, `/images/sample.jpg` for the download.
+
+**Should happen:** a video player; an audio player; a link card for the map (an embed address from Google Maps or OpenStreetMap shows the map itself); a download showing the file's kind and size.
+
+### 8. Asking the reader
 
 ```markdown
-::: a few photos from the walk, two across
-![The canal at first light](/images/gallery/sample-1.jpg)
-![A gate on the reservoir path](/images/gallery/sample-2.jpg)
-![Reeds after rain](/images/gallery/sample-3.jpg)
-![The old pumping station](/images/gallery/sample-4.jpg)
+::: what readers say about the walk
+::: a newsletter signup
+::: a contact form
+::: ask them to sign up at the end, on dark
+```
+
+**Should happen:** a testimonial with its curly quotes, a signup box, a form with name, email and message, and a dark pitch with a button.
+
+### 9. Hide part of the frame on one page
+
+In the front matter of `everything.md`, add:
+
+```yaml
+hide: [comments, pager]
+```
+
+**Should happen:** the comments and the pager go, from this page only.
+
+### 10. Dark, and a phone
+
+Press the ◐ button in the header, then make the window phone width.
+
+**Should happen:** everything readable in dark, nothing scrolling sideways, and "On this page" stepping out of the way on a narrow screen.
+
+## Part three: after your notes
+
+Restart `bun run play` and quit and reopen Neovim first: the server and the plugin both changed. Work in `testing/pages/posts/everything.md`.
+
+### 11. The second pass, after a colon
+
+On a pinned line, type ` : ` after the pin and say how it should look. Start from your video:
+
+```markdown
+::: a youtube video of my walk -> video : wider than the text
+https://youtu.be/QfQzUb7twZI
 :::
 ```
 
 **Should happen:**
 
-- While typing the addresses, completion offers the site's pictures after `](` too, and a wrong address gets the same warning as in step 3.
-- The figure is wider than the writing, with the caption under it.
-- The gallery is two pictures across.
-- In the browser, click a picture. It opens large on a dark ground, with "1 of 4", ‹ › buttons and its caption.
-  - The arrow keys move through the pictures.
-  - Esc, ×, or a click on the dark ground closes it.
-  - It fades in and out. Pin the line and add `motion=none` to make it open at once.
+- Nothing is sent while you type. After you pause, the log shows a `── Jev … second pass` block: the words, the part they're about (`about video`), three questions, and a `result` line such as `width=wide`.
+- The ghost text at the end of the line shows only what changes: ` ⇒ width=wide`.
+- `<M-l>` rewrites the pin and keeps your words: `-> video width=wide : wider than the text`. The ghost text goes, since the pin now says it. The video widens.
+- Change the words to `: full width` and pause: ` ⇒ width=full`. Then `: as wide as the writing`: ` ⇒ width back to default`, and accepting drops `width=` from the pin.
+- `: with a shadow`: no ghost, and a note on the words, "some of this is more than a video can do: its settings are width". Shadows come with the shared look settings, later.
 
-## 9. Something the catalog doesn't have
+**Then check the calls stay rare:**
 
-```markdown
-::: a map of the walk
-:::
-```
+- Save, close the file and open it again. Nothing is sent for lines whose `:` words were already there; `K` on one says what the words asked for.
+- Type the same words on another video, even differently cased (`Wider than the text.`): no call, the answer is reused.
 
-**Should happen:** the log says `nothing-fits`. There's no ghost text, and the line gets a warning, "nothing in the catalog fits". The page shows it as raw text. Delete the block afterwards.
+**Notice:** whether ` ⇒ …` reads clearly as "this is what changes", and whether the words after the colon feel like yours to keep editing.
 
-**Notice:** whether the warning tells you enough, or leaves you stuck.
-
-## 10. A mistake
-
-Type a plain form with a value the catalog doesn't have:
+### 12. A setting with no value for what you asked
 
 ```markdown
-::: callout kind=aside
-A tangent.
-:::
+::: our plans and prices -> pricing : the first and last ones stand out
 ```
 
-**Should happen:** a warning on `aside`, and `<leader>e` lists the allowed values (note, tip, warning). The page shows the raw lines. Delete `aside` with backspace, and completion offers the three values straight away. Choose one and the callout appears.
+**Should happen:** `featured` can only be none, last or middle. Expect either a note naming those values ("no value clearly matches what this asks of the pricing: featured can be none, last, middle"), or a pick of the nearest; tell me which, since that is Jev's call and it tunes the wording.
 
-## 11. One part inside another
+Then the other way to say it, in the plans themselves: end a `###` title with a space and an asterisk.
 
 ```markdown
-::: a dark band across the whole page
-The quiet part of the evening, after the last bus has gone.
-
-::: a quote
-Nobody walks this way after dark.
-:::
-:::
+### Reader *
 ```
 
-Type it top to bottom, and watch what the auto-closer does on the inner `::: `. Also try it the other way: write the band first, then go back inside it, onto the line directly above its closing `:::`, and type `::: a quote`. Either way, the quote gets its own closer.
+**Should happen:** any plan whose title ends in ` *` stands out, as many as you mark, and the asterisk itself isn't shown. Compare the two ways on the catalog page (`hugo server -s catalogs/universal/page --port 1418`, then http://localhost:1418/paper/#pricing: the last example marks the first and last plans).
 
-**Should happen:**
+**Notice:** whether the asterisk or the setting feels more natural to you.
 
-- The band is dark, runs edge to edge, and has light writing.
-- The quote inside it is light on dark too.
-- Each `:::` closes the block it belongs to.
+### 13. A form with nowhere to send
 
-**Notice:** whether the closer helps or gets in the way when nesting.
+Your `::: a newsletter signup -> subscribe` block now has a note on it: "subscribe does not work yet: to is not set (where it sends, a form service's address or an email)…". Same for the contact form.
 
-## 12. The ending
+Fix it either way:
 
-```markdown
-::: a break in the writing with a little ornament
-:::
+- on the line: `-> subscribe to=you@example.com`, or a form service's address;
+- or once for the whole site, in `testing/hugo.toml` under `[params.rubric]`: `form = "you@example.com"`. That needs a restart of `bun run play` and Neovim, since the site's settings are read when the server starts.
 
-::: two buttons, read more and about, centered
-[Read more](/posts/) [About](/)
-:::
+**Should happen:** the note goes.
 
-::: the latest posts as cards
-:::
-```
+### 14. Starter bodies
 
-**Should happen:**
+Start a new timeline, pricing, stats or chart on an empty block.
 
-- The divider is a small printer's mark, not a line.
-- Two buttons, centered, with the first one stronger. This line came back unsure last time; if it does again, choose as in step 7.
-- The other posts show in boxes, each with a summary. The page you're on is never among them.
-
-## 13. Close and reopen
-
-Save with `:w`, quit Neovim, and open the page again.
-
-**Should happen:** nothing prints in the play terminal, because every line is remembered, and the page looks the same.
-
-Then make a change and quit *without* saving (`:q!`). The preview goes back to the saved file: it shows what is on disk once no editor holds the page.
-
-## 14. On a phone
-
-Make the browser window narrow, about phone width.
-
-**Should happen:** nothing scrolls sideways, the gallery still fits, and the dark band still runs edge to edge.
-
-## 15. Look at Paper as a theme
-
-This one is by eye, in the browser, not in Neovim.
-
-```sh
-bun scripts/theme.ts look
-```
-
-**Should happen:** it ends `fit to ship` twice. The first is the checks on the files; the second is what was drawn in the browser. Then open `catalogs/blog/shots/index.html`: Paper's catalog page and its stress page, at phone, tablet and laptop widths, side by side.
-
-**Notice:** the stress page is the worst a writer will throw at a theme. Look for anything that reads badly even though it passes: the table on a phone, the dark band with everything in it, the long hero title, the warning callouts. Anything you'd change about Paper is cheapest to change now, before two more themes are built the same way.
+**Should happen:** the starter shows the shape only: `### When — What happened`, `**The price**`, `**0** what it counts`, `| Label | Value |`. Nothing that could contradict what you asked for, like the year-by-year starter did for "month by month".
 
 ## Afterwards
 
-- **Stop the play server with Ctrl-C.** The last line says how many calls went to Jev this session, how many failed, and their average time.
-
+- **Stop the play server with Ctrl-C.** The last line says how many calls went to Jev this session.
 - **Any line you liked or didn't:** the words, what it became, and what you expected. The `── Jev` block for it shows why.
-- **Your own words:** try saying the same thing differently from these steps ("a quote, really big, in the middle", "shade the next bit", "hide the rest"). The misses are what tunes the catalog's descriptions.
+- **Your own words:** say things differently from these steps. The misses are what tunes the catalog's descriptions.
 - **Every part in every setting**, for comparison:
 
   ```sh
-  hugo server -s catalogs/blog/page --port 1417
+  hugo server -s catalogs/universal/page --port 1418
   ```
 
-  Then open http://localhost:1417/paper/.
-- `testing/pages/posts/blog.md` has the same parts as ready-made scenes, if you want to look at them all at once.
+  Then open http://localhost:1418/paper/, and its stress page.
+- The checks behind all this: `RUBRIC_CATALOG=universal bun scripts/theme.ts look` draws the catalog, stress and a framed post at three widths, in light and dark, and refuses anything unreadable or overflowing. Pictures in `catalogs/universal/shots/index.html`.
+
+
+
+## NEW NOTES by David during the test
+
+for this:
+
+Then the other way to say it, in the plans themselves: end a `###` title with a star.
+
+```markdown
+### Reader ★
+```
+
+We can't use that, it is a pain to find that symbol on the keyboard... i get what youre trying, but it has to be something someone can type in, or we abandon this functionality

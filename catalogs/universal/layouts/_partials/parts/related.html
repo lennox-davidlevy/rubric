@@ -1,0 +1,8 @@
+{{- $n := 3 -}}
+{{- with .s.count }}{{ $n = int . }}{{ end -}}
+{{- with site.RegularPages.Related .page | first $n }}
+<section class="part part-related">
+<h2>More like this</h2>
+{{ partial "rubric/post-list.html" (dict "pages" . "style" "titles") }}
+</section>
+{{- end -}}

@@ -1,0 +1,9 @@
+{{- /* Columns are separated by a line of three dashes. */ -}}
+{{- $cols := split (string .inner) "<hr>" -}}
+<div class="part part-columns split-{{ .s.split }}" style="--count: {{ len $cols }}">
+{{- range $cols }}
+<div class="stack">
+{{ . | safeHTML }}
+</div>
+{{- end }}
+</div>

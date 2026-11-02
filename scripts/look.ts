@@ -116,10 +116,10 @@ export async function look(catalog: string, themes: string[]): Promise<Problem[]
   const out: Problem[] = [];
   const site = join(catalog, "page");
   const built = mkdtempSync(join(tmpdir(), "rubric-look-"));
-  const build = Bun.spawnSync(["hugo", "-s", site, "-d", built, "--quiet"], { stderr: "pipe" });
+  const build = Bun.spawnSync(["hugo", "-s", site, "-d", built, "--quiet"], { stdout: "pipe", stderr: "pipe" });
   if (build.exitCode !== 0) {
     rmSync(built, { recursive: true, force: true });
-    return [{ where: "catalog page", level: "error", message: `hugo failed: ${build.stderr.toString().trim()}` }];
+    return [{ where: "catalog page", level: "error", message: `hugo failed: ${(build.stderr.toString() + build.stdout.toString()).trim().split("\n").filter((l) => /ERROR/.test(l)).join("\n") || "see hugo's output"}` }];
   }
   const server = serve(built);
   const browser = await chromium.launch();
@@ -128,10 +128,15 @@ export async function look(catalog: string, themes: string[]): Promise<Problem[]
   try {
     for (const theme of themes) {
       mkdirSync(join(shots, theme), { recursive: true });
-      for (const [label, path] of [["catalog", `/${theme}/`], ["stress", `/stress/${theme}/`]] as const) {
+      // The catalog and stress pages in the theme, and a post wearing the
+      // site's frame; each in dark too, which a frame's theme-switch offers
+      // and which the reader's system asks for.
+      const pages: [string, string, boolean][] = [["catalog", `/${theme}/`, false], ["stress", `/stress/${theme}/`, false], ["stress-dark", `/stress/${theme}/`, true]];
+      if (await Bun.file(join(built, "posts/second/index.html")).exists() && theme === themes[0]) pages.push(["post", "/posts/second/", false], ["post-dark", "/posts/second/", true]);
+      for (const [label, path, dark] of pages) {
         sheet.push(`<h2>${theme}: ${label}</h2><div class="row">`);
         for (const width of WIDTHS) {
-          const page = await browser.newPage({ viewport: { width, height: 900 } });
+          const page = await browser.newPage({ viewport: { width, height: 900 }, colorScheme: dark ? "dark" : "light" });
           const where = `${label}/${theme} at ${width}px`;
           const failed: string[] = [];
           page.on("response", (r) => { if (r.status() >= 400) failed.push(new URL(r.url()).pathname); });
@@ -143,6 +148,10 @@ export async function look(catalog: string, themes: string[]): Promise<Problem[]
           const fonts = await page.evaluate(() => [...document.fonts].filter((f) => f.status === "error").map((f) => f.family));
           for (const f of fonts) out.push({ where, level: "error", message: `the font ${f} failed to load` });
           for (const f of new Set(failed)) out.push({ where, level: "error", message: `missing file ${f}` });
+          // A catalog page that shows no parts is broken, however clean it looks.
+          if (label === "catalog" && (await page.locator(".catalog-part").count()) === 0) {
+            out.push({ where, level: "error", message: "the catalog page shows no parts" });
+          }
           const seen = new Set<string>();
           for (const f of await page.evaluate(inspect)) {
             const key = `${f.kind} ${f.what}`;

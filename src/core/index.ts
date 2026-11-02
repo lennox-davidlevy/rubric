@@ -7,3 +7,4 @@ export * from "./questions.ts";
 export * from "./resolve.ts";
 export * from "./cache.ts";
 export * from "./write.ts";
+export * from "./frame.ts";

@@ -1,0 +1,22 @@
+{{- /*
+  A plan stands out when its title ends with an asterisk after a space
+  (### Supporter *), so the writer can mark any plans they like with a key on
+  every keyboard, or by the `featured` setting.
+*/ -}}
+{{- $x := partial "rubric/sections.html" (dict "html" .inner "level" 3) -}}
+{{- $n := len $x.items -}}
+{{- $featured := -1 -}}
+{{- if eq .s.featured "last" }}{{ $featured = sub $n 1 }}{{ else if eq .s.featured "middle" }}{{ $featured = div $n 2 }}{{ end -}}
+<div class="part part-pricing" style="--count: {{ $n }}">
+{{- range $i, $it := $x.items }}
+{{- $title := strings.TrimSpace (string $it.title) }}
+{{- $star := strings.HasSuffix $title " *" }}
+{{- if $star }}{{ $title = strings.TrimSpace (strings.TrimSuffix "*" $title) }}{{ end }}
+<section class="part-pricing-plan{{ if or $star (eq $i $featured) }} is-featured{{ end }}">
+<h3>{{ $title | safeHTML }}</h3>
+<div class="stack">
+{{ $it.body }}
+</div>
+</section>
+{{- end }}
+</div>

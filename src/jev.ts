@@ -7,8 +7,8 @@
 // types are still used for the questions and answers.
 
 import {
-  buildQuestions, buildState, detailQuestions, MODEL, PART, partQuestion, resolve,
-  type Answers, type Catalog, type PageKind, type Question, type Resolution,
+  buildQuestions, buildState, detailQuestions, MODEL, PART, partQuestion, refineQuestions, refineState, resolve, resolveRefine,
+  type Answers, type Catalog, type PageKind, type Question, type Refined, type Resolution,
 } from "./core/index.ts";
 
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
@@ -98,5 +98,34 @@ export async function ask(
     return { resolution: resolve(answers, catalog), request, response: first.body, ...(then ? { then } : {}), model: first.model, ms };
   } catch (err) {
     return error(`could not read Jev's answers: ${(err as Error).message}`, ms, { response: first.body, ...(then ? { then } : {}) });
+  }
+}
+
+export interface Refining {
+  refined?: Refined;
+  error?: string;
+  request: Request;
+  response?: unknown;
+  model?: string;
+  ms: number;
+}
+
+// The second pass: words after a pinned part's ":", asked only about that
+// part's settings, in one small request.
+export async function refine(
+  catalog: Catalog, part: string, words: string, page: PageKind, key = process.env.TYPESAFE_API_KEY,
+): Promise<Refining> {
+  const request: Request = {
+    model: MODEL,
+    state: refineState(words, page, part, catalog.parts[part]!.description),
+    questions: refineQuestions(catalog, part),
+  };
+  if (!key) return { error: "could not reach Jev: TYPESAFE_API_KEY is not set", request, ms: 0 };
+  const res = await call(request, key);
+  if (!res.ok) return { error: res.message, request, ...(res.body === undefined ? {} : { response: res.body }), ms: res.ms };
+  try {
+    return { refined: resolveRefine(res.answers, catalog, part), request, response: res.body, model: res.model, ms: res.ms };
+  } catch (err) {
+    return { error: `could not read Jev's answers: ${(err as Error).message}`, request, response: res.body, ms: res.ms };
   }
 }

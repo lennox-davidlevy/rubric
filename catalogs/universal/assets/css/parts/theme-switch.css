@@ -1,0 +1,3 @@
+/* theme-switch: light or dark. */
+.part-theme-switch { width: 2.5rem; min-height: 2.5rem; padding: 0; border-color: var(--rule); border-radius: 50%; background: transparent; color: var(--ink); font-size: var(--step-0); }
+.part-theme-switch:hover { background: var(--tint); color: var(--ink); border-color: var(--rule); }

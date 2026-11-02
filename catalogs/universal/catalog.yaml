@@ -1,5 +1,5 @@
 name: universal
-version: 3
+version: 4
 
 # Every component a website needs, as contracts only: what each part is,
 # its settings and what it expects inside. Nothing here is drawn yet. Drawn
@@ -23,6 +23,31 @@ version: 3
 # abbreviation), which sit inside a sentence and need their own syntax;
 # app controls wired to data, which wait for apps; animated text.
 
+# The names every theme fills and every part reads. A part never uses a
+# literal color, font or weight. Themes are built from the pieces in themes/,
+# which fill these between them; `bun scripts/theme.ts check` holds both sides
+# to this list.
+slots:
+  [ # palette
+   paper, ink, accent, muted, rule, tint, raised, link, heading, code-paper, code-ink,
+   positive, warning, danger, accent-tint, positive-tint, warning-tint, danger-tint,
+   dark-paper, dark-ink, dark-accent, dark-muted, dark-rule, dark-tint, dark-accent-tint,
+   dark-positive, dark-warning, dark-danger, dark-positive-tint, dark-warning-tint, dark-danger-tint,
+   shadow-soft, shadow-deep,
+   # pairing
+   font-body, font-display, font-mono, font-ui,
+   weight-body, weight-strong, weight-heading, weight-display,
+   leading-body, leading-heading, leading-display,
+   tracking-display, tracking-label, label-case, numerals, quote-style, ornament, code-size,
+   heading-case, link-line,
+   # scale
+   step--1, step-0, step-1, step-2, step-3, step-4,
+   space-1, space-2, space-3, space-4, space-5,
+   measure, wide, radius, border, control-radius]
+
+# Descriptions are Jev's prompt and are read literally: say what the part is,
+# in the words a writer would use. Value names are sent too; name a value for
+# what it does.
 parts:
 
   # ── Blocks in the writing ─────────────────────────────────────────────
@@ -163,6 +188,12 @@ parts:
           two: two pictures across
           three: three pictures across
           four: four pictures across
+      motion:
+        type: choice
+        default: subtle
+        values:
+          subtle: pictures open, close and slide with a short movement
+          none: pictures open, close and slide at once, with no movement
 
   video:
     description: A video to watch in the page, from a file or from a site like YouTube or Vimeo.
@@ -214,17 +245,16 @@ parts:
     description: A mathematical formula or equation.
     children: true
     body: |
-      E = mc^2
+      y = f(x)
 
   chart:
     description: A chart of numbers, drawn from a small table, such as a bar chart, a line chart or a pie chart.
     children: true
-    script: true
     body: |
-      | Month | Visits |
-      |-------|-------:|
-      | Jan   | 120    |
-      | Feb   | 180    |
+      | Label  | Value |
+      |--------|------:|
+      | First  | 1     |
+      | Second | 2     |
     settings:
       kind:
         type: choice
@@ -345,11 +375,11 @@ parts:
     description: Events in the order they happened, along a line, each with its date.
     children: true
     body: |
-      ### 2024 — What happened
+      ### When — What happened
 
       A line about it.
 
-      ### 2025 — What happened next
+      ### When — What happened next
 
       A line about it.
 
@@ -357,31 +387,31 @@ parts:
     description: A few big numbers side by side, each with a short line saying what it counts.
     children: true
     body: |
-      - **120** posts
-      - **8** years
-      - **3** books
+      - **0** what it counts
+      - **0** what it counts
+      - **0** what it counts
 
   pricing:
     description: Plans or prices side by side, each with what it includes and a button to choose it.
     children: true
     body: |
-      ### Free
+      ### A plan
 
-      **$0**
+      **The price**
 
-      - One thing
-      - Another thing
+      - What it includes
+      - What else
 
-      [Start](#)
+      [Choose it](#)
 
-      ### Pro
+      ### Another plan
 
-      **$10 a month**
+      **The price**
 
-      - Everything in Free
-      - More
+      - What it includes
+      - What else
 
-      [Choose Pro](#)
+      [Choose it](#)
     settings:
       featured:
         type: choice
@@ -483,6 +513,8 @@ parts:
     settings:
       to:
         type: text
+        needed: where it sends, a form service's address or an email
+        site: form
 
   subscribe:
     description: A box where readers give their email address to get new posts or a newsletter.
@@ -492,6 +524,8 @@ parts:
     settings:
       to:
         type: text
+        needed: where it sends, a form service's address or an email
+        site: form
 
   # ── The frame around the writing, chosen in rubric.md ─────────────────
 
@@ -543,10 +577,10 @@ parts:
     place: site
     children: true
     body: |
-      ### Sections
+      ### A heading
 
-      - [Posts](/posts/)
-      - [Notes](/notes/)
+      - [A page](/)
+      - [Another page](/)
     settings:
       side:
         type: choice

@@ -15,6 +15,10 @@ export interface Directive {
   words?: string;
   // The plain form, for plain lines and pins whose right side parses.
   plain?: PlainForm;
+  // Words after a lone ":" that follows a plain form: what to change about
+  // the part, asked of Jev only about that part's settings. The part is
+  // never asked again. `colon` is the column of the ":", `start` of the words.
+  refine?: Refine;
   // The closing fence's line, or undefined when the block is never closed.
   close?: number;
   // Index into Scan.directives of the enclosing block.
@@ -22,6 +26,12 @@ export interface Directive {
   // Problems with the line itself: a bad pin or a plain form that fails
   // validation. A directive with problems is never placed.
   problems: Diagnostic[];
+}
+
+export interface Refine {
+  words: string;
+  colon: number;
+  start: number;
 }
 
 export interface Scan {
@@ -84,11 +94,15 @@ export function scan(text: string, catalog: Catalog): Scan {
 }
 
 function classify(text: string, col: number, line: number, catalog: Catalog): Directive {
-  const pin = text.lastIndexOf(PIN);
-  if (pin !== -1) {
+  // The pin is the first " -> " whose right side reads as a plain form, so
+  // words may hold an arrow of their own; with none, the last one is the pin.
+  const pins = [...text.matchAll(/ -> /g)].map((m) => m.index);
+  const pin = pins.find((p) => parsePlain(splitRefine(text.slice(p + PIN.length), 0).plain) !== undefined) ?? pins.at(-1);
+  if (pin !== undefined) {
     const words = text.slice(0, pin).trim();
     const rightCol = col + pin + PIN.length;
-    const plain = parsePlain(text.slice(pin + PIN.length), rightCol);
+    const { plain: right, refine } = splitRefine(text.slice(pin + PIN.length), rightCol);
+    const plain = parsePlain(right, rightCol);
     if (!plain) {
       const problem: Diagnostic = {
         line, start: rightCol, end: col + text.length, code: "bad-pin",
@@ -96,14 +110,29 @@ function classify(text: string, col: number, line: number, catalog: Catalog): Di
       };
       return { line, kind: "pinned", words, problems: [problem] };
     }
-    return { line, kind: "pinned", words, plain, problems: validatePlain(plain, catalog, line) };
+    return { line, kind: "pinned", words, plain, ...(refine ? { refine } : {}), problems: validatePlain(plain, catalog, line) };
   }
 
-  const plain = parsePlain(text, col);
-  if (isPlain(plain, catalog)) return { line, kind: "plain", plain, problems: validatePlain(plain, catalog, line) };
+  const split = splitRefine(text, col);
+  const plain = parsePlain(split.plain, col);
+  if (isPlain(plain, catalog)) {
+    return { line, kind: "plain", plain, ...(split.refine ? { refine: split.refine } : {}), problems: validatePlain(plain, catalog, line) };
+  }
   const unfinished = unfinishedPlain(text, col, line, catalog);
   if (unfinished) return { line, kind: "plain", problems: [unfinished] };
   return { line, kind: "words", words: text, problems: [] };
+}
+
+// Splits a plain form from the words after its lone ":", if any. A colon
+// inside a value (to=https://…, cite="Ch. 2: Home") is part of the value.
+export function splitRefine(text: string, col: number): { plain: string; refine?: Refine } {
+  for (const m of text.matchAll(/[a-z][a-z0-9-]*="[^"]*"|\S+/g)) {
+    if (m[0] !== ":") continue;
+    const after = text.slice(m.index + 1);
+    const lead = after.length - after.trimStart().length;
+    return { plain: text.slice(0, m.index).trimEnd(), refine: { words: after.trim(), colon: col + m.index, start: col + m.index + 1 + lead } };
+  }
+  return { plain: text };
 }
 
 // A plain form still being typed: `quot`, or `quote size=large ci`. It is not

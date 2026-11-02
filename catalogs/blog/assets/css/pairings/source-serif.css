@@ -21,6 +21,7 @@
   --font-body: "Source Serif 4", Charter, "Iowan Old Style", Georgia, serif;
   --font-display: "Source Serif 4", Charter, "Iowan Old Style", Georgia, serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --font-ui: "Source Serif 4", Charter, "Iowan Old Style", Georgia, serif;
   --weight-body: 400;
   --weight-strong: 650;
   --weight-heading: 600;
@@ -35,4 +36,6 @@
   --quote-style: italic;
   --ornament: "*\2002*\2002*";
   --code-size: 0.82em;
+  --heading-case: none;
+  --link-line: underline;
 }

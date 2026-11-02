@@ -1,0 +1,5 @@
+/* people: a grid of faces, names and roles. */
+.part-people ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.part-people li { margin: 0; font-family: var(--font-ui); font-size: var(--step--1); color: var(--muted); }
+.part-people li img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius); margin-bottom: var(--space-1); background: var(--tint); }
+.part-people li strong { display: block; font-size: var(--step-0); color: var(--ink); }

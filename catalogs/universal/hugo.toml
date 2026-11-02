@@ -1,0 +1,31 @@
+# The universal catalog as a Hugo theme module. catalog.yaml and themes.yaml are
+# mounted as data, so the shortcodes validate their settings against the same
+# file Jev's questions are generated from.
+
+[[module.mounts]]
+source = "catalog.yaml"
+target = "data/catalog.yaml"
+
+[[module.mounts]]
+source = "themes.yaml"
+target = "data/themes.yaml"
+
+[[module.mounts]]
+source = "themes/pairings"
+target = "data/pairings"
+
+[[module.mounts]]
+source = "samples.yaml"
+target = "data/samples.yaml"
+
+[[module.mounts]]
+source = "layouts"
+target = "layouts"
+
+[[module.mounts]]
+source = "assets"
+target = "assets"
+
+[[module.mounts]]
+source = "static"
+target = "static"

@@ -1,6 +1,6 @@
 baseURL = "/"
 title = "Rubric playground"
-theme = "blog"
+theme = "universal"
 themesDir = "../catalogs"
 disableKinds = ["taxonomy", "term", "sitemap"]
 

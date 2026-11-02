@@ -1,0 +1,5 @@
+<p class="part part-post-meta byline">
+<time datetime="{{ .page.Date.Format "2006-01-02" }}">{{ .page.Date.Format "January 2, 2006" }}</time>
+{{- if ne .s.shows "date" }} <span aria-hidden="true">·</span> {{ .page.ReadingTime }} min read{{ end }}
+{{- if eq .s.shows "everything" }}{{ with .page.Params.author | default site.Params.author }} <span aria-hidden="true">·</span> {{ . }}{{ end }}{{ end }}
+</p>

@@ -9,12 +9,15 @@ import { parse } from "yaml";
 // because an unsettled answer falls back to it. Text, number and image
 // settings are never asked; they come from the plain form. An image is a
 // picture's address on the site, such as /images/walk.jpg, which the editor
-// completes from the site's static files and checks.
+// completes from the site's static files and checks. A text setting may be
+// `needed`, which says what its value is: the editor notes a placed part
+// without it. `site` names a key under [params.rubric] in hugo.toml that
+// gives it for every page, so a form's address is set once.
 export type Setting =
   | { type: "choice"; default: string; values: Record<string, string>; question?: string }
   | { type: "level"; default: string; levels: Record<string, string>; question?: string }
   | { type: "flag"; default?: boolean; true?: string; false?: string; question?: string }
-  | { type: "text"; default?: string }
+  | { type: "text"; default?: string; needed?: string; site?: string }
   | { type: "number"; default?: number }
   | { type: "image"; default?: string };
 
@@ -125,7 +128,12 @@ function setting(raw: unknown, at: string): Setting {
       };
     }
     case "text":
-      return { type: "text", ...(s.default === undefined ? {} : { default: string(s.default, `${at}.default`) }) };
+      return {
+        type: "text",
+        ...(s.default === undefined ? {} : { default: string(s.default, `${at}.default`) }),
+        ...(s.needed === undefined ? {} : { needed: string(s.needed, `${at}.needed`) }),
+        ...(s.site === undefined ? {} : { site: string(s.site, `${at}.site`) }),
+      };
     case "image":
       return { type: "image", ...(s.default === undefined ? {} : { default: string(s.default, `${at}.default`) }) };
     case "number":

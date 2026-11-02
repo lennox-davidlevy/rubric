@@ -1,0 +1,348 @@
+/* A page of plain prose, with no parts. Reads only slot names. This is the
+   page most of a blog is, so it is judged first. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-padding-top: var(--space-3);
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  font-weight: var(--weight-body);
+  line-height: var(--leading-body);
+  font-kerning: normal;
+  font-variant-numeric: var(--numerals) proportional-nums;
+  overflow-wrap: break-word;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--tint); color: var(--ink); }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.skip {
+  position: absolute;
+  left: var(--space-2);
+  top: -100%;
+  padding: var(--space-1) var(--space-2);
+  background: var(--ink);
+  color: var(--paper);
+}
+.skip:focus { top: var(--space-1); }
+
+/* The page is a grid of three widths, so a part can step out of the column
+   of prose to wide or full without any wrapper. */
+.flow {
+  --gutter: var(--space-3);
+  display: grid;
+  grid-template-columns:
+    [full-start] minmax(var(--gutter), 1fr)
+    [wide-start] minmax(0, calc((var(--wide) - var(--measure)) / 2))
+    [prose-start] min(var(--measure), 100% - 2 * var(--gutter))
+    [prose-end] minmax(0, calc((var(--wide) - var(--measure)) / 2))
+    [wide-end] minmax(var(--gutter), 1fr) [full-end];
+  align-content: start;
+}
+.flow > * { grid-column: prose; }
+
+/* Rhythm: no element owns the space above or below it. Space sits between
+   neighbors, one line of the prose apart, and more before a heading. */
+.flow > * { margin-block: 0; }
+.flow > * + * { margin-top: 1lh; }
+.flow > * + :is(h2, h3, h4) { margin-top: calc(1lh + var(--space-3)); }
+.flow > :is(h2, h3, h4) + * { margin-top: var(--space-1); }
+.flow > hr + * { margin-top: 0; }
+
+main.flow { padding-block: var(--space-4) var(--space-5); }
+
+/* A part's insides keep the same rhythm as the page. */
+.stack > * { margin-block: 0; }
+.stack > * + * { margin-top: 1lh; }
+.stack > * + :is(h2, h3, h4) { margin-top: calc(1lh + var(--space-2)); }
+.stack > :is(h2, h3, h4) + * { margin-top: var(--space-1); }
+
+/* Every part leaves more room around itself than a paragraph does. */
+.flow > .part { margin-block: calc(1lh + var(--space-2)); }
+.flow > .part + * { margin-top: calc(1lh + var(--space-2)); }
+.flow > :is(h2, h3, h4) + .part { margin-top: var(--space-2); }
+.stack > .part, .stack > .part + * { margin-top: calc(1lh + var(--space-1)); }
+
+/* Headings: the same face, heavier and tighter, never louder than they need. */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: var(--weight-heading);
+  line-height: var(--leading-heading);
+  color: var(--heading);
+  text-transform: var(--heading-case);
+  text-wrap: balance;
+  font-variant-numeric: lining-nums;
+}
+h1 { font-size: var(--step-4); letter-spacing: var(--tracking-display); line-height: var(--leading-display); }
+h2 { font-size: var(--step-2); letter-spacing: calc(var(--tracking-display) * 2 / 3); }
+h3 { font-size: var(--step-1); }
+h4 { font-size: var(--step-0); }
+
+p, li, dd { text-wrap: pretty; hanging-punctuation: first; }
+
+a {
+  color: inherit;
+  text-decoration-line: var(--link-line);
+  text-decoration-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  text-decoration-thickness: 0.06em;
+  text-underline-offset: 0.18em;
+  transition: color 120ms, text-decoration-color 120ms;
+}
+.flow a:not([class]), .stack a:not([class]) { color: var(--link); }
+a:hover { color: var(--accent); text-decoration-line: underline; text-decoration-color: var(--accent); }
+
+strong { font-weight: var(--weight-strong); }
+
+/* Lists hang their markers in the margin, so the text stays on the line. */
+ul, ol { padding-left: 1.25em; }
+li + li, li > ul, li > ol { margin-top: var(--space-1); }
+li::marker { color: var(--muted); }
+ol > li::marker { font-variant-numeric: lining-nums tabular-nums; }
+
+blockquote {
+  padding-left: calc(var(--space-3) - 2px);
+  border-left: calc(var(--border) * 2) solid var(--rule);
+  color: color-mix(in srgb, currentColor 82%, transparent);
+}
+blockquote > * { margin-block: 0; }
+blockquote > * + * { margin-top: 1lh; }
+
+hr {
+  width: 4rem;
+  height: 0;
+  margin-inline: auto;
+  border: 0;
+  border-top: var(--border) solid var(--muted);
+}
+.flow > hr { margin-block: calc(1lh + var(--space-2)); }
+
+/* Code: quiet, a tint behind blocks, no color beyond the theme's own. */
+code, kbd, samp, pre { font-family: var(--font-mono); font-size: var(--code-size); font-variant-numeric: normal; }
+:not(pre) > code {
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  background: var(--tint);
+}
+pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--code-paper);
+  color: var(--code-ink);
+  line-height: 1.55;
+  tab-size: 2;
+}
+pre code { font-size: inherit; background: none; padding: 0; }
+.flow > .highlight > pre, .flow > pre { margin-inline: calc(-1 * var(--space-3)); }
+.chroma .c, .chroma .c1, .chroma .cm, .chroma .cs, .chroma .ch { color: var(--muted); font-style: italic; }
+.chroma .k, .chroma .kd, .chroma .kn, .chroma .kr, .chroma .kc, .chroma .nt { color: var(--accent); }
+.chroma .s, .chroma .s1, .chroma .s2, .chroma .sb, .chroma .se { color: color-mix(in srgb, currentColor 75%, var(--accent)); }
+
+figure { margin: 0; }
+
+img, svg, video { display: block; max-width: 100%; height: auto; }
+p > img { border-radius: var(--radius); }
+
+/* A table wider than the screen scrolls in its own box (render-table.html),
+   never the page. */
+.table { overflow-x: auto; }
+.table > table { min-width: 32rem; }
+.flow > .table { margin-inline: calc(-1 * var(--space-3)); padding-inline: var(--space-3); }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--step--1);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+th, td { padding: var(--space-1) var(--space-2) var(--space-1) 0; text-align: left; vertical-align: top; }
+th { font-weight: var(--weight-heading); border-bottom: var(--border) solid currentColor; }
+td { border-bottom: var(--border) solid var(--rule); }
+
+abbr[title] { text-decoration: underline dotted var(--muted); }
+mark { background: var(--tint); color: inherit; padding: 0 0.1em; }
+sup, sub { line-height: 0; }
+
+/* Footnotes: smaller, below a short rule, with the marker in the accent. */
+sup a[role="doc-noteref"], .footnote-ref {
+  color: var(--accent);
+  text-decoration: none;
+  font-variant-numeric: lining-nums;
+  font-size: 0.75em;
+  padding-inline: 0.1em;
+}
+.footnotes {
+  font-size: var(--step--1);
+  color: var(--muted);
+  margin-top: calc(1lh + var(--space-4)) !important;
+}
+.footnotes hr { margin: 0 0 var(--space-3); width: 4rem; border-top-color: var(--rule); }
+.footnotes ol { padding-left: 1.25em; }
+.footnotes li + li { margin-top: var(--space-1); }
+.footnotes p { margin: 0; }
+.footnote-backref { text-decoration: none; margin-left: 0.25em; }
+
+/* The site around the writing. */
+.masthead, .site-footer {
+  max-width: calc(var(--measure) + 2 * var(--space-3));
+  margin-inline: auto;
+  padding-inline: var(--space-3);
+}
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  padding-top: var(--space-4);
+}
+.masthead a { text-decoration: none; }
+.masthead { font-family: var(--font-ui); }
+.masthead-title { font-weight: var(--weight-strong); letter-spacing: 0.005em; }
+.masthead nav { display: flex; gap: var(--space-3); font-size: var(--step--1); }
+.masthead nav a { color: var(--muted); }
+.masthead nav a:hover, .masthead nav a[aria-current] { color: var(--ink); }
+
+.site-footer {
+  padding-block: var(--space-3) var(--space-5);
+  border-top: var(--border) solid var(--rule);
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+.site-footer p { margin: 0; }
+.site-footer p + p { margin-top: var(--space-1); }
+.site-footer a { color: inherit; }
+@media (min-width: 40rem) {
+  .site-footer { border-top: 0; }
+  .site-footer::before {
+    content: "";
+    display: block;
+    width: 4rem;
+    margin-bottom: var(--space-3);
+    border-top: var(--border) solid var(--rule);
+  }
+}
+
+/* A page's title and byline. */
+.page-header + * { margin-top: var(--space-4) !important; }
+.page-header > * { margin: 0; }
+.byline {
+  margin-top: var(--space-2) !important;
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+.intro > :first-child { margin-top: 0; }
+.intro p:first-child { font-size: var(--step-1); line-height: 1.45; }
+
+.tags { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); font-size: var(--step--1); margin-top: var(--space-4) !important; }
+.tags a { color: var(--muted); text-decoration: none; }
+.tags a::before { content: "#"; opacity: 0.6; }
+.tags a:hover { color: var(--accent); }
+
+/* The list of posts, here because the home page uses it with no part. */
+.post-list { list-style: none; padding: 0; }
+.post-list li + li { margin-top: var(--space-2); }
+.post-list.style-dated li {
+  display: grid;
+  grid-template-columns: 6.5em 1fr;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+.post-list time { color: var(--muted); font-size: var(--step--1); font-variant-numeric: lining-nums tabular-nums; }
+.post-list a { text-decoration: none; }
+.post-list a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+@media (max-width: 30rem) {
+  .post-list.style-dated li { grid-template-columns: 1fr; gap: 0; }
+}
+
+/* The shell: the writing, with a sidebar or the page's contents beside it
+   when the frame has them, on a screen wide enough. */
+.shell { display: grid; grid-template-columns: minmax(0, 1fr); }
+.shell > main { min-width: 0; }
+@media (min-width: 64rem) {
+  .shell.has-left { grid-template-columns: 15rem minmax(0, 1fr); }
+  .shell.has-right { grid-template-columns: minmax(0, 1fr) 15rem; }
+  .shell.has-left.has-right { grid-template-columns: 15rem minmax(0, 1fr) 15rem; }
+}
+
+/* Dark, when the frame's theme-switch is set to it: the palette's own dark
+   band, for the whole page. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: var(--dark-paper);
+  --ink: var(--dark-ink);
+  --accent: var(--dark-accent);
+  --muted: var(--dark-muted);
+  --rule: var(--dark-rule);
+  --tint: var(--dark-tint);
+  --raised: var(--dark-tint);
+  --accent-tint: var(--dark-accent-tint);
+  --link: var(--dark-ink);
+  --heading: var(--dark-ink);
+  --code-paper: var(--dark-tint);
+  --code-ink: var(--dark-ink);
+  --positive: var(--dark-positive);
+  --warning: var(--dark-warning);
+  --danger: var(--dark-danger);
+  --positive-tint: var(--dark-positive-tint);
+  --warning-tint: var(--dark-warning-tint);
+  --danger-tint: var(--dark-danger-tint);
+}
+
+/* Controls: the inputs and buttons inside forms, search and the like. */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+:is(input, textarea, select) {
+  width: 100%;
+  padding: 0.55em 0.75em;
+  border: var(--border) solid color-mix(in srgb, var(--ink) 30%, transparent);
+  border-radius: var(--control-radius);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+}
+:is(input, textarea, select):focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+label { font-family: var(--font-ui); font-size: var(--step--1); color: var(--muted); }
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.5em 1.2em;
+  border: var(--border) solid var(--ink);
+  border-radius: var(--control-radius);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  font-weight: var(--weight-heading);
+  cursor: pointer;
+}
+button:hover { background: var(--accent); border-color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+
+@media print {
+  body { background: none; }
+  .masthead nav, .skip, .site-footer { display: none; }
+  a { text-decoration: none; }
+}

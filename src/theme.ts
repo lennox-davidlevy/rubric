@@ -83,6 +83,11 @@ export type Pairing = {
   quote: "italic" | "normal";
   ornament: string;
   code: string;
+  // Buttons, labels, navigation and forms: often a sans beside a serif.
+  ui: string[];
+  headingCase: "none" | "uppercase";
+  // Links in the writing: always underlined, or only on hover.
+  linkLine: "always" | "hover";
 };
 
 export type Scale = {
@@ -96,6 +101,10 @@ export type Scale = {
   measure: string;
   wide: string;
   radius: string;
+  // The width of lines and borders, and the corners of buttons and inputs
+  // (a pill is 999px).
+  border: string;
+  controlRadius: string;
 };
 
 export type Theme = { name: string; description: string; palette: string; pairing: string; scale: string };
@@ -139,6 +148,8 @@ const section = (raw: Raw, key: string, where: string): Raw => {
   return v as Raw;
 };
 
+const sameAs = (a: RGB, b: RGB) => a.every((v, i) => v === b[i]);
+
 export function parsePalette(name: string, raw: Raw): Palette {
   const where = `palettes/${name}.yaml`;
   const scheme = oneOf(raw, "scheme", where, ["light", "dark"] as const);
@@ -148,13 +159,34 @@ export function parsePalette(name: string, raw: Raw): Palette {
   for (const k of DARK_KEYS) c[`dark-${k}`] = hex(str(dark, k, `${where} dark`));
   // What a palette may leave out, worked out from what it gives. Each can
   // be set by hand instead, under the same name.
+  // In order: later ones may read earlier ones.
   const derived: Record<string, () => RGB> = {
     raised: () => c.paper!,
+    link: () => c.ink!,
+    heading: () => c.ink!,
+    "code-paper": () => c.tint!,
+    "code-ink": () => c.ink!,
+    // The colors of notices and marks: what went well, what to watch, what
+    // could do harm. Left out, they lean on the ink and the accent.
+    positive: () => c.ink!,
+    warning: () => c.accent!,
+    danger: () => c.accent!,
     "accent-tint": () => mix(c.accent!, c.paper!, 0.08),
+    "positive-tint": () => mix(c.positive!, c.paper!, 0.08),
+    "warning-tint": () => mix(c.warning!, c.paper!, 0.08),
+    "danger-tint": () => mix(c.danger!, c.paper!, 0.08),
     "dark-muted": () => mix(c["dark-ink"]!, c["dark-paper"]!, 0.68),
     "dark-rule": () => mix(c["dark-ink"]!, c["dark-paper"]!, 0.2),
     "dark-tint": () => mix(c["dark-ink"]!, c["dark-paper"]!, 0.09),
     "dark-accent-tint": () => mix(c["dark-accent"]!, c["dark-paper"]!, 0.12),
+    // On the dark ground a notice color is lifted toward the light ink, or
+    // is the dark band's accent when it was the page's accent.
+    "dark-positive": () => sameAs(c.positive!, c.ink!) ? c["dark-ink"]! : mix(c.positive!, c["dark-ink"]!, 0.45),
+    "dark-warning": () => sameAs(c.warning!, c.accent!) ? c["dark-accent"]! : mix(c.warning!, c["dark-ink"]!, 0.45),
+    "dark-danger": () => sameAs(c.danger!, c.accent!) ? c["dark-accent"]! : mix(c.danger!, c["dark-ink"]!, 0.45),
+    "dark-positive-tint": () => mix(c["dark-positive"]!, c["dark-paper"]!, 0.12),
+    "dark-warning-tint": () => mix(c["dark-warning"]!, c["dark-paper"]!, 0.12),
+    "dark-danger-tint": () => mix(c["dark-danger"]!, c["dark-paper"]!, 0.12),
   };
   for (const [k, make] of Object.entries(derived)) {
     const given = k.startsWith("dark-") ? dark[k.slice(5)] : raw[k];
@@ -203,6 +235,9 @@ export function parsePairing(name: string, raw: Raw): Pairing {
     quote: oneOf(raw, "quote", where, ["italic", "normal"] as const),
     ornament: str(raw, "ornament", where),
     code: str(raw, "code", where),
+    ui: raw.ui === undefined || raw.ui === "body" ? list(raw, "body", where) : list(raw, "ui", where),
+    headingCase: raw.headings === undefined ? "none" : oneOf(raw, "headings", where, ["none", "uppercase"] as const),
+    linkLine: raw.links === undefined ? "always" : oneOf(raw, "links", where, ["always", "hover"] as const),
   };
 }
 
@@ -224,6 +259,8 @@ export function parseScale(name: string, raw: Raw): Scale {
     measure: str(raw, "measure", where),
     wide: str(raw, "wide", where),
     radius: str(raw, "radius", where),
+    border: raw.border === undefined ? "1px" : str(raw, "border", where),
+    controlRadius: raw.controls === undefined ? str(raw, "radius", where) : str(raw, "controls", where),
   };
 }
 
@@ -312,6 +349,7 @@ export function pairingCss(p: Pairing): string {
     ["font-body", family(p.body)],
     ["font-display", family(p.display)],
     ["font-mono", family(p.mono)],
+    ["font-ui", family(p.ui)],
     ["weight-body", String(p.weight.body)],
     ["weight-strong", String(p.weight.strong)],
     ["weight-heading", String(p.weight.heading)],
@@ -326,6 +364,8 @@ export function pairingCss(p: Pairing): string {
     ["quote-style", p.quote],
     ["ornament", cssString(p.ornament)],
     ["code-size", p.code],
+    ["heading-case", p.headingCase],
+    ["link-line", p.linkLine === "always" ? "underline" : "none"],
   ];
   return header("pairings", p.name, `${p.name}: ${p.description}.`) + "\n" + faces + "\n" + block(vars);
 }
@@ -336,7 +376,7 @@ export function scaleCss(s: Scale): string {
     vars.push([`step-${i}`, fluid(s.body[0] * s.ratio[0] ** i, s.body[1] * s.ratio[1] ** i, s.screen)]);
   }
   s.space.forEach((v, i) => vars.push([`space-${i + 1}`, Array.isArray(v) ? fluid(v[0] * 16, v[1] * 16, s.screen) : `${v}rem`]));
-  vars.push(["measure", s.measure], ["wide", s.wide], ["radius", s.radius]);
+  vars.push(["measure", s.measure], ["wide", s.wide], ["radius", s.radius], ["border", s.border], ["control-radius", s.controlRadius]);
   const what = `${s.name}: ${s.description}. Body ${s.body[0]}px to ${s.body[1]}px, ratio ${s.ratio[0]} to ${s.ratio[1]}, from a ${s.screen[0]}px to a ${s.screen[1]}px screen.`;
   return header("scales", s.name, what) + "\n" + block(vars);
 }
@@ -360,6 +400,16 @@ const AA = 4.5;
 // the pair is drawn, for the message.
 const TEXT_PAIRS: [string, string, string][] = [
   ["ink", "paper", "the writing"],
+  ["link", "paper", "links"],
+  ["heading", "paper", "headings"],
+  ["code-ink", "code-paper", "code blocks"],
+  ["positive", "paper", "marks for what went well"],
+  ["warning", "paper", "warnings"],
+  ["danger", "paper", "dangers"],
+  ["positive", "positive-tint", "a tip's label"],
+  ["warning", "warning-tint", "a warning's label"],
+  ["danger", "danger-tint", "a danger's label"],
+  ["ink", "danger-tint", "a danger callout"],
   ["muted", "paper", "bylines, captions, dates"],
   ["accent", "paper", "links on hover, footnote marks, labels"],
   ["ink", "tint", "a tinted box, code"],
@@ -380,6 +430,9 @@ const TEXT_PAIRS: [string, string, string][] = [
   ["dark-ink", "dark-accent-tint", "a warning callout in a dark band"],
   ["dark-accent", "dark-accent-tint", "a warning callout's label in a dark band"],
   ["dark-paper", "dark-accent", "a filled button in a dark band, on hover"],
+  ["dark-positive", "dark-paper", "marks for what went well in a dark band"],
+  ["dark-warning", "dark-warning-tint", "a warning's label in a dark band"],
+  ["dark-danger", "dark-danger-tint", "a danger's label in a dark band"],
 ];
 
 // Grounds that must read as different from the page, not just be different.
@@ -466,7 +519,7 @@ export function lint(cat: Catalog, files: Record<string, string>): Problem[] {
       for (const m of code.matchAll(/var\(--([a-z0-9-]+)/g)) {
         if (!slots.has(m[1]!) && !local.has(m[1]!)) out.push({ where, level: "error", message: `--${m[1]} is not a slot in catalog.yaml` });
       }
-      if (/#[0-9a-f]{3,8}\b|\b(rgba?|hsla?|oklch|oklab)\(|\b(white|black)\b/i.test(code)) {
+      if (/#[0-9a-f]{3,8}\b|\b(rgba?|hsla?|oklch|oklab)\(|\b(white|black)\b(?!-)/i.test(code)) {
         out.push({ where, level: "error", message: `a literal color; use a slot` });
       }
       if (/font-weight:\s*\d/.test(code)) out.push({ where, level: "error", message: `a literal font weight; use a weight slot` });

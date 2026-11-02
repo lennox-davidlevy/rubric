@@ -11,11 +11,11 @@ import {
   CompletionItemKind, createConnection, DiagnosticSeverity, MarkupKind, ProposedFeatures, TextDocuments, TextDocumentSyncKind,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { Cache } from "../core/index.ts";
-import { ask } from "../jev.ts";
+import { atPlace, Cache, type PageKind } from "../core/index.ts";
+import { ask, refine } from "../jev.ts";
 import { findSiteRoot, openSite } from "../site.ts";
-import { stubResolver } from "./stub.ts";
-import { Workspace, type Resolver, type Severity } from "./workspace.ts";
+import { stubRefiner, stubResolver } from "./stub.ts";
+import { Workspace, type Refiner, type Resolver, type Severity } from "./workspace.ts";
 
 export function serve(opts: { stub: boolean }): void {
   const connection = createConnection(ProposedFeatures.all, process.stdin, process.stdout);
@@ -36,10 +36,14 @@ export function serve(opts: { stub: boolean }): void {
     if (root) {
       const site = await openSite(root);
       const cache = await Cache.load(site.cache);
+      // A line is asked only about the parts for its place: the frame in
+      // rubric.md, the parts for the writing in a page.
+      const forPage = (page: PageKind) => atPlace(site.catalog, page === "site" ? "site" : "writing");
+      const stubs = { site: stubResolver(forPage("site")), writing: stubResolver(forPage("post")) };
       const resolver: Resolver = opts.stub
-        ? stubResolver(site.catalog)
+        ? (directive, page) => stubs[page === "site" ? "site" : "writing"](directive, page)
         : async (directive, page) => {
-            const asked = await ask(site.catalog, directive, page);
+            const asked = await ask(forPage(page), directive, page);
             // `bun run play` creates .rubric/jev.jsonl and prints each call
             // from it. A log is appended a line at a time, not written whole;
             // nothing but that printer reads it.
@@ -48,6 +52,16 @@ export function serve(opts: { stub: boolean }): void {
               void appendFile(log, JSON.stringify({ t: Date.now(), ...asked }) + "\n").catch(() => {});
             }
             return { resolution: asked.resolution, model: asked.model ?? "unknown" };
+          };
+      const refiner: Refiner = opts.stub
+        ? stubRefiner(site.catalog)
+        : async (words, part, page) => {
+            const asked = await refine(site.catalog, part, words, page);
+            const log = join(site.root, ".rubric/jev.jsonl");
+            if (existsSync(log)) {
+              void appendFile(log, JSON.stringify({ t: Date.now(), pass: "second", part, ...asked }) + "\n").catch(() => {});
+            }
+            return { ...(asked.refined ? { refined: asked.refined } : {}), ...(asked.error ? { error: asked.error } : {}), model: asked.model ?? "unknown" };
           };
       workspace = new Workspace(site, cache, resolver, (f, notes) => {
         void connection.sendDiagnostics({
@@ -60,7 +74,7 @@ export function serve(opts: { stub: boolean }): void {
             message: n.message,
           })),
         });
-      });
+      }, { refiner });
     }
     return {
       capabilities: {
@@ -101,9 +115,12 @@ export function serve(opts: { stub: boolean }): void {
     const f = file(params.textDocument.uri);
     if (!f || !workspace) return [];
     const ghosts = await workspace.ghost(f, params.position.line);
+    // A refinement changes the pin mid-line, so the ghost text only shows
+    // what changes and the editor's rubric.pin command writes the whole line.
     return ghosts.map((g) => ({
       insertText: g.text,
       range: { start: { line: g.line, character: g.character }, end: { line: g.line, character: g.character } },
+      ...(g.replace === undefined ? {} : { command: { title: "Pin", command: "rubric.pin", arguments: [{ line: g.line, text: g.replace }] } }),
     }));
   });
 

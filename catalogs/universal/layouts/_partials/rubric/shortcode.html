@@ -1,0 +1,10 @@
+{{- /*
+  Every part's shortcode is this one line: check the settings against
+  catalog.yaml, render the block's Markdown, and hand both to the part's
+  partial in parts/. The catalog page calls the same partials directly, so
+  what it shows is exactly what a page gets.
+*/ -}}
+{{- $s := partial "rubric/settings.html" (dict "part" .Name "sc" .) -}}
+{{- $inner := "" -}}
+{{- with .Inner }}{{ $inner = . | $.Page.RenderString (dict "display" "block") }}{{ end -}}
+{{- partial (printf "parts/%s.html" .Name) (dict "s" $s "inner" $inner "raw" (.Inner | default "") "page" .Page) -}}

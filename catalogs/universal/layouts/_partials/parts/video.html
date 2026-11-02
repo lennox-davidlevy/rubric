@@ -1,0 +1,21 @@
+{{- /* The address is the block's first link or path; the rest is a caption. */ -}}
+{{- $html := string .inner -}}
+{{- $url := index (findRE `(?:https?://|/)[^"<\s]+` (replaceRE `(?s)^.*?<p>` "" $html) 1) 0 | default "" | htmlUnescape -}}
+{{- $caption := replaceRE `(?s)^\s*<p>.*?</p>` "" $html -}}
+
+{{- $yt := findRESubmatch `(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/|youtube\.com/shorts/)([\w-]{11})` $url 1 -}}
+{{- $vimeo := findRESubmatch `vimeo\.com/(?:video/)?(\d+)` $url 1 -}}
+<figure class="part part-video width-{{ .s.width }}">
+<div class="part-video-frame">
+{{- if $yt }}
+<iframe src="https://www.youtube-nocookie.com/embed/{{ index (index $yt 0) 1 }}" title="A video" loading="lazy" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"></iframe>
+{{- else if $vimeo }}
+<iframe src="https://player.vimeo.com/video/{{ index (index $vimeo 0) 1 }}?dnt=1" title="A video" loading="lazy" allow="autoplay; fullscreen; picture-in-picture"></iframe>
+{{- else if $url }}
+<video src="{{ $url }}" controls preload="metadata" playsinline></video>
+{{- end }}
+</div>
+{{- with trim $caption " \n" }}
+<figcaption class="stack">{{ . | safeHTML }}</figcaption>
+{{- end }}
+</figure>

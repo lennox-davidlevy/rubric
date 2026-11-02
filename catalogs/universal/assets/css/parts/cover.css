@@ -1,0 +1,4 @@
+/* cover: the post's own picture, across the top. */
+.flow > .part-cover { grid-column: wide; margin: 0 0 var(--space-3); }
+.part-cover img { width: 100%; aspect-ratio: 21 / 9; object-fit: cover; border-radius: var(--radius); }
+@media (max-width: 40rem) { .flow > .part-cover { grid-column: full; } .part-cover img { border-radius: 0; aspect-ratio: 3 / 2; } }

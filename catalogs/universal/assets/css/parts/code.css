@@ -1,0 +1,11 @@
+/* code: a code block with its file's name above it. */
+.part-code figcaption {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: color-mix(in srgb, var(--code-ink) 8%, var(--code-paper));
+  color: var(--code-ink);
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+}
+.part-code figcaption + * pre, .part-code figcaption + pre { border-radius: 0 0 var(--radius) var(--radius); }
+.flow > .part-code { margin-inline: calc(-1 * var(--space-3)); }

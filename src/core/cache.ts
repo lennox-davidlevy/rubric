@@ -8,14 +8,22 @@ import { writeWhole } from "./write.ts";
 import type { Catalog } from "./catalog.ts";
 import { parsePlain, type PlainForm } from "./plain.ts";
 import type { PageKind } from "./questions.ts";
-import type { Resolution } from "./resolve.ts";
+import type { Refined, Resolution } from "./resolve.ts";
 
 export type Cached = Exclude<Resolution, { outcome: "error" }> & { model: string; at: string };
+export type CachedRefine = Refined & { model: string; at: string };
+
+// Words after a ":" as the cache keys them: the same request however it is
+// cased, spaced or ended, so "A bit bigger." is asked once with "a bit bigger".
+export function refineWords(words: string): string {
+  return words.toLowerCase().replace(/\s+/g, " ").replace(/[\s.,;:!?]+$/, "").trim();
+}
 
 export class Cache {
-  #entries: Record<string, Cached>;
+  // Words lines and refinements share one file; their keys never collide.
+  #entries: Record<string, Cached | CachedRefine>;
 
-  constructor(entries: Record<string, Cached> = {}) {
+  constructor(entries: Record<string, Cached | CachedRefine> = {}) {
     this.#entries = entries;
   }
 
@@ -37,7 +45,20 @@ export class Cache {
   }
 
   get(catalog: Catalog, page: PageKind, directive: string): Cached | undefined {
-    return this.#entries[Cache.key(catalog, page, directive)];
+    return this.#entries[Cache.key(catalog, page, directive)] as Cached | undefined;
+  }
+
+  // A refinement depends on the part and the words, not the page.
+  static refineKey(catalog: Catalog, part: string, words: string): string {
+    return JSON.stringify(["refine", catalog.name, catalog.version, part, refineWords(words)]);
+  }
+
+  getRefine(catalog: Catalog, part: string, words: string): CachedRefine | undefined {
+    return this.#entries[Cache.refineKey(catalog, part, words)] as CachedRefine | undefined;
+  }
+
+  setRefine(catalog: Catalog, part: string, words: string, refined: Refined, model: string): void {
+    this.#entries[Cache.refineKey(catalog, part, words)] = { ...refined, model, at: new Date().toISOString() };
   }
 
   set(catalog: Catalog, page: PageKind, directive: string, resolution: Resolution, model: string): void {

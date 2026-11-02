@@ -41,7 +41,10 @@
   {{- end }}
 {{- end }}
 {{- if $catalog }}{{ $css = $css | append (resources.Get "css/catalog.css") }}{{ end }}
-{{- with $css | resources.Concat (printf "css/%s.css" (delimit $bundle "-")) | minify | fingerprint }}
+{{- /* Named for the theme and a short hash of the parts: a page with many
+     parts would otherwise outgrow a file name. */}}
+{{- $name := printf "css/%s-%s-%s-%s.css" $palette $pairing $scale (delimit $bundle "-" | md5 | strings.Truncate 8 "") }}
+{{- with $css | resources.Concat $name | minify | fingerprint }}
 <link rel="stylesheet" href="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}">
 {{- end }}
 {{- range $js }}

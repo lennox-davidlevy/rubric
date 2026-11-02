@@ -1,0 +1,13 @@
+{{- /* `to` is where the form sends: a form service's address, or an email. The site may give one for every form, as `form` under [params.rubric]. */ -}}
+{{- $to := .s.to | default site.Params.rubric.form | default "" -}}
+{{- $action := cond (hasPrefix $to "http") $to (cond (ne $to "") (printf "mailto:%s" $to) "") -}}
+
+<form class="part part-subscribe" method="post"{{ with $action }} action="{{ . }}"{{ end }}>
+<div class="stack">
+{{ .inner }}
+</div>
+<p class="part-subscribe-row">
+<label><span class="visually-hidden">Your email</span><input type="email" name="email" placeholder="you@example.com" autocomplete="email" required></label>
+<button type="submit">Subscribe</button>
+</p>
+</form>
