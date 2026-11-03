@@ -1,0 +1,25 @@
+/* tabs: panels in one place, chosen by tab. Without the script, each panel
+   is its heading and its writing, one after another. */
+.part-tabs-panel + .part-tabs-panel { margin-top: var(--space-3); }
+.part-tabs-title { font-size: var(--step-1); }
+.part-tabs.is-tabbed .part-tabs-panel { margin: 0; padding-top: var(--space-3); }
+.part-tabs-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-3);
+  border-bottom: var(--border) solid var(--rule);
+}
+.part-tabs-list button {
+  min-height: 2.75rem;
+  margin-bottom: calc(-1 * var(--border));
+  padding: 0;
+  border: 0;
+  border-bottom: calc(var(--border) * 2) solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font-weight: var(--weight-strong);
+}
+.part-tabs-list button:hover { background: none; color: var(--ink); }
+.part-tabs-list button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.part-tabs-list button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

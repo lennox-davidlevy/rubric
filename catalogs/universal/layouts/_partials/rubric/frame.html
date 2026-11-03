@@ -1,0 +1,22 @@
+{{- /* Draws the frame parts that belong in one place on the page. Each is
+     drawn by its part partial, with the page it is around. */ -}}
+{{- $p := .page -}}
+{{- $slot := .slot -}}
+{{- $places := dict
+    "top" (slice "banner" "header")
+    "before-title" (slice "breadcrumbs" "cover")
+    "after-title" (slice "post-meta")
+    "after-content" (slice "author" "tags" "share" "related" "pager" "comments")
+    "bottom" (slice "footer")
+    "tools" (slice "search" "theme-switch" "languages")
+    "footer-extra" (slice "social") -}}
+{{- range partial "rubric/frame-list.html" $p -}}
+  {{- $here := in (index $places $slot | default slice) .part -}}
+  {{- if eq .part "sidebar" }}{{ $here = eq $slot (printf "side-%s" (.settings.side | default "left")) }}{{ end -}}
+  {{- if eq .part "page-contents" }}{{ $here = eq $slot "side-right" }}{{ end -}}
+  {{- if $here -}}
+    {{- $inner := "" -}}
+    {{- with .body }}{{ $inner = $p.RenderString (dict "display" "block") . }}{{ end -}}
+    {{- partial "rubric/draw.html" (dict "name" .part "args" (dict "s" (.settings | default dict) "inner" $inner "page" $p)) -}}
+  {{- end -}}
+{{- end -}}

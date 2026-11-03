@@ -1,0 +1,126 @@
+/* gallery: a grid of pictures. Without the script each opens on its own; with
+   it they open in a lightbox (a <dialog>), one at a time. */
+.part-gallery ul {
+  display: grid;
+  grid-template-columns: repeat(var(--columns, 3), minmax(0, 1fr));
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.part-gallery li { margin: 0; }
+/* A gallery of one picture fills the row instead of sitting in half of it. */
+.part-gallery li:only-child { grid-column: 1 / -1; }
+.part-gallery li:only-child img { aspect-ratio: 3 / 2; }
+.part-gallery.columns-two { --columns: 2; }
+.part-gallery.columns-three { --columns: 3; }
+.part-gallery.columns-four { --columns: 4; }
+@media (max-width: 30rem) {
+  .part-gallery.columns-three, .part-gallery.columns-four { --columns: 2; }
+}
+.part-gallery a { display: block; border-radius: var(--radius); overflow: hidden; }
+.part-gallery img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: var(--tint);
+  transition: opacity 160ms;
+}
+.part-gallery a:hover img { opacity: 0.88; }
+
+/* A slideshow: one picture at a time, in a row that scrolls and snaps; the
+   reader swipes, or uses the arrows the script adds. */
+.part-gallery.layout-slideshow ul {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  gap: var(--space-1);
+}
+.part-gallery.layout-slideshow li { flex: 0 0 100%; scroll-snap-align: start; }
+.part-gallery.layout-slideshow img { aspect-ratio: 3 / 2; }
+@media (min-width: 56rem) { .flow > .part-gallery.layout-slideshow { grid-column: wide; } }
+.part-gallery-arrows { display: flex; justify-content: flex-end; gap: var(--space-1); margin-top: var(--space-1); }
+.part-gallery-arrows button { width: 2.75rem; padding: 0; font-size: var(--step-1); line-height: 1; background: var(--paper); color: var(--ink); border-color: var(--rule); }
+.part-gallery-arrows button:hover { background: var(--tint); color: var(--ink); border-color: var(--rule); }
+
+/* The lightbox, made by the script the first time a picture is opened. */
+.rubric-lightbox {
+  width: 100vw;
+  max-width: none;
+  height: 100svh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--dark-paper);
+  color: var(--dark-ink);
+  overflow: hidden;
+}
+.rubric-lightbox::backdrop { background: transparent; }
+.rubric-lightbox figure {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  /* Room for the counter and close button above, the arrows beside. */
+  padding: calc(2.75rem + var(--space-3)) calc(2.75rem + var(--space-3)) var(--space-3);
+}
+@media (max-width: 40rem) {
+  .rubric-lightbox figure { padding-inline: var(--space-2); }
+}
+.rubric-lightbox img {
+  max-width: 100%;
+  max-height: calc(100svh - 2.75rem - 2 * var(--space-3) - 3rem);
+  object-fit: contain;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-deep);
+  touch-action: pan-y;
+}
+.rubric-lightbox figcaption {
+  min-height: 1.6em;
+  padding-top: var(--space-2);
+  font-size: var(--step--1);
+  color: var(--dark-muted);
+  text-align: center;
+}
+.rubric-lightbox button {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--dark-ink) 12%, transparent);
+  color: var(--dark-ink);
+  font: 400 1.5rem/1 var(--font-body);
+  cursor: pointer;
+  transition: background-color 120ms;
+}
+.rubric-lightbox button:hover { background: color-mix(in srgb, var(--dark-ink) 24%, transparent); }
+.rubric-lightbox button:focus-visible { outline: 2px solid var(--dark-ink); outline-offset: 2px; }
+.rubric-lightbox .close { top: var(--space-2); right: var(--space-2); }
+.rubric-lightbox .prev, .rubric-lightbox .next { top: 50%; translate: 0 -50%; }
+.rubric-lightbox .prev { left: var(--space-2); }
+.rubric-lightbox .next { right: var(--space-2); }
+.rubric-lightbox .count {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-3);
+  line-height: 2.75rem;
+  font-size: var(--step--1);
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--dark-muted);
+}
+.rubric-lightbox.single .prev, .rubric-lightbox.single .next, .rubric-lightbox.single .count { display: none; }
+
+/* motion=subtle: a short fade in and between pictures. */
+.rubric-lightbox.motion-subtle[open], .rubric-lightbox.motion-subtle[open]::backdrop { animation: rubric-fade 180ms ease-out; }
+.rubric-lightbox.motion-subtle img { transition: opacity 140ms; }
+.rubric-lightbox.motion-subtle.changing img { opacity: 0; }
+@keyframes rubric-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .rubric-lightbox, .rubric-lightbox::backdrop, .rubric-lightbox img { animation: none !important; transition: none !important; }
+}

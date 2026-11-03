@@ -1,0 +1,4 @@
+{{- /* The post's own picture, from `cover` (or `image`) in its front matter. */ -}}
+{{- with .page.Params.cover | default .page.Params.image }}
+<figure class="part part-cover"><img src="{{ . | relURL }}" alt=""></figure>
+{{- end -}}

@@ -1,0 +1,17 @@
+{{- /*
+  The block holds Markdown images, on lines or in a list. Each becomes a
+  thumbnail linking to the full picture, so the gallery works with no script;
+  js/parts/gallery.js opens the links in a lightbox instead. A picture's alt
+  text is its caption there.
+*/ -}}
+{{- $imgs := findRE `<img[^>]*>` .inner -}}
+<div class="part part-gallery layout-{{ .s.layout }} columns-{{ .s.columns }} motion-{{ .s.motion }}" data-motion="{{ .s.motion }}">
+<ul>
+{{- range $imgs }}
+{{- $src := replaceRE `(?s).*\ssrc="([^"]*)".*` "$1" . }}
+{{- $alt := "" }}
+{{- if findRE `\salt="` . }}{{ $alt = replaceRE `(?s).*\salt="([^"]*)".*` "$1" . }}{{ end }}
+<li><a href="{{ $src | safeURL }}"><img src="{{ $src | safeURL }}" alt="{{ $alt | htmlUnescape }}" loading="lazy" decoding="async"></a></li>
+{{- end }}
+</ul>
+</div>

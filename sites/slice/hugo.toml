@@ -1,0 +1,24 @@
+baseURL = "/"
+title = "Slice"
+theme = "slice"
+themesDir = "../../catalogs"
+disableKinds = ["taxonomy", "term", "rss", "sitemap"]
+
+[params.rubric]
+theme = "plain"
+
+# Nested parts hand their HTML to the outer part's RenderString.
+[markup.goldmark.renderer]
+unsafe = true
+
+[markup.highlight]
+noClasses = false
+
+# For `hugo server` only. Its Last-Modified is to the second, so two rebuilds
+# in one second answer the browser's reload with 304 Not Modified and the
+# browser keeps the older page. Rubric rebuilds as the writer types, so this
+# happens often. Hugo reads this from the site only, never from a theme.
+[[server.headers]]
+for = "/**"
+[server.headers.values]
+Cache-Control = "no-store"

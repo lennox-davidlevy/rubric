@@ -1,0 +1,23 @@
+/* callout: a note set off from the prose, labeled with its kind. */
+.part-callout {
+  margin-inline: calc(-1 * var(--space-3));
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  background: var(--tint);
+}
+.part-callout-label {
+  margin: 0 0 var(--space-1);
+  font-size: 0.78em;
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--tracking-label);
+  text-transform: var(--label-case);
+  font-variant-numeric: lining-nums;
+  color: var(--muted);
+}
+.part-callout.kind-tip { background: transparent; border: 1px solid var(--rule); }
+.part-callout.kind-warning { background: var(--accent-tint); }
+.part-callout.kind-warning .part-callout-label { color: var(--accent); }
+
+@media (max-width: 40rem) {
+  .part-callout { border-radius: 0; border-inline: 0 !important; }
+}

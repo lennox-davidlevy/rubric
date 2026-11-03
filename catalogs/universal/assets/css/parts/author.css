@@ -1,0 +1,6 @@
+/* author: a short box about the writer. */
+.part-author { padding: var(--space-3); border-radius: var(--radius); background: var(--tint); font-size: var(--step--1); }
+.part-author .stack > p:has(> img:only-child) { float: left; margin: 0 var(--space-2) var(--space-1) 0; }
+.part-author img { width: 4rem; height: 4rem; border-radius: 50%; object-fit: cover; }
+.part-author::after { content: ""; display: block; clear: both; }
+.flow > .part-author { margin-top: var(--space-4); }

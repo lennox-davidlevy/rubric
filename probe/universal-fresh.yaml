@@ -1,0 +1,32 @@
+# A third set, written 2026-11-01 after the held-out run showed call-to-action
+# drawing in interactive things and "tint" missing gray, and before the fix
+# for either was run. Checked against once.
+
+- { directive: "a bold ending that tells people to buy the book", want: "call-to-action" }
+- { directive: "get them to start a free trial", want: "call-to-action" }
+- { directive: "a closing pitch with a button", want: "call-to-action" }
+- { directive: "a dark section urging people to donate", want: "call-to-action tone=dark" }
+- { directive: "a light gray panel behind the summary", want: "section tone=tint" }
+- { directive: "a softly shaded area for the recap", want: "section tone=tint" }
+- { directive: "a pale background behind this list", want: "section tone=tint" }
+- { directive: "a black band with the quote in it", want: "section tone=dark" }
+- { directive: "a box with a thin outline", want: "section edge=outlined" }
+- { directive: "a short reminder for readers", want: "callout" }
+- { directive: "a cover photo for the page with the title over it", want: "hero" }
+- { directive: "a row of our partners' logos", want: "logos" }
+- { directive: "a button to read the full report", want: "buttons" }
+- { directive: "a rating widget with stars", want: "nothing" }
+- { directive: "a quiz with multiple choice answers", want: "nothing" }
+- { directive: "a survey for readers", want: "nothing" }
+- { directive: "an upload box for photos", want: "nothing" }
+- { directive: "a booking form for appointments", want: "nothing" }
+- { directive: "a chat with an AI assistant", want: "nothing" }
+- { directive: "a stock ticker", want: "nothing" }
+- { directive: "a spreadsheet people can edit", want: "nothing" }
+- { directive: "a live sports score", want: "nothing" }
+- { directive: "a donation progress bar", want: "nothing" }
+- { directive: "a members-only area", want: "nothing" }
+- { place: site, directive: "a cart icon with the number of items", want: "nothing" }
+- { place: site, directive: "a notification bell", want: "nothing" }
+- { place: site, directive: "a bar at the top with the menu that stays put", want: "header sticky=stays" }
+- { place: site, directive: "a strip of small print at the bottom", want: "footer" }

@@ -1,0 +1,13 @@
+{{- /* The address is the block's first link or path; the rest is a caption. */ -}}
+{{- $html := string .inner -}}
+{{- $url := index (findRE `(?:https?://|/)[^"<\s]+` (replaceRE `(?s)^.*?<p>` "" $html) 1) 0 | default "" | htmlUnescape -}}
+{{- $caption := replaceRE `(?s)^\s*<p>.*?</p>` "" $html -}}
+
+<figure class="part part-audio">
+{{- with trim $caption " \n" }}
+<figcaption class="stack">{{ . | safeHTML }}</figcaption>
+{{- end }}
+{{- if $url }}
+<audio src="{{ $url }}" controls preload="none"></audio>
+{{- end }}
+</figure>

@@ -1,0 +1,16 @@
+{{- /* Each ### heading is "when — what". */ -}}
+{{- $x := partial "rubric/sections.html" (dict "html" .inner "level" 3) -}}
+<ol class="part part-timeline">
+{{- range $x.items }}
+{{- $parts := split (string .title) " — " }}
+{{- $when := cond (gt (len $parts) 1) (index $parts 0) "" }}
+{{- $what := cond (gt (len $parts) 1) (delimit (after 1 $parts) " — ") (string .title) }}
+<li>
+{{- with $when }}<p class="part-timeline-when">{{ . | safeHTML }}</p>{{ end }}
+<h3>{{ $what | safeHTML }}</h3>
+<div class="stack">
+{{ .body }}
+</div>
+</li>
+{{- end }}
+</ol>

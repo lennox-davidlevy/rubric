@@ -1,0 +1,37 @@
+/* call-to-action: a pitch with a button, on a tint, on dark, or on the accent. */
+.part-call-to-action { padding: var(--space-5) var(--space-3); border-radius: var(--radius); text-align: center; }
+.part-call-to-action .stack > * { margin-inline: auto; max-width: var(--measure); }
+.part-call-to-action h2 { margin: 0; }
+.part-call-to-action .stack > p:last-child > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.5em 1.4em;
+  border-radius: var(--control-radius);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-ui);
+  font-weight: var(--weight-heading);
+  text-decoration: none;
+}
+.part-call-to-action .stack > p:last-child > a:hover { background: var(--accent); color: var(--paper); }
+.part-call-to-action.tone-tint { background: var(--tint); }
+.part-call-to-action.tone-dark {
+  --paper: var(--dark-paper);
+  --ink: var(--dark-ink);
+  --accent: var(--dark-accent);
+  --muted: var(--dark-muted);
+  --heading: var(--dark-ink);
+  --link: var(--dark-ink);
+  background: var(--paper);
+  color: var(--ink);
+}
+.part-call-to-action.tone-accent { background: var(--accent); color: var(--paper); --heading: var(--paper); --link: var(--paper); }
+.part-call-to-action.tone-accent .stack > p:last-child > a { background: var(--paper); color: var(--accent); }
+.part-call-to-action.tone-accent .stack > p:last-child > a:hover { background: var(--ink); color: var(--paper); }
+@media (min-width: 56rem) {
+  .flow > .part-call-to-action { grid-column: wide; }
+}
+@media (max-width: 40rem) {
+  .flow > .part-call-to-action { grid-column: full; border-radius: 0; }
+}

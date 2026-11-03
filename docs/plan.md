@@ -1,15 +1,15 @@
 # Rubric: plan
 
-Written 2026-10-27, the night the idea came, as Warren. Revised 2026-10-28 after a first review. Revised 2026-10-30 after a second, and renamed Rubric the same day: Rubric is a product for other people, not a tool for my own sites; the first thing it makes is blogs; json-render was tried on as the renderer for a day and taken off again, and it stays in `reference/` to learn from. Nothing is built yet.
+Written 2026-10-27, the night the idea came, as Warren. Revised 2026-10-28 after a first review. Revised 2026-10-30 after a second, and renamed Rubric the same day: Rubric is a product for other people, not a tool for my own sites; the first thing it makes is blogs; json-render was tried on as the renderer for a day and taken off again, and it stays in `reference/` to learn from. Revised 2026-10-31 with the slice built: principles, functional parts, and the order settled as catalog first, review tooling after.
 
-The language server and the first vertical slice are planned in [lsp.md](lsp.md).
+The language server and the first vertical slice are planned in [lsp.md](lsp.md). The slice is built first.
 
 ## The idea
 
 You write words on a page. Where a part of the page should look a certain way, you open a block and say so in your own words:
 
 ```markdown
-::: a quote from the book, big and centred
+::: a quote from the book, big and centered
 
 Not all those who wander are lost.
 
@@ -30,12 +30,23 @@ For people who write and want layout to cost a sentence. The first of them keep 
 
 If Rubric is slow or its picks are wrong, people go back to one of these. Speed and pick accuracy are measured early, before anything is built on them (step 3).
 
+## Principles
+
+Four words, in the order they are judged: **fast, efficient, beautiful, simple.** Every piece below answers to them, and when two pull against each other, the earlier one wins.
+
+- **Fast.** A pick shows while you are still looking at the line. Jev answers in about 150 ms; the rest of the wait is pacing, chosen on purpose, and never more than a second or so after you stop typing. Nothing on the writing path waits for an agent.
+- **Efficient.** One request per finished line, every question in it, answered once and cached. Half-typed lines are never sent. A day of writing costs a cent.
+- **Beautiful.** A page of plain prose in any theme, with no fences, looks designed. Every part defaults to the theme, so a page with a dozen parts and no settings still looks like one thing. Beautiful is the one principle no test can check; the review rounds are its only instrument.
+- **Simple.** A part has a handful of settings, each a plain word. A line reads as what it does. The plain form is the whole format: free, offline, exact, in git.
+
+The reason to make a UI in Rubric rather than ask a coding agent for one is that here the work compounds. An agent gives a new thing each time, a minute later, in different CSS, and nobody reviews it. Rubric gives the same thing every time, in a moment, from parts a person looked at; and when nothing fits, the part drafted for you is reviewed once and then kept, for every page after and for everyone. The catalog grows from what people ask for and cannot get.
+
 ## The pieces
 
 | Piece | Role |
 | --- | --- |
 | **The catalog file** | The contract everything else depends on. For one kind of site, every part Rubric can place: a name, a one-line description, typed settings with their values described, whether it takes children, and which assets it brings. Jev's questions, validation, completion, the catalog page and the review rounds read this file and nothing else. Nothing outside the site's catalog can appear on a page. |
-| **The parts** | How each entry in the catalog is drawn. A part owns its own HTML, CSS and, when it needs it, JavaScript, loaded only on pages that use it. An animated backdrop is an ordinary part. Parts are written against the theme's slot names, never a literal colour. |
+| **The parts** | How each entry in the catalog is drawn. A part owns its own HTML, CSS and, when it needs it, JavaScript, loaded only on pages that use it. An animated backdrop is an ordinary part. Parts are written against the theme's slot names, never a literal color. |
 | **Hugo** | The first renderer and the whole blog: posts, pages, feeds, dates, drafts, tags, image resizing, a 404, static output with no runtime. A part is a shortcode plus its assets. `hugo server` rebuilds in milliseconds and live-reloads the preview, and it is the published build, so preview and site cannot differ. Rubric downloads a pinned binary on first run; writers never see it. |
 | **A theme** | Named values the parts read: `paper`, `ink`, `accent`, `muted`, `rule`, `band`, three font slots, a type scale, a spacing scale, a measure, radii, shadow levels. Several designed themes ship with each catalog, as CSS files that fill the slots. Every catalog reads the same slot names, which is what lets a theme move between catalogs. |
 | **Jev** (TypeSafe) | Reads a directive line and answers typed questions about it: which part, which settings, whether anything fits. Judgments from Jev, decisions in code. The model version is pinned, because an alias can change answers without a change to the code, and that would break the cache and the promise that the same words give the same page. |
@@ -44,6 +55,16 @@ If Rubric is slow or its picks are wrong, people go back to one of these. Speed 
 | **An agent harness** (Claude Code, OpenCode, Codex) | The slow path: when nothing in the catalog fits, an agent drafts a new part and it goes through review before it joins. Also how catalogs and themes are drafted in the first place. Minutes, not seconds, and never on the writing path. |
 
 The renderer is a choice about who draws the parts, made per catalog behind the catalog file. If a catalog ever needs parts that share state on the page, which is the one thing a script inside a part cannot do, that catalog's parts can be drawn by something else and Rubric does not change. Nothing in sight needs it.
+
+### Functional parts
+
+Some parts do things: a picker (tabs, a filter, a theme switch), a gallery with a lightbox, a backdrop that moves, a post list that sorts. They are ordinary catalog entries with three more rules, so that "functional" never costs "beautiful" or "simple":
+
+- **Every part works with no JavaScript, and the script only improves it.** Tabs are headings and sections without it; a gallery is images; a backdrop is a color. The script loads only on pages that use the part, the way a part's CSS does now (`.HasShortcode`).
+- **State lives in the page**: open or closed, the chosen tab, the URL hash, at most `localStorage`. Never a server, never shared between parts. The site stays static output.
+- **Motion is a setting with a quiet default.** `motion=none|subtle|lively` or a level, respected as `prefers-reduced-motion`, and `none` on a part that has no reason to move.
+
+The catalog file gains one optional field per part for its script, and nothing else changes shape: Jev's questions, validation and completion read settings the same way whether a part moves or not. The blog catalog carries one functional part from the start (`post-list` or `gallery`), so the shape of script loading is settled early instead of bolted on.
 
 ## The directive
 
@@ -57,7 +78,7 @@ A directive is a rubric: a note beside the words saying how they should be set. 
 
 - **Detection is free, with one rule.** A line starting with `:::` is a directive, unless it is inside a fenced code block, where it is code. The scanner tracks code fences. No model call to find out, and an essay heading like "Warm places" is never mistaken for one.
 - **Boundaries are explicit.** The block ends at its closing fence. Blocks nest; the innermost open block closes first. Heading levels stay the writer's.
-- **Plain form and words are the same line in two states.** `::: quote size=large align=centre` is what the words resolve to. A line is plain form when its first token is a part in the catalog and every remaining token is `key=value`. Anything else is words. Plain form is the source of truth: free, offline, exact.
+- **Plain form and words are the same line in two states.** `::: quote size=large align=center` is what the words resolve to. A line is plain form when its first token is a part in the catalog and every remaining token is `key=value`. Anything else is words. Plain form is the source of truth: free, offline, exact.
 - **The site-wide directive** lives in `rubric.md` at the site root, not in pages.
 
 A directive that resolves to nothing is left as plain text in the output, and Rubric says why beside it in the editor. Nothing is guessed.
@@ -87,9 +108,9 @@ Pinned lines never go to the network. Cached lines do not either. Over time most
 
 ## Ghost text and pinning
 
-The language server shows the resolved plain form as grey text at the end of the directive line, the way completion plugins show a suggestion. It is not in the file.
+The language server shows the resolved plain form as gray text at the end of the directive line, the way completion plugins show a suggestion. It is not in the file.
 
-- **Accept** with a key, and the plain form is written into the source. The line is now pinned: it works offline, never changes, and is in git. The words are kept as a trailing comment, since they record intent and are what re-resolution reads if the catalog changes: `::: quote size=large align=centre  <!-- a quote from the book, big and centred -->`.
+- **Accept** with a key, and the plain form is written into the source. The line is now pinned: it works offline, never changes, and is in git. The words are kept as a trailing comment, since they record intent and are what re-resolution reads if the catalog changes: `::: quote size=large align=center  <!-- a quote from the book, big and centered -->`.
 - **Do not accept**, and the words stay live. Jev re-reads the line when it is edited and the pick can change.
 - **Unsettled** picks show the top two and a key chooses between them.
 
@@ -104,7 +125,8 @@ The questions are generated from the catalog file. Nothing is hand-written per p
 | In the catalog | Becomes |
 | --- | --- |
 | The parts, each with its description | One Choice: which part does the line ask for? The descriptions are the criteria. |
-| The same, always | One Noul: does any part in the catalog fit what the line asks for? A Choice always picks something, so this is what tells code when nothing does. |
+| Each part, with its description | One Noul per part: does the line ask for this part? A Choice always picks something, so the picked part's Noul is what tells code when nothing fits. One Noul over the whole catalog did not separate in the probe; see [lsp.md](lsp.md). |
+| Each setting with a fixed set of values or levels | One Noul: does the line ask for any value other than the default, with those values described? A Choice or Score picks a value even when the line never mentions the setting. |
 | A setting with a fixed set of values, each described | A Choice among the values |
 | A setting that is yes or no, with true and false described | A Noul |
 | A setting that is a level, with each level described as a situation | A Score |
@@ -129,18 +151,69 @@ Rules that apply, from the TypeSafe guidance:
 | yes, part or setting gone | – | – | – | – | leave the line plain; warn; offer "re-resolve from the words" |
 | no | error | – | – | – | leave the line plain; show "could not reach Jev" |
 | no | ok | no (< 0.3) | – | – | leave the line plain; offer the slow path |
+| no | ok | yes (> 0.7) | split (top under 0.5) | – | leave the line plain; show the top two parts to choose from |
+| no | ok | fair (0.4 to 0.7) | all but certain (0.9 or more), in a catalog of 15 parts or more | – | place it, as for yes |
 | no | ok | unsettled | – | – | leave the line plain; show the top two parts to choose from |
 | no | ok | yes (> 0.7) | top two close | – | place the top part; ghost text shows both; a key swaps |
 | no | ok | yes | clear | one unsettled | place the part with that setting at its default; say which |
 | no | ok | yes | clear | clear | place the part with the settings the answers give |
 
+"Something fits" is the picked part's own `fits` answer; "part pick" is the part Choice. The two rows about how sure the Choice is came from the universal catalog's probe (2026-11-01, `docs/lsp.md`): writers rarely say every word of a description, so the right part's fit often sat between 0.4 and 0.7 while the Choice was all but certain; but in a small catalog the Choice is that sure of the closest part to anything, so the row applies only to large ones. The numbers live in `THRESHOLDS` in `src/core/questions.ts`.
+
 A directive nested inside a part that takes no children is left plain with a warning. Every combination gets an outcome before the code is written.
 
 ## Themes
 
-"Same colour as the theme" only works if the theme is named values. Every catalog reads the same slots, every theme fills them, and every part is written against them.
+"Same color as the theme" only works if the theme is named values. Every catalog reads the same slots, every theme fills them, and every part is written against them.
 
-The root directive in `rubric.md` is answered the same way as any other line: a Choice among the designed palettes, a Choice among the type pairings, and Scores for spacing and contrast that code maps to the scale values. The model never invents a colour. A dozen good palettes and a few pairings are a weekend of taste and they are what make every site look finished. The result is written into the site's Hugo config, and a site can override a value in plain form (`accent=#9a6512`) for the one person in ten who wants to.
+The root directive in `rubric.md` is answered the same way as any other line: a Choice among the designed palettes, a Choice among the type pairings, and Scores for spacing and contrast that code maps to the scale values. The model never invents a color. A dozen good palettes and a few pairings are a weekend of taste and they are what make every site look finished. The result is written into the site's Hugo config, and a site can override a value in plain form (`accent=#9a6512`) for the one person in ten who wants to.
+
+### How a theme is made
+
+Built and settled with Paper, before any second theme, on 2026-11-01, so that each theme after it is a few files and an afternoon of taste rather than CSS.
+
+- **A theme is three pieces**, each a short commented YAML file in the catalog's `themes/`. A **palette** holds the colors: paper, ink, accent, muted, rule, tint, and a dark band's paper, ink and accent. The rest are derived and can be set by hand. A **pairing** holds the fonts and how they are set: weights, leading, tracking, the label case, numerals, the ornament, the code size. Those belong to the faces, since a sans wants heavier, tighter headings than a book serif. A **scale** holds the type sizes (from a smallest and largest body size and ratio, worked out the way Utopia does), the spaces, the measure, the wide width and the radius. `themes.yaml` names the designed combinations. A site names one, and may swap any piece. Step 5 chooses a palette and a pairing separately, which is why they are separate.
+- **Dark is a palette, not a mode.** Night will be its own theme. Every theme already carries a dark band, so dark grounds are checked from the first theme.
+- **The CSS is generated.** `bun scripts/theme.ts build` turns each piece into one file under `assets/css/`, never edited by hand, and the layout loads one of each. Parts and `base.css` read slots only. A lint refuses a literal color, font or weight in them, and refuses a slot that `catalog.yaml` doesn't list.
+- **`check` judges the pieces on paper.** Every slot filled, nothing extra; every pair of text and ground at contrast 4.5 or more, including inside a dark band, a warning callout and a filled button; grounds that must read as different (a tint, a dark band, rules); font files present, every weight used drawable by a face, the preload real. `bun test` runs it, along with a check that the generated CSS is up to date.
+- **`look` judges what is drawn.** It draws each theme's catalog page and a stress page at 360, 768 and 1280px in a real browser. The stress page holds the hard cases: long titles, a long address, a long word, a wide table, every kind of inline text, code, footnotes, nesting in a dark band, a hero with no picture, a gallery of one. `look` fails a page that scrolls sideways, writing whose contrast fails against what is really behind it, a missing file or a script error. It saves the pictures with a sheet to look at them side by side. Both layers were tested by putting Paper's old dark-band accent back: `check` and `look` each refused it.
+- **`new`** starts a palette, pairing or scale as a copy of Paper's, and adds a combination to `themes.yaml`. The catalog and stress pages for it appear by themselves (a Hugo content adapter).
+- **The test of the pipeline is the second theme.** If making Studio or Night needs a change to a part's CSS, the pipeline missed something, and the fix goes into the slots, not the part.
+
+Not done yet: fallback-font metrics (`size-adjust` and the overrides), so the page doesn't shift when the real font arrives. That needs the font's measurements read from the file.
+
+## The universal catalog and skins
+
+Decided 2026-11-01, in conversation, after Paper and the theme pipeline were done. This reshapes "one catalog per kind of site" below.
+
+- **Sites, not apps.** Rubric makes websites from writing. App interfaces (controls wired to data, parts that share state, logins) wait. The catalog says what a part is and never how it is drawn, so an app catalog with another renderer can come later without changing how anyone writes.
+- **One catalog of every component a website needs**, in `catalogs/universal/catalog.yaml`, written first as contracts only: name, one-sentence description, a few settings, and a starter body. Its list comes from counting 637 Hugo themes (`docs/research/hugo-themes.md`): 34 parts in the writing and 18 in the frame around it. Inline pieces (badges, icons, keys) need their own syntax and are left out for now.
+- **Where a part is chosen** (`place` in the catalog): parts in the writing with a `:::` line in the page; the frame (header, footer, sidebar, breadcrumbs and the like) with the same `:::` lines in `rubric.md`, for every page, which a page may override at its top. A frame part is drawn in its place in the layout, wherever its line sits.
+- **Starter bodies** (`body`): once a part is picked, the editor writes what it expects into the empty block (a list of links for a header, a question and answer for a fold), so the writer sees the shape and edits it. Never over anything already written. Parts whose content comes from the site (breadcrumbs, a post list) have none.
+- **Controls have a purpose.** No bare input or date picker: a contact form, a newsletter signup, search, a filter. The inputs inside are drawn by the skin.
+- **Asking Jev in two steps**, if the probe agrees: which part first (one Choice, whatever the catalog's size), then only the winner's and the runner-up's settings. Asked the current way, one line against the universal catalog is 81 questions. Families first (navigation, media…) only if Jev's choice gets worse with more parts. A `:::` line in a page is never asked about frame parts, nor the reverse.
+- **Skins.** A skin is how the catalog looks: tokens (palette, pairing, scale), the frame and plain writing, and, in layers, default parts that read the tokens, the theme's own version of a part where it has one, and small CSS overrides. Every part is available in every skin. Open-source Hugo themes become skins: those with no components give tokens and a frame (PaperMod first), those with many give their own parts too (Blowfish first). The slots grow to carry more of a theme's personality (border, shadow strength, density), learned from those themes' CSS. GPL themes are left out.
+- **The probe on it** (2026-11-01, `docs/lsp.md`): the top pick among 34 parts is right 109 times in 112, so no family step. Tuned the same day against three sets (`docs/lsp.md`): descriptions stripped of details a writer would not say, and the truth table now counts how sure the Choice is. Nothing placed wrongly in any set; 21 of 28 right on the last, unseen one, the rest left for the writer to choose. Two steps match one step's accuracy with about 9 questions a line instead of 81, for about 100 ms more. Jev is priced per input token ($0.042 a million), so a line costs about $0.0002 in one step and a quarter of that in two: near nothing either way, so the editor keeps one step for speed, and two steps waits for a catalog that needs it.
+- **Drawn, 2026-11-01:** the 34 parts in the writing, as a Hugo module in `catalogs/universal/` built from the blog catalog's machinery (layouts, the theme pipeline, the catalog and stress pages), against richer slots learned from PaperMod, Bear Blog, Coder and Congo: `link`, `heading`, `code-paper` and `code-ink`, `positive`, `warning` and `danger` with their tints and dark-band versions, `font-ui`, `heading-case`, `link-line`, `border`, `control-radius`. Each defaults to what Paper did, so an older palette still works. No part needs a script it cannot do without: tabs read as headings without one, a diagram as its text; a chart is SVG drawn at build time and math is MathML, neither with a script. Diagrams use Mermaid 11.4.1, shipped in the catalog (`static/js/vendor/`, MIT, checked by its hash) and fetched only on pages with a diagram: no outside site is asked, and it works offline. Third-party code ships pinned with the catalog, never from a CDN.
+- **The baseline every skin gets** (decided 2026-11-01): notices are colored by kind (a tip `positive`, a warning `warning`, a danger `danger`, each on its own tint), as nearly every theme does. A skin restyles them; it does not drop the distinction.
+- **The frame, 2026-11-01:** `rubric.md` is a document the language server handles like a page. Its `:::` lines are asked only about frame parts, a page's only about parts for the writing, and a part in the other place is left as text with a `wrong-place` note. The server writes the frame to `content/rubric-frame/index.md`, a page Hugo reads but never publishes (`src/core/frame.ts`), and the layout draws each part in its place: banner and header on top (search, the light and dark switch and languages inside the header), breadcrumbs and cover above the title, post details under it, sidebar and page contents beside the writing, author, tags, share, related, pager and comments after it (those on dated pages only), footer and social links at the bottom. With no header or footer chosen, the plain ones stay. A page hides frame parts with `hide: [...]` in its front matter, for now, rather than `:::` lines at its top. Dark mode, from the theme switch, is the palette's own dark band for the whole page, so every palette has one. Accepting a pick on an empty block writes the part's starter body with it (tested in a real Neovim).
+- **After the first live test, 2026-11-02** (David's notes in `testing/TESTING.md`):
+  - Starter bodies never commit to content (`### When — What happened`, not `### 2024`), so a starter cannot contradict the words that picked it.
+  - A setting the words ask about with no value that clearly matches gets a note naming the values there are, instead of quietly keeping the default.
+  - Pricing: a plan whose title ends in ` *` stands out, any number of them, beside the `featured` setting. A mark has to be on every keyboard: ★ was tried first and dropped for that.
+  - A part that needs a value to work (a form's address) says so with a note. `needed` and `site` on a text setting; `form` under `[params.rubric]` gives every form one address.
+  - **The second pass**, `::: words -> part settings : more words`. The words after a lone `:` are asked only about the pinned part's settings (and whether they ask for more than any setting does), read as a whole; accepting rewrites the settings in the pin and keeps the words as the record. Settings the words do not mention are left as they are. The part is never asked again: pinned is pinned. Calls stay rare: never asked on opening a page or on a build, only once the writer changes those words; after a pause, like a words line; cached by part, catalog version and tidied words, so the same request is asked once for the whole site. What no setting covers gets a note; shared look settings (shadow, border, emphasis, size) are what will meet most of it, built with the skins; beyond that, the slow path.
+- **PaperMod, the first skin, 2026-11-02.** Its colors, fonts and sizes went into three pieces (`papermod` palette, `system-sans` pairing, `papermod` scale) read straight from its `theme-vars.css` and `common/*.css`; the rest is a skin layer, `assets/css/skins/papermod.css`, about 60 lines that read slots only: its header, chevron breadcrumbs, a 40px title, the cover inside the column, a heavy quote rule, tags as pills, the pager as one tinted box with PREV and NEXT, share links in a strip, post lists as bordered cards, and a centered one-line footer. A theme names its skin in `themes.yaml`; the shell loads it after the parts. What PaperMod taught the engine:
+  - **A pairing may have no faces**: the reader's own system fonts, nothing to fetch.
+  - **Code on a block of its own color** needs its own comment and keyword colors, `code-muted` and `code-accent`: PaperMod draws dark code blocks on a light page, where the page's muted and accent vanish. Both default to the page's own when code sits on the tint, so Paper is unchanged.
+  - **What a skin layer cannot do yet:** PaperMod puts the contents in a box at the top of a post, where ours is a column beside it; its list pages have a gray ground; its theme toggle is a moon icon by the site's name, and social links are icons. Each needs the part's markup to differ per skin, which is the second layer (a skin's own version of a part), first needed for Blowfish.
+- **Blowfish, the second skin, and the look settings, 2026-11-02.** Decided with David before building: a skin's richer components come along, so what Jev reads depends on the theme. Three rules:
+  1. **A skin can add settings to the catalog's parts and parts of its own** (`skins/<skin>.yaml`). While it is the site's skin, they are merged into the catalog Jev reads, and answers are cached per skin.
+  2. **Switching skins keeps them in the pin, unused, with a note** (`other-skin`): a setting another skin adds is left out of the page and the part still draws; a part another skin adds stays as text. Switch back and they return. Writing never breaks because the theme changed.
+  3. **Anything two skins share moves into the catalog**, with a default drawing, so every skin gets it. Porting every skin's capabilities to every skin (a carousel everywhere) is for later.
+  - Blowfish adds `icon` to the callout (six Font Awesome Free icons, CC BY 4.0, vendored with their notice) and a part of its own, `lead`. It draws its own callout and timeline (`_partials/skins/blowfish/parts/`); `rubric/draw.html` uses a skin's drawing of a part when there is one. Its pieces: `blowfish` palette, `blowfish-sans` pairing, `blowfish` scale, and `assets/css/skins/blowfish.css`. Its own colors were nudged a step in six places to pass the readability check, which now also checks links on tinted boxes.
+  - **The look settings** (`look` in catalog.yaml, version 5): `shadow`, `border`, `corners` and `text`, which every part in the writing takes. They are asked once a line, not once a part (8 questions), in the first pass and the second, so "a video with a shadow" and `: rounder, with a soft shadow` work on any part. They become classes on the part (`look-shadow-soft`); base.css draws them and a skin may redraw them. The frame does not take them.
+- **The order:** the catalog as contracts (done), the probe on it (done), the parts in the writing (done), the frame (done), a live test on the playground (done, with the second pass after it), then default drawings against richer slots, then PaperMod and Blowfish as the first imported skins (both done), then the theme by words.
 
 ## Catalogs
 
@@ -166,7 +239,7 @@ Rounds repeat until everything is kept. Kept items never move, so it converges. 
 
 ## The blog, as the MVP
 
-A site has a home page, posts, a few pages (about), an RSS feed and a 404. Dates, drafts and tags come from front matter. Nothing else, and all of it is Hugo's default behaviour.
+A site has a home page, posts, a few pages (about), an RSS feed and a 404. Dates, drafts and tags come from front matter. Nothing else, and all of it is Hugo's default behavior.
 
 The blog catalog, about a dozen parts:
 
@@ -210,12 +283,13 @@ One language server, thin clients. The server is where the features live, writte
 
 ## Order of work
 
-1. **The blog catalog and three themes**, drafted in a harness session and reviewed on the catalog page through review rounds, by hand. Parts as shortcodes with their assets, the catalog file, the slot names, the catalog page template, the nested-shortcode pattern settled. A page of plain prose in each theme has to be beautiful before anything else is built. This is the hard part of Rubric.
+0. **The slice**, in [lsp.md](lsp.md): one thin path through every layer with an ugly three-part catalog, from a line typed in Neovim to Jev to ghost text to Hugo's preview. Decided 2026-10-31, and built the same day: it covers steps 2 and 4 in miniature, and the Jev numbers from it are in lsp.md. It comes first because it tests the two numbers the pitch rests on, the round trip and pick accuracy, before weeks go into a catalog, and because what Jev does with the first descriptions says how the blog catalog's descriptions should be written. It settles the catalog file's shape, the slot names, the pin format and the nested-shortcode pattern that step 1 then builds on.
+1. **The blog catalog and three themes**, drafted in a harness session and reviewed by hand, on the catalog page once it exists and on the preview before then. Parts as shortcodes with their assets, one of them functional, the catalog file, the slot names, the catalog page template. Descriptions written the way the slice found works: one plain sentence for the part, one for each value. A page of plain prose in each theme has to be beautiful before anything else is built. This is the hard part of Rubric. The catalog comes before the review tooling (step 6) on purpose: its shape, found by building and using it, is what says what a review form reviews.
 2. **Source to page.** The scanner, the preprocessor, the validator, the sidecar, the watcher beside `hugo server`, plain form only. After this step Rubric is a usable static blog tool with no model in it.
 3. **The Jev gate.** A fixture of about fifty real directive lines against the blog catalog, including negatives, nested blocks and hard cases, each with the plain form it should resolve to, run against the live API on a small budget. Two numbers come out: the round trip, which decides whether ghost text feels like completion or like waiting, and the top-pick accuracy. If accuracy is not near-perfect the fix is in the part descriptions and the setting descriptions, made here. If the round trip is too slow for ghost text, the loop runs on save instead and the pitch changes, which is better known now.
 4. **The language server and the Neovim client.** Ghost text, pinning, completion, diagnostics, code actions, cache.
 5. **The theme by words.** The root directive through the palette and pairing Choices.
-6. **The slow path.** `new`, `round`, the taste record, parts joining the shared catalog.
+6. **The slow path, and designing by rounds.** `new`, `round`, `review.yaml`, the taste record, parts joining the shared catalog; "nothing fits" becomes an offer to draft. Also the way a theme is designed iteratively: palettes and pairings go through the same page and the same rounds. On the plan from the start; built after the catalog's shape is known.
 7. **VS Code**, then more catalogs (essay, portfolio, docs), the browser editor, the hosted version.
 
 ## Reference
@@ -233,7 +307,7 @@ Repos cloned into `reference/`, which is ignored by git, and what each is for. R
 | `artempyanykh/marksman` | A Markdown language server: attach rules, diagnostics and completion inside Markdown. | step 4 |
 | `zbirenbaum/copilot.lua` and Neovim's `runtime/lua/vim/lsp/inline_completion.lua` | Ghost text mechanics in Neovim, accept keys, how the suggestion is shown and cleared. | step 4 |
 | `fenneclab/hugo-bin` | Downloading a pinned Hugo binary from an npm package. | step 2 |
-| `tailwindlabs/tailwindcss-intellisense` | Completion items that carry a colour swatch, for theme and tone values. | step 4 |
+| `tailwindlabs/tailwindcss-intellisense` | Completion items that carry a color swatch, for theme and tone values. | step 4 |
 
 Not repos: the TypeSafe cookbooks for function calling and intent routing (docs.typesafe.ai), and Hugo's own documentation on shortcodes, `RenderString` and modules.
 
@@ -243,10 +317,12 @@ Not repos: the TypeSafe cookbooks for function calling and intent routing (docs.
 - The catalog file is the contract. Parts own their assets. The renderer is chosen per catalog behind it.
 - Hugo is the first renderer and the blog. json-render is out of the end result and in `reference/`.
 - Catalogs are several designed templates, drafted by an LLM and reviewed by a person, then frozen. Not generated per site.
-- The theme is picked, not generated. The model never writes a colour.
+- The theme is picked, not generated. The model never writes a color.
 - The block body stays out of Jev's state, so the cache key and the answer agree.
 - One language server; Neovim first, VS Code second, a browser editor and the hosted version later.
-- The name is Rubric, from 2026-10-30. It was Warren, a place where many small sites are made, until the product stopped being about my sites. A rubric is the note written in red in a manuscript saying how a part should be read or set, which is exactly what the directive line is. The repo folder is still `warren` until it is renamed.
+- Catalog and functionality first, the review rounds and `new` after, so the catalog's shape instructs the design tooling rather than the other way round. Decided 2026-10-31. Iterative design of themes and catalogs stays on the plan as step 6.
+- Functional parts are ordinary parts: they work without JavaScript, keep state in the page, and move only when asked. Decided 2026-10-31.
+- The name is Rubric, from 2026-10-30. It was Warren, a place where many small sites are made, until the product stopped being about my sites. A rubric is the note written in red in a manuscript saying how a part should be read or set, which is exactly what the directive line is.
 
 ## Open questions
 
@@ -254,4 +330,6 @@ Not repos: the TypeSafe cookbooks for function calling and intent routing (docs.
 - Whether the plain form also accepts the directive spelling `::: {.quote size=large}` for portability.
 - Whether the cache is committed with the site or local only. Pinned lines make it matter little.
 - Whether a part can be site-specific without joining the shared catalog, or whether everything new goes through the pool.
+- Whether Jev can fill a text setting (`cite`) by choosing among spans of the writer's own words, since it cannot write text. To try when the catalog goes deep.
+- Whether a hero replaces the page's own title, since both show today.
 - The Jev key for writers: their own, or a proxy that comes with the hosted version.

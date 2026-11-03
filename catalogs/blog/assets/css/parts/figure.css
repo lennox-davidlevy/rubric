@@ -1,0 +1,24 @@
+/* figure: one picture and its caption, at the column, wide, or edge to edge. */
+.part-figure > p { margin: 0; }
+.part-figure img { width: 100%; border-radius: var(--radius); }
+.part-figure > p:not(:has(img)) {
+  margin-top: var(--space-2);
+  font-size: var(--step--1);
+  line-height: 1.5;
+  color: var(--muted);
+}
+.part-figure.width-wide { grid-column: wide; }
+.part-figure.width-full {
+  grid-column: full;
+  display: grid;
+  grid-template-columns: subgrid;
+}
+.part-figure.width-full > p { grid-column: prose; }
+.part-figure.width-full > p:has(img) { grid-column: full; }
+.part-figure.width-full img { border-radius: 0; max-height: 85svh; object-fit: cover; }
+
+@media (max-width: 40rem) {
+  .part-figure.width-wide { grid-column: full; }
+  .part-figure.width-wide img { border-radius: 0; }
+  .part-figure.width-wide > p:not(:has(img)) { padding-inline: var(--space-3); }
+}

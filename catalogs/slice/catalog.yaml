@@ -1,0 +1,59 @@
+name: slice
+version: 7
+
+slots: [paper, ink, accent, muted, rule, band]
+
+parts:
+  section:
+    description: A box or a band across the page that sets the writing inside it apart from the rest of the page.
+    children: true
+    settings:
+      tone:
+        type: choice
+        default: theme
+        values:
+          theme: the page's own colors
+          tint: a light tint of color behind the writing
+          dark: a dark background with light writing
+      surface:
+        type: choice
+        default: flat
+        values:
+          flat: sits in the page with no edge
+          raised: lifted off the page with a shadow
+      shadow:
+        type: level
+        default: none
+        levels:
+          none: no shadow at all
+          soft: a faint shadow, barely there
+          deep: a strong shadow, clearly floating
+  quote:
+    description: A quotation of words someone said or wrote.
+    children: true
+    settings:
+      size:
+        type: choice
+        default: normal
+        values:
+          normal: the same size as the prose
+          large: noticeably larger than the prose, a pull quote
+      align:
+        type: choice
+        default: left
+        values:
+          left: aligned with the prose
+          center: centered on the page
+      cite:
+        type: text
+  callout:
+    description: A short note for the reader, set off from the main prose, such as a tip, an aside or a warning.
+    children: true
+    settings:
+      kind:
+        type: choice
+        default: note
+        values:
+          note: something worth knowing
+          aside: a tangent the reader may skip
+          warning: something that could go wrong

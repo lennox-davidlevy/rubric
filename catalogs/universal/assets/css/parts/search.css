@@ -1,0 +1,22 @@
+/* search: a box that finds pages on the site as the reader types. */
+.part-search { position: relative; min-width: 10rem; }
+.part-search input { padding-block: 0.35em; }
+.part-search-results {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 20;
+  width: min(22rem, 90vw);
+  margin: 0;
+  padding: var(--space-1) 0;
+  list-style: none;
+  background: var(--raised);
+  border: var(--border) solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-deep);
+  text-align: left;
+}
+.part-search-results li { margin: 0; }
+.part-search-results a { display: block; padding: var(--space-1) var(--space-2); text-decoration: none; color: var(--ink); }
+.part-search-results a:hover, .part-search-results a:focus { background: var(--tint); }
+.part-search-none { padding: var(--space-1) var(--space-2); color: var(--muted); }

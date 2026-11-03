@@ -1,0 +1,8 @@
+{{- $url := .page.Permalink -}}
+{{- $title := .page.Title -}}
+<nav class="part part-share" aria-label="Share">
+<span class="part-share-label">Share</span>
+<a href="mailto:?subject={{ $title | urlquery }}&amp;body={{ $url | urlquery }}">Email</a>
+<a href="https://bsky.app/intent/compose?text={{ printf "%s %s" $title $url | urlquery }}">Bluesky</a>
+<a href="https://www.linkedin.com/sharing/share-offsite/?url={{ $url | urlquery }}">LinkedIn</a>
+</nav>

@@ -1,0 +1,5 @@
+{{- /* Whether this page's frame has a part. Usage:
+     {{ if partial "rubric/frame-has.html" (dict "page" . "part" "header") }} */ -}}
+{{- $has := false -}}
+{{- range partial "rubric/frame-list.html" .page }}{{ if eq .part $.part }}{{ $has = true }}{{ end }}{{ end -}}
+{{- return $has -}}

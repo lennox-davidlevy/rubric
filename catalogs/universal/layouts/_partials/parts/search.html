@@ -1,0 +1,8 @@
+{{- /* With no script, a site search on DuckDuckGo; js/parts/search.js
+     searches the site's own feed as the reader types. */ -}}
+{{- $host := urls.Parse site.BaseURL -}}
+<form class="part part-search" action="https://duckduckgo.com/" method="get" role="search" data-feed="{{ with site.Home.OutputFormats.Get "rss" }}{{ .RelPermalink }}{{ end }}">
+<label><span class="visually-hidden">Search this site</span><input type="search" name="q" placeholder="Search" autocomplete="off"></label>
+{{- with $host.Host }}<input type="hidden" name="sites" value="{{ . }}">{{ end }}
+<ul class="part-search-results" hidden></ul>
+</form>

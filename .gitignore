@@ -1,1 +1,13 @@
 reference/
+.env
+.null-ls_*
+public/
+resources/_gen/
+.hugo_build.lock
+.playwright-mcp/
+node_modules/
+sites/*/content/
+testing/content/
+probe/runs/
+.rubric/
+catalogs/*/shots/

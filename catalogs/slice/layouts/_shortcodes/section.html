@@ -1,0 +1,4 @@
+{{- $s := partial "rubric/settings.html" (dict "part" "section" "sc" .) -}}
+<section class="part-section tone-{{ $s.tone }} surface-{{ $s.surface }} shadow-{{ $s.shadow }}">
+{{ .Inner | .Page.RenderString (dict "display" "block") }}
+</section>

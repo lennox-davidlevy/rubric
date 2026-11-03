@@ -1,0 +1,8 @@
+<header class="part part-hero size-{{ .s.size }} align-{{ .s.align }}{{ with .s.image }} has-image{{ end }}">
+<div class="part-hero-text stack">
+{{ .inner }}
+</div>
+{{- with .s.image }}
+<img class="part-hero-image" src="{{ . | relURL }}" alt="" loading="eager" decoding="async">
+{{- end }}
+</header>

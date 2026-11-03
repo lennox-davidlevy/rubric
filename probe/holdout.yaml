@@ -1,0 +1,26 @@
+# Held out: never used while tuning wording. Run only to check that a change
+# made on lines.yaml generalizes.
+- directive: a big centered line from the interview
+  want: quote size=large align=center
+- directive: what my teacher used to say
+  want: quote
+- directive: a note about the version this was written for
+  want: callout
+- directive: careful, this deletes your data
+  want: callout kind=warning
+- directive: a side note, not essential
+  want: callout kind=aside
+- directive: a shaded band behind the next few paragraphs
+  want: section tone=tint
+- directive: an inverted section, light text on dark
+  want: section tone=dark
+- directive: a raised card
+  want: section surface=raised
+- directive: a map of where we stayed
+  want: nothing
+- directive: a table of results
+  want: nothing
+- directive: an embedded video
+  want: nothing
+- directive: bigger
+  want: nothing

@@ -1,0 +1,22 @@
+/* reading: 18 to 20px writing on a gentle scale, for reading. Body 18px to 20px, ratio 1.2 to 1.25, from a 360px to a 1240px screen.
+   Made by `bun scripts/theme.ts build` from themes/scales/reading.yaml.
+   Edit that file, not this one. */
+
+:root {
+  --step--1: clamp(0.9375rem, 0.912rem + 0.114vw, 1rem);
+  --step-0: clamp(1.125rem, 1.074rem + 0.227vw, 1.25rem);
+  --step-1: clamp(1.35rem, 1.263rem + 0.386vw, 1.5625rem);
+  --step-2: clamp(1.62rem, 1.484rem + 0.606vw, 1.9531rem);
+  --step-3: clamp(1.944rem, 1.741rem + 0.904vw, 2.4414rem);
+  --step-4: clamp(2.3328rem, 2.039rem + 1.307vw, 3.0518rem);
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: clamp(2rem, 1.795rem + 0.909vw, 2.5rem);
+  --space-5: clamp(3rem, 2.386rem + 2.727vw, 4.5rem);
+  --measure: 38rem;
+  --wide: 56rem;
+  --radius: 4px;
+  --border: 1px;
+  --control-radius: 4px;
+}

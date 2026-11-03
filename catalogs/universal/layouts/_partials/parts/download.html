@@ -1,0 +1,22 @@
+{{- /* The block's first link is the file; the rest says what is in it. */ -}}
+{{- $html := string .inner -}}
+{{- $href := replaceRE `(?s)^.*?<a href="([^"]*)".*$` "$1" $html -}}
+{{- if eq $href $html }}{{ $href = "" }}{{ end -}}
+{{- $name := replaceRE `(?s)^.*?<a href="[^"]*"[^>]*>(.*?)</a>.*$` "$1" $html -}}
+{{- $rest := replaceRE `(?s)^\s*<p>.*?</p>` "" $html -}}
+{{- $ext := path.Ext $href | strings.TrimPrefix "." | upper -}}
+{{- $size := "" -}}
+{{- $local := path.Join "static" $href -}}
+{{- if and (hasPrefix $href "/") (fileExists $local) -}}
+  {{- $bytes := (os.Stat $local).Size -}}
+  {{- $size = cond (ge $bytes 1048576) (printf "%.1f MB" (div (float $bytes) 1048576)) (printf "%.0f KB" (math.Ceil (div (float $bytes) 1024))) -}}
+{{- end -}}
+<div class="part part-download">
+<a class="part-download-link" href="{{ $href }}" download>
+<span class="part-download-name">{{ $name | safeHTML }}</span>
+<span class="part-download-meta">{{ delimit (slice $ext $size | complement (slice "")) " · " }}</span>
+</a>
+{{- with trim $rest " \n" }}
+<div class="stack">{{ . | safeHTML }}</div>
+{{- end }}
+</div>

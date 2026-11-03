@@ -1,0 +1,5 @@
+{{- with .page.Translations }}
+<nav class="part part-languages" aria-label="Languages">
+{{- range . }}<a href="{{ .RelPermalink }}" hreflang="{{ .Language.Lang }}" lang="{{ .Language.Lang }}">{{ .Language.LanguageName }}</a>{{ end }}
+</nav>
+{{- end -}}

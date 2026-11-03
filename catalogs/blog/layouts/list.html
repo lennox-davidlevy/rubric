@@ -1,0 +1,7 @@
+{{ define "main" }}
+<header class="page-header">
+<h1>{{ .Title }}</h1>
+</header>
+{{ partial "rubric/content.html" . }}
+{{ partial "rubric/post-list.html" (dict "pages" .RegularPages "style" "dated") }}
+{{ end }}

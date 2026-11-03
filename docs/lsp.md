@@ -6,9 +6,9 @@ Written 2026-10-30. The first thing built is one thin vertical slice through eve
 
 In a site folder with `hugo server` running and Neovim open on a page:
 
-1. You type `::: a quote from the book, big and centred` and stop.
-2. Within a moment, grey text appears at the end of the line: `-> quote size=large align=centre`, and the preview shows the block drawn as a large centred quote.
-3. You press the accept key. The grey text becomes real text. The line is pinned and never goes to the network again.
+1. You type `::: a quote from the book, big and centered` and stop.
+2. Within a moment, gray text appears at the end of the line: `-> quote size=large align=center`, and the preview shows the block drawn as a large centered quote.
+3. You press the accept key. The gray text becomes real text. The line is pinned and never goes to the network again.
 4. You press the swap key instead, and the second pick shows, in the editor and in the preview.
 5. You type a line nothing fits, `::: a spreadsheet of my taxes`, and the editor marks it with "nothing in the catalog fits" and the preview shows the line as plain text.
 6. You stop Jev (bad key, no network) and the editor says "could not reach Jev" and nothing else changes.
@@ -47,7 +47,7 @@ parts:
         type: choice
         default: theme
         values:
-          theme: the page's own colours
+          theme: the page's own colors
           band: a tinted band across the page
           dark: inverted, ink on paper becomes paper on ink
       surface:
@@ -76,7 +76,7 @@ parts:
       align:
         type: choice
         default: left
-        values: { left: aligned with the prose, centre: centred on the page }
+        values: { left: aligned with the prose, center: centered on the page }
       cite:
         type: text
   callout:
@@ -97,21 +97,21 @@ parts:
 - `children: false` parts (a `divider`, later) are where a nested directive is an error.
 - The version is part of the cache key. Change a description, bump the version, and every live line is asked again.
 
-The shortcode for a part reads the same setting names: `{{< quote size="large" align="centre" >}}`. The validator checks a plain form against this file before the preprocessor writes it, so the shortcode can never receive a value the file does not allow.
+The shortcode for a part reads the same setting names: `{{< quote size="large" align="center" >}}`. The validator checks a plain form against this file before the preprocessor writes it, so the shortcode can never receive a value the file does not allow.
 
 ## The pin format
 
 The plan had the words kept in a trailing comment. The slice uses a simpler form, because it makes accepting the ghost text a plain insertion with no range tricks, and keeps the words visible while deciding:
 
 ```markdown
-::: a quote from the book, big and centred -> quote size=large align=centre
+::: a quote from the book, big and centered -> quote size=large align=center
 ```
 
 - A line with `->` is pinned. Left of it are the words, right of it is the plain form. Code reads only the right side. The words stay as the record of intent and are what "re-resolve" reads if the catalog changes.
 - A line with no `->` whose first token is a part and whose other tokens are `key=value` is plain form, written by hand or by completion.
 - Any other line is words, and live.
 
-The ghost text is exactly the text that accepting inserts: ` -> quote size=large align=centre` at the end of the line. Nothing else about the line changes. If the comment form turns out to read better, inline completion items carry a range and Neovim draws a ranged item as an overlay, so the whole line can be replaced on accept instead. Settled in the slice.
+The ghost text is exactly the text that accepting inserts: ` -> quote size=large align=center` at the end of the line. Nothing else about the line changes. If the comment form turns out to read better, inline completion items carry a range and Neovim draws a ranged item as an overlay, so the whole line can be replaced on accept instead. Settled in the slice.
 
 ## What the editor gets from the server
 
@@ -130,24 +130,18 @@ Every feature is a standard protocol method, so VS Code and the browser editor g
 
 ## Completion and snippets
 
-Typing `:::` and a space offers every part in the catalog, with its description as the detail. Choosing one inserts a snippet in the protocol's own grammar, so it works with any completion plugin and needs no snippet engine:
+Typing `:::` and a space offers every part in the catalog, with its description as the detail. Choosing one inserts the part's name only. The planned snippet, with every setting as a choice placeholder, was dropped in the slice: it wrote every default into the line, and the plain form leaves defaults out.
 
-```
-quote size=${1|normal,large|} align=${2|left,centre|} cite=${3}
-```
-
-Each `choice` setting becomes a choice placeholder with its values; `text` settings become plain placeholders; settings at their default are left out unless the writer tabs to them. Editors that do not draw choice lists show the first value, and completion inside the line still offers the rest.
-
-Inside a plain-form line, completion is contextual: after the part name it offers that part's settings, each with its description; after `key=` it offers that setting's values, each with its description. Typing words instead of a part name offers nothing, by design, because words are for Jev.
+Inside a plain-form line, completion is contextual: after the part name it offers that part's settings not yet given, each with its type and default; after `key=` it offers that setting's values, each with its description. After a pin's ` -> ` it works the same way. Typing words instead of a part name offers nothing, by design, because words are for Jev. Lines in code fences and front matter get nothing.
 
 ## What goes to Jev
 
-One request per live line, generated from the catalog file, with every question bundled. The slice sends roughly this for `::: a quote from the book, big and centred`:
+One request per live line, generated from the catalog file, with every question bundled. The slice sends roughly this for `::: a quote from the book, big and centered`:
 
 ```json
 {
   "state": {
-    "directive": "a quote from the book, big and centred",
+    "directive": "a quote from the book, big and centered",
     "page": "post"
   },
   "questions": [
@@ -159,7 +153,7 @@ One request per live line, generated from the catalog file, with every question 
     { "id": "quote.size", "type": "choice",
       "text": "What size does `directive` ask the quote to be?",
       "options": { "normal": "the same size as the prose", "large": "noticeably larger…" } },
-    { "id": "quote.align", "type": "choice", "text": "…", "options": { "left": "…", "centre": "…" } },
+    { "id": "quote.align", "type": "choice", "text": "…", "options": { "left": "…", "center": "…" } },
     { "id": "section.tone", "type": "choice", "text": "…", "options": { "theme": "…", "band": "…", "dark": "…" } },
     { "id": "section.surface", "type": "choice", "…": "…" },
     { "id": "section.shadow", "type": "score", "levels": { "none": "…", "soft": "…", "deep": "…" } },
@@ -178,39 +172,85 @@ One request per live line, generated from the catalog file, with every question 
 - **An API error is a diagnostic** that says so. It is never read as "no".
 - **The probe before the server**: the resolver is run from a script against the live API on a dozen lines, with the payloads kept, before any of it is wired to an editor. That needs your permission and a small budget, and it is where the first wording is tuned.
 
+## What the probe found
+
+Step 4, run 2026-10-31 against `jev-1.14.0`: `bun scripts/probe.ts` over `probe/lines.yaml` (19 lines, tuned on) and `probe/holdout.yaml` (12 lines, checked against). The request sketch above changed in two ways, and the catalog's descriptions changed more than the code did.
+
+- **Round trip: median 140 ms, p90 182 ms, max 292 ms** over 93 calls of 16 questions each. Ghost text can feel like completion; the debounce, not the network, will set the pace.
+- **One `fits` Noul for the whole catalog did not separate.** "heads up" scored 0.67 and "a photo gallery" 0.63. It is now one Noul per part, `fits:<part>`, and the resolver reads the one for the part the Choice picked.
+- **A Choice or Score sets settings nobody asked for.** "a pull quote" came back `align=center`, "a dark band" `shadow=deep`. Each choice and level setting now has a `said:<part>:<setting>` Noul: does the line ask for any value other than the default, with those values listed and described. Below 0.3 the setting stays at its default; in the band it stays at its default and is named as unsettled. Asking "what tone" without the values failed the human test: `tone` is jargon.
+- **Descriptions are the prompt, and literal.** "Words quoted from someone else, set off from the prose" missed "an excerpt from the letter" (0.51), because the line says neither "quoted" nor "set off". "A quotation of words someone said or wrote" scores 0.83. The section's "a run of the page set apart" let a gallery fit at 0.44. Write each description as what the part *is*, in the words a writer would use, with no qualifier the writer would not say.
+- **Value names are sent to the model.** `tone=band` lost to `dark` on "a dark band", because every section is a band; the value is now `tint`. Name a value for what it does.
+- **Answers vary a little between runs** (0.67 then 0.62 on the same line). A line on a threshold can flip. The cache makes a line stable after its first answer.
+- **Results:** tuning set 19/19 in each of three runs. Held-out 10/12 in each of three runs. The two misses fail safely: "a note about the version this was written for" leaves the line plain with callout and section offered (callout fits 0.62), and "a shaded band behind the next few paragraphs" places a section with tone left at its default and named (said 0.65, value `tint` at 0.92). Both are cases for the fifty-line gate, not for more tuning against lines already seen.
+- **The TypeSafe SDK 0.7.0 does not work under Bun**: it locks a reader on the response body, which Bun counts as using it ("Body already used"). Rubric calls the HTTP API with `fetch` (`src/jev.ts`) and keeps the SDK for its types. Worth reporting to TypeSafe.
+
+### The universal catalog, 2026-11-01
+
+`bun scripts/probe.ts probe/universal.yaml --catalog universal --steps both`: 120 lines written before any run (91 in the writing, 29 in `rubric.md`, 8 that nothing should fit), against the 52-part universal catalog, each line asked only about the parts for its place, once in one request and once in two steps. Eleven lines were first sent cut short at a comma (a YAML flow-mapping mistake in the lines file); they were rerun whole and merged, and the probe now refuses a line with stray keys.
+
+- **Choosing among 34 parts works.** Jev's top pick was the right part for 109 of 112 lines (two steps; 108 in one). The three wrong tops are arguable: "a card that floats above the page with a shadow" went to `cards`, "a slideshow of the photos" to `embed`, "the gist with the script" to `code`. No family step is needed at this size.
+- **The fits check is what holds lines back.** For 20 lines the right part came first but its `fits` Noul landed between 0.4 and 0.7, so the line was left unsettled with the right part offered first (safe, but a choice for the writer). Four more fell under 0.3 and came back as nothing fitting. Lines like "my recent writing", "two buttons", "the PDF to download" and "the date and reading time under the title" are the kind.
+- **Results:** two steps 93/120 as wanted, 18 unsettled with the right part offered, one placed wrongly ("a countdown to launch day" became `stats`; nothing should fit). One step 95/120, 14 unsettled with the right part offered, two placed wrongly (that countdown again, and the slideshow as `embed`).
+- **Size and speed:** one step asks 81 questions a line in the writing and 29 in `rubric.md`, two steps about 9 in all. One step: median 164 ms, p90 181 ms. Two steps: median 270 ms, p90 302 ms, two round trips.
+- **Price, and the choice it settles.** Jev 1.14 costs $0.042 per million input tokens; output is free. By request size, one step is about 5,000 tokens a line in the writing (about $0.0002) and two steps about 1,300 (about $0.00005). The whole run, 268 calls, cost about four cents. Both are near nothing, so speed decides: the editor keeps one step, about 100 ms faster. Two steps stays in `ask` for a catalog large enough to need it; one request's limit is about 64,000 tokens, roughly ten times this catalog.
+
+### Tuning, 2026-11-01
+
+Three sets: the 120 above for tuning; `probe/universal-holdout.yaml`, 68 lines written before any tuning; and `probe/universal-fresh.yaml`, 28 lines written after the held-out run had informed one change and before that change was run. Rules were tried offline first, by replaying the saved answers (the one-step run keeps an answer to every question), so only description changes needed new calls. About 470 more calls, about nine cents.
+
+- **Descriptions: no detail a writer would not say, no word shared with another part.** "With a caption under it", "that the reader can sort", "with its name, its size and what it is", "the first one stronger" are features or styling; dropping them lifted the tuning set from 95 to 105 on the old rule. Embed's "a slideshow" pulled "a slideshow of the photos" from gallery. The held-out run showed the opposite mistake: call-to-action rewritten as "a part that asks the reader to do one thing" drew in a poll, a live chat, a video call and checkout; it is now "a short pitch that urges the reader to sign up, buy or try something, with a button to do it". "A light tint of color" missed gray and shaded; it now says so. Catalog version 3.
+- **The Choice's own confidence counts.** Two rows joined the truth table: a pick is not placed when the Choice is split (top under 0.5), however clear the fit, which caught "a countdown to launch day" (fit 0.78, Choice 0.47 for stats); and a fit from 0.4 is enough when the Choice is 0.9 or more. The rule sat on a plateau of nearby numbers, not an edge.
+- **But only in a large catalog.** Replayed on the slice's 3 parts, a sure Choice turned right "nothing fits" answers into unsettled ones; run on the blog's 11 parts, it placed a flowchart and a pie chart as figure and a PDF and a zip as buttons, Choice over 0.9 and fit 0.4 to 0.7, the same fits as right parts in the universal catalog. In a small catalog the Choice is sure of whatever is closest. So the second row applies from 15 parts, and never overrules a fit below 0.3.
+- **Results, one step, final rule:** tuning 110/120; held out 65/68 (seen once, so no longer clean); fresh 21/28, the honest number. **Nothing placed wrongly in any of the three.** Every miss is a setting left at its default (3) or a line left for the writer with the right part offered, or with nothing fitting shown as unsure (16). The slice's old runs: 87/93 as before. The blog catalog places a testimonial as a quote and logos as a gallery when it has neither, at fits above 0.7, as the old rule did; reasonable stand-ins.
+- **Left alone:** lines nothing should fit ("a quiz", "a live sports score") mostly come back unsettled rather than nothing fitting, fits 0.3 to 0.6. Both leave the line plain; raising `no` to catch them would start losing real matches.
+
 ## The document flow inside the server
 
 1. On open and on every change, the server scans the buffer: code fences tracked, directive lines found, blocks matched to their closers, each line classified as pinned, plain or words.
 2. The preprocessor writes `content/<page>.md` from the buffer: pinned and plain lines become shortcode calls, resolved words lines become their cached shortcode calls, unresolved words lines are copied as text, everything else is copied byte for byte. Hugo rebuilds and the preview shows the page as it is in the editor right now.
-3. Words lines that are not cached go into a debounce, a few hundred milliseconds from the last change to that line. When it fires, one request per line goes to Jev.
-4. When an answer comes back, the resolver runs, the cache and the sidecar are written, the content file is written again, diagnostics are published for that line, and the inline completion for that line is now available. The server also sends a refresh request so an editor that supports it asks again without the cursor moving.
+3. A words line that is not cached goes to Jev when the writer leaves it (an edit lands on another line), or after a one-second pause on it. One request per distinct line. A line shaped like a plain form being typed (`quot`, `quote size=large ci`) is not words and is never sent; it gets an `unfinished-part` or `unfinished-setting` diagnostic instead. The first version asked on every 200 ms pause, and a morning in the playground cached 115 answers, most of them fragments like `a raised box that is kin`.
+4. When an answer comes back, the resolver runs, the cache is written, and the page is drawn again: content file, sidecar and diagnostics, 100 ms after the last change to it. The same wait applies to typing: a burst of keystrokes is one drawing. Hugo and the browser then take about 215 ms more, so the page shows about a third of a second after the writer stops.
+
+   **The stale preview.** The live tests found the browser a keystroke or two behind: `Hello wor` for `Hello world`, and later `my grandm` for `cite="my grandma"`. The buffer, the server's text, content/ and the page Hugo served were all right; only the browser was stale. The first explanation was that a browser still reloading misses livereload's next message, so drawing was slowed to 300 ms. That made it rarer, not gone. The real cause, reproduced with two writes and a browser on a copy of the site (2026-11-01): `hugo server` sends `Last-Modified` to the second. When two builds land in the same second, the browser's reload asks `If-Modified-Since`, Hugo answers 304, and the browser keeps the older page. Before the fix, 4 of 12 paired writes ended stale; with `Cache-Control: no-store` from the site's `[[server.headers]]`, 0 of 18, and bursts of twelve writes 150 ms apart ended on the last one every time. Hugo reads `server` settings from the site's own config only, never from a theme, so every Rubric site carries the header, and the command that creates sites must write it. With the cause fixed, the wait came down to 100 ms.
+
+   `scripts/live-repro.ts` types blocks through the real Neovim config and compares the buffer, the server's text, content/ and what Hugo serves, and checks the no-store header. With `RUBRIC_HOLD` set it keeps the page up for a look in a browser attached to livereload.
 5. The accept key inserts the ghost text. The next change notification shows the line is pinned, and the loop never asks about it again.
+
+**What the second live test found (2026-11-02), and what changed:**
+
+- **Half-typed front matter crashed Hugo.** Typing `hide: [comments, pager]` one key at a time sent `hide: [co` to `content/`; Hugo 0.169 rejected the page, and its next rebuild panicked (`Shift: unknown type *hugolib.pageMetaSource for "/tags"`). Reproduced key by key on a copy of the playground; skipping the states that don't parse, no panic. So a page whose front matter doesn't parse is never written (`src/core/frontmatter.ts`); it gets a `bad-front-matter` note and Hugo keeps its last good version.
+- **A theme switch needed Neovim restarted.** The server read `hugo.toml` once. It now watches the site's folder and reopens the site when `hugo.toml` settles and parses (`watchConfig` in `src/server/main.ts`, `Workspace.reload`). A half-typed `hugo.toml` is skipped, or a missing `[params.rubric]` would flip the site to Paper mid-word.
+- **Every change reloaded the page,** so a video started over and a diagram was drawn from nothing, and the page jumped. Hugo's livereload picks up any `window.LiveReloadPlugin*` defined before it runs; `assets/js/rubric-live.js`, loaded only under `hugo server`, is one. It takes Hugo's reload (which a changed page sends as the made-up path `/x.js`), fetches the page, and changes the live page to match: it compares the new page with the last one Hugo sent, not with the live one, so what scripts drew (a diagram's SVG, tabs) is kept wherever the page didn't change. The longest run of unchanged nodes is never moved, since moving an iframe reloads it. Part scripts set up only what they haven't (`data-ready`) and run again on `rubric:drawn`. A changed script, or anything unexpected, falls back to a plain reload.
+- **The preview follows the cursor.** The plugin sends `rubric/cursor` when the cursor settles on another line; the server posts the page's file, address and line to a relay in `bun run play` (127.0.0.1:1416, or `relay` under `[params.rubric]`), and the page listens with an EventSource. The server's writes carry a `{{< rubric-line N >}}` marker before each top-level block (`src/core/live.ts`), only where a blank line comes first, so no list or part is split; it draws a `<link>`, which takes no space, and only under `hugo server`. The page scrolls the cursor's line to a third of the way down, between the markers around it.
+- **A placed but empty block drew nothing,** so Jev's pick didn't show until it was accepted. The live content fills an empty top-level block with the part's starter body, faded (`{{< rubric-line N "starter" >}}`). `rubric build` writes neither markers nor starters: the editor's `content/` is a preview, and a built site comes from `rubric build`.
+- **Two picks were invisible** until `<M-n>`, since Neovim shows "(2/2)" only after a move. The server sends `rubric/picks` with each ghost answer, and the plugin puts `1 of 2 · <M-n> for the next` after the ghost text.
+- **A switch back to Paper sometimes lost a Blowfish callout** until it was edited (the third run). Hugo watches `hugo.toml` too, and when its rebuild came before the server's rewrite, Paper's shortcode met `icon="lightbulb"` and failed the build; Hugo kept the old page, and the browser never got the good one. Reproduced on a copy of the playground: one switch in six failed. Now a part or setting that another skin brings is left out by the shortcode instead of failing (`_partials/rubric/settings.html`; a part draws only its writing), which is what the server's rewrite does a moment later anyway. Truly unknown settings still fail. Ten switches at varied timing, all right; `test/hugo.test.ts` covers it.
+
+**Faster ghost text (after the third run, 2026-11-02).** A ghost took about 1.25 s: a 1 s wait for the writer to pause, about 215 ms for Jev (360 ms on the first call of a session), and up to 25 ms to notice the answer. So the wait was the slow part, and it already sent half-typed lines when the writer paused mid-line ("a flowchart of the ro"). Neovim keeps its ghost text request open while the server waits for Jev, so asking sooner is all it takes:
+
+- **The writer can say a line is done.** The accept key with no ghost text shown, and Esc, send `rubric/ask`, and the server asks at once (`Workspace.askNow`). Pressing `<M-l>` straight after typing shows the ghost about 215 ms later; it never adds a call, since it replaces the one the pause would have made.
+- **The pause is fitted to the writer.** Once the server has seen 20 gaps between keys on words lines, it waits half again the gap the writer leaves nine times in ten, between 400 ms and the old 1 s (`Workspace.pause`). Each edit to a words line is logged to `testing/.rubric/keys.jsonl` while `bun run play` runs, and `bun scripts/pause.ts` replays it against other pauses, to check the calls don't grow.
+- **The connection is open before the first call.** A fresh connection to Jev's host costs about 230 ms and an open one about 100 ms; one stays open at least 40 s. Typing on a words line sends a HEAD with no key to the host when nothing has used it for 20 s (`warm` in `src/jev.ts`), which is never a call to Jev.
 
 Only the server writes to `content/`. The editor's buffer is never written by the server; the accept key is the editor inserting a completion. `hugo server` is started by hand in the slice; the `rubric` command that starts both comes after.
 
 ## Neovim
 
-Three things, and no plugin yet:
+A small plugin in `editors/nvim/`:
 
 ```lua
--- lsp/rubric.lua, in the lspconfig form
-return {
-  cmd = { 'rubric', 'lsp' },
-  filetypes = { 'markdown' },
-  root_markers = { 'rubric.md' },
-}
+vim.opt.runtimepath:append("/path/to/rubric/editors/nvim")
+require("rubric").setup({
+  capabilities = require("cmp_nvim_lsp").default_capabilities(),  -- if nvim-cmp is used
+})
 ```
 
-```lua
-vim.lsp.enable('rubric')
-vim.lsp.inline_completion.enable()
-vim.keymap.set('i', '<Tab>', function()
-  if not vim.lsp.inline_completion.get() then return '<Tab>' end
-end, { expr = true })
-vim.keymap.set('i', '<C-n>', function() vim.lsp.inline_completion.select() end)
-```
+It defines the server in the `vim.lsp.config` form (`bun src/cli.ts lsp`, run from the repo so Bun loads `.env`), with `root_markers = { "rubric.md" }` so it attaches only inside a Rubric site, and only to Markdown. On attach it turns on Neovim's inline completion for the buffer and maps three insert-mode keys: `<M-l>` accepts (Neovim's `inline_completion.get()`), `<M-n>` and `<M-p>` switch between the pick and the runner-up (`inline_completion.select()`). Not `<Tab>` and `<C-n>`, which completion plugins own, and not `<M-[>`, which a terminal sends as `ESC [`, the start of an escape sequence, so the key after it is swallowed. All three are options.
 
-The root marker is what makes the server attach only inside a Rubric site, and only to Markdown. The accept key is Neovim's own inline completion accept; the swap key is its own candidate cycling. When the slice works, the plugin that ships is this plus the `:Rubric` commands.
+Two things found in Neovim's source settle how the server answers. Neovim asks for inline completion only in insert mode, 200 ms after the cursor stops, and has no handler for the server's refresh request. So **the server holds the request open** until the line's answer arrives (up to five seconds), and drops it if the line changes while it waits, since a pick for words no longer there would be pinned onto the wrong ones. And an item whose range is empty at the end of the line is drawn there and inserted there, which is exactly the pin.
+
+When the slice works, the plugin that ships is this plus the `:Rubric` commands.
 
 ## Steps
 
@@ -223,6 +263,8 @@ The root marker is what makes the server attach only inside a Rubric site, and o
 | 5 | Server | Attached in Neovim with a stub resolver, the content file follows the buffer, diagnostics appear on bad lines, completion offers the parts and their settings. |
 | 6 | Jev in the server | The six scenes in "the slice, stated exactly" all happen. |
 | 7 | Measure | Twenty lines, time to ghost text and time to preview, recorded in `docs/measurements.md` with the model id and date. |
+
+**Progress.** Step 1 done 2026-10-31: `catalogs/slice/` (the catalog as a Hugo theme module, with shortcodes that validate against `catalog.yaml`) and `sites/slice/`. Step 2 done 2026-10-31: `src/core/`, in TypeScript on Bun, with fixtures in `test/fixtures/` and a test that builds every fixture's output in Hugo (`bun test`). Steps 3 and 4 done 2026-10-31: `src/core/questions.ts`, `resolve.ts`, `cache.ts`, `src/jev.ts` and `scripts/probe.ts`; see "What the probe found". Step 5 done 2026-10-31: `src/server/` (the logic in `workspace.ts`, the protocol in `main.ts`, a stub resolver) and `editors/nvim/`, tested in `test/workspace.test.ts` and in a real headless Neovim driven over `--listen` (`test/nvim.test.ts`: attach, diagnostics, completion, ghost text in insert mode, the accept key, the pinned line placed). Step 6 is wired and checked by hand against live Jev: scenes 1, 2, 3, 5 and 6 happen (ghost text 214 ms after entering insert mode on a line already resolved in the background; the preview draws the pick before accepting; a bad key gives "could not reach Jev: HTTP 401 …" on each line and nothing else changes). Scene 4, the swap key, is tested with the stub but has not been seen live, since it needs a line whose top two parts are close. Step 7 remains.
 
 Steps 1 to 3 are code with no network and can be written in one session. Step 4 needs the key and the budget. Steps 5 and 6 are where the editor details get settled.
 
@@ -238,13 +280,13 @@ These feed the fifty-line gate in the plan, which is run against the real blog c
 
 - Themes, the root directive, and any design quality in the three parts.
 - The `rubric` command, downloading Hugo, the watcher for editors without the protocol.
-- Code actions, document colours, the `:Rubric` commands, the slow path, review rounds.
+- Code actions, document colors, the `:Rubric` commands, the slow path, review rounds.
 - VS Code and the browser editor. Both are clients of this server; nothing in the slice is Neovim-specific except the three lines above.
 
 ## Settled in the slice
 
 - The pin format: `->` or the trailing comment with a ranged item.
 - The debounce length, from the measurements.
-- The nested-shortcode pattern in Hugo: `.Inner | .Page.RenderString` is the expected answer.
+- ~~The nested-shortcode pattern in Hugo~~: settled 2026-10-31 in step 1. Every part renders `.Inner | .Page.RenderString (dict "display" "block")` with goldmark's `unsafe` on, so a nested part's HTML passes through the outer part's Markdown intact. Parts nest in a section with Markdown, headings and multiple paragraphs inside, all as expected.
 - Whether the inline completion refresh is needed or the editor asks often enough on its own.
 - The question text template per setting type, from the probe.

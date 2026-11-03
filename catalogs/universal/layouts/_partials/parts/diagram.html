@@ -1,0 +1,6 @@
+{{- /* The diagram's text, as written. Without the script it is shown as it
+     is; js/parts/diagram.js draws it, in the theme's colors, with the copy of
+     Mermaid that ships in static/js/vendor/. */ -}}
+<figure class="part part-diagram" data-mermaid="{{ "js/vendor/mermaid-11.4.1.min.js" | relURL }}">
+<pre class="part-diagram-source">{{ trim .raw "\n" }}</pre>
+</figure>

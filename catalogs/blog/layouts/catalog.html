@@ -1,0 +1,60 @@
+{{- /*
+  The catalog page: every part in catalog.yaml, at its defaults and then with
+  each other value of each setting, one setting at a time. Each item is
+  labeled with its plain form, the line a writer would pin. Parts are drawn
+  by the same partials their shortcodes use.
+*/ -}}
+{{ define "main" }}
+{{- $cat := hugo.Data.catalog }}
+{{- $samples := hugo.Data.samples }}
+{{- $theme := .Params.rubric.theme | default "paper" }}
+<header class="page-header">
+<h1>The {{ $cat.name }} catalog</h1>
+<p class="byline">Version {{ $cat.version }} · {{ len $cat.parts }} parts · in <strong>{{ $theme }}</strong>: {{ (index hugo.Data.themes $theme).description }}</p>
+</header>
+<nav class="catalog-nav" aria-label="Themes and parts">
+<p>{{ range $name, $_ := hugo.Data.themes }}{{ if eq $name $theme }}<strong>{{ $name }}</strong>{{ else }}<a href="{{ printf "/%s/" $name | relURL }}">{{ $name }}</a>{{ end }} {{ end }}· <a href="{{ printf "/stress/%s/" $theme | relURL }}">the stress page</a></p>
+<p>{{ range $name, $_ := $cat.parts }}<a href="#{{ $name }}">{{ $name }}</a> {{ end }}</p>
+</nav>
+
+{{- range $name, $part := $cat.parts }}
+{{- $sample := index $samples $name | default dict }}
+{{- $defs := $part.settings | default dict }}
+{{- $base := dict }}
+{{- range $k, $d := $defs }}{{ $base = merge $base (dict $k ($d.default | default "")) }}{{ end }}
+{{- with $sample.settings }}{{ $base = merge $base . }}{{ end }}
+
+{{- /* One item at the defaults, one per other value, then the extras. */}}
+{{- $items := slice (dict) }}
+{{- range $k, $d := $defs }}
+  {{- $values := cond (eq $d.type "level") $d.levels $d.values }}
+  {{- range $v, $_ := $values }}
+    {{- if ne $v (string $d.default) }}
+      {{- $item := dict $k $v }}
+      {{- with index ($sample.pair | default dict) $k }}{{ $item = merge . $item }}{{ end }}
+      {{- $items = $items | append $item }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- range $sample.extra }}{{ $items = $items | append . }}{{ end }}
+
+<h2 id="{{ $name }}" class="catalog-part">{{ $name }}</h2>
+<p class="catalog-description">{{ $part.description }}{{ if $part.script }} <em>Brings a script.</em>{{ end }}</p>
+
+{{- if not (templates.Exists (printf "_partials/parts/%s.html" $name)) }}
+<p class="catalog-missing">Not drawn yet.</p>
+{{- else }}
+{{- $inner := "" }}
+{{- with $sample.md }}{{ $inner = $.RenderString (dict "display" "block") . }}{{ end }}
+{{- $toc := "" }}
+{{- with $sample.toc }}{{ $toc = printf "<nav id=\"TableOfContents\">%s</nav>" ($.RenderString (dict "display" "block") .) | safeHTML }}{{ end }}
+{{- range $items }}
+{{- $s := merge $base . }}
+{{- $label := slice $name }}
+{{- range $k, $v := . }}{{ $label = $label | append (printf "%s=%s" $k $v) }}{{ end }}
+<p class="catalog-label"><code>::: {{ delimit $label " " }}</code></p>
+{{ partial (printf "parts/%s.html" $name) (dict "s" $s "inner" $inner "page" $ "toc" $toc) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{ end }}

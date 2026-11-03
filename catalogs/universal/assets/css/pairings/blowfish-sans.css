@@ -1,0 +1,27 @@
+/* blowfish-sans: the reader's own system sans, extra-bold titles and loose lines.
+   Made by `bun scripts/theme.ts build` from themes/pairings/blowfish-sans.yaml.
+   Edit that file, not this one. */
+
+
+:root {
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif;
+  --weight-body: 400;
+  --weight-strong: 600;
+  --weight-heading: 700;
+  --weight-display: 800;
+  --leading-body: 1.75;
+  --leading-heading: 1.33;
+  --leading-display: 1.11;
+  --tracking-display: -0.01em;
+  --tracking-label: 0.05em;
+  --label-case: uppercase;
+  --numerals: lining-nums;
+  --quote-style: italic;
+  --ornament: "\2022  \2022  \2022";
+  --code-size: 0.875em;
+  --heading-case: none;
+  --link-line: none;
+}

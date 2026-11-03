@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="{{ site.Language.Locale | default "en" }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ if .IsHome }}{{ site.Title }}{{ else }}{{ .Title }} · {{ site.Title }}{{ end }}</title>
+{{- with .Description | default .Summary | plainify }}
+<meta name="description" content="{{ . | truncate 160 }}">
+{{- end }}
+{{- /* A page may name its own theme, as the catalog and stress pages do.
+     A theme is a palette, a pairing and a scale (themes.yaml); a site may
+     swap any one of them. */}}
+{{- $catalog := .Params.rubric.catalog | default false }}
+{{- $theme := .Params.rubric.theme | default site.Params.rubric.theme | default "paper" }}
+{{- $t := index hugo.Data.themes $theme }}
+{{- if not $t }}{{ errorf "rubric: %q is not a theme in this catalog" $theme }}{{ end }}
+{{- $own := and (not .Params.rubric.theme) site.Params.rubric }}
+{{- $palette := cond (and $own site.Params.rubric.palette) site.Params.rubric.palette $t.palette }}
+{{- $pairing := cond (and $own site.Params.rubric.pairing) site.Params.rubric.pairing $t.pairing }}
+{{- $scale := cond (and $own site.Params.rubric.scale) site.Params.rubric.scale $t.scale }}
+{{- $css := slice }}
+{{- range slice (printf "palettes/%s" $palette) (printf "pairings/%s" $pairing) (printf "scales/%s" $scale) }}
+  {{- with resources.Get (printf "css/%s.css" .) }}{{ $css = $css | append . }}{{ else }}{{ errorf "rubric: no %s in this catalog" . }}{{ end }}
+{{- end }}
+{{- range (index hugo.Data.pairings $pairing).preload }}
+<link rel="preload" href="{{ printf "fonts/%s" . | relURL }}" as="font" type="font/woff2" crossorigin>
+{{- end }}
+{{- $css = $css | append (resources.Get "css/base.css") }}
+{{- $js := slice }}
+{{- $bundle := slice $palette $pairing $scale }}
+{{- /* A part's CSS and script are loaded only on pages that use it: in the
+     writing, or in the frame around this page. */}}
+{{- $framed := slice }}
+{{- range partial "rubric/frame-list.html" . }}{{ $framed = $framed | append .part }}{{ end }}
+{{- range $name, $part := hugo.Data.catalog.parts }}
+  {{- if or $catalog ($.HasShortcode $name) (in $framed $name) }}
+    {{- with resources.Get (printf "css/parts/%s.css" $name) }}
+      {{- $css = $css | append . }}
+      {{- $bundle = $bundle | append $name }}
+    {{- end }}
+    {{- if $part.script }}
+      {{- with resources.Get (printf "js/parts/%s.js" $name) }}{{ $js = $js | append . }}{{ end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- /* The skin's own layer last but the catalog page's: what the slots cannot
+     say, such as a header laid out the way the theme it came from does. */}}
+{{- with $t.skin }}
+  {{- with resources.Get (printf "css/skins/%s.css" .) }}{{ $css = $css | append . }}{{ else }}{{ errorf "rubric: no skin %q in this catalog" . }}{{ end }}
+  {{- $bundle = $bundle | append (printf "skin-%s" .) }}
+{{- end }}
+{{- if $catalog }}{{ $css = $css | append (resources.Get "css/catalog.css") }}{{ end }}
+{{- /* Named for the theme and a short hash of the parts: a page with many
+     parts would otherwise outgrow a file name. */}}
+{{- $name := printf "css/%s-%s-%s-%s.css" $palette $pairing $scale (delimit $bundle "-" | md5 | strings.Truncate 8 "") }}
+{{- with $css | resources.Concat $name | minify | fingerprint }}
+<link rel="stylesheet" href="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}">
+{{- end }}
+{{- range $js }}
+{{- with . | minify | fingerprint }}
+<script src="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}" defer></script>
+{{- end }}
+{{- end }}
+{{- with site.Home.OutputFormats.Get "rss" }}
+<link rel="alternate" type="application/rss+xml" href="{{ .RelPermalink }}" title="{{ site.Title }}">
+{{- end }}
+{{- /* The live preview only: which file this page is written from, where the
+     writer's cursor comes from, and the script that follows it and changes
+     the page in place instead of reloading it. Never in a built site. */}}
+{{- if hugo.IsServer }}
+{{- with .File }}
+<meta name="rubric-source" content="{{ .Path }}">
+{{- end }}
+<meta name="rubric-relay" content="{{ site.Params.rubric.relay | default "http://127.0.0.1:1416" }}">
+{{- with resources.Get "js/rubric-live.js" | fingerprint }}
+<script src="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}"></script>
+{{- end }}
+{{- end }}
+{{- if partial "rubric/frame-has.html" (dict "page" . "part" "theme-switch") }}
+{{- /* Before anything is drawn, so a reader who chose dark never sees a light flash. */}}
+<script>try{var t=localStorage.getItem("rubric-theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.dataset.theme=t}catch(e){}</script>
+{{- end }}
+</head>
+<body>
+<a class="skip" href="#main">Skip to the writing</a>
+{{- /* The frame around the writing, from rubric.md; with no header or footer
+     there, the plain ones. */}}
+{{ partial "rubric/frame.html" (dict "page" . "slot" "top") }}
+{{- if not (partial "rubric/frame-has.html" (dict "page" . "part" "header")) }}
+<header class="masthead">
+  <a class="masthead-title" href="{{ "/" | relURL }}"{{ if .IsHome }} aria-current="page"{{ end }}>{{ site.Title }}</a>
+  {{- with site.Menus.main }}
+  <nav aria-label="Site">
+    {{- range . }}
+    <a href="{{ .URL }}"{{ if $.IsMenuCurrent "main" . }} aria-current="page"{{ end }}>{{ .Name }}</a>
+    {{- end }}
+  </nav>
+  {{- end }}
+  {{ partial "rubric/frame.html" (dict "page" . "slot" "tools") }}
+</header>
+{{- end }}
+{{- $left := partial "rubric/frame.html" (dict "page" . "slot" "side-left") }}
+{{- $right := partial "rubric/frame.html" (dict "page" . "slot" "side-right") }}
+<div class="shell{{ with trim $left " \n" }} has-left{{ end }}{{ with trim $right " \n" }} has-right{{ end }}">
+{{ $left }}
+<main id="main" class="flow">
+{{ block "main" . }}{{ end }}
+</main>
+{{ $right }}
+</div>
+{{ partial "rubric/frame.html" (dict "page" . "slot" "bottom") }}
+{{- if not (partial "rubric/frame-has.html" (dict "page" . "part" "footer")) }}
+<footer class="site-footer">
+  {{- with site.Params.footer }}<p>{{ . | markdownify }}</p>{{ end }}
+  <p>© {{ now.Year }} {{ site.Params.author | default site.Title }}{{ with site.Home.OutputFormats.Get "rss" }} · <a href="{{ .RelPermalink }}">RSS</a>{{ end }}</p>
+  {{ partial "rubric/frame.html" (dict "page" . "slot" "footer-extra") }}
+</footer>
+{{- end }}
+</body>
+</html>

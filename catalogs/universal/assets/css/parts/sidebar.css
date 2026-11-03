@@ -1,0 +1,16 @@
+/* sidebar: a column beside the writing on every page. */
+.part-sidebar { padding: var(--space-4) var(--space-3); font-family: var(--font-ui); font-size: var(--step--1); }
+.part-sidebar h2, .part-sidebar h3 { margin: 0 0 var(--space-1); font-family: var(--font-ui); font-size: var(--step--1); color: var(--muted); text-transform: var(--label-case); letter-spacing: var(--tracking-label); }
+.part-sidebar ul { margin: 0; padding: 0; list-style: none; }
+.part-sidebar li + li { margin-top: 0.35em; }
+.part-sidebar a { text-decoration: none; }
+.part-sidebar a:hover { color: var(--accent); }
+.part-sidebar .stack > * + :is(h2, h3) { margin-top: var(--space-3); }
+@media (min-width: 64rem) {
+  .part-sidebar > .stack { position: sticky; top: var(--space-4); }
+  .part-sidebar.side-left { border-right: var(--border) solid var(--rule); }
+  .part-sidebar.side-right { border-left: var(--border) solid var(--rule); }
+}
+@media (max-width: 63.99rem) {
+  .part-sidebar { order: 3; border-top: var(--border) solid var(--rule); }
+}

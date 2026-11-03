@@ -1,0 +1,4 @@
+/* contact-form: name, email and message, then send. */
+.part-contact-form > p { margin: 0; }
+.part-contact-form > p + p { margin-top: var(--space-2); }
+.part-contact-form label { display: grid; gap: var(--space-1); }

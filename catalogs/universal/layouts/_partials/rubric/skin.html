@@ -1,0 +1,9 @@
+{{- /*
+  The skin a page is drawn in: its theme's skin in themes.yaml, or "". A
+  page may name its own theme, as the catalog and stress pages do.
+
+  Usage: {{ $skin := partial "rubric/skin.html" .page }}
+*/ -}}
+{{- $theme := . | default site.Home -}}
+{{- $name := $theme.Params.rubric.theme | default site.Params.rubric.theme | default "paper" -}}
+{{- return ((index hugo.Data.themes $name).skin | default "") -}}

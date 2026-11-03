@@ -1,0 +1,5 @@
+{{- $pages := where site.RegularPages "Section" "posts" -}}
+{{- with .s.tag }}{{ $pages = where $pages "Params.tags" "intersect" (slice .) }}{{ end -}}
+<div class="part part-post-list">
+{{ partial "rubric/post-list.html" (dict "pages" $pages "page" .page "style" .s.style "count" (cond (ne .s.count "") (int .s.count) 0)) }}
+</div>

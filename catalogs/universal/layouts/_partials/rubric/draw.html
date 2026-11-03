@@ -1,0 +1,25 @@
+{{- /*
+  Draws one part: the skin's own version of it when the skin has one
+  (_partials/skins/<skin>/parts/<part>.html), the catalog's otherwise. Then
+  the look settings that are not at their default become classes on the
+  part's outer element (look-shadow-soft…), which the skin draws.
+
+  Usage: {{ partial "rubric/draw.html" (dict "name" "callout" "args" (dict "s" … "page" …)) }}
+*/ -}}
+{{- /* The catalog page names the skin, since it draws frame parts around
+     another page. */ -}}
+{{- $skin := cond (isset . "skin") .skin (partial "rubric/skin.html" .args.page) -}}
+{{- $path := printf "parts/%s.html" .name -}}
+{{- with $skin -}}
+  {{- $own := printf "skins/%s/parts/%s.html" . $.name -}}
+  {{- if templates.Exists (printf "_partials/%s" $own) }}{{ $path = $own }}{{ end -}}
+{{- end -}}
+{{- $html := partial $path .args -}}
+{{- $classes := slice -}}
+{{- range $key, $def := hugo.Data.catalog.look | default dict -}}
+  {{- $v := index ($.args.s | default dict) $key -}}
+  {{- if and $v (ne (string $v) (string $def.default)) }}{{ $classes = $classes | append (printf "look-%s-%s" $key $v) }}{{ end -}}
+{{- end -}}
+{{- with $classes }}{{ $html = replaceRE `class="part ` (printf `class="part %s ` (delimit . " ")) (string $html) 1 }}{{ end -}}
+{{- $html = $html | safeHTML -}}
+{{- return $html -}}

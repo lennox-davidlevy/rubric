@@ -1,0 +1,8 @@
+{{ define "main" }}
+{{ partial "rubric/frame.html" (dict "page" . "slot" "before-title") }}
+<header class="page-header">
+<h1>{{ .Title }}</h1>
+</header>
+{{ partial "rubric/content.html" . }}
+{{ partial "rubric/post-list.html" (dict "pages" .RegularPages "style" "dated") }}
+{{ end }}

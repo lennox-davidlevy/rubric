@@ -1,0 +1,57 @@
+{{- /*
+  Reads a part's settings from the shortcode call and checks them against
+  catalog.yaml, the skin's additions and the look settings. Unknown settings and disallowed values fail the build, so a bad
+  line can never render silently. Returns a dict with every setting filled in,
+  defaults included.
+
+  A part or setting that another skin brings is left out, not an error: the
+  page keeps it in the pin, and when the theme changes in hugo.toml, Hugo
+  rebuilds with the new skin a moment before Rubric rewrites the page
+  without it. Failing that build left the old page in the browser. For a
+  part, this returns false and the shortcode draws only its writing.
+
+  Usage: {{ $s := partial "rubric/settings.html" (dict "part" "quote" "sc" .) }}
+*/ -}}
+{{- $p := partial "rubric/part.html" (dict "part" .part "skin" (partial "rubric/skin.html" .sc.Page)) -}}
+{{- $others := hugo.Data.skins | default dict -}}
+{{- if not $p -}}
+  {{- range $others }}{{ if index (.parts | default dict) $.part }}{{ return false }}{{ end }}{{ end -}}
+  {{- errorf "rubric: %q is not a part in the catalog or this theme's skin (%s)" .part .sc.Position -}}
+{{- end -}}
+{{- $defs := $p.settings -}}
+{{- $params := .sc.Params | default dict -}}
+{{- if reflect.IsSlice $params -}}
+  {{- errorf "rubric: %s takes key=value settings only (%s)" .part .sc.Position -}}
+{{- end -}}
+
+{{- range $key, $value := $params -}}
+  {{- $def := index $defs $key -}}
+  {{- if not $def -}}
+    {{- $elsewhere := false -}}
+    {{- range $others }}{{ with index (.parts | default dict) $.part }}{{ if index (.settings | default dict) $key }}{{ $elsewhere = true }}{{ end }}{{ end }}{{ end -}}
+    {{- if $elsewhere }}{{ continue }}{{ end -}}
+    {{- errorf "rubric: %s has no setting %q (%s)" $.part $key $.sc.Position -}}
+  {{- end -}}
+  {{- $allowed := slice -}}
+  {{- if eq $def.type "choice" -}}
+    {{- $allowed = $def.values -}}
+  {{- else if eq $def.type "level" -}}
+    {{- $allowed = $def.levels -}}
+  {{- else if eq $def.type "flag" -}}
+    {{- $allowed = dict "true" "" "false" "" -}}
+  {{- end -}}
+  {{- if and (eq $def.type "number") (not (findRE `^[0-9]+$` (string $value))) -}}
+    {{- errorf "rubric: %q is not a number for %s.%s (%s)" $value $.part $key $.sc.Position -}}
+  {{- end -}}
+  {{- if and $allowed (not (isset $allowed (string $value))) -}}
+    {{- $names := slice -}}
+    {{- range $name, $_ := $allowed }}{{ $names = $names | append $name }}{{ end -}}
+    {{- errorf "rubric: %q is not allowed for %s.%s; allowed: %s (%s)" $value $.part $key (delimit $names ", ") $.sc.Position -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $out := dict -}}
+{{- range $key, $def := $defs -}}
+  {{- $out = merge $out (dict $key (index $params $key | default $def.default | default "")) -}}
+{{- end -}}
+{{- return $out -}}

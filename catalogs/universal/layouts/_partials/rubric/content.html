@@ -1,0 +1,8 @@
+{{- /* A page's content, with the contents part filled in. */ -}}
+{{- $content := .Content -}}
+{{- $marker := "<!--rubric:contents-->" -}}
+{{- if strings.Contains $content $marker -}}
+  {{- $nav := partial "parts/contents.html" (dict "toc" .TableOfContents) -}}
+  {{- $content = replace $content $marker $nav | safeHTML -}}
+{{- end -}}
+{{- $content -}}

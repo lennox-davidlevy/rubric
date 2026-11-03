@@ -1,0 +1,4 @@
+/* comments: a place to answer, under a post. */
+.part-comments { margin-top: var(--space-4) !important; padding-top: var(--space-3); border-top: var(--border) solid var(--rule); }
+.part-comments h2 { font-size: var(--step-1); }
+.part-comments-unset { font-size: var(--step--1); color: var(--muted); }

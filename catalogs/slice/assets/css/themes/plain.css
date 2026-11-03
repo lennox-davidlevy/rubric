@@ -1,0 +1,27 @@
+/* The slice's one theme. A theme fills the slots and nothing else. */
+:root {
+  --paper: #fbfaf7;
+  --ink: #1d1c1a;
+  --accent: #9a3b26;
+  --muted: #6d6a64;
+  --rule: #dedad2;
+  --band: #f1ece2;
+
+  --font-body: Georgia, "Iowan Old Style", serif;
+  --font-display: Georgia, "Iowan Old Style", serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  --step-0: 1.125rem;
+  --step-1: 1.4rem;
+  --step-2: 1.9rem;
+
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: 2.5rem;
+
+  --measure: 36rem;
+  --radius: 6px;
+  --shadow-soft: 0 1px 3px rgb(0 0 0 / 0.08);
+  --shadow-deep: 0 12px 32px rgb(0 0 0 / 0.18);
+}

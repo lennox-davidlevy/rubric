@@ -1,0 +1,12 @@
+{{- $x := partial "rubric/sections.html" (dict "html" .inner "level" 3) -}}
+<div class="part part-cards columns-{{ .s.columns }} edge-{{ .s.edge }}">
+{{- with trim (string $x.before) " \n" }}<div class="stack part-cards-intro">{{ . | safeHTML }}</div>{{ end }}
+<ul>
+{{- range $x.items }}
+<li class="stack">
+<h3>{{ .title }}</h3>
+{{ .body }}
+</li>
+{{- end }}
+</ul>
+</div>

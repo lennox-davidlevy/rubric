@@ -1,0 +1,13 @@
+{{- /* With service=giscus and params.giscus set, giscus. Otherwise, with
+     params.email set, a link to reply by email, which needs no service. */ -}}
+{{- $g := site.Params.giscus -}}
+<section class="part part-comments" id="comments">
+<h2>Comments</h2>
+{{- if and (eq .s.service "giscus") $g }}
+<script src="https://giscus.app/client.js" data-repo="{{ $g.repo }}" data-repo-id="{{ $g.repoID }}" data-category="{{ $g.category }}" data-category-id="{{ $g.categoryID }}" data-mapping="pathname" data-reactions-enabled="0" data-theme="preferred_color_scheme" crossorigin="anonymous" async></script>
+{{- else if site.Params.email }}
+<p><a href="mailto:{{ site.Params.email }}?subject={{ printf "Re: %s" .page.Title | urlquery }}">Reply by email</a></p>
+{{- else }}
+<p class="part-comments-unset">Comments need <code>params.email</code>, or <code>service=giscus</code> and <code>params.giscus</code>, in the site's settings.</p>
+{{- end }}
+</section>

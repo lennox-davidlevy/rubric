@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="{{ site.Language.Locale | default "en" }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ if .IsHome }}{{ site.Title }}{{ else }}{{ .Title }} · {{ site.Title }}{{ end }}</title>
+{{- $theme := site.Params.rubric.theme | default "plain" }}
+{{- $css := slice (resources.Get (printf "css/themes/%s.css" $theme)) (resources.Get "css/base.css") }}
+{{- $bundle := slice $theme }}
+{{- /* A part's CSS is loaded only on pages that use it. */}}
+{{- range $name, $_ := hugo.Data.catalog.parts }}
+  {{- if $.HasShortcode $name }}
+    {{- with resources.Get (printf "css/parts/%s.css" $name) }}
+      {{- $css = $css | append . }}
+      {{- $bundle = $bundle | append $name }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- with $css | resources.Concat (printf "css/%s.css" (delimit $bundle "-")) | minify | fingerprint }}
+<link rel="stylesheet" href="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}">
+{{- end }}
+</head>
+<body>
+<header class="site-header"><a href="{{ "/" | relURL }}">{{ site.Title }}</a></header>
+<main>
+{{ block "main" . }}{{ end }}
+</main>
+</body>
+</html>

@@ -1,0 +1,23 @@
+/* chart: SVG drawn when the site is built, colored from the theme. */
+.part-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.part-chart-grid { stroke: var(--rule); stroke-width: 1; }
+.part-chart-axis { fill: var(--muted); font-family: var(--font-ui); font-size: 13px; font-variant-numeric: lining-nums tabular-nums; }
+.part-chart-series.s0, .part-chart-key.s0 { fill: var(--accent); background: var(--accent); }
+.part-chart-series.s1, .part-chart-key.s1 { fill: var(--ink); background: var(--ink); }
+.part-chart-series.s2, .part-chart-key.s2 { fill: var(--muted); background: var(--muted); }
+.part-chart-line { fill: none; stroke-width: 2.5; stroke-linejoin: round; }
+.part-chart-line.s0 { stroke: var(--accent); }
+.part-chart-line.s1 { stroke: var(--ink); }
+.part-chart-line.s2 { stroke: var(--muted); }
+.part-chart-dot { stroke: var(--paper); stroke-width: 2; }
+.part-chart-dot.s0 { fill: var(--accent); }
+.part-chart-dot.s1 { fill: var(--ink); }
+.part-chart-dot.s2 { fill: var(--muted); }
+.part-chart-legend { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: var(--space-2) 0 0; padding: 0; list-style: none; font-family: var(--font-ui); font-size: var(--step--1); color: var(--muted); }
+.part-chart-legend li { display: flex; align-items: center; gap: 0.5em; margin: 0; }
+.part-chart-key { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; }
+.part-chart-value { color: var(--ink); font-variant-numeric: lining-nums tabular-nums; }
+.part-chart-pie { display: grid; gap: var(--space-3); align-items: center; }
+.part-chart-pie svg { max-width: 18rem; margin-inline: auto; }
+.part-chart-pie .part-chart-legend { flex-direction: column; }
+@media (min-width: 40rem) { .part-chart-pie { grid-template-columns: 18rem 1fr; } }

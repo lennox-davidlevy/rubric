@@ -1,0 +1,89 @@
+{{- /*
+  The catalog page: every part in catalog.yaml, at its defaults and then with
+  each other value of each setting, one setting at a time. Each item is
+  labeled with its plain form, the line a writer would pin. Parts are drawn
+  by the same partials their shortcodes use.
+*/ -}}
+{{ define "main" }}
+{{- $cat := hugo.Data.catalog }}
+{{- $samples := hugo.Data.samples }}
+{{- $theme := .Params.rubric.theme | default "paper" }}
+{{- $skin := partial "rubric/skin.html" . }}
+{{- /* The catalog's parts, and the parts this theme's skin adds. */}}
+{{- $parts := $cat.parts }}
+{{- with $skin }}{{ range $name, $p := (index hugo.Data.skins .).parts }}{{ if not (index $cat.parts $name) }}{{ $parts = merge $parts (dict $name $p) }}{{ end }}{{ end }}{{ end }}
+<header class="page-header">
+<h1>The {{ $cat.name }} catalog</h1>
+<p class="byline">Version {{ $cat.version }} · {{ len $parts }} parts{{ with $skin }}, with the {{ . }} skin's{{ end }} · in <strong>{{ $theme }}</strong>: {{ (index hugo.Data.themes $theme).description }}</p>
+</header>
+<nav class="catalog-nav" aria-label="Themes and parts">
+<p>{{ range $name, $_ := hugo.Data.themes }}{{ if eq $name $theme }}<strong>{{ $name }}</strong>{{ else }}<a href="{{ printf "/%s/" $name | relURL }}">{{ $name }}</a>{{ end }} {{ end }}· <a href="{{ printf "/stress/%s/" $theme | relURL }}">the stress page</a></p>
+<p>{{ range $name, $_ := $parts }}<a href="#{{ $name }}">{{ $name }}</a> {{ end }}<a href="#look">look</a></p>
+</nav>
+
+{{- range $name, $part := $parts }}
+{{- $sample := index $samples $name | default dict }}
+{{- /* Its own settings and the skin's additions; the look is shown once, below. */}}
+{{- $defs := $part.settings | default dict }}
+{{- with $skin }}{{ with index ((index hugo.Data.skins .).parts | default dict) $name }}{{ if index $cat.parts $name }}{{ $defs = merge $defs (.settings | default dict) }}{{ end }}{{ end }}{{ end }}
+{{- $base := dict }}
+{{- range $k, $d := $defs }}{{ $base = merge $base (dict $k ($d.default | default "")) }}{{ end }}
+{{- with $sample.settings }}{{ $base = merge $base . }}{{ end }}
+
+{{- /* One item at the defaults, one per other value, then the extras. */}}
+{{- $items := slice (dict) }}
+{{- range $k, $d := $defs }}
+  {{- $values := cond (eq $d.type "level") $d.levels $d.values }}
+  {{- range $v, $_ := $values }}
+    {{- if ne $v (string $d.default) }}
+      {{- $item := dict $k $v }}
+      {{- with index ($sample.pair | default dict) $k }}{{ $item = merge . $item }}{{ end }}
+      {{- $items = $items | append $item }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- range $sample.extra }}{{ $items = $items | append . }}{{ end }}
+
+<h2 id="{{ $name }}" class="catalog-part">{{ $name }}</h2>
+<p class="catalog-description">{{ $part.description }}{{ if $part.script }} <em>Brings a script.</em>{{ end }}{{ if not (index $cat.parts $name) }} <em>Comes with the {{ $skin }} skin.</em>{{ end }}</p>
+
+{{- if not (or (templates.Exists (printf "_partials/parts/%s.html" $name)) (and $skin (templates.Exists (printf "_partials/skins/%s/parts/%s.html" $skin $name)))) }}
+<p class="catalog-missing">Not drawn yet.</p>
+{{- else }}
+{{- $inner := "" }}
+{{- with $sample.md | default $part.body }}{{ $inner = $.RenderString (dict "display" "block") . }}{{ end }}
+{{- $toc := "" }}
+{{- with $sample.toc }}{{ $toc = printf "<nav id=\"TableOfContents\">%s</nav>" ($.RenderString (dict "display" "block") .) | safeHTML }}{{ end }}
+{{- range $items }}
+{{- /* An extra item may bring its own writing, as `md`; it is not a setting. */}}
+{{- $own := index . "md" }}
+{{- $s := merge $base . }}
+{{- $label := slice $name }}
+{{- range $k, $v := . }}{{ if ne $k "md" }}{{ $label = $label | append (printf "%s=%s" $k $v) }}{{ end }}{{ end }}
+<p class="catalog-label"><code>::: {{ delimit $label " " }}</code></p>
+{{- /* A frame part is drawn around a sample post, as it would be on one. */}}
+{{- $ctx := cond (eq $part.place "site") (site.GetPage "/posts/second") $ }}
+{{- if eq $part.place "site" }}{{ with $sample.md | default $part.body }}{{ $inner = $ctx.RenderString (dict "display" "block") . }}{{ end }}{{ end }}
+{{- $itemInner := $inner }}
+{{- with $own }}{{ $itemInner = $.RenderString (dict "display" "block") . }}{{ end }}
+{{- with $own }}<p class="catalog-label">with its own writing:</p>{{ end }}
+{{ partial "rubric/draw.html" (dict "name" $name "skin" $skin "args" (dict "s" $s "inner" $itemInner "raw" ($own | default $sample.md | default $part.body | default "") "page" $ctx "toc" $toc)) }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- /* The look settings, which every part in the writing has, shown once on
+     a callout: each value of each, one at a time. */}}
+<h2 id="look" class="catalog-part">look</h2>
+<p class="catalog-description">How any part in the writing looks, beyond its own settings. Every part has these; here on a callout.</p>
+{{- $callout := index $samples "callout" | default dict }}
+{{- $inner := $.RenderString (dict "display" "block") ($callout.md | default "A short note.") }}
+{{- range $key, $def := $cat.look }}
+  {{- range $v, $_ := $def.values }}
+    {{- if ne $v $def.default }}
+<p class="catalog-label"><code>::: callout {{ $key }}={{ $v }}</code></p>
+{{ partial "rubric/draw.html" (dict "name" "callout" "skin" $skin "args" (dict "s" (dict "kind" "note" "icon" "none" $key $v) "inner" $inner "raw" "" "page" $)) }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{ end }}

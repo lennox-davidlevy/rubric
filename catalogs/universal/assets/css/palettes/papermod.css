@@ -1,0 +1,43 @@
+/* papermod: white paper, near-black ink and gray, with no accent color.
+   Made by `bun scripts/theme.ts build` from themes/palettes/papermod.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #1f1f1f;
+  --accent: #1e1e1e;
+  --muted: #6c6c6c;
+  --rule: #eeeeee;
+  --tint: #f5f5f5;
+  --dark-paper: #1d1e20;
+  --dark-ink: #dadadb;
+  --dark-accent: #dadadb;
+  --raised: #ffffff;
+  --link: #1e1e1e;
+  --heading: #1e1e1e;
+  --code-paper: #1c1d21;
+  --code-ink: #d5d5d6;
+  --code-muted: #8b8c8f;
+  --code-accent: #66d9ef;
+  --positive: #1a7f37;
+  --warning: #8a5c00;
+  --danger: #cf222e;
+  --accent-tint: #ededed;
+  --positive-tint: #edf5ef;
+  --warning-tint: #f6f2eb;
+  --danger-tint: #fbedee;
+  --dark-muted: #9b9c9d;
+  --dark-rule: #414244;
+  --dark-tint: #2e2e33;
+  --dark-accent-tint: #343536;
+  --dark-positive: #84b191;
+  --dark-warning: #b6a178;
+  --dark-danger: #d5878d;
+  --dark-positive-tint: #29302e;
+  --dark-warning-tint: #2f2e2b;
+  --dark-danger-tint: #332b2d;
+  --shadow-soft: 0 1px 2px rgb(31 31 31 / 0.048), 0 2px 8px rgb(31 31 31 / 0.04);
+  --shadow-deep: 0 2px 4px rgb(31 31 31 / 0.048), 0 16px 40px rgb(31 31 31 / 0.112);
+}

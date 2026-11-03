@@ -1,0 +1,8 @@
+{{ define "main" }}
+{{- with partial "rubric/content.html" . }}
+<div class="intro">
+{{ . }}
+</div>
+{{- end }}
+{{ partial "rubric/post-list.html" (dict "pages" (where site.RegularPages "Section" "posts") "style" "dated") }}
+{{ end }}

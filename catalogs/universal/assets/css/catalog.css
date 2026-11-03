@@ -1,0 +1,24 @@
+/* The catalog page only. */
+.catalog-nav { font-size: var(--step--1); color: var(--muted); }
+.catalog-nav p { margin: 0; display: flex; flex-wrap: wrap; gap: 0 var(--space-2); }
+.catalog-nav p + p { margin-top: var(--space-1); }
+.flow > .catalog-part {
+  margin-top: var(--space-5);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: var(--step-1);
+  font-weight: 500;
+}
+.catalog-description { color: var(--muted); }
+.flow > .catalog-label { margin-top: var(--space-5); margin-bottom: 0; }
+.catalog-label code { background: none; padding: 0; color: var(--muted); font-size: var(--step--1); }
+.flow > .catalog-label + * { margin-top: var(--space-2); }
+.catalog-missing { color: var(--accent); font-style: italic; }
+
+/* A frame part shown as a sample: drawn in the column, not stuck to the
+   screen or set beside the page. */
+.flow > .part-header.sticky-stays { position: relative; }
+.flow > :is(.part-header, .part-footer, .part-banner) { grid-column: wide; }
+.flow > .part-page-contents { display: block; position: static; padding: 0; }
+.flow > .part-sidebar { padding: 0; border: 0; }

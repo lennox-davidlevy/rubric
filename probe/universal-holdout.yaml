@@ -1,0 +1,80 @@
+# Held out: written 2026-11-01 before any tuning on probe/universal.yaml, and
+# not looked at until tuning was done. Checked against once per change worth
+# keeping, never tuned on. Every directive is quoted, since an unquoted comma
+# ends a YAML flow value.
+
+# in the writing
+- { directive: "a gray box around this paragraph", want: "section tone=tint" }
+- { directive: "an inverted section with white text on black", want: "section tone=dark" }
+- { directive: "a full width stripe", want: "section width=full" }
+- { directive: "a splash header for the landing page", want: "hero" }
+- { directive: "a quotation from the essay", want: "quote" }
+- { directive: "what Mark Twain said, large", want: "quote size=large" }
+- { directive: "a client's kind words about working with us", want: "testimonial" }
+- { directive: "note: this only works on version 2", want: "callout" }
+- { directive: "be careful here", want: "callout kind=warning" }
+- { directive: "a helpful hint", want: "callout kind=tip" }
+- { directive: "a margin note", want: "sidenote" }
+- { directive: "a photo with a caption underneath", want: "figure" }
+- { directive: "a set of pictures from the wedding", want: "gallery" }
+- { directive: "a rotating slider of screenshots", want: "gallery layout=slideshow" }
+- { directive: "embed the vimeo clip", want: "video" }
+- { directive: "an mp3 of the interview", want: "audio" }
+- { directive: "an instagram post", want: "embed" }
+- { directive: "a google map of the venue", want: "embed" }
+- { directive: "the snippet from utils.py with its filename", want: "code" }
+- { directive: "a diagram of how the parts connect", want: "diagram" }
+- { directive: "the quadratic formula", want: "math" }
+- { directive: "a graph of sales over the year", want: "chart kind=line" }
+- { directive: "a table people can sort", want: "table" }
+- { directive: "tabbed code examples for npm and yarn", want: "tabs" }
+- { directive: "frequently asked questions", want: "fold" }
+- { directive: "a details section the reader can expand", want: "fold" }
+- { directive: "three columns", want: "columns" }
+- { directive: "a feature grid", want: "cards" }
+- { directive: "a numbered how-to", want: "steps" }
+- { directive: "milestones of the project in order", want: "timeline" }
+- { directive: "key figures, big and bold", want: "stats" }
+- { directive: "a pricing table", want: "pricing" }
+- { directive: "our team members with their roles", want: "people" }
+- { directive: "trusted by these brands", want: "logos" }
+- { directive: "a final pitch with a sign-up button", want: "call-to-action" }
+- { directive: "a button that says get started", want: "buttons" }
+- { directive: "a downloadable zip of the source", want: "download" }
+- { directive: "the five newest posts", want: "post-list" }
+- { directive: "an index of the sections on this page", want: "contents" }
+- { directive: "a section break", want: "divider" }
+- { directive: "a form to get in touch", want: "contact-form" }
+- { directive: "join the mailing list", want: "subscribe" }
+
+# nothing fits, in the writing
+- { directive: "a live chat with support", want: "nothing" }
+- { directive: "a poll for readers to vote in", want: "nothing" }
+- { directive: "a video call", want: "nothing" }
+- { directive: "a checkout page", want: "nothing" }
+- { directive: "a weather widget", want: "nothing" }
+- { directive: "a timer that counts down to the event", want: "nothing" }
+- { directive: "a drawing canvas", want: "nothing" }
+- { directive: "a password reset form", want: "nothing" }
+
+# in rubric.md
+- { place: site, directive: "a top navigation bar", want: "header" }
+- { place: site, directive: "a header that sticks to the top", want: "header sticky=stays" }
+- { place: site, directive: "a site-wide announcement", want: "banner" }
+- { place: site, directive: "the bottom of every page with the copyright", want: "footer" }
+- { place: site, directive: "a side menu", want: "sidebar" }
+- { place: site, directive: "a trail of links back to home", want: "breadcrumbs" }
+- { place: site, directive: "an on-this-page menu beside the article", want: "page-contents" }
+- { place: site, directive: "a featured image at the top of each post", want: "cover" }
+- { place: site, directive: "an about the author box", want: "author" }
+- { place: site, directive: "next post and previous post", want: "pager" }
+- { place: site, directive: "a discussion section for each post", want: "comments" }
+- { place: site, directive: "links to share on social media", want: "share" }
+- { place: site, directive: "find anything on the site", want: "search" }
+- { place: site, directive: "a light and dark switch", want: "theme-switch" }
+
+# nothing fits, in rubric.md
+- { place: site, directive: "a shopping basket in the corner", want: "nothing" }
+- { place: site, directive: "a login button for members", want: "nothing" }
+- { place: site, directive: "a popup asking for feedback", want: "nothing" }
+- { place: site, directive: "a music player that follows you between pages", want: "nothing" }

@@ -1,0 +1,5 @@
+5-7 | plain | left (invalid) | quote color=red |
+9-11 | plain | left (invalid) | quote size=huge |
+13-15 | plain | left (invalid) | quote size=large size=normal |
+17-19 | plain | left (invalid) | - |
+23 | plain | left (unclosed) | callout kind=note |

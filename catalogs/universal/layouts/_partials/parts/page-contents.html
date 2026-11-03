@@ -1,0 +1,6 @@
+{{- with .page.TableOfContents }}{{ if strings.Contains . "<li" }}
+<nav class="part part-page-contents" aria-label="On this page">
+<p class="part-page-contents-label">On this page</p>
+{{ . }}
+</nav>
+{{- end }}{{ end -}}

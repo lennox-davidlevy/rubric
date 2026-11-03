@@ -1,0 +1,3 @@
+/* related: other posts like this one. */
+.part-related { margin-top: var(--space-4) !important; }
+.part-related h2 { font-size: var(--step-0); font-family: var(--font-ui); color: var(--muted); text-transform: var(--label-case); letter-spacing: var(--tracking-label); }

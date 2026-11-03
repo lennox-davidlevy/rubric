@@ -1,0 +1,25 @@
+/* timeline: events along a line, each with when it happened. */
+.part-timeline { list-style: none; padding: 0 0 0 var(--space-3); border-left: var(--border) solid var(--rule); }
+.part-timeline > li { position: relative; }
+.part-timeline > li + li { margin-top: var(--space-4); }
+.part-timeline > li::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--space-3) - 0.375rem - var(--border) / 2);
+  top: 0.45em;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: var(--paper);
+  border: calc(var(--border) * 2) solid var(--accent);
+}
+.part-timeline-when {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  font-weight: var(--weight-strong);
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--accent);
+}
+.part-timeline h3 { margin: 0; font-size: var(--step-1); }
+.part-timeline .stack { margin-top: var(--space-1); }

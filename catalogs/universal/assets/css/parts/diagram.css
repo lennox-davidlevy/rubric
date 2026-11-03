@@ -1,0 +1,12 @@
+/* diagram: drawn by the script; its text, as written, until then. */
+.part-diagram { overflow-x: auto; }
+.part-diagram svg { display: block; max-width: 100%; height: auto; margin-inline: auto; }
+.part-diagram-source {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--code-paper);
+  color: var(--code-ink);
+  font-family: var(--font-mono);
+  font-size: var(--code-size);
+}

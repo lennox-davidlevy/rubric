@@ -1,0 +1,5 @@
+5-7 | words | placed | quote size=large align=center | "a quote from the book, big and centered"
+9-11 | words | placed | callout kind=warning | "callout warning"
+13-15 | words | left (unresolved) | - | "a spreadsheet of my taxes"
+17-19 | words | left (invalid) | quote color=red | "a line the catalog has since changed under"
+21-23 | words | placed | quote size=large | "blockquote size=large"

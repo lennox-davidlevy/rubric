@@ -1,0 +1,22 @@
+{{- /* One closed section, or, when the block has ## headings, one per
+     heading: a list of questions and answers. */ -}}
+{{- $x := partial "rubric/sections.html" (dict "html" .inner "level" 2) -}}
+{{- if $x.items }}
+<div class="part part-fold-group">
+{{- range $i, $it := $x.items }}
+<details class="part-fold"{{ if and (eq $i 0) (eq $.s.open "first") }} open{{ end }}>
+<summary>{{ $it.title }}</summary>
+<div class="stack">
+{{ $it.body }}
+</div>
+</details>
+{{- end }}
+</div>
+{{- else }}
+<details class="part part-fold"{{ if eq .s.open "first" }} open{{ end }}>
+<summary>{{ .s.summary | default "More" | markdownify }}</summary>
+<div class="stack">
+{{ .inner }}
+</div>
+</details>
+{{- end -}}

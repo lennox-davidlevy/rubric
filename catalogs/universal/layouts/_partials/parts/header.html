@@ -1,0 +1,12 @@
+{{- /* The site's name, its links (the block's list) and any tools the frame
+     has: search, the light and dark switch, other languages. */ -}}
+{{- $here := printf `href="%s"` .page.RelPermalink -}}
+<header class="part part-header layout-{{ .s.layout }} sticky-{{ .s.sticky }}">
+<div class="part-header-inner">
+<a class="part-header-title" href="{{ "/" | relURL }}"{{ if .page.IsHome }} aria-current="page"{{ end }}>{{ site.Title }}</a>
+{{- with .inner }}
+<nav class="part-header-nav" aria-label="Site">{{ replace (string .) $here (printf `%s aria-current="page"` $here) | safeHTML }}</nav>
+{{- end }}
+<div class="part-header-tools">{{ partial "rubric/frame.html" (dict "page" .page "slot" "tools") }}</div>
+</div>
+</header>

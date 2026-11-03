@@ -1,0 +1,18 @@
+{{- /* Simple: the block's links on one line, then the copyright. Columns:
+     each ### heading in the block heads a column of links. */ -}}
+<footer class="part part-footer layout-{{ .s.layout }}">
+<div class="part-footer-inner">
+{{- if eq .s.layout "columns" }}
+{{- $x := partial "rubric/sections.html" (dict "html" .inner "level" 3) }}
+<div class="part-footer-columns">
+{{- range $x.items }}
+<section><h2>{{ .title }}</h2>{{ .body }}</section>
+{{- end }}
+</div>
+{{- else }}
+{{- with .inner }}<nav class="part-footer-links" aria-label="Footer">{{ . }}</nav>{{ end }}
+{{- end }}
+<p class="part-footer-small">© {{ now.Year }} {{ site.Params.author | default site.Title }}{{ with site.Home.OutputFormats.Get "rss" }} · <a href="{{ .RelPermalink }}">RSS</a>{{ end }}</p>
+{{ partial "rubric/frame.html" (dict "page" .page "slot" "footer-extra") }}
+</div>
+</footer>

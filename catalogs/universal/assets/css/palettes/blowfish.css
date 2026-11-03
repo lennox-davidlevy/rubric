@@ -1,0 +1,43 @@
+/* blowfish: white paper, slate ink and a clear blue, with a dark code block.
+   Made by `bun scripts/theme.ts build` from themes/palettes/blowfish.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #334155;
+  --accent: #1d4ed8;
+  --muted: #5b6b80;
+  --rule: #e2e8f0;
+  --tint: #f1f5f9;
+  --dark-paper: #1e293b;
+  --dark-ink: #cbd5e1;
+  --dark-accent: #60a5fa;
+  --raised: #ffffff;
+  --link: #1d4ed8;
+  --heading: #0f172a;
+  --code-paper: #272822;
+  --code-ink: #f8f8f2;
+  --code-muted: #a6a28c;
+  --code-accent: #66d9ef;
+  --positive: #15803d;
+  --warning: #8f5a07;
+  --danger: #b91c1c;
+  --accent-tint: #dbeafe;
+  --positive-tint: #ecf5ef;
+  --warning-tint: #f6f2eb;
+  --danger-tint: #f9eded;
+  --dark-muted: #94a3b8;
+  --dark-rule: #475569;
+  --dark-tint: #283548;
+  --dark-accent-tint: #263852;
+  --dark-positive: #79af97;
+  --dark-warning: #b09e7f;
+  --dark-danger: #fb8a8a;
+  --dark-positive-tint: #293946;
+  --dark-warning-tint: #303743;
+  --dark-danger-tint: #393544;
+  --shadow-soft: 0 1px 2px rgb(15 23 42 / 0.096), 0 2px 8px rgb(15 23 42 / 0.08);
+  --shadow-deep: 0 2px 4px rgb(15 23 42 / 0.096), 0 16px 40px rgb(15 23 42 / 0.224);
+}

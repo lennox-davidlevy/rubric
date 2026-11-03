@@ -1,0 +1,7 @@
+These icons are from Font Awesome Free 6 (https://fontawesome.com), by
+Fonticons, Inc., licensed under the Creative Commons Attribution 4.0
+International license (CC BY 4.0): https://creativecommons.org/licenses/by/4.0/
+
+Copied unchanged from the Blowfish Hugo theme (github.com/nunocoracao/blowfish,
+assets/icons/), which ships them the same way. To add one, copy its SVG from
+there or from Font Awesome Free 6, and keep this notice.

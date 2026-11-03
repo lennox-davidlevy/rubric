@@ -1,0 +1,32 @@
+# Blowfish's type: Tailwind's system sans, with its typography plugin's
+# weights and leading: an extra-bold title, loose 1.75 lines.
+description: the reader's own system sans, extra-bold titles and loose lines
+
+faces: []
+preload: []
+
+body: [-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Noto Sans, Arial, sans-serif]
+display: body
+mono: [ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace]
+
+weight:
+  body: 400
+  strong: 600
+  heading: 700
+  display: 800
+
+leading:
+  body: 1.75
+  heading: 1.33
+  display: 1.11
+
+tracking:
+  display: -0.01em
+  label: 0.05em
+
+labels: uppercase
+numerals: lining
+quote: italic
+ornament: "• • •"
+code: 0.875em
+links: hover

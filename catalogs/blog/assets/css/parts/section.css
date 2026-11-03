@@ -1,0 +1,46 @@
+/* section: a box or a band. At prose width a box steps out by one gutter so
+   the writing inside stays on the column; wide and full use the page grid. */
+.part-section {
+  --pad: var(--space-3);
+}
+.part-section:not(.tone-theme.edge-flat) {
+  padding: var(--space-4) var(--pad);
+  border-radius: var(--radius);
+}
+.part-section.width-prose:not(.tone-theme.edge-flat) { margin-inline: calc(-1 * var(--pad)); }
+
+.part-section.width-wide, .part-section.width-full {
+  display: grid;
+  grid-template-columns: subgrid;
+  padding-inline: 0;
+}
+.part-section.width-wide { grid-column: wide; }
+.part-section.width-full, .part-section.width-full:not(.tone-theme.edge-flat) { grid-column: full; border-radius: 0; }
+.part-section.width-wide > .stack, .part-section.width-full > .stack { grid-column: prose; }
+
+.part-section.tone-tint { background: var(--tint); }
+.part-section.tone-dark {
+  /* The slots, redefined for writing on a dark ground. */
+  --paper: var(--dark-paper);
+  --ink: var(--dark-ink);
+  --accent: var(--dark-accent);
+  --muted: var(--dark-muted);
+  --rule: var(--dark-rule);
+  --tint: var(--dark-tint);
+  --accent-tint: var(--dark-accent-tint);
+  --raised: var(--dark-paper);
+  background: var(--paper);
+  color: var(--ink);
+}
+.part-section.tone-dark ::selection { background: var(--rule); }
+
+.part-section.edge-outlined { border: 1px solid var(--rule); }
+.part-section.edge-raised {
+  background-color: var(--raised);
+  box-shadow: var(--shadow-deep);
+}
+.part-section.edge-raised.tone-tint { background-color: var(--tint); }
+
+@media (max-width: 40rem) {
+  .part-section.width-prose:not(.tone-theme.edge-flat) { border-radius: 0; border-inline: 0; }
+}

@@ -1,0 +1,12 @@
+{{- /* The block's links: each named for its site. */ -}}
+{{- $names := dict "github.com" "GitHub" "gitlab.com" "GitLab" "codeberg.org" "Codeberg" "bsky.app" "Bluesky" "x.com" "X" "twitter.com" "X" "linkedin.com" "LinkedIn" "instagram.com" "Instagram" "youtube.com" "YouTube" "mastodon.social" "Mastodon" "fosstodon.org" "Mastodon" "hachyderm.io" "Mastodon" -}}
+{{- $urls := findRE `https?://[^"<\s]+` (replaceRE `href="[^"]*"` "" (string .inner)) -}}
+{{- if $urls }}
+<nav class="part part-social" aria-label="Elsewhere">
+{{- range $urls }}
+{{- $u := htmlUnescape . -}}
+{{- $host := replaceRE `^https?://(?:www\.)?([^/]+).*$` "$1" $u -}}
+<a href="{{ $u }}" rel="me">{{ index $names $host | default (cond (hasPrefix $u "mailto:") "Email" $host) }}</a>
+{{- end }}
+</nav>
+{{- end -}}

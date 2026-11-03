@@ -1,0 +1,22 @@
+{{- /* Blowfish's timeline: a blue line with a round mark for each event, and
+     each event on a card lifted well off the page, its date as the heading.
+     Each ### heading is "when — what", as in the catalog's. */ -}}
+{{- $x := partial "rubric/sections.html" (dict "html" .inner "level" 3) -}}
+{{- $check := resources.Get "icons/fontawesome/check.svg" -}}
+<ol class="part part-timeline">
+{{- range $x.items }}
+{{- $parts := split (string .title) " — " }}
+{{- $when := cond (gt (len $parts) 1) (index $parts 0) "" }}
+{{- $what := cond (gt (len $parts) 1) (delimit (after 1 $parts) " — ") (string .title) }}
+<li>
+<span class="part-timeline-mark" aria-hidden="true">{{ with $check }}{{ .Content | safeHTML }}{{ end }}</span>
+<div class="part-timeline-card">
+{{- with $when }}<p class="part-timeline-when">{{ . | safeHTML }}</p>{{ end }}
+<h3>{{ $what | safeHTML }}</h3>
+<div class="stack">
+{{ .body }}
+</div>
+</div>
+</li>
+{{- end }}
+</ol>

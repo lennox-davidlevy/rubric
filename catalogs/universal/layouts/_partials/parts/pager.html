@@ -1,0 +1,9 @@
+{{- /* Earlier and later posts in the same section. */ -}}
+{{- $earlier := .page.PrevInSection -}}
+{{- $later := .page.NextInSection -}}
+{{- if or $earlier $later }}
+<nav class="part part-pager" aria-label="More posts">
+{{- with $earlier }}<a class="part-pager-earlier" href="{{ .RelPermalink }}" rel="prev"><span>Earlier</span>{{ .LinkTitle }}</a>{{ end }}
+{{- with $later }}<a class="part-pager-later" href="{{ .RelPermalink }}" rel="next"><span>Later</span>{{ .LinkTitle }}</a>{{ end }}
+</nav>
+{{- end -}}

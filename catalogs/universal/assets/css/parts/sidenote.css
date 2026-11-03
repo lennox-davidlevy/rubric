@@ -1,0 +1,28 @@
+/* sidenote: a note beside the writing. In the margin on a wide screen, level
+   with the end of the paragraph before it; in the flow, small, on a phone. */
+.part-sidenote {
+  padding-left: calc(var(--space-2) - var(--border));
+  border-left: var(--border) solid var(--rule);
+  font-size: var(--step--1);
+  line-height: 1.5;
+  color: var(--muted);
+}
+@media (min-width: 72rem) {
+  .flow > .part-sidenote {
+    grid-column: prose-end / full-end;
+    position: relative;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .flow > .part-sidenote > .stack {
+    position: absolute;
+    bottom: 0;
+    left: var(--space-4);
+    width: min(16rem, 100% - var(--space-5));
+    padding-left: calc(var(--space-2) - var(--border));
+    border-left: var(--border) solid var(--rule);
+  }
+  .flow > .part-sidenote + * { margin-top: 1lh; }
+}

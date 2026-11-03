@@ -1,0 +1,41 @@
+# PaperMod's colors (github.com/adityatelange/hugo-PaperMod, MIT), from its
+# assets/css/core/theme-vars.css. Grayscale, with no accent of its own: links
+# and marks are the heading color, and its dark mode is a gray near-black.
+description: white paper, near-black ink and gray, with no accent color
+
+scheme: light
+
+paper: "#ffffff"    # --theme
+ink: "#1f1f1f"      # --content, the writing
+heading: "#1e1e1e"  # --primary
+link: "#1e1e1e"     # --primary, underlined
+accent: "#1e1e1e"   # PaperMod has none; marks and rules use --primary
+muted: "#6c6c6c"    # --secondary
+rule: "#eeeeee"     # --border
+tint: "#f5f5f5"     # --code-bg, behind inline code, tags, the contents box
+raised: "#ffffff"   # --entry, a post card
+
+# Its code blocks are dark on the light page.
+code-paper: "#1c1d21"  # --code-block-bg
+code-ink: "#d5d5d6"
+code-muted: "#8b8c8f"
+code-accent: "#66d9ef"
+
+# PaperMod has no notice colors; these are plain, readable ones.
+positive: "#1a7f37"
+warning: "#8a5c00"
+danger: "#cf222e"
+
+# Its dark mode, which is also the dark band.
+dark:
+  paper: "#1d1e20"  # --theme
+  ink: "#dadadb"    # --primary
+  accent: "#dadadb"
+  muted: "#9b9c9d"  # --secondary
+  rule: "#414244"   # --tertiary; its --border is too faint to rule with
+  tint: "#2e2e33"   # --entry and --code-block-bg
+
+# PaperMod raises nothing with a shadow of its own (cards have a border
+# instead), so these are only for the look settings: a part asked to have one.
+shadow:
+  strength: 0.8

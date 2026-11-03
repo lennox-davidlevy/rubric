@@ -1,0 +1,13 @@
+{{- /* `file` names the code. When a file of that name is in the site, its
+     code is shown; otherwise the block's own code is, under the name. */ -}}
+{{- $code := .inner -}}
+{{- with .s.file }}{{ if fileExists . }}
+  {{- $lang := path.Ext . | strings.TrimPrefix "." -}}
+  {{- $code = transform.Highlight (os.ReadFile .) $lang (cond (ne $.s.lines "") (dict "hl_lines" $.s.lines) dict) -}}
+{{- end }}{{ end -}}
+<figure class="part part-code">
+{{- with .s.file }}
+<figcaption>{{ . }}</figcaption>
+{{- end }}
+{{ $code }}
+</figure>
