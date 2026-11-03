@@ -6,7 +6,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  applyRefine, atPlace, Cache, formatPlain, frame, FRAME_PAGE, framePage, parsePlain, preprocess, refineWords, scan, lines as splitLines,
+  applyRefine, atPlace, Cache, frontMatterProblem, liveContent, settingsOf, formatPlain, frame, FRAME_PAGE, framePage, parsePlain, preprocess, refineWords, scan, lines as splitLines,
   THRESHOLDS, writeWhole,
   type Catalog, type Diagnostic, type Directive, type Entry, type PageKind, type Place, type Refined, type Resolution,
 } from "../core/index.ts";
@@ -62,9 +62,16 @@ interface Doc {
 }
 
 export interface Options {
-  // How long the writer pauses on a words line before it is sent to Jev.
-  // Leaving the line sends it at once.
+  // The longest the writer pauses on a words line before it is sent to Jev.
+  // Leaving the line, Esc, or the accept key with nothing shown sends it at
+  // once (askNow). Once the server has seen enough of the writer's typing,
+  // the pause is fitted to it: half again the gap the writer leaves between
+  // keys nine times in ten, never under minIdleMs.
   idleMs?: number;
+  minIdleMs?: number;
+  // Each edit to a words line, for `bun run play` to log, so the pause can
+  // be tuned on real typing (scripts/pause.ts).
+  onEdit?: (edit: { t: number; line: number; words: string; pause: number }) => void;
   // How long a ghost text request waits for an answer before giving up.
   waitMs?: number;
   // How long after the last change the page is drawn to content/, so a burst
@@ -81,7 +88,8 @@ export interface Options {
 const PIN = " -> ";
 
 export class Workspace {
-  readonly site: Site;
+  // Replaced by reload() when hugo.toml changes, as when the theme does.
+  site: Site;
   #cache: Cache;
   #resolver: Resolver;
   #publish: (file: string, notes: Note[]) => void;
@@ -92,6 +100,11 @@ export class Workspace {
   #timers = new Map<string, ReturnType<typeof setTimeout>>();
   #draws = new Map<string, ReturnType<typeof setTimeout>>();
   #idleMs: number;
+  #minIdleMs: number;
+  #onEdit: Options["onEdit"];
+  // The writer's recent gaps between keys on a words line, and the last edit.
+  #gaps: number[] = [];
+  #lastEdit: { file: string; line: number; t: number } | undefined;
   #waitMs: number;
   #drawMs: number;
   #refiner: Refiner | undefined;
@@ -102,6 +115,8 @@ export class Workspace {
     this.#resolver = resolver;
     this.#publish = publish;
     this.#idleMs = opts.idleMs ?? 1000;
+    this.#minIdleMs = Math.min(opts.minIdleMs ?? 400, this.#idleMs);
+    this.#onEdit = opts.onEdit;
     this.#waitMs = opts.waitMs ?? 5000;
     this.#drawMs = opts.drawMs ?? 100;
     this.#refiner = opts.refiner;
@@ -117,6 +132,30 @@ export class Workspace {
     }
     const rubric = join(this.site.root, "rubric.md");
     if (!this.#docs.has(rubric)) await this.#write("rubric.md", "site", await readFile(rubric, "utf8").catch(() => ""));
+  }
+
+  // The site again, after hugo.toml changed: a new theme may bring another
+  // skin, so other parts and settings. Every page is drawn again with it, and
+  // open pages' lines are asked about in it; answers are kept per skin, so
+  // lines already asked in it cost nothing.
+  async reload(site: Site): Promise<void> {
+    this.site = site;
+    this.#errors.clear();
+    this.#written.clear();
+    await this.buildAll();
+    for (const file of this.#docs.keys()) {
+      await this.#render(file);
+      this.#askAll(file);
+    }
+  }
+
+  // Where the writer's cursor is, for the live preview to follow: the page's
+  // file as Hugo knows it, its address, and the line. Nothing for rubric.md,
+  // which is not a page of its own.
+  cursor(file: string, line: number): { source: string; url: string; line: number } | undefined {
+    const doc = this.#docs.get(file);
+    if (!doc || doc.page === "site") return undefined;
+    return { source: doc.rel, url: pageUrl(doc.rel, doc.text), line };
   }
 
   // The parts a line can be in this kind of file: the frame in rubric.md,
@@ -148,11 +187,50 @@ export class Workspace {
     if (!doc) return this.open(file, text);
     doc.editing = firstChangedLine(doc.text, text);
     doc.text = text;
+    this.#timeEdit(file, doc);
     this.#drawSoon(file);
     // Half-typed words are not worth an answer: the line being edited waits
     // for a pause, and every other line has been left, so is finished.
     this.#askAll(file, doc.editing);
     this.#schedule(file);
+  }
+
+  // The writer says the line is done (Esc, or the accept key before any ghost
+  // text): ask now rather than after the pause. The ghost text request
+  // Neovim already has open is answered as soon as Jev is.
+  askNow(file: string): void {
+    if (!this.#docs.has(file)) return;
+    clearTimeout(this.#timers.get(file));
+    this.#timers.delete(file);
+    this.#askAll(file);
+  }
+
+  // How long to wait for a pause on the line being typed: fitted to the
+  // writer once there are enough gaps to go on, the most otherwise.
+  pause(): number {
+    if (this.#gaps.length < 20) return this.#idleMs;
+    const sorted = [...this.#gaps].sort((a, b) => a - b);
+    const p90 = sorted[Math.floor(0.9 * (sorted.length - 1))]!;
+    return Math.round(Math.min(this.#idleMs, Math.max(this.#minIdleMs, 1.5 * p90)));
+  }
+
+  #timeEdit(file: string, doc: Doc): void {
+    const line = doc.editing;
+    const d = line === undefined ? undefined : this.#directiveAt(doc, line);
+    if (line === undefined || d?.kind !== "words" || d.line !== line || d.words === undefined) {
+      this.#lastEdit = undefined;
+      return;
+    }
+    const t = Date.now();
+    const last = this.#lastEdit;
+    // Only gaps within one burst of typing on one line: a longer one is the
+    // writer stopping, which is what the pause is for.
+    if (last && last.file === file && last.line === line && t - last.t < 2000) {
+      this.#gaps.push(t - last.t);
+      if (this.#gaps.length > 200) this.#gaps.shift();
+    }
+    this.#lastEdit = { file, line, t };
+    this.#onEdit?.({ t, line, words: d.words, pause: this.pause() });
   }
 
   // A closed page is drawn from disk again, so unsaved edits leave the preview.
@@ -314,7 +392,7 @@ export class Workspace {
     const eq = token.indexOf("=");
     if (eq === -1) {
       const used = new Set([...body.matchAll(/([a-z][a-z0-9-]*)=/g)].map((m) => m[1]));
-      return Object.entries(part.settings)
+      return Object.entries(settingsOf(this.site.catalog, first!))
         .filter(([name]) => !used.has(name) && name.startsWith(token))
         .map(([name, s]) => ({
           label: name,
@@ -328,7 +406,8 @@ export class Workspace {
 
     const key = token.slice(0, eq);
     const typed = token.slice(eq + 1);
-    const def = Object.hasOwn(part.settings, key) ? part.settings[key] : undefined;
+    const defs = settingsOf(this.site.catalog, first!);
+    const def = Object.hasOwn(defs, key) ? defs[key] : undefined;
     if (def?.type === "image") return this.#pictures(typed, tokenStart + eq + 1, character, true);
     const values =
       def?.type === "choice" ? def.values
@@ -363,8 +442,9 @@ export class Workspace {
     if (d.plain && Object.hasOwn(parts, d.plain.part)) {
       const part = parts[d.plain.part]!;
       const out = [`**${d.plain.part}**: ${part.description}`];
+      const defs = settingsOf(this.site.catalog, d.plain.part);
       for (const s of d.plain.settings) {
-        const def = part.settings[s.key];
+        const def = defs[s.key];
         const meaning =
           def?.type === "choice" ? def.values[s.value]
           : def?.type === "level" ? def.levels[s.value]
@@ -408,12 +488,27 @@ export class Workspace {
   #unsettledMessage(partName: string, unsettled: string[]): string {
     const part = this.site.catalog.parts[partName];
     const each = unsettled.map((name) => {
-      const def = part?.settings[name];
+      const def = part ? settingsOf(this.site.catalog, partName)[name] : undefined;
       const values = def?.type === "choice" ? Object.keys(def.values) : def?.type === "level" ? Object.keys(def.levels) : def?.type === "flag" ? ["true", "false"] : [];
       const at = def?.type === "choice" || def?.type === "level" ? ` (left at ${def.default})` : "";
       return values.length ? `${name} can be ${values.join(", ")}${at}` : name;
     });
     return `no value clearly matches what this asks of the ${partName}: ${each.join("; ")}`;
+  }
+
+  // Words after a ":" that ask more than the part's settings can say: what
+  // was taken, then every value the part has, so the writer sees how near
+  // the nearest is. "hard shadow" becomes shadow=deep, and the note says
+  // deep is as far as shadow goes.
+  #beyondMessage(partName: string, hit: Refined): string {
+    const defs = settingsOf(this.site.catalog, partName);
+    const took = Object.entries(hit.settings).map(([k, v]) => `${k}=${v}`);
+    const offers = Object.entries(defs).flatMap(([name, def]) => {
+      const values = def.type === "choice" ? Object.keys(def.values) : def.type === "level" ? Object.keys(def.levels) : def.type === "flag" ? ["true", "false"] : [];
+      return values.length ? [`${name} ${values.join(", ")}`] : [];
+    });
+    const head = took.length ? `took ${took.join(" ")}, but some of this asks for more` : "this asks for more";
+    return `${head} than ${partName}'s settings can say. ${offers.length ? `${partName} offers ${offers.join("; ")}` : `${partName} has no settings`}`;
   }
 
   #directiveAt(doc: Doc, line: number): Directive | undefined {
@@ -432,7 +527,7 @@ export class Workspace {
     const said = Object.entries(hit.settings).map(([k, v]) => `${k}=${v}`);
     const out = [said.length ? `the words ask for ${said.join(" ")}` : "the words ask for no setting"];
     if (hit.unsettled.length) out.push(this.#unsettledMessage(part, hit.unsettled));
-    if (hit.beyond > THRESHOLDS.yes) out.push(`some of it is more than a ${part} can do`);
+    if (hit.beyond > THRESHOLDS.yes) out.push(`some of it asks for more than ${part}'s settings can say`);
     return out.join("; ");
   }
 
@@ -441,7 +536,7 @@ export class Workspace {
     this.#timers.set(file, setTimeout(() => {
       this.#timers.delete(file);
       this.#askAll(file);
-    }, this.#idleMs));
+    }, this.pause()));
   }
 
   #askAll(file: string, except?: number): void {
@@ -532,7 +627,7 @@ export class Workspace {
     if (!doc) return;
     const { entries, diagnostics } = await this.#write(doc.rel, doc.page, doc.text);
     this.#publish(file, [
-      ...diagnostics.map((d): Note => ({ ...d, severity: "warning" })),
+      ...diagnostics.map((d): Note => ({ ...d, severity: d.code === "other-skin" ? "information" : "warning" })),
       ...this.#wordsNotes(doc, entries),
       ...this.#neededNotes(doc, entries),
       ...this.#refineNotes(doc),
@@ -543,15 +638,22 @@ export class Workspace {
   async #write(rel: string, page: PageKind, text: string) {
     if (page === "site") return this.#writeFrame(text);
     const out = preprocess(text, this.site.catalog, this.#cache.resolver(this.site.catalog, page));
+    // Half-typed front matter is never handed to Hugo; the page it last read
+    // stays until the front matter parses again.
+    const broken = frontMatterProblem(text);
+    if (broken) out.diagnostics.unshift(broken);
     // Renders overlap (a keystroke, an answer arriving), so each file is
     // written whole and in order, through a folder Hugo does not watch.
     const tmp = join(this.site.root, ".rubric/tmp");
     const target = join(this.site.content, rel);
     const sidecar = join(this.site.root, ".rubric/sidecar", `${rel}.json`);
     const writes = [writeWhole(sidecar, JSON.stringify(out.entries, null, 2) + "\n", tmp)];
-    if (this.#written.get(target) !== out.content) {
-      this.#written.set(target, out.content);
-      writes.push(writeWhole(target, out.content, tmp));
+    // The live preview's markers and starters: the editor's content/ is a
+    // preview; `rubric build` writes the page without them.
+    const content = liveContent(text, out, this.site.catalog);
+    if (!broken && this.#written.get(target) !== content) {
+      this.#written.set(target, content);
+      writes.push(writeWhole(target, content, tmp));
     }
     await Promise.all(writes);
     return out;
@@ -647,14 +749,7 @@ export class Workspace {
       }
       if (!hit) continue;
       if (hit.unsettled.length) notes.push({ ...at, code: "left-at-default", severity: "information", message: this.#unsettledMessage(part, hit.unsettled) });
-      if (hit.beyond > THRESHOLDS.yes) {
-        const defs = this.site.catalog.parts[part]?.settings ?? {};
-        const asked = Object.keys(defs).filter((k) => ["choice", "level", "flag"].includes(defs[k]!.type));
-        notes.push({
-          ...at, code: "beyond-part", severity: "information",
-          message: `some of this is more than a ${part} can do${asked.length ? `: its settings are ${asked.join(", ")}` : ", which has no settings"}`,
-        });
-      }
+      if (hit.beyond > THRESHOLDS.yes) notes.push({ ...at, code: "beyond-part", severity: "information", message: this.#beyondMessage(part, hit) });
     }
     return notes;
   }
@@ -669,7 +764,14 @@ export class Workspace {
       const error = this.#errors.get(this.#key(doc.page, e.words));
       const hit = this.#cache.get(this.site.catalog, doc.page, e.words);
       if (error && !hit) notes.push({ ...at, code: "jev-error", severity: "warning", message: `could not reach Jev: ${error.replace(/^could not reach Jev: /, "")}` });
-      else if (hit?.outcome === "nothing-fits") notes.push({ ...at, code: "nothing-fits", severity: "warning", message: "nothing in the catalog fits" });
+      else if (hit?.outcome === "nothing-fits") {
+        // rubric.md is asked only about the frame, so a line for the writing
+        // fits nothing there; say where it would go.
+        const message = doc.page === "site"
+          ? "nothing for the frame fits; rubric.md holds only what goes around every page, and parts for the writing go in a page"
+          : "nothing in the catalog fits";
+        notes.push({ ...at, code: "nothing-fits", severity: "warning", message });
+      }
       else if (hit?.outcome === "unsettled") notes.push({ ...at, code: "unsettled", severity: "information", message: `not sure what this asks for: ${hit.candidates.map((c) => c.plain).join(" or ")}` });
       else if (hit?.outcome === "placed" && hit.candidates[0]!.unsettled.length) {
         notes.push({ ...at, code: "left-at-default", severity: "information", message: this.#unsettledMessage(hit.candidates[0]!.part, hit.candidates[0]!.unsettled) });
@@ -688,4 +790,19 @@ function firstChangedLine(before: string, after: string): number {
   let i = 0;
   while (i < a.length && i < b.length && a[i] === b[i]) i++;
   return i;
+}
+
+// The address Hugo gives a page, as near as the file says: its url or slug
+// in the front matter, or its path, lowercased, with an index file standing
+// for its folder.
+export function pageUrl(rel: string, text: string): string {
+  const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1] ?? "";
+  const field = (name: string) => new RegExp(`^${name}:\\s*["']?([^"'\\n]+?)["']?\\s*$`, "m").exec(fm)?.[1];
+  const url = field("url");
+  if (url) return url.startsWith("/") ? url : `/${url}`;
+  const parts = rel.replace(/\\/g, "/").replace(/\.md$/, "").split("/");
+  const last = parts.pop()!;
+  if (last !== "_index" && last !== "index") parts.push(field("slug") ?? last);
+  const path = parts.map((p) => p.toLowerCase().replace(/\s+/g, "-")).join("/");
+  return path ? `/${path}/` : "/";
 }

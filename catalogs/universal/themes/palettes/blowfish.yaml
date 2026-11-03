@@ -1,0 +1,42 @@
+# Blowfish's colors (github.com/nunocoracao/blowfish, MIT), its default
+# "blowfish" scheme (assets/css/schemes/blowfish.css) as its Tailwind
+# typography draws them: slate grays, a blue primary, a monokai code block.
+description: white paper, slate ink and a clear blue, with a dark code block
+
+scheme: light
+
+paper: "#ffffff"    # neutral (white)
+ink: "#334155"      # neutral-700, the writing
+heading: "#0f172a"  # neutral-900
+link: "#1d4ed8"     # primary-700; its 600 is too faint on the pale blue of a callout
+accent: "#1d4ed8"   # primary-700: marks, buttons, labels on the pale blue
+muted: "#5b6b80"    # neutral-500 (#64748b), a shade darker to read on the tint
+rule: "#e2e8f0"     # neutral-200
+tint: "#f1f5f9"     # neutral-100
+raised: "#ffffff"
+accent-tint: "#dbeafe"  # primary-100, behind an alert
+
+code-paper: "#272822"   # its monokai code block
+code-ink: "#f8f8f2"
+code-muted: "#a6a28c"   # monokai's comment gray, lifted to be readable
+code-accent: "#66d9ef"
+
+positive: "#15803d"  # green-700
+warning: "#8f5a07"   # between yellow-700 and 800, to read on its tint
+danger: "#b91c1c"    # red-700
+
+# Its dark appearance, which is also the dark band.
+dark:
+  paper: "#1e293b"  # neutral-800
+  ink: "#cbd5e1"    # neutral-300
+  accent: "#60a5fa" # primary-400
+  muted: "#94a3b8"  # neutral-400
+  rule: "#475569"   # neutral-600
+  tint: "#283548"   # between neutral-800 and 700, so light text reads on it
+  danger: "#fb8a8a" # red-400, a touch lighter to read on its tint
+
+# Blowfish lifts cards and alerts with Tailwind's shadows, the timeline's
+# strongly.
+shadow:
+  color: "#0f172a"
+  strength: 1.6

@@ -55,3 +55,18 @@ end
 function RubricTest.line(n)
   return vim.api.nvim_buf_get_lines(0, n - 1, n, false)[1] or ""
 end
+
+-- The hint beside the ghost text when there is more than one pick, or "".
+function RubricTest.picks()
+  local ns = vim.api.nvim_get_namespaces()["rubric.picks"]
+  if not ns then
+    return ""
+  end
+  for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })) do
+    local vt = m[4].virt_text
+    if vt and vt[1] then
+      return vt[1][1]
+    end
+  end
+  return ""
+end

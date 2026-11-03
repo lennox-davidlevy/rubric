@@ -1,0 +1,6 @@
+{{- /* Written by the language server for the live preview, never by
+     `rubric build`: where a block starts in the writer's file, so the
+     preview can follow their cursor, and whether the block below is a
+     starter body standing in for an empty one. Nothing outside `hugo server`.
+     A <link> is never drawn, so it leaves the spacing as it was. */ -}}
+{{- if hugo.IsServer }}<link data-rubric-line="{{ .Get 0 }}"{{ with .Get 1 }} data-rubric-starter{{ end }}>{{ end -}}

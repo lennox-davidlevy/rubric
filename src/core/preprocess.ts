@@ -61,6 +61,16 @@ export function preprocess(text: string, catalog: Catalog, resolve: Resolve = ()
         }));
       }
     }
+    // Settings another skin adds are kept in the pin but left out of the
+    // page, with a note; the part still draws. A part another skin adds
+    // does not draw at all.
+    const notes = problems.filter((p) => p.code === "other-skin");
+    if (form && notes.length > 0 && notes.length === problems.length && Object.hasOwn(catalog.parts, form.part)) {
+      const elsewhere = catalog.elsewhere.settings[form.part] ?? {};
+      form = { ...form, settings: form.settings.filter((s) => !Object.hasOwn(elsewhere, s.key)) };
+      diagnostics.push(...notes);
+      problems = [];
+    }
     forms.push(form);
 
     const wrongPlace = form && Object.hasOwn(catalog.parts, form.part) && catalog.parts[form.part]!.place !== place;

@@ -52,18 +52,22 @@ describe("reading the answers", () => {
   };
 
   test("asks each setting whether the words speak to it, and what no setting covers", () => {
-    expect(Object.keys(refineQuestions(catalog, "video")).sort()).toEqual(["beyond", "setting:video:width", "told:video:width"]);
+    const ids = Object.keys(refineQuestions(catalog, "video"));
+    for (const id of ["beyond", "setting:video:width", "told:video:width", "setting:video:shadow", "told:video:shadow"]) expect(ids).toContain(id);
   });
 
+  // The look settings, which the words leave alone in these tests.
+  const lookUntold = (part: string) => Object.fromEntries(["shadow", "border", "corners", "text"].map((k) => [`told:${part}:${k}`, noul(0.05)]));
+
   test("a setting the words speak to takes their value; one they leave alone is left", () => {
-    const answers = { "told:video:width": noul(0.9), "setting:video:width": choice({ prose: 0.05, wide: 0.9, full: 0.05 }), beyond: noul(0.1) } as unknown as Answers;
+    const answers = { ...lookUntold("video"), "told:video:width": noul(0.9), "setting:video:width": choice({ prose: 0.05, wide: 0.9, full: 0.05 }), beyond: noul(0.1) } as unknown as Answers;
     expect(resolveRefine(answers, catalog, "video")).toEqual({ settings: { width: "wide" }, unsettled: [], beyond: 0.1 });
     const quiet = { ...answers, "told:video:width": noul(0.1) } as unknown as Answers;
     expect(resolveRefine(quiet, catalog, "video").settings).toEqual({});
   });
 
   test("spoken to with no clear value is unsettled", () => {
-    const answers = { "told:pricing:featured": noul(0.9), "setting:pricing:featured": choice({ none: 0.1, last: 0.45, middle: 0.45 }), beyond: noul(0.8) } as unknown as Answers;
+    const answers = { ...lookUntold("pricing"), "told:pricing:featured": noul(0.9), "setting:pricing:featured": choice({ none: 0.1, last: 0.45, middle: 0.45 }), beyond: noul(0.8) } as unknown as Answers;
     expect(resolveRefine(answers, catalog, "pricing")).toEqual({ settings: {}, unsettled: ["featured"], beyond: 0.8 });
   });
 
@@ -135,12 +139,28 @@ describe("in the editor", () => {
     expect(asked).toEqual([]);
   });
 
+  test("a look setting is something any part can do", async () => {
+    await ws.change(page(), `${head}::: a video -> video : with a soft shadow\nhttps://youtu.be/x\n:::\n`);
+    await ws.settle();
+    const [g] = await ws.ghost(page(), 3);
+    expect(g?.replace).toBe("::: a video -> video shadow=soft : with a soft shadow");
+  });
+
   test("words asking for more than the part can do get a note on them", async () => {
-    await ws.change(page(), `${head}::: a video -> video : with a shadow\nhttps://youtu.be/x\n:::\n`);
+    await ws.change(page(), `${head}::: a video -> video : with sparkles\nhttps://youtu.be/x\n:::\n`);
     await ws.settle();
     const n = (notes.get(page()) ?? []).find((x) => x.code === "beyond-part");
     expect(n).toMatchObject({ line: 3, start: 23 });
-    expect(n!.message).toBe("some of this is more than a video can do: its settings are width");
+    expect(n!.message).toBe(
+      "this asks for more than video's settings can say. video offers width prose, wide, full; shadow none, soft, deep; border none, outlined; corners theme, square, round; text normal, smaller, bigger",
+    );
+  });
+
+  test("the note says what was taken when some of it fit", async () => {
+    await ws.change(page(), `${head}::: a video -> video : wide, with sparkles\nhttps://youtu.be/x\n:::\n`);
+    await ws.settle();
+    const n = (notes.get(page()) ?? []).find((x) => x.code === "beyond-part");
+    expect(n!.message).toStartWith("took width=wide, but some of this asks for more than video's settings can say. video offers width prose, wide, full;");
   });
 
   test("no completion after the colon: those words are for Jev", () => {

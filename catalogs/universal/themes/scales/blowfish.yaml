@@ -1,0 +1,16 @@
+# Blowfish's sizes, from Tailwind's typography at its base size: 16px
+# writing, headings at 20, 24 and 36px, a 65-character column, 6px corners.
+description: 16px writing in a 65-character column, headings on a ratio of 1.25
+
+screen: [360, 1240]
+body: [16, 17]
+ratio: [1.2, 1.25]
+steps: [-1, 4]
+
+space: [0.5, 1, 1.5, [2, 2.5], [3, 4]]
+
+measure: 37rem   # max-w-prose, 65ch
+wide: 64rem
+radius: 6px      # rounded-md
+border: 1px
+controls: 6px

@@ -4,9 +4,9 @@
 // the cache, and the API-error row in the client.
 
 import type { ChoiceResponse, NoulResponse, ScoreResponse } from "@typesafe-ai/sdk";
-import type { Catalog } from "./catalog.ts";
+import { settingsOf, type Catalog } from "./catalog.ts";
 import { formatPlain } from "./plain.ts";
-import { BEYOND, fitsId, PART, saidId, settingId, THRESHOLDS, toldId } from "./questions.ts";
+import { BEYOND, fitsId, lookId, lookSaidId, PART, saidId, settingId, THRESHOLDS, toldId } from "./questions.ts";
 
 export type Answer = NoulResponse | ChoiceResponse | ScoreResponse;
 export type Answers = Readonly<Record<string, Answer>>;
@@ -110,6 +110,22 @@ function candidate(answers: Answers, catalog: Catalog, part: string, probability
     if (value !== undefined) settings.push({ key: name, value });
   }
 
+  // The look, asked once for the line, applies to whichever part it is.
+  if (catalog.parts[part]!.place === "writing") {
+    for (const [name, def] of Object.entries(catalog.look)) {
+      if (def.type !== "choice" || !answers[lookId(name)]) continue;
+      const said = noul(answers, lookSaidId(name));
+      if (said < THRESHOLDS.no) continue;
+      if (said <= THRESHOLDS.yes) {
+        unsettled.push(name);
+        continue;
+      }
+      const [best, p] = top(choiceAnswer(answers, lookId(name)).probabilities as Record<string, number>);
+      if (p < THRESHOLDS.settled || !Object.hasOwn(def.values, best)) unsettled.push(name);
+      else if (best !== def.default) settings.push({ key: name, value: best });
+    }
+  }
+
   return { part, probability, plain: formatPlain({ part, settings }), unsettled };
 }
 
@@ -126,7 +142,7 @@ export interface Refined {
 export function resolveRefine(answers: Answers, catalog: Catalog, part: string): Refined {
   const settings: Record<string, string> = {};
   const unsettled: string[] = [];
-  for (const [name, def] of Object.entries(catalog.parts[part]!.settings)) {
+  for (const [name, def] of Object.entries(settingsOf(catalog, part))) {
     if (def.type !== "choice" && def.type !== "level" && def.type !== "flag") continue;
     const told = noul(answers, toldId(part, name));
     if (told < THRESHOLDS.no) continue;
@@ -156,7 +172,7 @@ export function resolveRefine(answers: Answers, catalog: Catalog, part: string):
 export function applyRefine(
   form: { part: string; settings: readonly { key: string; value: string }[] }, refined: Refined, catalog: Catalog,
 ): { part: string; settings: { key: string; value: string }[] } {
-  const defs = catalog.parts[form.part]?.settings ?? {};
+  const defs = settingsOf(catalog, form.part);
   const isDefault = (key: string, value: string) => {
     const d = defs[key];
     return d !== undefined && "default" in d && d.default !== undefined ? String(d.default) === value : d?.type === "flag" && value === "false";

@@ -8,23 +8,28 @@ warm, paper and ink, quiet, lots of room to read
 ::: breadcrumbs
 :::
 
-::: the date, reading time and author under the title
+::: the date, reading time and author under the title -> post-meta shows=everything
 :::
 
-::: a footer with the copyright
+::: tags under the post -> tags
 :::
 
-::: a search box
+::: a footer with the copyright -> footer
+- [About](/about/)
+- [RSS](/index.xml)
 :::
 
-::: a dark mode toggle
+::: a search box -> search
 :::
 
-::: the headings of the page on the side as you scroll
+::: a dark mode toggle -> theme-switch
 :::
 
-::: previous and next links
+::: the headings of the page on the side as you scroll -> page-contents
 :::
 
-::: let readers reply under the posts
+::: previous and next links -> pager
+:::
+
+::: let readers reply under posts -> comments
 :::

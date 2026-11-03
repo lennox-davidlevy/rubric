@@ -7,7 +7,7 @@
 // types are still used for the questions and answers.
 
 import {
-  buildQuestions, buildState, detailQuestions, MODEL, PART, partQuestion, refineQuestions, refineState, resolve, resolveRefine,
+  buildQuestions, buildState, detailQuestions, lookQuestions, MODEL, PART, partQuestion, refineQuestions, refineState, resolve, resolveRefine,
   type Answers, type Catalog, type PageKind, type Question, type Refined, type Resolution,
 } from "./core/index.ts";
 
@@ -29,7 +29,24 @@ export interface Asked {
 
 type Called = { ok: true; answers: Answers; model: string; body: unknown; ms: number } | { ok: false; message: string; body?: unknown; ms: number };
 
+// When Rubric last spoke to Jev's host. A connection left idle is closed,
+// and opening one again costs about 130 ms on the next call.
+let lastUsed = 0;
+
+// Opens the connection to Jev's host ahead of a call, so the first call after
+// a while isn't the slow one: about 230 ms for a fresh connection, 100 ms for
+// one already open. It sends no key and asks no question, so it is never a
+// call to Jev, and it is skipped while the connection is likely still open.
+export function warm(): void {
+  if (Date.now() - lastUsed < 20_000) return;
+  lastUsed = Date.now();
+  void fetch(new URL("/", ENDPOINT), { method: "HEAD", signal: AbortSignal.timeout(TIMEOUT_MS) })
+    .then((r) => r.arrayBuffer())
+    .catch(() => {});
+}
+
 async function call(request: Request, key: string): Promise<Called> {
+  lastUsed = Date.now();
   const started = performance.now();
   let res: Response;
   try {
@@ -86,7 +103,7 @@ export async function ask(
       .sort((a, b) => b[1] - a[1])
       .slice(0, 2)
       .map(([name]) => name);
-    const second: Request = { model: MODEL, state, questions: detailQuestions(catalog, ranked) };
+    const second: Request = { model: MODEL, state, questions: { ...detailQuestions(catalog, ranked), ...lookQuestions(catalog) } };
     const next = await call(second, key);
     ms += next.ms;
     then = { request: second, ...(next.body === undefined ? {} : { response: next.body }), ms: next.ms };

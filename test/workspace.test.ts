@@ -29,7 +29,8 @@ beforeAll(async () => {
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-const content = () => readFileSync(join(dir, "content/posts/test.md"), "utf8");
+// content/ without the live preview's markers, which have tests of their own.
+const content = () => readFileSync(join(dir, "content/posts/test.md"), "utf8").replace(/\{\{< rubric-line [^>]*>\}\}\n\n/g, "");
 const codes = () => (notes.get(page) ?? []).map((n) => `${n.line}:${n.code}`);
 
 const text = [
@@ -186,6 +187,51 @@ describe("when Jev is asked", () => {
     await w.close(page);
   });
 
+  test("the writer can say a line is done, and it is sent at once", async () => {
+    const { w, asked } = await counting(10_000);
+    await w.open(page, draft("a"));
+    await w.change(page, draft("a big quote"));
+    expect(asked).toEqual(["a"]);
+    w.askNow(page);
+    expect(asked).toEqual(["a", "a big quote"]);
+    // The pause it cut short sends nothing more.
+    await w.settle();
+    expect(asked).toEqual(["a", "a big quote"]);
+    await w.close(page);
+  });
+
+  test("an open ghost text request is answered as soon as the line is asked", async () => {
+    const { w } = await counting(10_000);
+    await w.open(page, draft("a"));
+    await w.change(page, draft("a big quote"));
+    const started = Date.now();
+    const ghost = w.ghost(page, 1);
+    w.askNow(page);
+    expect((await ghost).map((g) => g.text)).toEqual([" -> quote size=large"]);
+    expect(Date.now() - started).toBeLessThan(200);
+    await w.close(page);
+  });
+
+  test("the pause is fitted to the writer's typing, and never shorter than the floor", async () => {
+    const edits: number[] = [];
+    const w = new Workspace(ws.site, await Cache.load(join(dir, "no-cache.json")), stubResolver(ws.site.catalog, 1), () => {}, {
+      idleMs: 1000, minIdleMs: 400, onEdit: (e) => edits.push(e.pause),
+    });
+    await w.open(page, draft("a"));
+    expect(w.pause()).toBe(1000);
+    // A fast typist: about 100 ms between keys, 200 now and then.
+    let words = "a";
+    for (let i = 0; i < 30; i++) {
+      words += i % 5 === 4 ? " " : "x";
+      await w.change(page, draft(words));
+      await Bun.sleep(i % 10 === 9 ? 200 : 100);
+    }
+    expect(w.pause()).toBeGreaterThanOrEqual(400);
+    expect(w.pause()).toBeLessThan(1000);
+    expect(edits.at(-1)).toBe(w.pause());
+    await w.close(page);
+  });
+
   test("ghost text gives up when the line changes while it waits", async () => {
     const { w } = await counting(10_000);
     await w.open(page, draft("a big quote"));
@@ -278,5 +324,21 @@ describe("pictures", () => {
       [3, 16, "no file at /image/sample.jpg in static/"],
       [7, 8, "no file at /images/nowhere.png in static/"],
     ]);
+  });
+});
+
+describe("front matter", () => {
+  test("a half-typed line is never handed to Hugo, and the page keeps its last good version", async () => {
+    await ws.change(page, "---\ntitle: Good\n---\nBody.\n");
+    await ws.settle();
+    expect(content()).toContain("title: Good");
+    await ws.change(page, "---\ntitle: Good\nhide: [comm\n---\nBody, edited.\n");
+    await ws.settle();
+    expect(content()).toContain("Body.");
+    expect(notes.get(page)?.find((n) => n.code === "bad-front-matter")).toMatchObject({ line: 2 });
+    await ws.change(page, "---\ntitle: Good\nhide: [comments]\n---\nBody, edited.\n");
+    await ws.settle();
+    expect(content()).toContain("hide: [comments]");
+    expect(codes().some((c) => c.endsWith("bad-front-matter"))).toBe(false);
   });
 });

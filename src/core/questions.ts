@@ -3,7 +3,7 @@
 // only wording that lives outside it, so this is where tuning happens.
 
 import type { ChoiceQuestion, NoulQuestion, ScoreQuestion } from "@typesafe-ai/sdk";
-import type { Catalog, Setting } from "./catalog.ts";
+import { settingsOf, type Catalog, type Setting } from "./catalog.ts";
 
 // Pinned to a versioned id, never an alias: an alias can move and change
 // answers with no change here, which would break the cache and the promise
@@ -54,6 +54,10 @@ export const fitsId = (part: string) => `fits:${part}`;
 export const saidId = (part: string, setting: string) => `said:${part}:${setting}`;
 export const settingId = (part: string, setting: string) => `setting:${part}:${setting}`;
 export const toldId = (part: string, setting: string) => `told:${part}:${setting}`;
+// The look settings are the same for every part, so they are asked once a
+// line, not once a part.
+export const lookId = (setting: string) => `look:${setting}`;
+export const lookSaidId = (setting: string) => `look-said:${setting}`;
 export const BEYOND = "beyond";
 
 export function buildState(directive: string, page: PageKind): State {
@@ -78,10 +82,9 @@ export function refineState(words: string, page: PageKind, part: string, descrip
 // counts; and if so, which value. Then whether the line asks for anything no
 // setting covers, which the editor says rather than quietly ignores.
 export function refineQuestions(catalog: Catalog, partName: string): Record<string, Question> {
-  const part = catalog.parts[partName]!;
   const questions: Record<string, Question> = {};
   const covers: Record<string, string> = {};
-  for (const [name, setting] of Object.entries(part.settings)) {
+  for (const [name, setting] of Object.entries(settingsOf(catalog, partName))) {
     const q = settingQuestion(partName, name, setting);
     if (!q) continue;
     questions[settingId(partName, name)] = q;
@@ -154,11 +157,31 @@ export function detailQuestions(catalog: Catalog, parts: readonly string[]): Rec
   return questions;
 }
 
+// How the line asks the part to look: for each look setting, whether the
+// line asks for anything other than the default, and which value. Asked
+// once a line, whatever the part.
+export function lookQuestions(catalog: Catalog): Record<string, Question> {
+  const questions: Record<string, Question> = {};
+  for (const [name, setting] of Object.entries(catalog.look)) {
+    if (setting.type !== "choice") continue;
+    questions[lookId(name)] = { type: "choice", instructions: setting.question ?? `Which ${name} does \`directive\` ask for?`, criteria: setting.values };
+    questions[lookSaidId(name)] = {
+      type: "noul",
+      instructions: {
+        question: `Does \`directive\` ask for one of these ${name} values?`,
+        values: Object.fromEntries(Object.entries(setting.values).filter(([v]) => v !== setting.default)),
+      },
+    };
+  }
+  return questions;
+}
+
 // One request per directive line, every question speculative: which part,
-// and the details of every part. Code reads only what belongs to the part it
-// picks. Its size grows with the catalog; `ask` in two steps does not.
+// the details of every part, and the look. Code reads only what belongs to
+// the part it picks. Its size grows with the catalog; `ask` in two steps
+// does not.
 export function buildQuestions(catalog: Catalog): Record<string, Question> {
-  return { ...partQuestion(catalog), ...detailQuestions(catalog, Object.keys(catalog.parts)) };
+  return { ...partQuestion(catalog), ...detailQuestions(catalog, Object.keys(catalog.parts)), ...lookQuestions(catalog) };
 }
 
 function settingQuestion(part: string, name: string, s: Setting): Question | undefined {

@@ -40,3 +40,37 @@ test.skipIf(!hugo)("every fixture builds in Hugo", () => {
     rmSync(site, { recursive: true, force: true });
   }
 });
+
+// When the theme changes in hugo.toml, Hugo rebuilds with the new skin a
+// moment before Rubric rewrites the page, so for that build the page can
+// still hold another skin's parts and settings. That build must not fail:
+// a failed build left the old theme's page in the browser.
+test.skipIf(!hugo)("a part or setting another skin brings is left out, not an error", () => {
+  const site = mkdtempSync(join(tmpdir(), "rubric-hugo-skin-"));
+  const build = (body: string) => {
+    writeFileSync(join(site, "content/posts/p.md"), `---\ntitle: P\n---\n\n${body}\n`);
+    return Bun.spawnSync([hugo!, "--quiet", "-s", site, "-d", join(site, "public")]);
+  };
+  try {
+    writeFileSync(
+      join(site, "hugo.toml"),
+      readFileSync(join(root, "testing/hugo.toml"), "utf8")
+        .replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(root, "catalogs"))}`)
+        .replace(/^theme = "(?!universal).*"$/m, `theme = "paper"`),
+    );
+    mkdirSync(join(site, "content/posts"), { recursive: true });
+
+    const ok = build(`{{< callout kind="tip" icon="lightbulb" >}}\nHello.\n{{< /callout >}}\n\n{{< lead >}}\nA larger opening.\n{{< /lead >}}`);
+    expect(ok.stderr.toString()).toBe("");
+    expect(ok.exitCode).toBe(0);
+    const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");
+    expect(html).toContain(`class="part part-callout kind-tip"`);
+    expect(html).not.toContain("has-icon");
+    expect(html).toContain("<p>A larger opening.</p>");
+
+    const bad = build(`{{< callout nonsense="x" >}}\nHello.\n{{< /callout >}}`);
+    expect(bad.exitCode).not.toBe(0);
+  } finally {
+    rmSync(site, { recursive: true, force: true });
+  }
+});

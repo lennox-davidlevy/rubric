@@ -19,6 +19,8 @@ export function refineWords(words: string): string {
   return words.toLowerCase().replace(/\s+/g, " ").replace(/[\s.,;:!?]+$/, "").trim();
 }
 
+const skinKey = (catalog: Catalog) => (catalog.skin ? [`skin:${catalog.skin.name}@${catalog.skin.version}`] : []);
+
 export class Cache {
   // Words lines and refinements share one file; their keys never collide.
   #entries: Record<string, Cached | CachedRefine>;
@@ -27,8 +29,10 @@ export class Cache {
     this.#entries = entries;
   }
 
+  // A skin's additions are part of what Jev reads, so they are part of the
+  // key: switching skins asks again. Without a skin the key is as it was.
   static key(catalog: Catalog, page: PageKind, directive: string): string {
-    return JSON.stringify([catalog.name, catalog.version, page, directive]);
+    return JSON.stringify([catalog.name, catalog.version, ...skinKey(catalog), page, directive]);
   }
 
   static async load(path: string): Promise<Cache> {
@@ -50,7 +54,7 @@ export class Cache {
 
   // A refinement depends on the part and the words, not the page.
   static refineKey(catalog: Catalog, part: string, words: string): string {
-    return JSON.stringify(["refine", catalog.name, catalog.version, part, refineWords(words)]);
+    return JSON.stringify(["refine", catalog.name, catalog.version, ...skinKey(catalog), part, refineWords(words)]);
   }
 
   getRefine(catalog: Catalog, part: string, words: string): CachedRefine | undefined {

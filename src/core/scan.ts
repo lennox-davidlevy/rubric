@@ -153,7 +153,7 @@ function unfinishedPlain(text: string, col: number, line: number, catalog: Catal
 }
 
 // Front matter is the writer's metadata, never page content.
-function frontMatterEnd(src: string[]): number {
+export function frontMatterEnd(src: string[]): number {
   const delim = src[0]?.trimEnd();
   if (delim !== "---" && delim !== "+++") return 0;
   for (let i = 1; i < src.length; i++) if (src[i]!.trimEnd() === delim) return i + 1;

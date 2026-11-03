@@ -74,7 +74,10 @@
 
 // A slideshow: arrows to move one picture at a time; swiping and the
 // trackpad already do, since the row scrolls and snaps.
-document.querySelectorAll(".part-gallery.layout-slideshow").forEach((gallery) => {
+// Runs again on "rubric:drawn", when the live preview puts new parts in the
+// page without reloading it; anything set up once is marked and skipped.
+const slideshows = () => document.querySelectorAll(".part-gallery.layout-slideshow:not([data-ready])").forEach((gallery) => {
+  gallery.dataset.ready = "";
   const row = gallery.querySelector("ul");
   if (!row || row.children.length < 2) return;
   const arrows = document.createElement("div");
@@ -90,3 +93,5 @@ document.querySelectorAll(".part-gallery.layout-slideshow").forEach((gallery) =>
   }
   gallery.append(arrows);
 });
+slideshows();
+document.addEventListener("rubric:drawn", slideshows);

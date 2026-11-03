@@ -29,3 +29,7 @@ target = "assets"
 [[module.mounts]]
 source = "static"
 target = "static"
+
+[[module.mounts]]
+source = "skins"
+target = "data/skins"

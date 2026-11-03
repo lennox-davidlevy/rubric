@@ -2,7 +2,7 @@
 // A part name followed by key=value settings, where a value with spaces is in
 // double quotes. Plain form is the source of truth; words resolve to it.
 
-import { NAME, type Catalog } from "./catalog.ts";
+import { NAME, settingsOf, type Catalog } from "./catalog.ts";
 import type { Diagnostic } from "./diagnostic.ts";
 
 export interface Span {
@@ -64,23 +64,32 @@ export function parsePlain(text: string, offset = 0): PlainForm | undefined {
 }
 
 // A directive line is plain form when its first token is a part in the
-// catalog and every remaining token is key=value. Anything else is words.
+// catalog, or in another skin's, and every remaining token is key=value.
+// Anything else is words.
 export function isPlain(form: PlainForm | undefined, catalog: Catalog): form is PlainForm {
-  return form !== undefined && Object.hasOwn(catalog.parts, form.part);
+  return form !== undefined && (Object.hasOwn(catalog.parts, form.part) || Object.hasOwn(catalog.elsewhere.parts, form.part));
 }
 
+// Problems with a plain form. A part or a setting another skin adds is an
+// "other-skin" note, not a mistake: switching skins never breaks a page.
 export function validatePlain(form: PlainForm, catalog: Catalog, line: number): Diagnostic[] {
   const part = Object.hasOwn(catalog.parts, form.part) ? catalog.parts[form.part] : undefined;
   if (!part) {
+    const skin = catalog.elsewhere.parts[form.part];
+    if (skin) return [{ line, ...form.partSpan, code: "other-skin", message: `${form.part} comes with the ${skin} skin; this site's theme doesn't draw it` }];
     return [{ line, ...form.partSpan, code: "unknown-part", message: `"${form.part}" is not a part in the ${catalog.name} catalog` }];
   }
 
+  const defs = settingsOf(catalog, form.part);
   const out: Diagnostic[] = [];
   const seen = new Set<string>();
   for (const s of form.settings) {
-    const def = Object.hasOwn(part.settings, s.key) ? part.settings[s.key] : undefined;
+    const def = Object.hasOwn(defs, s.key) ? defs[s.key] : undefined;
     if (!def) {
-      out.push({ line, ...s.keySpan, code: "unknown-setting", message: `${form.part} has no setting "${s.key}"` });
+      const skin = catalog.elsewhere.settings[form.part]?.[s.key];
+      out.push(skin
+        ? { line, ...s.keySpan, code: "other-skin", message: `${s.key} comes with the ${skin} skin; this site's theme leaves it out and keeps it in the pin` }
+        : { line, ...s.keySpan, code: "unknown-setting", message: `${form.part} has no setting "${s.key}"` });
       continue;
     }
     if (seen.has(s.key)) {

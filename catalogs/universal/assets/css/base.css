@@ -348,3 +348,25 @@ button:hover { background: var(--accent); border-color: var(--accent); }
   .masthead nav, .skip, .site-footer { display: none; }
   a { text-decoration: none; }
 }
+
+/* The look settings, which any part in the writing takes (catalog.yaml,
+   look): a shadow, a line around it, its corners, the size of its writing.
+   They win over the part's own drawing and the skin's layer (two classes),
+   since the writer asked for them; a skin draws them its own way by
+   redefining these. A part with no picture or player in it gets room inside
+   its shadow or line. */
+.part:is(.look-shadow-soft, .look-shadow-deep) { border-radius: var(--radius); }
+.part.look-shadow-soft { box-shadow: var(--shadow-soft); }
+.part.look-shadow-deep { box-shadow: var(--shadow-deep); }
+.part.look-border-outlined { border: var(--border) solid color-mix(in srgb, var(--ink) 28%, transparent); border-radius: var(--radius); }
+.part:is(.look-shadow-soft, .look-shadow-deep, .look-border-outlined):not(:has(img, video, iframe, audio, svg)) { padding: var(--space-2) var(--space-3); }
+.part.look-corners-square, .part.look-corners-square :is(img, video, iframe, pre) { border-radius: 0; }
+.part.look-corners-round { border-radius: 1.25rem; }
+.part.look-corners-round :is(img, video, iframe, pre) { border-radius: 1rem; }
+.part.look-text-smaller { font-size: var(--step--1); }
+.part.look-text-bigger { font-size: var(--step-1); }
+
+/* The live preview only: a part Jev placed whose block is still empty shows
+   its starter body, faded, so its shape is there before the writing is. The
+   marker before it is written by the language server, never by a build. */
+link[data-rubric-starter] + * { opacity: 0.45; }

@@ -14,7 +14,11 @@ export type Code =
   | "no-children"
   // A frame part (header, footer…) in a page, or a part for the writing in
   // rubric.md: each is chosen in its own place.
-  | "wrong-place";
+  | "wrong-place"
+  // A part or setting another skin adds: kept, not drawn, never an error.
+  | "other-skin"
+  // Front matter that does not parse, as while a line of it is half typed.
+  | "bad-front-matter";
 
 export interface Diagnostic {
   line: number;

@@ -1,5 +1,5 @@
 name: universal
-version: 4
+version: 5
 
 # Every component a website needs, as contracts only: what each part is,
 # its settings and what it expects inside. Nothing here is drawn yet. Drawn
@@ -10,6 +10,38 @@ version: 4
 # (docs/research/hugo-themes.md): about thirty kinds of block in the
 # writing, about twenty pieces of frame around it.
 #
+# How any part in the writing looks, beyond its own settings: the same for
+# every part, asked once a line (`::: a video, with a shadow`, or after the
+# pin's colon). Each skin draws them in its own way.
+look:
+  shadow:
+    type: choice
+    default: none
+    values:
+      none: no shadow, it sits flat on the page
+      soft: lifted a little off the page, with a light shadow
+      deep: lifted well off the page, with a strong shadow
+  border:
+    type: choice
+    default: none
+    values:
+      none: no line around it
+      outlined: a thin line all around it
+  corners:
+    type: choice
+    default: theme
+    values:
+      theme: the corners the rest of the site has
+      square: sharp, square corners
+      round: well-rounded corners
+  text:
+    type: choice
+    default: normal
+    values:
+      normal: its writing at the usual size
+      smaller: its writing set smaller than usual
+      bigger: its writing set bigger than usual
+
 # Descriptions are Jev's prompt and are read literally: say what the part
 # is, in the words a writer would use, with nothing the writer would not
 # say. Value names are sent too; name a value for what it does.
@@ -200,6 +232,8 @@ parts:
     children: true
     body: |
       https://www.youtube.com/watch?v=
+
+      A line about it, shown under the video.
     settings:
       width:
         type: choice
@@ -214,6 +248,8 @@ parts:
     children: true
     body: |
       /audio/
+
+      A line about it, shown with the player.
 
   embed:
     description: Something from another site shown in the page, such as a social media post, a map, presentation slides or a gist.

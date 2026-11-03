@@ -13,8 +13,8 @@ import { join } from "node:path";
 
 const repo = join(import.meta.dir, "..");
 const site = join(repo, "testing");
-const page = join(site, "pages/posts/playground.md");
-const content = join(site, "content/posts/playground.md");
+const page = join(site, "pages/posts/walk.md");
+const content = join(site, "content/posts/walk.md");
 const blocks = Number(process.argv[2] ?? 4);
 const perKey = Number(process.argv[3] ?? 120);
 const dir = mkdtempSync(join(tmpdir(), "rubric-live-"));
@@ -42,7 +42,7 @@ const type = async (s: string) => {
 // browser asking. A race that needs two builds in one second is rarely caught
 // by sampling, so the header itself is checked.
 const served = async () => {
-  const res = await fetch(`http://localhost:${process.env.RUBRIC_PORT ?? 1415}/posts/playground/`);
+  const res = await fetch(`http://localhost:${process.env.RUBRIC_PORT ?? 1415}/posts/walk/`);
   const text = (await res.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
   return { text, stale: !/no-store/.test(res.headers.get("cache-control") ?? "") };
 };

@@ -8,8 +8,11 @@
 // each call to testing/.rubric/jev.jsonl when that file exists; this script
 // empties it at start and prints each line as it lands. The whole request and
 // response are in that file for anything the print leaves out.
+//
+// It also creates testing/.rubric/keys.jsonl, where the server notes when
+// each words line was typed; `bun scripts/pause.ts` replays it.
 
-import { closeSync, mkdirSync, openSync, readSync, statSync, watch, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readSync, statSync, watch, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { THRESHOLDS } from "../src/core/questions.ts";
 
@@ -23,6 +26,10 @@ if (built.exitCode !== 0) process.exit(built.exitCode ?? 1);
 
 mkdirSync(join(site, ".rubric"), { recursive: true });
 writeFileSync(log, "");
+// When each words line was typed, kept across sessions, so the pause before
+// a line is asked can be fitted to real typing (scripts/pause.ts).
+const keys = join(site, ".rubric/keys.jsonl");
+if (!existsSync(keys)) writeFileSync(keys, "");
 
 const hugo = Bun.spawn(["hugo", "server", "-s", "testing", "--port", port], { cwd: repo, stdout: "inherit", stderr: "inherit" });
 
@@ -194,6 +201,51 @@ function drain(): void {
 watch(log, drain);
 // A watch can miss an event; a slow poll catches it.
 setInterval(drain, 1000);
+
+// The relay for the live preview's cursor: the language server posts where
+// the writer's cursor is, and each open preview page listens and scrolls to
+// it (rubric-live.js). The last position is sent to a page as it connects,
+// so a page opened by moving to another file scrolls straight to the cursor.
+const relayPort = Number(process.env.RUBRIC_RELAY_PORT ?? "1416");
+// The language server and the page both reach it at 127.0.0.1:1416, or at
+// relay = "…" under [params.rubric] in hugo.toml.
+const listeners = new Set<ReadableStreamDefaultController<string>>();
+let lastCursor: string | undefined;
+const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type" };
+try {
+  Bun.serve({
+    port: relayPort,
+    hostname: "127.0.0.1",
+    idleTimeout: 0,
+    async fetch(req) {
+      const url = new URL(req.url);
+      if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+      if (req.method === "POST" && url.pathname === "/cursor") {
+        lastCursor = JSON.stringify(await req.json());
+        for (const c of listeners) {
+          try { c.enqueue(`data: ${lastCursor}\n\n`); } catch { listeners.delete(c); }
+        }
+        return new Response(null, { status: 204, headers: cors });
+      }
+      if (url.pathname === "/events") {
+        let me: ReadableStreamDefaultController<string>;
+        const stream = new ReadableStream<string>({
+          start(c) {
+            me = c;
+            listeners.add(c);
+            c.enqueue(": rubric\n\n");
+            if (lastCursor) c.enqueue(`data: ${lastCursor}\n\n`);
+          },
+          cancel() { listeners.delete(me); },
+        });
+        return new Response(stream, { headers: { ...cors, "Content-Type": "text/event-stream", "Cache-Control": "no-store" } });
+      }
+      return new Response("not found", { status: 404, headers: cors });
+    },
+  });
+} catch (err) {
+  console.log(yellow(`rubric: the preview will not follow the cursor: port ${relayPort} is taken (${(err as Error).message})`));
+}
 
 // Ctrl-C reaches Hugo too; the summary prints once it has gone.
 const finish = (code: number) => {

@@ -1,6 +1,9 @@
 // table: lets the reader sort by a column, by clicking its heading. Numbers
 // sort as numbers. Without it the table reads the same, unsorted.
-document.querySelectorAll(".part-table[data-sortable] table").forEach((table) => {
+// Runs again on "rubric:drawn", when the live preview puts new parts in the
+// page without reloading it; anything set up once is marked and skipped.
+const sortable = () => document.querySelectorAll(".part-table[data-sortable] table:not([data-ready])").forEach((table) => {
+  table.dataset.ready = "";
   const body = table.tBodies[0];
   if (!body) return;
   const heads = [...table.querySelectorAll("thead th")];
@@ -28,3 +31,5 @@ document.querySelectorAll(".part-table[data-sortable] table").forEach((table) =>
     });
   });
 });
+sortable();
+document.addEventListener("rubric:drawn", sortable);

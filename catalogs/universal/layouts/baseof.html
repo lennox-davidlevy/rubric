@@ -64,6 +64,18 @@
 {{- with site.Home.OutputFormats.Get "rss" }}
 <link rel="alternate" type="application/rss+xml" href="{{ .RelPermalink }}" title="{{ site.Title }}">
 {{- end }}
+{{- /* The live preview only: which file this page is written from, where the
+     writer's cursor comes from, and the script that follows it and changes
+     the page in place instead of reloading it. Never in a built site. */}}
+{{- if hugo.IsServer }}
+{{- with .File }}
+<meta name="rubric-source" content="{{ .Path }}">
+{{- end }}
+<meta name="rubric-relay" content="{{ site.Params.rubric.relay | default "http://127.0.0.1:1416" }}">
+{{- with resources.Get "js/rubric-live.js" | fingerprint }}
+<script src="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}"></script>
+{{- end }}
+{{- end }}
 {{- if partial "rubric/frame-has.html" (dict "page" . "part" "theme-switch") }}
 {{- /* Before anything is drawn, so a reader who chose dark never sees a light flash. */}}
 <script>try{var t=localStorage.getItem("rubric-theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.dataset.theme=t}catch(e){}</script>

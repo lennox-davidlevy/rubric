@@ -17,3 +17,10 @@ papermod:
   pairing: system-sans
   scale: papermod
   skin: papermod
+
+blowfish:
+  description: white and slate with a clear blue, the reader's own sans, cards lifted with shadows; after Blowfish
+  palette: blowfish
+  pairing: blowfish-sans
+  scale: blowfish
+  skin: blowfish

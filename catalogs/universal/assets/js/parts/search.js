@@ -1,7 +1,10 @@
 // search: finds pages on this site as the reader types, from the site's own
 // feed (its titles and summaries), fetched once on first use. Without it the
 // form searches the site on DuckDuckGo.
-document.querySelectorAll(".part-search[data-feed]").forEach((form) => {
+// Runs again on "rubric:drawn", when the live preview puts new parts in the
+// page without reloading it; anything set up once is marked and skipped.
+const searches = () => document.querySelectorAll(".part-search[data-feed]:not([data-ready])").forEach((form) => {
+  form.dataset.ready = "";
   const input = form.querySelector("input[type=search]");
   const results = form.querySelector(".part-search-results");
   let items;
@@ -41,3 +44,5 @@ document.querySelectorAll(".part-search[data-feed]").forEach((form) => {
   });
   input.addEventListener("keydown", (e) => { if (e.key === "Escape") { results.hidden = true; input.blur(); } });
 });
+searches();
+document.addEventListener("rubric:drawn", searches);

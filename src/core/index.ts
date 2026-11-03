@@ -8,3 +8,5 @@ export * from "./resolve.ts";
 export * from "./cache.ts";
 export * from "./write.ts";
 export * from "./frame.ts";
+export * from "./frontmatter.ts";
+export * from "./live.ts";

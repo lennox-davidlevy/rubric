@@ -1,0 +1,95 @@
+/* Blowfish's layer (github.com/nunocoracao/blowfish, MIT): what its palette,
+   pairing and scale cannot say, read from its Tailwind classes and its
+   rendered pages. Its own callout, timeline and lead are drawn by
+   _partials/skins/blowfish/parts/; their styles are here. Slots only. */
+
+/* The header: a plain name and links, small, with no rule under it. */
+.part-header-title { font-size: var(--step-0); font-weight: var(--weight-body); }
+.part-header-nav ul { font-size: var(--step-0); }
+.part-header-nav a { color: var(--heading); font-weight: var(--weight-body); }
+.part-header-nav a:hover, .part-header-nav a[aria-current] { color: var(--accent); }
+.part-header.sticky-stays { border-bottom: 0; box-shadow: var(--shadow-soft); }
+
+/* Breadcrumbs small and muted, each followed by a slash; the post itself
+   left out, as Blowfish does. */
+.part-breadcrumbs ol { font-size: var(--step--1); color: var(--muted); }
+.part-breadcrumbs li + li::before { content: none; }
+.part-breadcrumbs li:not([aria-current])::after { content: "/"; margin-inline: 0.3em; }
+.part-breadcrumbs li[aria-current] { display: none; }
+.part-breadcrumbs a:hover { color: var(--accent); }
+
+/* An extra-bold title; the date line at the writing's size. */
+.page-header h1 { font-weight: var(--weight-display); color: var(--heading); }
+.part-post-meta { font-size: var(--step-0); color: var(--muted); }
+
+/* Links in the writing are blue, underlined only on hover. */
+.flow a:not([class]) { color: var(--link); }
+.flow a:not([class]):hover { text-decoration-line: underline; text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+
+/* A quote: a blue rule beside italic writing. Inline code: bold, no box. */
+blockquote { border-left: 0.25rem solid color-mix(in srgb, var(--accent) 85%, var(--paper)); padding-left: var(--space-2); font-style: italic; color: var(--ink); }
+:not(pre, .catalog-label) > code { background: none; padding: 0; font-weight: var(--weight-strong); color: var(--accent); }
+:not(pre, .catalog-label) > code::before, :not(pre, .catalog-label) > code::after { content: "`"; }
+hr { width: 100%; border-top: var(--border) solid var(--rule); }
+
+/* Tags as small outlined blue badges. */
+.part-tags a { display: inline-block; margin: 0 0.3rem 0.3rem 0; padding: 0 0.3rem; border: var(--border) solid var(--accent); border-radius: var(--control-radius); color: var(--accent); font-size: var(--step--1); line-height: 1.5; text-decoration: none; }
+
+/* The pager: a dotted rule, then each post with an arrow and no label. */
+.part-pager { border-top: var(--border) dotted var(--rule); padding-top: var(--space-2); }
+.part-pager a { border-top: 0; color: var(--ink); }
+.part-pager a span { font-size: 0; }
+.part-pager-earlier span::before { content: "\2190"; font-size: var(--step-0); margin-right: 0.5em; }
+.part-pager-later span::after { content: "\2192"; font-size: var(--step-0); margin-left: 0.5em; }
+
+/* "On this page" with a line down its left side. */
+.part-page-contents { border-left: var(--border) dotted var(--muted); padding-left: var(--space-2); }
+
+/* The footer: the copyright on the left, links on the right, no rule. */
+.part-footer { border-top: 0; color: var(--muted); }
+.part-footer-inner { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: var(--space-1) var(--space-3); }
+.part-footer-inner > * { margin: 0; }
+.part-footer-links { order: 2; }
+.part-footer-links ul { margin: 0; }
+
+/* Buttons filled in the accent, as Blowfish's are. */
+.part-buttons a:first-child, .part-call-to-action a:last-child { background: var(--accent); border-color: var(--accent); color: var(--paper); }
+
+/* Post lists: Blowfish's cards are lifted, not outlined. */
+.post-list.style-cards li { border-color: transparent; box-shadow: var(--shadow-soft); }
+.post-list.style-cards li:hover { box-shadow: var(--shadow-deep); }
+
+/* Its own callout: an icon beside the note on a pale card, lifted a little. */
+.part-callout { display: flex; gap: var(--space-2); align-items: flex-start; padding: var(--space-2) var(--space-3); background: var(--accent-tint); box-shadow: var(--shadow-soft); border-radius: var(--radius); }
+.part-callout .stack { flex: 1; min-width: 0; }
+.part-callout-icon { flex: none; display: flex; width: 1.1em; padding-top: 0.3em; color: color-mix(in srgb, var(--accent) 70%, var(--paper)); }
+.part-callout-icon svg { width: 100%; height: auto; }
+.part-callout-label { color: var(--heading); }
+.part-callout.kind-tip .part-callout-icon { color: var(--positive); }
+.part-callout.kind-warning .part-callout-icon { color: var(--warning); }
+.part-callout.kind-danger .part-callout-icon { color: var(--danger); }
+
+/* Its own timeline: a blue line, a round mark per event, each on a card. */
+.part-timeline { padding-left: var(--space-4); border-left: calc(var(--border) * 2) solid var(--accent); }
+.part-timeline > li::before { content: none; }
+.part-timeline > li + li { margin-top: var(--space-3); }
+.part-timeline-mark {
+  position: absolute;
+  left: calc(-1 * var(--space-4) - 1rem - var(--border));
+  top: var(--space-3);
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--paper);
+}
+.part-timeline-mark svg { width: 0.9rem; height: 0.9rem; }
+.part-timeline-card { padding: var(--space-3); border-radius: calc(var(--radius) + 2px); background: var(--raised); box-shadow: var(--shadow-deep); }
+.part-timeline-when { color: var(--heading); font-size: var(--step-2); font-weight: var(--weight-heading); }
+.part-timeline h3 { margin-top: var(--space-1); font-size: var(--step-0); }
+
+/* Its own lead: the opening paragraph larger and softer than the rest. */
+.part-lead { font-size: var(--step-1); line-height: var(--leading-heading); color: var(--muted); }
+.part-lead > * { margin: 0; }

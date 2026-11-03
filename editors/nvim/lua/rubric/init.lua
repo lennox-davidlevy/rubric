@@ -9,7 +9,8 @@
 local M = {}
 
 local defaults = {
-  -- Accept the ghost text: pins the line.
+  -- Accept the ghost text: pins the line. Before any ghost text shows, it
+  -- asks Jev about the line at once instead of waiting for a pause.
   accept = "<M-l>",
   -- Switch between the pick and the runner-up. Not <M-[>: a terminal sends it
   -- as ESC [, the start of an escape sequence, and the next key is lost.
@@ -95,6 +96,113 @@ local function reopen_completion(bufnr)
   })
 end
 
+-- When Jev offers two picks for a line, say so beside the ghost text: Neovim
+-- shows the count only after the writer moves to the next one. The server
+-- sends rubric/picks with each ghost text answer; the hint goes as soon as
+-- the line changes, the cursor leaves it, or insert mode ends.
+local picks_ns = vim.api.nvim_create_namespace("rubric.picks")
+local picks_shown = {}
+
+local function clear_picks(bufnr)
+  if picks_shown[bufnr] then
+    pcall(vim.api.nvim_buf_clear_namespace, bufnr, picks_ns, 0, -1)
+    picks_shown[bufnr] = nil
+  end
+end
+
+local function picks_handler(next_key)
+  return function(_, params)
+    local bufnr = vim.uri_to_bufnr(params.uri)
+    clear_picks(bufnr)
+    if params.count < 2 or not vim.startswith(vim.api.nvim_get_mode().mode, "i") then
+      return
+    end
+    local text = vim.api.nvim_buf_get_lines(bufnr, params.line, params.line + 1, false)[1]
+    if not text then
+      return
+    end
+    vim.api.nvim_buf_set_extmark(bufnr, picks_ns, params.line, 0, {
+      virt_text = { { ("  1 of %d · %s for the next"):format(params.count, next_key), "ComplHintMore" } },
+      virt_text_pos = "eol",
+      hl_mode = "combine",
+    })
+    picks_shown[bufnr] = { line = params.line, text = text }
+  end
+end
+
+local function watch_picks(bufnr)
+  local group = vim.api.nvim_create_augroup("RubricPicks" .. bufnr, { clear = true })
+  vim.api.nvim_create_autocmd({ "TextChangedI", "CursorMovedI" }, {
+    group = group,
+    buffer = bufnr,
+    callback = function()
+      local shown = picks_shown[bufnr]
+      if not shown then
+        return
+      end
+      local row = vim.api.nvim_win_get_cursor(0)[1] - 1
+      local text = vim.api.nvim_buf_get_lines(bufnr, shown.line, shown.line + 1, false)[1]
+      if row ~= shown.line or text ~= shown.text then
+        clear_picks(bufnr)
+      end
+    end,
+  })
+  vim.api.nvim_create_autocmd("InsertLeave", {
+    group = group,
+    buffer = bufnr,
+    callback = function()
+      clear_picks(bufnr)
+    end,
+  })
+end
+
+-- Where the cursor is, for the live preview to follow: sent when it moves to
+-- another line or another page, a moment after it stops, so holding j sends
+-- one, not fifty.
+local function send_cursor(bufnr, client_id)
+  local timer = assert(vim.uv.new_timer())
+  local last
+  local function send()
+    local client = vim.lsp.get_client_by_id(client_id)
+    if not client or not vim.api.nvim_buf_is_valid(bufnr) or vim.api.nvim_get_current_buf() ~= bufnr then
+      return
+    end
+    local line = vim.api.nvim_win_get_cursor(0)[1] - 1
+    if line == last then
+      return
+    end
+    last = line
+    client:notify("rubric/cursor", { uri = vim.uri_from_bufnr(bufnr), line = line })
+  end
+  local group = vim.api.nvim_create_augroup("RubricCursor" .. bufnr, { clear = true })
+  vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
+    group = group,
+    buffer = bufnr,
+    callback = function()
+      timer:stop()
+      timer:start(60, 0, vim.schedule_wrap(send))
+    end,
+  })
+  -- Back in this page from another: the preview opens it again.
+  vim.api.nvim_create_autocmd("BufEnter", {
+    group = group,
+    buffer = bufnr,
+    callback = function()
+      last = nil
+      timer:stop()
+      timer:start(60, 0, vim.schedule_wrap(send))
+    end,
+  })
+  vim.api.nvim_create_autocmd("BufWipeout", {
+    group = group,
+    buffer = bufnr,
+    callback = function()
+      timer:stop()
+      timer:close()
+    end,
+  })
+end
+
 -- The repository root, from where this file sits.
 local function repo_root()
   local here = debug.getinfo(1, "S").source:sub(2)
@@ -112,6 +220,7 @@ function M.setup(opts)
     filetypes = { "markdown" },
     root_markers = { "rubric.md" },
     capabilities = opts.capabilities,
+    handlers = { ["rubric/picks"] = picks_handler(opts.next) },
   })
   vim.lsp.enable("rubric")
 
@@ -142,16 +251,34 @@ function M.setup(opts)
         close_directive(event.buf)
       end
       reopen_completion(event.buf)
+      watch_picks(event.buf)
+      send_cursor(event.buf, client.id)
+      -- The line is done: ask now rather than after the pause.
+      local function ask_now()
+        local c = vim.lsp.get_client_by_id(client.id)
+        if c then
+          c:notify("rubric/ask", { uri = vim.uri_from_bufnr(event.buf) })
+        end
+      end
+      vim.api.nvim_create_autocmd("InsertLeave", {
+        group = vim.api.nvim_create_augroup("RubricAsk" .. event.buf, { clear = true }),
+        buffer = event.buf,
+        callback = ask_now,
+      })
       local function map(lhs, rhs, desc)
         vim.keymap.set("i", lhs, rhs, { buffer = event.buf, desc = desc })
       end
       map(opts.accept, function()
-        vim.lsp.inline_completion.get()
-      end, "Rubric: accept and pin")
+        if not vim.lsp.inline_completion.get() then
+          ask_now()
+        end
+      end, "Rubric: accept and pin, or ask now")
       map(opts.next, function()
+        clear_picks(event.buf)
         vim.lsp.inline_completion.select({ count = 1 })
       end, "Rubric: next pick")
       map(opts.prev, function()
+        clear_picks(event.buf)
         vim.lsp.inline_completion.select({ count = -1 })
       end, "Rubric: previous pick")
     end,

@@ -1,7 +1,12 @@
 // tabs: makes each panel's heading a tab, one panel shown at a time, with
 // the arrow keys moving between tabs. Without it the panels read as headings
 // and sections, so nothing is lost.
-document.querySelectorAll(".part-tabs").forEach((root, n) => {
+// Runs again on "rubric:drawn", when the live preview puts new parts in the
+// page without reloading it; anything set up once is marked and skipped.
+let made = 0;
+const tabbed = () => document.querySelectorAll(".part-tabs:not([data-ready])").forEach((root) => {
+  root.dataset.ready = "";
+  const n = made++;
   const panels = [...root.querySelectorAll(":scope > .part-tabs-panel")];
   if (panels.length < 2) return;
   const list = document.createElement("div");
@@ -45,3 +50,5 @@ document.querySelectorAll(".part-tabs").forEach((root, n) => {
   });
   select(0);
 });
+tabbed();
+document.addEventListener("rubric:drawn", tabbed);

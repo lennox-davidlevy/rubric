@@ -2,10 +2,10 @@ baseURL = "/"
 title = "Rubric playground"
 theme = "universal"
 themesDir = "../catalogs"
-disableKinds = ["taxonomy", "term", "sitemap"]
+disableKinds = ["sitemap"]
 
 [params.rubric]
-theme = "papermod"
+theme = "paper"
 
 # Nested parts hand their HTML to the outer part's RenderString.
 [markup.goldmark.renderer]

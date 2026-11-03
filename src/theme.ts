@@ -413,6 +413,8 @@ const AA = 4.5;
 const TEXT_PAIRS: [string, string, string][] = [
   ["ink", "paper", "the writing"],
   ["link", "paper", "links"],
+  ["link", "tint", "links in a tinted box"],
+  ["link", "accent-tint", "links in a callout on the accent's tint"],
   ["heading", "paper", "headings"],
   ["code-ink", "code-paper", "code blocks"],
   ["code-muted", "code-paper", "comments in code blocks"],

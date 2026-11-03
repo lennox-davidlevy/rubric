@@ -38,6 +38,6 @@
   --dark-positive-tint: #29302e;
   --dark-warning-tint: #2f2e2b;
   --dark-danger-tint: #332b2d;
-  --shadow-soft: 0 1px 2px rgb(31 31 31 / 0), 0 2px 8px rgb(31 31 31 / 0);
-  --shadow-deep: 0 2px 4px rgb(31 31 31 / 0), 0 16px 40px rgb(31 31 31 / 0);
+  --shadow-soft: 0 1px 2px rgb(31 31 31 / 0.048), 0 2px 8px rgb(31 31 31 / 0.04);
+  --shadow-deep: 0 2px 4px rgb(31 31 31 / 0.048), 0 16px 40px rgb(31 31 31 / 0.112);
 }

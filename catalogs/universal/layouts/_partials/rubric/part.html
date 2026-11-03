@@ -1,0 +1,16 @@
+{{- /*
+  A part as a page in one skin sees it: the catalog's part with the skin's
+  added settings, or a part the skin adds; with the look settings if it is in
+  the writing. Returns a dict, "def" and "settings", or false.
+
+  Usage: {{ $p := partial "rubric/part.html" (dict "part" "callout" "skin" $skin) }}
+*/ -}}
+{{- $base := index hugo.Data.catalog.parts .part -}}
+{{- $skin := cond (ne .skin "") (index (hugo.Data.skins | default dict) .skin | default dict) dict -}}
+{{- $added := index ($skin.parts | default dict) .part -}}
+{{- $def := $base | default $added -}}
+{{- if not $def }}{{ return false }}{{ end -}}
+{{- $settings := $def.settings | default dict -}}
+{{- if and $base $added }}{{ $settings = merge $settings ($added.settings | default dict) }}{{ end -}}
+{{- if eq ($def.place | default "writing") "writing" }}{{ $settings = merge $settings (hugo.Data.catalog.look | default dict) }}{{ end -}}
+{{- return dict "def" $def "settings" $settings -}}

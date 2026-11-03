@@ -35,6 +35,7 @@ dark:
   rule: "#414244"   # --tertiary; its --border is too faint to rule with
   tint: "#2e2e33"   # --entry and --code-block-bg
 
-# PaperMod raises nothing with a shadow: cards have a border instead.
+# PaperMod raises nothing with a shadow of its own (cards have a border
+# instead), so these are only for the look settings: a part asked to have one.
 shadow:
-  strength: 0
+  strength: 0.8

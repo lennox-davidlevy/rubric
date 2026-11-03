@@ -17,6 +17,6 @@
   {{- if $here -}}
     {{- $inner := "" -}}
     {{- with .body }}{{ $inner = $p.RenderString (dict "display" "block") . }}{{ end -}}
-    {{- partial (printf "parts/%s.html" .part) (dict "s" (.settings | default dict) "inner" $inner "page" $p) -}}
+    {{- partial "rubric/draw.html" (dict "name" .part "args" (dict "s" (.settings | default dict) "inner" $inner "page" $p)) -}}
   {{- end -}}
 {{- end -}}
