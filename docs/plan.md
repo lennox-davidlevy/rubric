@@ -1,6 +1,6 @@
 # Rubric: plan
 
-Written 2026-10-27, the night the idea came, as Warren. Revised 2026-10-28 after a first review. Revised 2026-10-30 after a second, and renamed Rubric the same day: Rubric is a product for other people, not a tool for my own sites; the first thing it makes is blogs; json-render was tried on as the renderer for a day and taken off again, and it stays in `reference/` to learn from. Revised 2026-10-31 with the slice built: principles, functional parts, and the order settled as catalog first, review tooling after.
+Written 2026-10-27, the night the idea came, as Warren. Revised 2026-10-28 after a first review. Revised 2026-10-30 after a second, and renamed Rubric the same day: Rubric is a product for other people, not a tool for my own sites; the first thing it makes is blogs; json-render was tried on as the renderer for a day and taken off again, and it stays in `reference/` to learn from. Revised 2026-10-31 with the slice built: principles, functional parts, and the order settled as catalog first, review tooling after. Revised 2026-11-06 in a status review: the order of work says where each step stands, the pin format is the one that survived, and step 5 has a proposed shape.
 
 The language server and the first vertical slice are planned in [lsp.md](lsp.md). The slice is built first.
 
@@ -110,13 +110,13 @@ Pinned lines never go to the network. Cached lines do not either. Over time most
 
 The language server shows the resolved plain form as gray text at the end of the directive line, the way completion plugins show a suggestion. It is not in the file.
 
-- **Accept** with a key, and the plain form is written into the source. The line is now pinned: it works offline, never changes, and is in git. The words are kept as a trailing comment, since they record intent and are what re-resolution reads if the catalog changes: `::: quote size=large align=center  <!-- a quote from the book, big and centered -->`.
+- **Accept** with a key, and the plain form is written into the source. The line is now pinned: it works offline, never changes, and is in git. The words stay on the line, since they record intent and are what re-resolution reads if the catalog changes: `::: a quote from the book, big and centered -> quote size=large align=center`. Words after a lone `:` at the end are the second pass, asked only about the pinned part's settings.
 - **Do not accept**, and the words stay live. Jev re-reads the line when it is edited and the pick can change.
 - **Unsettled** picks show the top two and a key chooses between them.
 
 Only the accept key writes to the source. The core never edits a file the editor has open.
 
-[lsp.md](lsp.md) proposes a simpler pin format for the first slice, `::: the words -> quote size=large`, so that accepting is a plain insertion. Whichever survives the slice becomes the format here.
+The `->` form came from [lsp.md](lsp.md), so that accepting is a plain insertion at the end of the line. It survived the slice and three live tests, and the trailing-comment form is out.
 
 ## Jev's questions
 
@@ -168,6 +168,8 @@ A directive nested inside a part that takes no children is left plain with a war
 
 The root directive in `rubric.md` is answered the same way as any other line: a Choice among the designed palettes, a Choice among the type pairings, and Scores for spacing and contrast that code maps to the scale values. The model never invents a color. A dozen good palettes and a few pairings are a weekend of taste and they are what make every site look finished. The result is written into the site's Hugo config, and a site can override a value in plain form (`accent=#9a6512`) for the one person in ten who wants to.
 
+**Step 5 as proposed on 2026-11-06, to agree on before it is built.** The first line of `rubric.md` is already the site's look in words; it becomes a `:::` line asked only about the theme: a Choice among the combinations in `themes.yaml`, since a skin (PaperMod, Blowfish) is asked for by its look, and a Choice each among the palettes, pairings and scales in the catalog's `themes/`, with their descriptions as the criteria, so a piece can be swapped. The pin is a plain form naming the combination and any swapped piece, and a site that wants one value by hand writes it there. The pinned line, not `hugo.toml`, is the source of truth: the server already writes the frame page from `rubric.md`, so the theme travels in that page's front matter, and the layout reads it from there before `[params.rubric]`, which stays as the override for a site with no theme line. That keeps the rule that the server writes only `content/` and `.rubric/`, and a theme change reaches the page the way a frame change does, with no restart. Three of each piece are too few for a Choice to mean much, which is why importing themes is its own step before this one, and the probe runs on theme lines before the server asks them.
+
 ### How a theme is made
 
 Built and settled with Paper, before any second theme, on 2026-11-01, so that each theme after it is a few files and an afternoon of taste rather than CSS.
@@ -210,12 +212,14 @@ Decided 2026-11-01, in conversation, after Paper and the theme pipeline were don
 - **Blowfish, the second skin, and the look settings, 2026-11-02.** Decided with David before building: a skin's richer components come along, so what Jev reads depends on the theme. Three rules:
   1. **A skin can add settings to the catalog's parts and parts of its own** (`skins/<skin>.yaml`). While it is the site's skin, they are merged into the catalog Jev reads, and answers are cached per skin.
   2. **Switching skins keeps them in the pin, unused, with a note** (`other-skin`): a setting another skin adds is left out of the page and the part still draws; a part another skin adds stays as text. Switch back and they return. Writing never breaks because the theme changed.
-  3. **Anything two skins share moves into the catalog**, with a default drawing, so every skin gets it. Porting every skin's capabilities to every skin (a carousel everywhere) is for later.
+  3. **Anything two skins share moves into the catalog**, with a default drawing, so every skin gets it. Porting every skin's capabilities to every skin (a carousel everywhere) is step 5 of the order of work (decided 2026-11-06): the catalog ends with the same parts for every theme.
   - Blowfish adds `icon` to the callout (six Font Awesome Free icons, CC BY 4.0, vendored with their notice) and a part of its own, `lead`. It draws its own callout and timeline (`_partials/skins/blowfish/parts/`); `rubric/draw.html` uses a skin's drawing of a part when there is one. Its pieces: `blowfish` palette, `blowfish-sans` pairing, `blowfish` scale, and `assets/css/skins/blowfish.css`. Its own colors were nudged a step in six places to pass the readability check, which now also checks links on tinted boxes.
   - **The look settings** (`look` in catalog.yaml, version 5): `shadow`, `border`, `corners` and `text`, which every part in the writing takes. They are asked once a line, not once a part (8 questions), in the first pass and the second, so "a video with a shadow" and `: rounder, with a soft shadow` work on any part. They become classes on the part (`look-shadow-soft`); base.css draws them and a skin may redraw them. The frame does not take them.
 - **The order:** the catalog as contracts (done), the probe on it (done), the parts in the writing (done), the frame (done), a live test on the playground (done, with the second pass after it), then default drawings against richer slots, then PaperMod and Blowfish as the first imported skins (both done), then the theme by words.
 
 ## Catalogs
+
+*Reshaped on 2026-11-01 by "The universal catalog and skins" above: one catalog of every website component, with themes imported from open-source Hugo themes as skins. The catalog page, the review rounds and the slow path below still hold. The blog table under "The blog, as the MVP" is the sketch the universal catalog grew from, and `catalogs/blog/` is that catalog, kept for its themes.*
 
 There are several, one per kind of site: **blog** first, then essay, portfolio, docs. A catalog is a Hugo theme module: the catalog file, the parts as shortcodes with their assets, the themes as CSS, and a **catalog page** that renders every part in every setting in each theme. Hugo renders the catalog page from the catalog file in one template. The catalog page is how a catalog is judged, on rendered things, not code.
 
@@ -278,19 +282,31 @@ One language server, thin clients. The server is where the features live, writte
 - **Neovim first.** It is where I write, so the MVP gets used every day by its first user, and that is what finds the problems. Neovim 0.12 has inline completion over the language-server protocol (`vim.lsp.inline_completion`, to confirm against the build), so ghost text is the standard mechanism, not extmark tricks. The plugin is an attach rule, the accept and swap keys, and the commands (`:Rubric new`, `draft`, `round`, `open`).
 - **VS Code second.** It has inline completion natively and a standard client library, so the extension is a few hundred lines over the same server. This is where most writers who have an editor are.
 - **A browser editor third**, beside the preview, for writers who have no editor. It is a CodeMirror client of the same server, and it is the surface the hosted version uses. Built when there is someone to put it in front of, not before.
+- **A standalone application** is the other way to reach people without an editor, decided against VS Code and the browser editor once Neovim is done (2026-11-06).
 
 `rubric` is one process beside `hugo server`: watcher, preprocessor, cache, language server. Saving from any editor updates the preview, with no plugin at all. The command downloads Hugo on first run.
 
 ## Order of work
+
+Where each step stands, 2026-11-06: step 0 is built and merged to `main`. Step 1 is done in its reshaped form: the universal catalog's 52 parts and frame, Paper as the reference theme with the theme pipeline, PaperMod and Blowfish as imported skins. Step 2 is done but for the `rubric` command: `rubric build` and `rubric watch` exist in `src/cli.ts`, while downloading Hugo and starting both processes do not, and the playground starts Hugo by hand. Step 3 was run against the universal catalog instead of a blog fixture, 112 lines and three tuning sets, with the numbers in lsp.md. Step 4 is done, through three live tests. Step 5 is next. Decided 2026-11-06: populate from open-source Hugo themes and reach total functionality before anything is drafted by words; building your own theme or part is stretch.
 
 0. **The slice**, in [lsp.md](lsp.md): one thin path through every layer with an ugly three-part catalog, from a line typed in Neovim to Jev to ghost text to Hugo's preview. Decided 2026-10-31, and built the same day: it covers steps 2 and 4 in miniature, and the Jev numbers from it are in lsp.md. It comes first because it tests the two numbers the pitch rests on, the round trip and pick accuracy, before weeks go into a catalog, and because what Jev does with the first descriptions says how the blog catalog's descriptions should be written. It settles the catalog file's shape, the slot names, the pin format and the nested-shortcode pattern that step 1 then builds on.
 1. **The blog catalog and three themes**, drafted in a harness session and reviewed by hand, on the catalog page once it exists and on the preview before then. Parts as shortcodes with their assets, one of them functional, the catalog file, the slot names, the catalog page template. Descriptions written the way the slice found works: one plain sentence for the part, one for each value. A page of plain prose in each theme has to be beautiful before anything else is built. This is the hard part of Rubric. The catalog comes before the review tooling (step 6) on purpose: its shape, found by building and using it, is what says what a review form reviews.
 2. **Source to page.** The scanner, the preprocessor, the validator, the sidecar, the watcher beside `hugo server`, plain form only. After this step Rubric is a usable static blog tool with no model in it.
 3. **The Jev gate.** A fixture of about fifty real directive lines against the blog catalog, including negatives, nested blocks and hard cases, each with the plain form it should resolve to, run against the live API on a small budget. Two numbers come out: the round trip, which decides whether ghost text feels like completion or like waiting, and the top-pick accuracy. If accuracy is not near-perfect the fix is in the part descriptions and the setting descriptions, made here. If the round trip is too slow for ghost text, the loop runs on save instead and the pitch changes, which is better known now.
 4. **The language server and the Neovim client.** Ghost text, pinning, completion, diagnostics, code actions, cache.
-5. **The theme by words.** The root directive through the palette and pairing Choices.
-6. **The slow path, and designing by rounds.** `new`, `round`, `review.yaml`, the taste record, parts joining the shared catalog; "nothing fits" becomes an offer to draft. Also the way a theme is designed iteratively: palettes and pairings go through the same page and the same rounds. On the plan from the start; built after the catalog's shape is known.
-7. **VS Code**, then more catalogs (essay, portfolio, docs), the browser editor, the hosted version.
+5. **Populate from open-source Hugo themes, into one theme shape.** Import as many as the pipeline allows, from the 637 counted in `docs/research/hugo-themes.md`: those with no components as pieces and a frame, those with many as skins with their own parts, GPL ones left out. Two things grow together. The theme shape: one set of slots (colors, faces, sizes, border, shadow, density and whatever else the imports show a theme needs) that every theme fills, so a theme is the same shape whatever it came from. And the catalog: every component gleaned from any theme joins it with a default drawing, so at the end every theme offers the same parts, as many as the imports yield, and a skin differs only in how it draws them. A part that one skin brings and another lacks is a gap to fill, not a rule, which moves the universal section's "porting every skin's capabilities to every skin" from later into this step. Done when a dozen or more of each piece and a handful of skins all fill the one shape and draw the one catalog.
+6. **The theme by words.** The same shape as a part: write what you want in `rubric.md`, and the pick shows in the preview before you accept, with `<M-n>` for the runner-up. If the site has pages, the preview is the writer's own pages restyled, which the live preview already does on a theme switch. If it has none, the preview is a template page, to be designed in this step, that shows what a site in that theme would use: plain prose, a few parts, the frame. The pin names the combination and any swapped piece, and is carried through the frame page, as proposed under Themes.
+7. **Total functionality.** The `rubric` command: a new site, a pinned Hugo downloaded on first run, the server and Hugo started together, `build`. A writer goes from nothing to a published site with only the catalog and the imported themes. Done when the playground is a `rubric` site like any other and nothing is started by hand.
+8. **Beyond Neovim.** The first goal is Neovim done, since that is where the first user writes. Then something a person without Neovim can use: VS Code over the same server, a browser editor, or a standalone application; which one is decided when Neovim is done.
+
+### Stretch
+
+After total functionality, decided 2026-11-06: build your own theme and catalog. Not before, because a draft is only as good as what it is judged against, and that is the catalog and the themes above.
+
+- **The slow path for parts.** `::: new: a timeline of posts by year` hands the request, the catalog, the slots and the taste record to the writer's harness; `new`, `round`, `review.yaml`, parts joining the shared catalog; "nothing fits" becomes an offer to draft. On the plan from the start.
+- **Drafting a theme, never a whole theme from nothing.** A theme is nothing on its own; it exists only as the catalog page and the stress page looking right, which is where it is judged. Most "new" themes are new combinations of pieces, which the words already reach. A genuinely new piece is a short YAML file drafted from the words and the taste record, refused by `check` and `look` before anyone sees it, then one round for the thing no check can judge. Skins are imported, not drafted: a frame and a theme's own drawings are a session with the pipeline, and a look no skin has is a note toward the next import.
+- **More catalogs**, for kinds of site the universal catalog does not cover, and apps behind another renderer.
 
 ## Reference
 
@@ -322,11 +338,12 @@ Not repos: the TypeSafe cookbooks for function calling and intent routing (docs.
 - One language server; Neovim first, VS Code second, a browser editor and the hosted version later.
 - Catalog and functionality first, the review rounds and `new` after, so the catalog's shape instructs the design tooling rather than the other way round. Decided 2026-10-31. Iterative design of themes and catalogs stays on the plan as step 6.
 - Functional parts are ordinary parts: they work without JavaScript, keep state in the page, and move only when asked. Decided 2026-10-31.
+- Populate from open-source Hugo themes and reach total functionality first. Building your own theme or part by words is stretch, and a theme is never drafted from nothing: pieces are drafted and judged on the catalog and stress pages, skins are imported. Decided 2026-11-06.
 - The name is Rubric, from 2026-10-30. It was Warren, a place where many small sites are made, until the product stopped being about my sites. A rubric is the note written in red in a manuscript saying how a part should be read or set, which is exactly what the directive line is.
 
 ## Open questions
 
-- Source layout inside a site folder: `pages/posts/` and `pages/`, or one folder with front matter deciding.
+- ~~Source layout inside a site folder~~: `pages/posts/` and `pages/`, as the playground has it. Settled in use.
 - Whether the plain form also accepts the directive spelling `::: {.quote size=large}` for portability.
 - Whether the cache is committed with the site or local only. Pinned lines make it matter little.
 - Whether a part can be site-specific without joining the shared catalog, or whether everything new goes through the pool.

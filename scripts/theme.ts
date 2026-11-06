@@ -10,7 +10,7 @@
 //   bun scripts/theme.ts new scale <name> [--from <name>]
 //   bun scripts/theme.ts new theme <name> <palette> <pairing> <scale>
 //
-// RUBRIC_CATALOG names the catalog (blog by default).
+// RUBRIC_CATALOG names the catalog (universal by default).
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -18,7 +18,7 @@ import { check, KINDS, load, outputs, type Kind, type Problem, ThemeError } from
 import { look } from "./look.ts";
 
 const repo = join(import.meta.dir, "..");
-const dir = join(repo, "catalogs", process.env.RUBRIC_CATALOG ?? "blog");
+const dir = join(repo, "catalogs", process.env.RUBRIC_CATALOG ?? "universal");
 const tty = process.stdout.isTTY;
 const paint = (code: number) => (s: string) => (tty ? `\x1b[${code}m${s}\x1b[0m` : s);
 const [red, yellow, green, dim] = [paint(31), paint(33), paint(32), paint(2)];
