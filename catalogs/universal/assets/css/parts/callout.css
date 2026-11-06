@@ -15,6 +15,8 @@
   font-variant-numeric: lining-nums;
   color: var(--muted);
 }
+.part-callout-icon { display: inline-block; width: 1em; margin-right: 0.45em; vertical-align: -0.12em; }
+.part-callout-icon svg { display: block; width: 100%; height: auto; fill: currentColor; }
 .part-callout.kind-tip { background: var(--positive-tint); }
 .part-callout.kind-tip .part-callout-label { color: var(--positive); }
 .part-callout.kind-warning { background: var(--warning-tint); }

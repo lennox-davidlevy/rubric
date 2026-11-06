@@ -1,0 +1,27 @@
+/* Bear Blog's layer (github.com/janraasch/hugo-bearblog, MIT), read from
+   layouts/partials/style.html: almost nothing, on purpose. A small bold name,
+   plain links, a hairline by each quote, dated lists with a monospace date. */
+
+.part-header { background: none; }
+.part-header-inner { max-width: calc(var(--measure) + 2 * var(--space-3)); flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+.part-header-title { font-size: var(--step-1); font-weight: var(--weight-strong); }
+.part-header-nav ul { font-size: var(--step-0); gap: 0 var(--space-1); }
+.part-header-nav a, .masthead nav a { color: var(--link); }
+.part-header-nav a:hover { text-decoration: underline; color: var(--link); }
+.part-header-tools { margin-left: 0; }
+.part-header.sticky-stays { border-bottom: 0; }
+
+strong { color: var(--heading); }
+blockquote { padding-left: var(--space-3); border-left: var(--border) solid var(--muted); font-style: italic; color: var(--heading); }
+hr { width: 100%; border-top: var(--border) var(--rule-style) var(--ink); }
+:not(pre) > code { background: none; }
+
+/* The list of posts: a monospace date in a fixed column, then the title. */
+.post-list.style-dated li { grid-template-columns: 130px 1fr; }
+.post-list time { font-family: var(--font-mono); font-size: var(--step--1); }
+.post-list a { color: var(--link); }
+
+.part-footer { border-top: 0; text-align: center; }
+.part-footer-links ul, .part-social { justify-content: center; }
+
+.part-header.layout-split .part-header-nav { margin-left: 0; }

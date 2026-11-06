@@ -1,0 +1,28 @@
+/* book-sans: the reader's own interface sans, with headings no heavier than the writing.
+   Made by `bun scripts/theme.ts build` from themes/pairings/book-sans.yaml.
+   Edit that file, not this one. */
+
+
+:root {
+  --font-body: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-ui: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --weight-body: 400;
+  --weight-strong: 700;
+  --weight-heading: 400;
+  --weight-display: 400;
+  --leading-body: 1.6;
+  --leading-heading: 1.25;
+  --leading-display: 1.2;
+  --tracking-body: 0em;
+  --tracking-display: 0em;
+  --tracking-label: 0em;
+  --label-case: none;
+  --numerals: lining-nums;
+  --quote-style: normal;
+  --ornament: "* * *";
+  --code-size: 0.875em;
+  --heading-case: none;
+  --link-line: none;
+}

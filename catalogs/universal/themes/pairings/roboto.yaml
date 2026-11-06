@@ -1,0 +1,24 @@
+# Blog Awesome's type (github.com/hugo-sid/hugo-blog-awesome, MIT), from
+# assets/sass/main.scss: Roboto with very loose lines. SIL OFL, vendored from
+# @fontsource-variable/roboto 5.3.0, the Latin subset.
+description: Roboto for everything, a familiar sans, very loosely set
+
+faces:
+  - { family: Roboto, file: roboto-normal.woff2, style: normal, weight: [100, 900] }
+  - { family: Roboto, file: roboto-italic.woff2, style: italic, weight: [100, 900] }
+preload: [roboto-normal.woff2]
+
+body: [Roboto, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif]
+display: body
+mono: [Consolas, Menlo, monospace]
+
+weight: { body: 400, strong: 700, heading: 700, display: 700 }
+leading: { body: 1.85, heading: 1.3, display: 1.25 }
+tracking: { display: 0em, label: 0.04em }
+
+labels: none
+numerals: lining
+quote: italic
+ornament: "* * *"
+code: 0.875em
+links: hover

@@ -1,0 +1,14 @@
+# Hextra's sizes (assets/css/styles.css, Tailwind's scale): 16px, h1 at 2.25rem, a
+# 72ch-like column inside an 80rem page, 8px corners.
+description: 16px writing in a roomy column with crisp 8px corners and hairlines
+
+screen: [360, 1240]
+body: [16, 16]
+ratio: [1.2, 1.25]
+steps: [-1, 4]
+space: [0.5, 1, 1.5, [2, 2.5], [3, 4]]
+measure: 46rem
+wide: 80rem
+radius: 8px
+border: 1px
+controls: 8px

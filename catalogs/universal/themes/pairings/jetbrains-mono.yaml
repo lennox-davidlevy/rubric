@@ -1,0 +1,24 @@
+# Cactus's type (github.com/monkeyWzr/hugo-theme-cactus, MIT), from
+# assets/scss/_variables.scss: JetBrains Mono for everything. SIL OFL, vendored
+# from @fontsource-variable/jetbrains-mono 5.3.0, the Latin subset.
+description: JetBrains Mono for everything, a tall, even programmer's monospace
+
+faces:
+  - { family: JetBrains Mono, file: jetbrains-mono-normal.woff2, style: normal, weight: [100, 800] }
+  - { family: JetBrains Mono, file: jetbrains-mono-italic.woff2, style: italic, weight: [100, 800] }
+preload: [jetbrains-mono-normal.woff2]
+
+body: [JetBrains Mono, ui-monospace, Menlo, Consolas, monospace]
+display: body
+mono: [JetBrains Mono, ui-monospace, Menlo, Consolas, monospace]
+
+weight: { body: 400, strong: 700, heading: 700, display: 700 }
+leading: { body: 1.725, heading: 1.4, display: 1.3 }
+tracking: { display: 0em, label: 0.04em }
+
+labels: uppercase
+numerals: lining
+quote: italic
+ornament: "* * *"
+code: 0.95em
+links: always

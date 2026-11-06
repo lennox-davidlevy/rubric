@@ -1,0 +1,48 @@
+/* geekdoc: white and charcoal with a deep teal header and a strong blue link, and a slate dark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/geekdoc.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #343840;
+  --accent: #205375;
+  --muted: #6b6e74;
+  --rule: #d9dbdd;
+  --tint: #f4f6f7;
+  --dark-paper: #29363e;
+  --dark-ink: #bfc3c5;
+  --dark-accent: #89b8dc;
+  --raised: #ffffff;
+  --link: #0a539a;
+  --heading: #343840;
+  --code-paper: #f4f6f7;
+  --code-ink: #343840;
+  --code-muted: #6b6e74;
+  --code-accent: #205375;
+  --positive: #007e34;
+  --warning: #926100;
+  --danger: #d50000;
+  --accent-tint: #edf1f4;
+  --positive-tint: #ebf5ef;
+  --warning-tint: #f6f2eb;
+  --danger-tint: #fcebeb;
+  --dark-link: #89b8dc;
+  --dark-heading: #e0e2e3;
+  --band: #205375;
+  --band-ink: #ffffff;
+  --dark-muted: #9aa0a4;
+  --dark-rule: #4a565d;
+  --dark-tint: #1d262b;
+  --dark-raised: #1d262b;
+  --dark-accent-tint: #354651;
+  --dark-positive: #91bda5;
+  --dark-warning: #beae8d;
+  --dark-danger: #dda1a2;
+  --dark-positive-tint: #35464a;
+  --dark-warning-tint: #3b4447;
+  --dark-danger-tint: #3f434a;
+  --shadow-soft: 0 1px 2px rgb(52 56 64 / 0.06), 0 2px 8px rgb(52 56 64 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(52 56 64 / 0.06), 0 16px 40px rgb(52 56 64 / 0.14);
+}

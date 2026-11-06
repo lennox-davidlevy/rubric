@@ -1,0 +1,48 @@
+/* cactus-white: white, soft charcoal, pink links and a green accent.
+   Made by `bun scripts/theme.ts build` from themes/palettes/cactus-white.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #383838;
+  --accent: #1b7756;
+  --muted: #6c6c6c;
+  --rule: #dddddd;
+  --tint: #eeeeee;
+  --dark-paper: #1d1f21;
+  --dark-ink: #c9cacc;
+  --dark-accent: #2bbc8a;
+  --raised: #ffffff;
+  --link: #935a77;
+  --heading: #383838;
+  --code-paper: #eeeeee;
+  --code-ink: #383838;
+  --code-muted: #6c6c6c;
+  --code-accent: #1b7756;
+  --positive: #1c7d5b;
+  --warning: #8a5c00;
+  --danger: #cf222e;
+  --accent-tint: #edf4f1;
+  --positive-tint: #edf5f2;
+  --warning-tint: #f6f2eb;
+  --danger-tint: #fbedee;
+  --dark-link: #d480aa;
+  --dark-heading: #eeeeee;
+  --band: #1d1f21;
+  --band-ink: #c9cacc;
+  --dark-muted: #979797;
+  --dark-rule: #444444;
+  --dark-tint: #2c2e30;
+  --dark-raised: #2c2e30;
+  --dark-accent-tint: #1f322e;
+  --dark-positive: #7ba799;
+  --dark-warning: #ad9970;
+  --dark-danger: #cc7e85;
+  --dark-positive-tint: #282f2f;
+  --dark-warning-tint: #2e2e2b;
+  --dark-danger-tint: #322a2d;
+  --shadow-soft: 0 1px 2px rgb(56 56 56 / 0.06), 0 2px 8px rgb(56 56 56 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(56 56 56 / 0.06), 0 16px 40px rgb(56 56 56 / 0.14);
+}

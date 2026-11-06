@@ -1,0 +1,30 @@
+# Hugo Book's colors (github.com/alex-shpak/hugo-book, MIT), from
+# assets/styles/themes.css: the browser's black and white, its own blue, and the
+# Nord palette for dark. Its accent colors are the notices.
+description: plain black on white with one web blue, and the cool Nord slate for dark
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#000000"
+heading: "#000000"
+link: "#0055bb"
+accent: "#0055bb"
+muted: "#64748b"
+rule: "#e9ecef"
+tint: "#f8f9fa"
+positive: "#2c7f2c"  # nudged from #3bad3b, to read
+warning: "#935f28"  # nudged from #f59e42, to read
+danger: "#c34040"  # nudged from #d84747, to read
+
+dark:
+  paper: "#2e3440"
+  ink: "#eceff4"
+  link: "#9db6d0"  # nudged from #81a1c1, to read
+  accent: "#98b2cd"  # nudged from #81a1c1, to read
+  muted: "#d8dee9"
+  rule: "#434c5e"
+  tint: "#3b4252"
+  positive: "#a3be8c"
+  warning: "#daa290"  # nudged from #d08770, to read
+  danger: "#d8a1a6"  # nudged from #bf616a, to read

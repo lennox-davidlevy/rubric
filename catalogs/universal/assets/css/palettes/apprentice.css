@@ -1,0 +1,48 @@
+/* apprentice: a low-contrast dark gray with muted sage and steel.
+   Made by `bun scripts/theme.ts build` from themes/palettes/apprentice.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: dark;
+
+  --paper: #262626;
+  --ink: #bcbcbc;
+  --accent: #5fafaf;
+  --muted: #989898;
+  --rule: #444444;
+  --tint: #303030;
+  --dark-paper: #303030;
+  --dark-ink: #bcbcbc;
+  --dark-accent: #6fb7b7;
+  --raised: #262626;
+  --link: #9d9dbe;
+  --heading: #bcbcbc;
+  --code-paper: #303030;
+  --code-ink: #bcbcbc;
+  --code-muted: #989898;
+  --code-accent: #5fafaf;
+  --positive: #87af87;
+  --warning: #ffffaf;
+  --danger: #c48a8a;
+  --accent-tint: #2b3131;
+  --positive-tint: #2e312e;
+  --warning-tint: #373731;
+  --danger-tint: #332e2e;
+  --dark-link: #afafca;
+  --dark-heading: #bcbcbc;
+  --band: #303030;
+  --band-ink: #bcbcbc;
+  --dark-muted: #a9a9a9;
+  --dark-rule: #4c4c4c;
+  --dark-tint: #3d3d3d;
+  --dark-raised: #3d3d3d;
+  --dark-accent-tint: #384040;
+  --dark-positive: #a4b6a4;
+  --dark-warning: #dadab6;
+  --dark-danger: #c0a6a6;
+  --dark-positive-tint: #3e403e;
+  --dark-warning-tint: #444440;
+  --dark-danger-tint: #413e3e;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

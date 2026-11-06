@@ -1,0 +1,32 @@
+# The solarized-dark scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/solarized-dark.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08. The band is 01.
+description: the deep teal ground of Solarized with its precise blue and cyan
+
+scheme: dark
+
+paper: "#002b36"
+ink: "#93a1a1"
+heading: "#eee8d5"
+link: "#4ea1da"  # nudged from #268bd2, to read
+accent: "#9397d4"  # nudged from #6c71c4, to read
+muted: "#8f9ea0"  # nudged from #839496, to read
+rule: "#586e75"
+tint: "#073642"
+code-ink: "#98a6a6"
+code-muted: "#8f9ea0"
+code-accent: "#9397d4"
+positive: "#8b9e0d"  # nudged from #859900, to read
+warning: "#b98f0d"  # nudged from #b58900, to read
+danger: "#e6706e"  # nudged from #dc322f, to read
+
+dark:
+  paper: "#073642"
+  ink: "#abb6b6"  # nudged from #93a1a1, to read
+  heading: "#eee8d5"
+  link: "#6fb2e2"  # nudged from #268bd2, to read
+  accent: "#a2a6da"  # nudged from #6c71c4, to read
+  muted: "#99aaad"
+  positive: "#a7b37c"
+  warning: "#b4aa75"
+  danger: "#caa1a1"

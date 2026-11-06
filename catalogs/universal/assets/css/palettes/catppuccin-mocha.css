@@ -1,0 +1,48 @@
+/* catppuccin-mocha: a deep violet-black with soft pastel marks.
+   Made by `bun scripts/theme.ts build` from themes/palettes/catppuccin-mocha.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: dark;
+
+  --paper: #292938;
+  --ink: #cdd6f4;
+  --accent: #cba6f7;
+  --muted: #9092a0;
+  --rule: #3b3c4d;
+  --tint: #181825;
+  --dark-paper: #181825;
+  --dark-ink: #cdd6f4;
+  --dark-accent: #cba6f7;
+  --raised: #292938;
+  --link: #89b4fa;
+  --heading: #f5e0dc;
+  --code-paper: #181825;
+  --code-ink: #cdd6f4;
+  --code-muted: #848696;
+  --code-accent: #cba6f7;
+  --positive: #a6e3a1;
+  --warning: #f9e2af;
+  --danger: #f38ba8;
+  --accent-tint: #363347;
+  --positive-tint: #333840;
+  --warning-tint: #3a3842;
+  --danger-tint: #393141;
+  --dark-link: #89b4fa;
+  --dark-heading: #f5e0dc;
+  --band: #181825;
+  --band-ink: #cdd6f4;
+  --dark-muted: #9399b2;
+  --dark-rule: #3c3e4e;
+  --dark-tint: #282938;
+  --dark-raised: #282938;
+  --dark-accent-tint: #2d293e;
+  --dark-positive: #bbdccf;
+  --dark-warning: #e1dbd5;
+  --dark-danger: #deb4d2;
+  --dark-positive-tint: #2c3039;
+  --dark-warning-tint: #302f3a;
+  --dark-danger-tint: #302b3a;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

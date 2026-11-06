@@ -4,7 +4,7 @@ A short run. It checks only the fixes from the run on 2026-11-02; everything tha
 
 Write what you find in the **Notes** section at the bottom, numbered by step.
 
-Last updated: 2026-11-02.
+Last updated: 2026-11-06.
 
 ## 0. Set up
 
@@ -113,14 +113,23 @@ Then in `walk.md`:
 ::: a tip with a lightbulb
 ```
 
-**Should happen:** expect `callout kind=tip icon=lightbulb`, drawn with a lightbulb. Completion after `::: callout ` offers `icon` and its values. (Last time this was missing because Neovim's server still had Paper's parts.)
+**Should happen:** expect `callout kind=tip icon=lightbulb`, drawn with a lightbulb. Completion after `::: callout ` offers `icon` and its values, in any theme now: the icon moved into the catalog (2026-11-06), since most imported themes have one.
+
+Then a part only Blowfish still has:
+
+```markdown
+::: a big opening paragraph
+```
+
+**Should happen:** expect `lead`, drawn larger and softer than the writing.
 
 Switch back to `theme = "paper"` and save:
 
-- The callout still draws, without its icon, and `icon=lightbulb` gets the note "icon comes with the blowfish skin; this site's theme leaves it out and keeps it in the pin".
-- Switching to Blowfish again brings the icon back.
+- The callout still draws, and now keeps its lightbulb, drawn Paper's way.
+- The lead stays as text, with the note "lead comes with the blowfish skin; this site's theme doesn't draw it".
+- Switching to Blowfish again brings the lead back.
 
-**Fixed since your run:** the callout sometimes vanished after a switch and stayed gone until you edited it. Hugo rebuilt with the new theme a moment before Rubric rewrote the page, Paper failed on the `icon` it didn't know, and the browser kept the old page. Now a setting or part from another skin is skipped in that moment instead of failing. Switch back and forth a few times quickly: the callout should always be there, with the icon only in Blowfish.
+**Fixed since your run:** the callout sometimes vanished after a switch and stayed gone until you edited it. Hugo rebuilt with the new theme a moment before Rubric rewrote the page, Paper failed on the `icon` it didn't know, and the browser kept the old page.
 
 ## 9. Faster ghost text
 
@@ -140,6 +149,54 @@ Type a new line and press `<M-l>` as soon as you finish, without pausing:
 - The calls shouldn't go up. Each line should still show one `── Jev` block in the play terminal. Watch for half-typed words in them (like "a flowchart of the ro"), and note any.
 
 Your typing is logged to `testing/.rubric/keys.jsonl`: when each `:::` line was typed, and its words. After a session, `bun scripts/pause.ts` shows how many calls each pause would have made on your real typing. If the fitted one sends more than the old one, say so and we'll change it.
+
+## 10. The imported themes
+
+**New.** No restart needed, and it can wait until the rest is done. In `testing/hugo.toml`, change `theme` under `[params.rubric]` and save, once each. Every name below should restyle `walk.md` in place. Look for anything hard to read, or that looks broken. A full list of the 71 is in `catalogs/universal/themes.yaml`.
+
+- `terminal`: near-black, amber, monospace, a filled block for the name, dashed lines.
+- `bear`: almost nothing, Verdana, one blue.
+- `hyde-teal`: a colored column on the left with a huge display name. On a phone width, it sits on top.
+- `gruvbox-light`, `dracula`, `solarized-dark`: text-file look, `#` marks on headings, `[name] $` as the site's name.
+- `github`: the code-host look, tinted bar, thin lines.
+- `relearn-blue`: a dark menu on the left, notices with a filled title.
+- `hextra`: hairlines and 8px boxes.
+- `geekdoc`: a deep teal bar, a geometric sans for headings.
+
+**Should happen:** dark palettes such as `terminal` stay dark. If your frame has the light and dark switch, its dark setting moves them to a ground one step away, not to a light page.
+
+All 71 at once, side by side: `bun scripts/theme.ts look` (about 10 minutes), then open `catalogs/universal/shots/index.html`.
+
+## 11. Four new parts
+
+**New.** Restart Neovim once, since the catalog changed. In `walk.md`, try each. They should be picked and drawn in any theme:
+
+```markdown
+::: a map of where the walk starts
+51.5055, -0.0754
+
+By the river.
+:::
+
+::: the route as a PDF to read here
+/files/route.pdf
+:::
+
+::: the files in this project as a tree
+
+:::
+
+::: bars showing how far along each goal is
+
+:::
+```
+
+**Should happen:**
+
+- `map`, with `zoom` from words like "close up". A frame from OpenStreetMap with a marker, and a link under it. Move your cursor off and back: no reload.
+- `pdf`. The frame stays empty until `/files/route.pdf` is a real file in the site's `static/`, and the link under it works once it is.
+- `file-tree` and `progress` write a starter body you edit. In `hextra`, the tree has folder and file icons.
+- These are Jev's first look at these parts: the words above have not been run through the probe. Note any line that picks the wrong part, especially a map that picks `embed`.
 
 ## Afterwards
 

@@ -1,0 +1,48 @@
+/* base16-dark: a neutral near-black with the classic base16 rainbow of soft marks.
+   Made by `bun scripts/theme.ts build` from themes/palettes/base16-dark.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: dark;
+
+  --paper: #181818;
+  --ink: #d8d8d8;
+  --accent: #ba8baf;
+  --muted: #b8b8b8;
+  --rule: #383838;
+  --tint: #282828;
+  --dark-paper: #282828;
+  --dark-ink: #d8d8d8;
+  --dark-accent: #c097b7;
+  --raised: #181818;
+  --link: #7cafc2;
+  --heading: #e8e8e8;
+  --code-paper: #282828;
+  --code-ink: #d8d8d8;
+  --code-muted: #b8b8b8;
+  --code-accent: #ba8baf;
+  --positive: #a1b56c;
+  --warning: #f7ca88;
+  --danger: #c17774;
+  --accent-tint: #252124;
+  --positive-tint: #23251f;
+  --warning-tint: #2a2621;
+  --danger-tint: #26201f;
+  --dark-link: #7cafc2;
+  --dark-heading: #e8e8e8;
+  --band: #282828;
+  --band-ink: #d8d8d8;
+  --dark-muted: #a5a5a5;
+  --dark-rule: #4b4b4b;
+  --dark-tint: #383838;
+  --dark-raised: #383838;
+  --dark-accent-tint: #3a3539;
+  --dark-positive: #bfc8a7;
+  --dark-warning: #e6d2b4;
+  --dark-danger: #ceacab;
+  --dark-positive-tint: #3a3b37;
+  --dark-warning-tint: #3f3c39;
+  --dark-danger-tint: #3c3838;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

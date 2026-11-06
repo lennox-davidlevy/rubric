@@ -1,0 +1,22 @@
+# Risotto's type (github.com/joeroe/risotto, MIT), from
+# assets/css/typography.css: Fira Mono if the reader has it, or their own
+# monospace, with every heading the size of the writing. Nothing to fetch.
+description: the reader's own monospace for everything, like a text file
+
+faces: []
+preload: []
+
+body: [Fira Mono, ui-monospace, SF Mono, Menlo, Consolas, monospace]
+display: body
+mono: [Fira Mono, ui-monospace, SF Mono, Menlo, Consolas, monospace]
+
+weight: { body: 400, strong: 700, heading: 600, display: 600 }
+leading: { body: 1.5, heading: 1.5, display: 1.5 }
+tracking: { display: 0em, label: 0em }
+
+labels: none
+numerals: lining
+quote: normal
+ornament: "* * *"
+code: 1em
+links: always

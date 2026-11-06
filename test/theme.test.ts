@@ -3,7 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { check, checkPairing, checkPalette, contrast, cssString, fluid, hex, lint, load, parsePairing, parsePalette } from "../src/theme.ts";
+import { check, checkPairing, checkPalette, contrast, cssString, fluid, hex, lint, load, pairingCss, paletteCss, parsePairing, parsePalette, scaleCss } from "../src/theme.ts";
 
 const blog = join(import.meta.dir, "../catalogs/blog");
 
@@ -37,6 +37,34 @@ describe("the universal catalog's themes, PaperMod's skin among them", () => {
   });
 }); 
 
+describe("the one shape every theme fills", () => {
+  const cat = load(join(import.meta.dir, "../catalogs/universal"));
+
+  test("there are a dozen or more of each piece, and a handful of skins", () => {
+    for (const kind of [cat.palettes, cat.pairings, cat.scales]) expect(Object.keys(kind).length).toBeGreaterThanOrEqual(12);
+    expect(new Set(Object.values(cat.themes).map((t) => t.skin).filter(Boolean)).size).toBeGreaterThanOrEqual(5);
+  });
+
+  test("every piece fills the same slots, whatever theme it came from", () => {
+    const filled = (css: string) => [...css.matchAll(/^\s*--([a-z0-9-]+):/gm)].map((m) => m[1]!).sort();
+    const shape = (css: (piece: never) => string, pieces: object) => new Set(Object.values(pieces).map((p) => filled(css(p as never)).join(" ")));
+    expect(shape(paletteCss, cat.palettes).size).toBe(1);
+    expect(shape(pairingCss, cat.pairings).size).toBe(1);
+    expect(shape(scaleCss, cat.scales).size).toBe(1);
+  });
+
+  test("the slots added for imported themes leave Paper as it was", () => {
+    const paper = cat.palettes.paper!.colors;
+    expect(paper["dark-link"]).toBe(paper["dark-ink"]);
+    expect(paper["dark-heading"]).toBe(paper["dark-ink"]);
+    expect(paper["dark-raised"]).toBe(paper["dark-tint"]);
+    expect(paper.band).toBe(paper["dark-paper"]);
+    expect(paper["band-ink"]).toBe(paper["dark-ink"]);
+    expect(pairingCss(cat.pairings["source-serif"]!)).toContain("--tracking-body: 0em;");
+    expect(scaleCss(cat.scales.reading!)).toContain("--rule-style: solid;");
+  });
+});
+
 describe("checks", () => {
   const paper = { description: "d", scheme: "light", paper: "#f9f6ef", ink: "#221e19", accent: "#9a3412", muted: "#6b6357", rule: "#e2dacb", tint: "#f1e9d9" };
 
@@ -44,6 +72,14 @@ describe("checks", () => {
     const p = parsePalette("p", { ...paper, dark: { paper: "#2a2520", ink: "#f3ede2", accent: "#9a3412" } });
     const errors = checkPalette(p).filter((x) => x.level === "error").map((x) => x.message);
     expect(errors[0]).toContain("dark-accent on dark-paper (quote marks, ornaments and links in a dark band) has contrast 2.08");
+  });
+
+  test("a colored sidebar's writing has to read on it, and a dark palette's band may sit close to its page", () => {
+    const dark = { paper: "#2a2520", ink: "#f3ede2", accent: "#e5936a" };
+    const yellow = parsePalette("p", { ...paper, dark, band: "#f4bf75", "band-ink": "#ffffff" });
+    expect(checkPalette(yellow).map((x) => x.message).join()).toContain("band-ink on band (writing on a colored sidebar or header)");
+    const night = parsePalette("p", { ...paper, scheme: "dark", paper: "#1a170f", ink: "#eceae5", accent: "#eec35e", muted: "#a8a59c", rule: "#4a463a", tint: "#28241a", dark: { paper: "#2a261b", ink: "#eceae5", accent: "#eec35e" } });
+    expect(checkPalette(night)).toEqual([]);
   });
 
   test("derived colors can be set by hand", () => {

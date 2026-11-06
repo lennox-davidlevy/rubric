@@ -1,0 +1,42 @@
+/* Hugo Book's layer (github.com/alex-shpak/hugo-book, MIT), read from
+   assets/styles/: a plain 16rem menu down the left on a wide screen, notices
+   with a colored bar, tabs in a thin box, outlined buttons. */
+
+.part-header-nav a { color: var(--ink); }
+.part-header-nav a[aria-current] { color: var(--link); font-weight: var(--weight-strong); }
+.part-header.sticky-stays { position: static; border-bottom: 0; }
+
+@media (min-width: 56rem) {
+  body { padding-left: 16rem; }
+  body > .part-header { position: fixed; inset: 0 auto 0 0; width: 16rem; overflow-y: auto; }
+  body > .part-header .part-header-inner { display: block; padding: var(--space-3); }
+  body > .part-header .part-header-title { display: block; margin-bottom: var(--space-2); font-weight: var(--weight-strong); }
+  body > .part-header .part-header-nav { margin: 0; }
+  body > .part-header .part-header-nav ul { display: block; font-size: var(--step--1); }
+  body > .part-header .part-header-nav li + li { margin-top: var(--space-1); }
+  body > .part-header .part-header-tools { margin: var(--space-2) 0 0; }
+}
+
+.flow a:not([class]) { color: var(--link); }
+h1, h2, h3, h4 { font-weight: var(--weight-heading); }
+blockquote { margin-inline: 0; padding: var(--space-1) var(--space-2); border-left: var(--radius) solid var(--rule); color: inherit; }
+hr { width: 100%; border-top: var(--border) solid var(--rule); }
+
+/* A hint: a pale wash of its color, with a bar of it down the side. */
+.part-callout { margin-inline: 0; padding: var(--space-2); background: color-mix(in srgb, var(--muted) 10%, transparent); border-left: var(--radius) solid var(--muted); border-radius: var(--radius); }
+.part-callout.kind-tip { background: var(--positive-tint); border-left-color: var(--positive); }
+.part-callout.kind-warning { background: var(--warning-tint); border-left-color: var(--warning); }
+.part-callout.kind-danger { background: var(--danger-tint); border-left-color: var(--danger); }
+.part-callout-label { color: var(--ink); text-transform: none; letter-spacing: 0; }
+
+/* Tabs in a thin box; steps with a small outlined number. */
+.part-tabs.is-tabbed { border: var(--border) solid var(--rule); border-radius: var(--radius); }
+.part-tabs.is-tabbed .part-tabs-list { padding-inline: var(--space-2); }
+.part-tabs.is-tabbed .part-tabs-panel { padding: var(--space-2); }
+.part-tabs-list button[aria-selected="true"] { border-bottom-color: var(--link); }
+.part-steps > li::before { background: var(--tint); color: var(--ink); border: var(--border) solid var(--rule); }
+.part-fold { border: var(--border) solid var(--rule); border-radius: var(--radius); padding-inline: var(--space-2); }
+.part-buttons a, .part-buttons :is(p > a:first-child, li:first-child > a) { background: transparent; border-color: var(--link); color: var(--link); }
+.part-buttons a:hover, .part-buttons :is(p > a:first-child, li:first-child > a):hover { background: var(--tint); border-color: var(--link); color: var(--link); }
+
+.part-footer { margin-top: var(--space-4); border-top: 0; }

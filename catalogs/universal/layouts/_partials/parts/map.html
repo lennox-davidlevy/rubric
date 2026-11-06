@@ -1,0 +1,22 @@
+{{- /* A map from the block's first line, "latitude, longitude"; the rest is a
+     caption. OpenStreetMap draws it, framed, only as the reader nears it, and
+     the link works whatever becomes of the frame. */ -}}
+{{- $html := string .inner -}}
+{{- $first := index (findRE `(?s)<p>.*?</p>` $html 1) 0 | default "" -}}
+{{- $nums := findRE `-?\d+(?:\.\d+)?` $first 2 -}}
+{{- $caption := trim (replaceRE `(?s)^\s*<p>.*?</p>` "" $html) " \n" -}}
+<figure class="part part-map zoom-{{ .s.zoom }}">
+{{- if eq (len $nums) 2 }}
+{{- $lat := float (index $nums 0) }}{{ $lon := float (index $nums 1) -}}
+{{- $d := index (dict "city" 0.06 "neighborhood" 0.012 "street" 0.003) (.s.zoom | default "neighborhood") | default 0.012 -}}
+{{- $box := printf "%.5f,%.5f,%.5f,%.5f" (sub $lon (mul $d 1.5)) (sub $lat $d) (add $lon (mul $d 1.5)) (add $lat $d) -}}
+{{- $mark := printf "%.5f,%.5f" $lat $lon -}}
+<div class="part-map-frame"><iframe src="https://www.openstreetmap.org/export/embed.html?bbox={{ $box }}&amp;layer=mapnik&amp;marker={{ $mark }}" title="A map of {{ $mark }}" loading="lazy"></iframe></div>
+<p class="part-map-link"><a href="https://www.openstreetmap.org/?mlat={{ $lat }}&amp;mlon={{ $lon }}">Open this map</a></p>
+{{- else }}
+<p class="part-map-empty">This map needs its place as a first line: latitude, longitude.</p>
+{{- end }}
+{{- with $caption }}
+<figcaption class="stack">{{ . | safeHTML }}</figcaption>
+{{- end }}
+</figure>

@@ -1,0 +1,26 @@
+# m10c's default colors (github.com/vaga/hugo-theme-m10c, MIT), from
+# assets/css/main.scss: slate, pale writing, a mint accent, and a darker slate
+# column, which is the band.
+description: slate gray with pale writing, white headings and a mint accent
+
+scheme: dark
+
+paper: "#353b43"
+ink: "#afbac4"
+heading: "#ffffff"
+link: "#57cc8a"
+accent: "#57cc8a"
+muted: "#9ba6b0"
+rule: "#4d545d"
+tint: "#242930"
+positive: "#57cc8a"
+warning: "#e5c07b"
+danger: "#ff9a9a"
+
+dark:
+  paper: "#242930"
+  ink: "#afbac4"
+  heading: "#ffffff"
+  link: "#57cc8a"
+  accent: "#57cc8a"
+  muted: "#9aa1a9"

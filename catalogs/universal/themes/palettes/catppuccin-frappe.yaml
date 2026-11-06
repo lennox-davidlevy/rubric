@@ -1,0 +1,27 @@
+# The catppuccin-frappe scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/catppuccin-frappe.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08. The band is 01.
+description: a dusty blue-gray with soft pastel marks
+
+scheme: dark
+
+paper: "#303446"
+ink: "#c6d0f5"
+heading: "#f2d5cf"
+link: "#92aeef"  # nudged from #8caaee, to read
+accent: "#ca9ee6"
+muted: "#9ca0ae"  # nudged from #626880, to read
+rule: "#414559"
+tint: "#292c3c"
+code-muted: "#9196a6"
+positive: "#a6d189"
+warning: "#e5c890"
+danger: "#e98e90"  # nudged from #e78284, to read
+
+dark:
+  paper: "#292c3c"
+  ink: "#c6d0f5"
+  heading: "#f2d5cf"
+  link: "#92aeef"  # nudged from #8caaee, to read
+  accent: "#ca9ee6"
+  muted: "#9ea6c0"

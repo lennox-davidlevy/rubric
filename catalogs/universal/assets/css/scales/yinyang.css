@@ -1,0 +1,23 @@
+/* yinyang: 18px writing in a generous column with plain 32px titles. Body 17px to 18px, ratio 1.15 to 1.2, from a 360px to a 1240px screen.
+   Made by `bun scripts/theme.ts build` from themes/scales/yinyang.yaml.
+   Edit that file, not this one. */
+
+:root {
+  --step--1: clamp(0.9239rem, 0.918rem + 0.025vw, 0.9375rem);
+  --step-0: clamp(1.0625rem, 1.037rem + 0.114vw, 1.125rem);
+  --step-1: clamp(1.2219rem, 1.169rem + 0.233vw, 1.35rem);
+  --step-2: clamp(1.4052rem, 1.317rem + 0.391vw, 1.62rem);
+  --step-3: clamp(1.6159rem, 1.482rem + 0.596vw, 1.944rem);
+  --step-4: clamp(1.8583rem, 1.664rem + 0.863vw, 2.3328rem);
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: clamp(2rem, 1.795rem + 0.909vw, 2.5rem);
+  --space-5: clamp(3rem, 2.591rem + 1.818vw, 4rem);
+  --measure: 44rem;
+  --wide: 50rem;
+  --radius: 3px;
+  --border: 2px;
+  --control-radius: 3px;
+  --rule-style: solid;
+}

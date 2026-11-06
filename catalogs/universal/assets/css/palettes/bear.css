@@ -1,0 +1,48 @@
+/* bear: white, soft gray writing and one clear blue, with a deep teal dark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/bear.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #444444;
+  --accent: #2e68c7;
+  --muted: #6f6f6f;
+  --rule: #d9d9d9;
+  --tint: #f4f4f4;
+  --dark-paper: #01242e;
+  --dark-ink: #dddddd;
+  --dark-accent: #8cc2dd;
+  --raised: #ffffff;
+  --link: #2e68c7;
+  --heading: #222222;
+  --code-paper: #f4f4f4;
+  --code-ink: #444444;
+  --code-muted: #6f6f6f;
+  --code-accent: #306dd1;
+  --positive: #1a7f37;
+  --warning: #8a5c00;
+  --danger: #cf222e;
+  --accent-tint: #eef3fb;
+  --positive-tint: #edf5ef;
+  --warning-tint: #f6f2eb;
+  --danger-tint: #fbedee;
+  --dark-link: #8cc2dd;
+  --dark-heading: #eeeeee;
+  --band: #01242e;
+  --band-ink: #dddddd;
+  --dark-muted: #97a2a5;
+  --dark-rule: #2d4951;
+  --dark-tint: #15353e;
+  --dark-raised: #15353e;
+  --dark-accent-tint: #123743;
+  --dark-positive: #85b392;
+  --dark-warning: #b8a37a;
+  --dark-danger: #d7898e;
+  --dark-positive-tint: #11353a;
+  --dark-warning-tint: #173337;
+  --dark-danger-tint: #1b303a;
+  --shadow-soft: 0 1px 2px rgb(68 68 68 / 0.06), 0 2px 8px rgb(68 68 68 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(68 68 68 / 0.06), 0 16px 40px rgb(68 68 68 / 0.14);
+}

@@ -1,0 +1,13 @@
+# hello-friend-ng's sizes (assets/scss/_variables.scss, _main.scss): 16px in an
+# 860px column, the broadest here, with room around everything.
+description: 16px writing in a broad 860px column
+
+screen: [360, 1240]
+body: [16, 16]
+ratio: [1.2, 1.25]
+steps: [-1, 4]
+space: [0.5, 1, 1.5, [2, 2.5], [3, 4]]
+measure: 53.75rem
+wide: 60rem
+radius: 8px
+border: 1px

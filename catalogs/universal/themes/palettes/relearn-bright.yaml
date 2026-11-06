@@ -1,0 +1,26 @@
+# Relearn's relearn-bright variant (github.com/McShelby/hugo-theme-relearn, MIT), from
+# assets/css/theme-relearn-bright.css, with relearn-light's values for what it leaves out. Its
+# menu color is the band. Its notices are its own box colors.
+description: white with a blue link and a bright green menu
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#262626"
+band: "#83c932"
+band-ink: "#474747"  # nudged from #ffffff, to read
+heading: "#101010"
+link: "#4d64a2"  # nudged from #6380d0, to read
+accent: "#000000"
+muted: "#6b6b6b"
+rule: "#d0d0d0"
+tint: "#f8f8f8"
+positive: "#2e7d32"
+warning: "#ab4f09"  # nudged from #b45309, to read
+danger: "#c62828"
+
+dark:
+  paper: "#202020"
+  ink: "#d2d2d2"
+  link: "#7a97e5"  # nudged from #6c8ce3, to read
+  accent: "#7a97e5"  # nudged from #6c8ce3, to read

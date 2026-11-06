@@ -1,0 +1,24 @@
+/* Coder's layer (github.com/luizdepra/hugo-coder, MIT), read from
+   assets/scss/_navigation.scss and _base.scss: a tall bar with the name in
+   spaced capitals, links in medium weight, a thin rule by each italic quote. */
+
+.part-header { border-bottom: var(--border) solid var(--tint); }
+.part-header-inner { min-height: 6rem; }
+.part-header-title { text-transform: uppercase; letter-spacing: 0.1em; font-weight: var(--weight-heading); color: var(--ink); }
+.part-header-nav ul { font-size: var(--step-0); }
+.part-header-nav a { color: var(--link); }
+.part-header-nav a:hover { color: var(--link); text-decoration: underline; }
+.part-header-nav a[aria-current] { font-weight: var(--weight-strong); color: var(--link); }
+
+.flow a:not([class]) { font-weight: var(--weight-heading); }
+h2, h3, h4 { font-weight: var(--weight-heading); }
+blockquote { border-left: calc(var(--border) * 2) solid var(--tint); padding-left: var(--space-2); font-style: italic; color: inherit; }
+hr { width: 100%; border-top: var(--border) solid var(--tint); }
+
+/* Its notices have a title on a line of its own above a pale box. */
+.part-callout { padding: 0; overflow: hidden; }
+.part-callout-label { margin: 0; padding: var(--space-1) var(--space-3); border-bottom: var(--border) solid color-mix(in srgb, currentColor 25%, transparent); text-transform: none; letter-spacing: 0; }
+.part-callout .stack { padding: var(--space-2) var(--space-3); }
+
+.part-footer { border-top: 0; text-align: center; }
+.part-footer-links ul, .part-social { justify-content: center; }

@@ -1,0 +1,27 @@
+# Archie's colors (github.com/athul/archie, MIT), from assets/css/main.css and
+# dark.css: crimson on white, and a bright green on charcoal.
+description: white with crimson marks, and a charcoal dark with bright green
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#232333"
+heading: "#232333"
+link: "#232333"
+accent: "#d11339"  # nudged from #dc143c, to read
+muted: "#6d6d6d"  # nudged from #737373, to read
+rule: "#d9d9d9"
+tint: "#f1f1f1"
+code-paper: "#ececec"
+code-muted: "#696973"
+positive: "#1a7f37"
+warning: "#8a5c00"
+danger: "#b91c3c"
+
+dark:
+  paper: "#202124"
+  ink: "#ffffff"
+  link: "#ffffff"
+  accent: "#50fa7b"
+  muted: "#dddddd"
+  tint: "#3a3a3a"

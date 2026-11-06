@@ -1,0 +1,48 @@
+/* hyde-blue: white, soft gray writing and a dusty blue, with a sidebar in the same color.
+   Made by `bun scripts/theme.ts build` from themes/palettes/hyde-blue.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #515151;
+  --accent: #4e7585;
+  --muted: #717171;
+  --rule: #e5e5e5;
+  --tint: #f9f9f9;
+  --dark-paper: #202020;
+  --dark-ink: #e8e8e8;
+  --dark-accent: #8fc3e8;
+  --raised: #ffffff;
+  --link: #4a6f7e;
+  --heading: #313131;
+  --code-paper: #f9f9f9;
+  --code-ink: #515151;
+  --code-muted: #717171;
+  --code-accent: #4e7585;
+  --positive: #1a7f37;
+  --warning: #8a5c00;
+  --danger: #aa5159;
+  --accent-tint: #f1f4f5;
+  --positive-tint: #edf5ef;
+  --warning-tint: #f6f2eb;
+  --danger-tint: #f8f1f2;
+  --dark-link: #8fc3e8;
+  --dark-heading: #e8e8e8;
+  --band: #6a9fb5;
+  --band-ink: #2f2f2f;
+  --dark-muted: #a8a8a8;
+  --dark-rule: #484848;
+  --dark-tint: #323232;
+  --dark-raised: #323232;
+  --dark-accent-tint: #2d3438;
+  --dark-positive: #8bb998;
+  --dark-warning: #bea980;
+  --dark-danger: #cca4a8;
+  --dark-positive-tint: #2d322e;
+  --dark-warning-tint: #33302b;
+  --dark-danger-tint: #353030;
+  --shadow-soft: 0 1px 2px rgb(81 81 81 / 0.06), 0 2px 8px rgb(81 81 81 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(81 81 81 / 0.06), 0 16px 40px rgb(81 81 81 / 0.14);
+}

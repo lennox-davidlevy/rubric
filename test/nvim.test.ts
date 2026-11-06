@@ -220,7 +220,7 @@ test.skipIf(!nvim)("Neovim: switching the theme in hugo.toml reaches the server 
     .replace(/^theme = .*$/m, `theme = "universal"`);
   writeFileSync(join(site, "hugo.toml"), config);
   const page = join(site, "pages/posts/theme.md");
-  writeFileSync(page, ["---", "title: Theme", "---", "::: a tip -> callout icon=lightbulb", "Hi.", ":::", ""].join("\n"));
+  writeFileSync(page, ["---", "title: Theme", "---", "::: an opening -> lead", "Hi.", ":::", ""].join("\n"));
 
   const editor = Bun.spawn([nvim!, "--headless", "--listen", sock, "-u", join(repo, "test/nvim/init.lua"), "-i", "NONE", page], {
     cwd: site, env: { ...process.env, RUBRIC_REPO: repo }, stdout: "ignore", stderr: "ignore",

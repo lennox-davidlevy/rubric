@@ -1,0 +1,48 @@
+/* papercolor-light: a printed-paper light gray with magenta and blue marks.
+   Made by `bun scripts/theme.ts build` from themes/palettes/papercolor-light.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #eeeeee;
+  --ink: #0f0f0f;
+  --accent: #00101c;
+  --muted: #001116;
+  --rule: #008700;
+  --tint: #c65858;
+  --dark-paper: #1c1c1c;
+  --dark-ink: #d5d5d5;
+  --dark-accent: #95dede;
+  --raised: #eeeeee;
+  --link: #0a0a00;
+  --heading: #001118;
+  --code-paper: #ca6767;
+  --code-ink: #0a0a0a;
+  --code-muted: #001116;
+  --code-accent: #00101c;
+  --positive: #007400;
+  --warning: #a64a00;
+  --danger: #af0000;
+  --accent-tint: #dbdcdd;
+  --positive-tint: #dbe4db;
+  --warning-tint: #e8e1db;
+  --danger-tint: #e9dbdb;
+  --dark-link: #ffbdde;
+  --dark-heading: #edcaba;
+  --band: #1c1c1c;
+  --band-ink: #d5d5d5;
+  --dark-muted: #aed6ea;
+  --dark-rule: #5faf00;
+  --dark-tint: #af005f;
+  --dark-raised: #af005f;
+  --dark-accent-tint: #2b3333;
+  --dark-positive: #75a975;
+  --dark-warning: #c09675;
+  --dark-danger: #c78080;
+  --dark-positive-tint: #272d27;
+  --dark-warning-tint: #302b27;
+  --dark-danger-tint: #312828;
+  --shadow-soft: 0 1px 2px rgb(15 15 15 / 0.06), 0 2px 8px rgb(15 15 15 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(15 15 15 / 0.06), 0 16px 40px rgb(15 15 15 / 0.14);
+}

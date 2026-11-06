@@ -1,0 +1,48 @@
+/* loveit: white and warm near-black with teal blue links, and a soft charcoal dark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/loveit.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #161209;
+  --accent: #237592;
+  --muted: #707077;
+  --rule: #e4e4e4;
+  --tint: #f5f5f5;
+  --dark-paper: #292a2d;
+  --dark-ink: #a9a9b3;
+  --dark-accent: #55bde2;
+  --raised: #f8f8f8;
+  --link: #237592;
+  --heading: #161209;
+  --code-paper: #f5f5f5;
+  --code-ink: #161209;
+  --code-muted: #707077;
+  --code-accent: #237592;
+  --positive: #007869;
+  --warning: #a25b00;
+  --danger: #d01338;
+  --accent-tint: #edf4f6;
+  --positive-tint: #ebf4f3;
+  --warning-tint: #f8f2eb;
+  --danger-tint: #fbecef;
+  --dark-link: #55bde2;
+  --dark-heading: #ffffff;
+  --band: #292a2d;
+  --band-ink: #a9a9b3;
+  --dark-muted: #9e9ea0;
+  --dark-rule: #363636;
+  --dark-tint: #353539;
+  --dark-raised: #252627;
+  --dark-accent-tint: #2e3c43;
+  --dark-positive: #00bfa5;
+  --dark-warning: #ff9100;
+  --dark-danger: #ff7979;
+  --dark-positive-tint: #243c3b;
+  --dark-warning-tint: #433628;
+  --dark-danger-tint: #433336;
+  --shadow-soft: 0 1px 2px rgb(22 18 9 / 0.06), 0 2px 8px rgb(22 18 9 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(22 18 9 / 0.06), 0 16px 40px rgb(22 18 9 / 0.14);
+}

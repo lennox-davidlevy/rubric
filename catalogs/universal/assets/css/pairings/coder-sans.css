@@ -1,0 +1,28 @@
+/* coder-sans: the reader's own system sans, loosely set, with semibold headings.
+   Made by `bun scripts/theme.ts build` from themes/pairings/coder-sans.yaml.
+   Edit that file, not this one. */
+
+
+:root {
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", Helvetica, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", Helvetica, sans-serif;
+  --font-mono: "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", Helvetica, sans-serif;
+  --weight-body: 400;
+  --weight-strong: 700;
+  --weight-heading: 600;
+  --weight-display: 600;
+  --leading-body: 1.8;
+  --leading-heading: 1.25;
+  --leading-display: 1.2;
+  --tracking-body: 0em;
+  --tracking-display: 0em;
+  --tracking-label: 0em;
+  --label-case: none;
+  --numerals: lining-nums;
+  --quote-style: normal;
+  --ornament: "* * *";
+  --code-size: 0.85em;
+  --heading-case: none;
+  --link-line: none;
+}

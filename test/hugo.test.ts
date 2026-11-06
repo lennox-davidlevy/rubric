@@ -65,11 +65,52 @@ test.skipIf(!hugo)("a part or setting another skin brings is left out, not an er
     expect(ok.exitCode).toBe(0);
     const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");
     expect(html).toContain(`class="part part-callout kind-tip"`);
+    // The icon is the catalog's, so every skin draws it; only Blowfish marks it has-icon.
+    expect(html).toContain(`class="part-callout-icon"`);
     expect(html).not.toContain("has-icon");
     expect(html).toContain("<p>A larger opening.</p>");
 
     const bad = build(`{{< callout nonsense="x" >}}\nHello.\n{{< /callout >}}`);
     expect(bad.exitCode).not.toBe(0);
+  } finally {
+    rmSync(site, { recursive: true, force: true });
+  }
+});
+
+// The parts the imported themes brought: each reads its plain block, and says
+// so when the block has nothing it can use.
+test.skipIf(!hugo)("a map, a PDF, a file tree and progress bars draw from their blocks", () => {
+  const site = mkdtempSync(join(tmpdir(), "rubric-hugo-parts-"));
+  try {
+    writeFileSync(
+      join(site, "hugo.toml"),
+      readFileSync(join(root, "testing/hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(root, "catalogs"))}`),
+    );
+    mkdirSync(join(site, "content/posts"), { recursive: true });
+    writeFileSync(
+      join(site, "content/posts/p.md"),
+      [
+        "---", "title: P", "---", "",
+        `{{< map zoom="street" >}}\n51.5055, -0.0754\n\nBy the river.\n{{< /map >}}`,
+        "{{< map >}}\nsomewhere nice\n{{< /map >}}",
+        "{{< pdf >}}\n/files/route.pdf\n\nThe route.\n{{< /pdf >}}",
+        "{{< file-tree >}}\n- pages/\n  - about.md\n- hugo.toml\n{{< /file-tree >}}",
+        "{{< progress >}}\n- Miles: 72%\n- Too many: 140%\n{{< /progress >}}",
+      ].join("\n\n"),
+    );
+    const build = Bun.spawnSync([hugo!, "--quiet", "-s", site, "-d", join(site, "public")]);
+    expect(build.stderr.toString()).toBe("");
+    const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");
+    expect(html).toContain(`class="part part-map zoom-street"`);
+    expect(html).toMatch(/embed\.html\?bbox=-0\.0799.*marker=51\.50550/);
+    expect(html).toContain("By the river.");
+    expect(html).toContain("This map needs its place as a first line");
+    expect(html).toContain(`data="/files/route.pdf"`);
+    expect(html).toContain(`<li class="is-folder">pages/`);
+    expect(html).not.toContain(`<li class="is-folder">hugo.toml`);
+    expect(html).toContain(`aria-valuenow="72"`);
+    expect(html).toContain(`<span>Miles</span>`);
+    expect(html).toContain(`aria-valuenow="100"`);
   } finally {
     rmSync(site, { recursive: true, force: true });
   }

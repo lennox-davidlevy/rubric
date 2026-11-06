@@ -1,0 +1,59 @@
+/* Geekdoc's layer (github.com/thegeeklab/hugo-geekdoc, MIT), read from src/sass/: a deep
+   teal bar with its name and links in the band ink, a darker footer, hints with a strong title on a
+   pale box, bars with the number inside. */
+
+body > .part-header, body > .masthead {
+  --paper: var(--band);
+  --ink: var(--band-ink);
+  --heading: var(--band-ink);
+  --muted: var(--band-ink);
+  --link: var(--band-ink);
+  --accent: var(--band-ink);
+  --rule: var(--band-ink);
+  max-width: none;
+  background: var(--band);
+  color: var(--band-ink);
+}
+body > .masthead { padding-bottom: var(--space-2); padding-top: var(--space-2); }
+.part-header-title { font-family: var(--font-display); font-size: var(--step-2); font-weight: var(--weight-heading); }
+.part-header-nav ul { font-size: var(--step-0); }
+.part-header-nav a, .masthead nav a { color: var(--band-ink); }
+.part-header-nav a:hover { text-decoration: underline; }
+.part-header.sticky-stays { border-bottom: 0; }
+
+h1, h2, h3, h4 { font-family: var(--font-display); }
+.flow a:not([class]) { color: var(--link); }
+blockquote { margin-inline: 0; padding: var(--space-2); border-left: calc(var(--border) * 3) solid var(--rule); background: var(--tint); color: inherit; }
+hr { width: 100%; border-top: var(--border) solid var(--rule); }
+:not(pre) > code { padding: 0.1em 0.3em; }
+
+/* A hint: a bold title on a line of its own, a colored edge, a pale box. */
+.part-callout { margin-inline: 0; padding: 0; overflow: hidden; border: var(--border) solid var(--rule); border-left: calc(var(--border) * 3) solid var(--accent); background: var(--paper); }
+.part-callout-label { margin: 0; padding: var(--space-1) var(--space-2); background: var(--tint); color: var(--ink); text-transform: none; letter-spacing: 0; }
+.part-callout .stack { padding: var(--space-2); }
+.part-callout.kind-tip { background: var(--paper); border-left-color: var(--positive); }
+.part-callout.kind-warning { background: var(--paper); border-left-color: var(--warning); }
+.part-callout.kind-danger { background: var(--paper); border-left-color: var(--danger); }
+.part-tabs.is-tabbed { border: var(--border) solid var(--rule); border-radius: var(--radius); }
+.part-tabs.is-tabbed .part-tabs-list { background: var(--tint); padding-inline: var(--space-2); }
+.part-tabs.is-tabbed .part-tabs-panel { padding: var(--space-2); }
+.flow .part-buttons a, .part-buttons :is(p > a:first-child, li:first-child > a) { background: var(--band); border-color: var(--band); color: var(--band-ink); }
+.flow .part-buttons a:hover, .part-buttons :is(p > a:first-child, li:first-child > a):hover { background: var(--accent); border-color: var(--accent); color: var(--paper); }
+
+/* Its own bars: a thick bar with the title above, the number at the right. */
+.part-progress-track { height: 1.25rem; border-radius: var(--control-radius); }
+.part-progress-label { font-weight: var(--weight-strong); }
+.part-progress-value { font-weight: var(--weight-body); }
+.part-progress-bar { background: var(--band); }
+.part-footer {
+  --paper: var(--dark-paper);
+  --ink: var(--dark-ink);
+  --heading: var(--dark-heading);
+  --muted: var(--dark-muted);
+  --link: var(--dark-link);
+  --accent: var(--dark-accent);
+  background: var(--paper);
+  color: var(--muted);
+  border-top: 0;
+}
+.part-footer a { color: var(--link); }

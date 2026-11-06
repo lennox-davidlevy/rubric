@@ -1,0 +1,33 @@
+# The tokyo-night-light scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/tokyo-night-light.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08.
+# Its base16 numbers hold no red, amber and green for notices, so those are the
+# scheme's own published ones.
+description: a pale blue-gray with deep navy and indigo
+
+scheme: light
+
+paper: "#d5d6db"
+ink: "#343b59"
+heading: "#1a1b26"
+link: "#34548a"
+accent: "#5a4a78"
+muted: "#4c505e"
+rule: "#bfc0c5"  # nudged from #dfe0e5, to read
+tint: "#cbccd1"
+positive: "#44592e"  # nudged from #485e30, to read
+warning: "#754d11"  # nudged from #8f5e15, to read
+danger: "#85404d"  # nudged from #8c4351, to read
+
+dark:
+  paper: "#1a1b26"
+  ink: "#a9b1d6"
+  heading: "#cbccd1"
+  link: "#2ac3de"
+  accent: "#bb9af7"
+  muted: "#7f839e"  # nudged from #787c99, to read
+  rule: "#2f3549"
+  tint: "#16161e"
+  positive: "#899596"
+  warning: "#9c908a"
+  danger: "#a38aa2"

@@ -1,0 +1,14 @@
+# Congo's sizes (tailwind.config.js, its prose settings): 16 to 18px, a 65ch-like
+# column, large soft corners on cards and alerts.
+description: 16 to 18px writing in a 44rem column with a big title and soft corners
+
+screen: [360, 1240]
+body: [16, 18]
+ratio: [1.2, 1.3]
+steps: [-1, 4]
+space: [0.5, 1, 1.5, [2, 2.5], [3, 4.5]]
+measure: 44rem
+wide: 64rem
+radius: 6px
+border: 1px
+controls: 6px

@@ -1,0 +1,5 @@
+{{- /* The block's nested list as a tree of files; a line ending in a slash is
+     a folder. */ -}}
+<div class="part part-file-tree">
+{{ replaceRE `<li>([^<\n]*/)(\s*(?:<|\n))` `<li class="is-folder">$1$2` (string .inner) | safeHTML }}
+</div>

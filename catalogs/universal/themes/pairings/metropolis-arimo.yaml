@@ -1,0 +1,29 @@
+# Geekdoc's type (src/sass/_defaults.scss): Liberation Sans for the writing and
+# Metropolis, a geometric sans, for the header. Arimo is the same design as
+# Liberation Sans, and is what Fontsource carries. Arimo is SIL OFL, Metropolis
+# is public domain; vendored from Fontsource, the Latin subset.
+description: Metropolis, a geometric sans, for headings, with Arimo, a plain Helvetica-like sans, for the writing
+
+faces:
+  - { family: Arimo, file: arimo-normal.woff2, style: normal, weight: [400, 700] }
+  - { family: Arimo, file: arimo-italic.woff2, style: italic, weight: [400, 700] }
+  - { family: Metropolis, file: metropolis-400.woff2, style: normal, weight: 400 }
+  - { family: Metropolis, file: metropolis-600.woff2, style: normal, weight: 600 }
+  - { family: Metropolis, file: metropolis-700.woff2, style: normal, weight: 700 }
+preload: [arimo-normal.woff2]
+
+body: [Arimo, Liberation Sans, Arial, Helvetica, sans-serif]
+display: [Metropolis, Arial, Helvetica, sans-serif]
+ui: [Arimo, Liberation Sans, Arial, Helvetica, sans-serif]
+mono: [Liberation Mono, Menlo, Consolas, monospace]
+
+weight: { body: 400, strong: 700, heading: 600, display: 700 }
+leading: { body: 1.6, heading: 1.25, display: 1.2 }
+tracking: { display: 0em, label: 0.03em }
+
+labels: none
+numerals: lining
+quote: normal
+ornament: "* * *"
+code: 0.875em
+links: hover

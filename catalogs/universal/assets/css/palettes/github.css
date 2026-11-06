@@ -1,0 +1,48 @@
+/* github: white, slate writing, a code-host blue and cool gray lines, with a dim blue-black dark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/github.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #24292f;
+  --accent: #0969da;
+  --muted: #57606a;
+  --rule: #d0d7de;
+  --tint: #f6f8fa;
+  --dark-paper: #0d1117;
+  --dark-ink: #c9d1d9;
+  --dark-accent: #58a6ff;
+  --raised: #ffffff;
+  --link: #0969da;
+  --heading: #24292f;
+  --code-paper: #f6f8fa;
+  --code-ink: #24292f;
+  --code-muted: #57606a;
+  --code-accent: #0969da;
+  --positive: #1a7f37;
+  --warning: #926200;
+  --danger: #cf222e;
+  --accent-tint: #ebf3fc;
+  --positive-tint: #edf5ef;
+  --warning-tint: #f6f2eb;
+  --danger-tint: #fbedee;
+  --dark-link: #58a6ff;
+  --dark-heading: #c9d1d9;
+  --band: #0d1117;
+  --band-ink: #c9d1d9;
+  --dark-muted: #8b949e;
+  --dark-rule: #30363d;
+  --dark-tint: #161b22;
+  --dark-raised: #161b22;
+  --dark-accent-tint: #162333;
+  --dark-positive: #3fb950;
+  --dark-warning: #d29922;
+  --dark-danger: #f85149;
+  --dark-positive-tint: #13251e;
+  --dark-warning-tint: #252118;
+  --dark-danger-tint: #29191d;
+  --shadow-soft: 0 1px 2px rgb(36 41 47 / 0.06), 0 2px 8px rgb(36 41 47 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(36 41 47 / 0.06), 0 16px 40px rgb(36 41 47 / 0.14);
+}

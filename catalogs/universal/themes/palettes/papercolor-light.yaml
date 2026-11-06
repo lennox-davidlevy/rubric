@@ -1,0 +1,35 @@
+# The papercolor-light scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/papercolor-light.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08.
+# Its base16 numbers hold no red, amber and green for notices, so those are the
+# scheme's own published ones.
+description: a printed-paper light gray with magenta and blue marks
+
+scheme: light
+
+paper: "#eeeeee"
+ink: "#0f0f0f"  # nudged from #444444, to read
+heading: "#001118"  # nudged from #005f87, to read
+link: "#0a0a00"  # nudged from #d75f00, to read
+accent: "#00101c"  # nudged from #005faf, to read
+muted: "#001116"  # nudged from #0087af, to read
+rule: "#008700"
+tint: "#c65858"  # nudged from #af0000, to read
+code-paper: "#ca6767"
+code-ink: "#0a0a0a"
+code-muted: "#001116"
+code-accent: "#00101c"
+positive: "#007400"  # nudged from #008700, to read
+warning: "#a64a00"  # nudged from #d75f00, to read
+danger: "#af0000"
+
+dark:
+  paper: "#1c1c1c"
+  ink: "#d5d5d5"  # nudged from #808080, to read
+  heading: "#edcaba"  # nudged from #d7875f, to read
+  link: "#ffbdde"  # nudged from #ff5faf, to read
+  accent: "#95dede"  # nudged from #00afaf, to read
+  muted: "#aed6ea"  # nudged from #5fafd7, to read
+  rule: "#5faf00"
+  tint: "#af005f"
+  danger: "#c78080"

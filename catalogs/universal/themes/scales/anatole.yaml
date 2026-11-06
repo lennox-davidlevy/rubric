@@ -1,0 +1,13 @@
+# Anatole's sizes (assets/scss/partials/_base.scss and its layout): a modest
+# column beside its profile, cards with round corners and a soft shadow.
+description: 16 to 17px writing in a modest column, with soft rounded cards
+
+screen: [360, 1240]
+body: [16, 17]
+ratio: [1.2, 1.25]
+steps: [-1, 4]
+space: [0.5, 1, 1.5, [2, 2.5], [3, 4]]
+measure: 42rem
+wide: 46rem
+radius: 8px
+border: 1px

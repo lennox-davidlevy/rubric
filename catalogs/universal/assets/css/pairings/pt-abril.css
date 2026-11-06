@@ -1,0 +1,56 @@
+/* pt-abril: PT Sans for the writing with Abril Fatface, a heavy display serif, for the largest titles.
+   Made by `bun scripts/theme.ts build` from themes/pairings/pt-abril.yaml.
+   Edit that file, not this one. */
+
+@font-face {
+  font-family: "PT Sans";
+  src: url("../fonts/pt-sans-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PT Sans";
+  src: url("../fonts/pt-sans-400-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PT Sans";
+  src: url("../fonts/pt-sans-700-normal.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Abril Fatface";
+  src: url("../fonts/abril-fatface.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-body: "PT Sans", Helvetica, Arial, sans-serif;
+  --font-display: "Abril Fatface", Georgia, serif;
+  --font-mono: Menlo, Monaco, "Courier New", monospace;
+  --font-ui: "PT Sans", Helvetica, Arial, sans-serif;
+  --weight-body: 400;
+  --weight-strong: 700;
+  --weight-heading: 400;
+  --weight-display: 400;
+  --leading-body: 1.5;
+  --leading-heading: 1.25;
+  --leading-display: 1.15;
+  --tracking-body: 0em;
+  --tracking-display: 0em;
+  --tracking-label: 0.02em;
+  --label-case: none;
+  --numerals: lining-nums;
+  --quote-style: italic;
+  --ornament: "* * *";
+  --code-size: 0.85em;
+  --heading-case: none;
+  --link-line: none;
+}

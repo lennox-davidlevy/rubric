@@ -1,0 +1,48 @@
+/* congo-sapphire: white, neutral gray writing and a sapphire blue, with a dark neutral dark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/congo-sapphire.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #334155;
+  --accent: #4338ca;
+  --muted: #5f6e84;
+  --rule: #e2e8f0;
+  --tint: #f1f5f9;
+  --dark-paper: #1e293b;
+  --dark-ink: #cbd5e1;
+  --dark-accent: #9da6f8;
+  --raised: #ffffff;
+  --link: #4338ca;
+  --heading: #1e293b;
+  --code-paper: #f8fafc;
+  --code-ink: #334155;
+  --code-muted: #6c747f;
+  --code-accent: #334155;
+  --positive: #15803d;
+  --warning: #995d07;
+  --danger: #b91c1c;
+  --accent-tint: #f0effb;
+  --positive-tint: #ecf5ef;
+  --warning-tint: #f7f2eb;
+  --danger-tint: #f9eded;
+  --dark-link: #9da6f8;
+  --dark-heading: #e2e8f0;
+  --band: #1e293b;
+  --band-ink: #cbd5e1;
+  --dark-muted: #a3b0c2;
+  --dark-rule: #475569;
+  --dark-tint: #334155;
+  --dark-raised: #334155;
+  --dark-accent-tint: #2d3852;
+  --dark-positive: #79af97;
+  --dark-warning: #b59f7f;
+  --dark-danger: #cc9499;
+  --dark-positive-tint: #293946;
+  --dark-warning-tint: #303743;
+  --dark-danger-tint: #333646;
+  --shadow-soft: 0 1px 2px rgb(51 65 85 / 0.06), 0 2px 8px rgb(51 65 85 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(51 65 85 / 0.06), 0 16px 40px rgb(51 65 85 / 0.14);
+}

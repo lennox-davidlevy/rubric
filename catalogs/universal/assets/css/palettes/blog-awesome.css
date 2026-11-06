@@ -1,0 +1,48 @@
+/* blog-awesome: white, soft gray writing, navy headings and an electric blue, with a blue-black dark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/blog-awesome.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #434648;
+  --accent: #003fff;
+  --muted: #6f6f6f;
+  --rule: #ececec;
+  --tint: #f6f6f6;
+  --dark-paper: #131418;
+  --dark-ink: #babdc4;
+  --dark-accent: #77a8fd;
+  --raised: #ffffff;
+  --link: #003fff;
+  --heading: #0d122b;
+  --code-paper: #f6f6f6;
+  --code-ink: #434648;
+  --code-muted: #6f6f6f;
+  --code-accent: #003fff;
+  --positive: #1a7f37;
+  --warning: #8a5c00;
+  --danger: #cf222e;
+  --accent-tint: #ebf0ff;
+  --positive-tint: #edf5ef;
+  --warning-tint: #f6f2eb;
+  --danger-tint: #fbedee;
+  --dark-link: #77a8fd;
+  --dark-heading: #eaeaea;
+  --band: #131418;
+  --band-ink: #babdc4;
+  --dark-muted: #9b9ba3;
+  --dark-rule: #4a4d56;
+  --dark-tint: #2d2d2d;
+  --dark-raised: #2d2d2d;
+  --dark-accent-tint: #1f2633;
+  --dark-positive: #72a185;
+  --dark-warning: #a4916c;
+  --dark-danger: #c37781;
+  --dark-positive-tint: #1e2525;
+  --dark-warning-tint: #242322;
+  --dark-danger-tint: #282025;
+  --shadow-soft: 0 1px 2px rgb(67 70 72 / 0.06), 0 2px 8px rgb(67 70 72 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(67 70 72 / 0.06), 0 16px 40px rgb(67 70 72 / 0.14);
+}

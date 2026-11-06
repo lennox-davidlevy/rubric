@@ -1,0 +1,26 @@
+# The catppuccin-mocha scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/catppuccin-mocha.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08. The band is 01.
+description: a deep violet-black with soft pastel marks
+
+scheme: dark
+
+paper: "#292938"  # nudged from #1e1e2e, to read
+ink: "#cdd6f4"
+heading: "#f5e0dc"
+link: "#89b4fa"
+accent: "#cba6f7"
+muted: "#9092a0"  # nudged from #585b70, to read
+rule: "#3b3c4d"  # nudged from #313244, to read
+tint: "#181825"
+code-muted: "#848696"
+positive: "#a6e3a1"
+warning: "#f9e2af"
+danger: "#f38ba8"
+
+dark:
+  paper: "#181825"
+  ink: "#cdd6f4"
+  heading: "#f5e0dc"
+  link: "#89b4fa"
+  accent: "#cba6f7"

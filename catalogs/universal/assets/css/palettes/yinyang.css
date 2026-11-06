@@ -1,0 +1,48 @@
+/* yinyang: pure black on pure white with a dark plum line, and a soft black dark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/yinyang.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #000000;
+  --accent: #482936;
+  --muted: #57606a;
+  --rule: #482936;
+  --tint: #f5f5f5;
+  --dark-paper: #1a1a1a;
+  --dark-ink: #e0e0e0;
+  --dark-accent: #c490b0;
+  --raised: #ffffff;
+  --link: #000000;
+  --heading: #000000;
+  --code-paper: #f5f5f5;
+  --code-ink: #000000;
+  --code-muted: #57606a;
+  --code-accent: #482936;
+  --positive: #1a7f37;
+  --warning: #8a5c00;
+  --danger: #cf222e;
+  --accent-tint: #f0eeef;
+  --positive-tint: #edf5ef;
+  --warning-tint: #f6f2eb;
+  --danger-tint: #fbedee;
+  --dark-link: #b0b0b0;
+  --dark-heading: #e0e0e0;
+  --band: #1a1a1a;
+  --band-ink: #e0e0e0;
+  --dark-muted: #a0a0a0;
+  --dark-rule: #8b5a7a;
+  --dark-tint: #2c2c2c;
+  --dark-raised: #2c2c2c;
+  --dark-accent-tint: #2e282c;
+  --dark-positive: #87b494;
+  --dark-warning: #b9a57b;
+  --dark-danger: #d88b90;
+  --dark-positive-tint: #272d29;
+  --dark-warning-tint: #2d2b26;
+  --dark-danger-tint: #312828;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

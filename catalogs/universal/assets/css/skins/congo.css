@@ -1,0 +1,33 @@
+/* Congo's layer (github.com/jpanther/congo, MIT), read from its Tailwind classes and
+   tailwind.config.js. Blowfish grew from it, so the bones are shared: a plain header,
+   extra-bold titles, links with a colored underline, pale tinted alerts with an icon. */
+
+.part-header { background: none; }
+.part-header-title { font-size: var(--step-1); font-weight: var(--weight-display); color: var(--heading); }
+.part-header-nav ul { font-size: var(--step-0); }
+.part-header-nav a { color: var(--ink); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 50%, transparent); text-decoration-thickness: 2px; text-underline-offset: 0.25em; }
+.part-header-nav a:hover { color: var(--accent); }
+.part-header.sticky-stays { border-bottom: 0; }
+
+.page-header h1 { font-weight: var(--weight-display); }
+.flow a:not([class]) { color: var(--link); text-decoration-line: underline; text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent); text-decoration-thickness: 0.1em; }
+.flow a:not([class]):hover { color: var(--paper); background: var(--accent); text-decoration: none; border-radius: 2px; }
+blockquote { padding-left: var(--space-2); border-left: 0.25rem solid color-mix(in srgb, var(--accent) 35%, var(--paper)); font-style: italic; color: var(--ink); }
+hr { width: 100%; border-top: var(--border) solid var(--rule); }
+:not(pre) > code { background: none; padding: 0; font-weight: var(--weight-strong); color: var(--accent); }
+:not(pre) > code::before, :not(pre) > code::after { content: "`"; }
+
+.part-tags a { display: inline-block; margin: 0 0.3rem 0.3rem 0; padding: 0 0.4rem; border-radius: var(--radius); background: var(--tint); font-size: var(--step--1); text-decoration: none; }
+.part-buttons :is(p > a:first-child, li:first-child > a), .part-call-to-action a:last-child { background: var(--accent); border-color: var(--accent); color: var(--paper); }
+
+/* Its own alert: an icon in the accent beside a note on a pale card. */
+.part-callout { display: flex; gap: var(--space-2); margin-inline: 0; padding: var(--space-2) var(--space-3); background: var(--accent-tint); }
+.part-callout .stack { flex: 1; min-width: 0; }
+.part-callout .part-callout-icon { flex: none; margin: 0; padding-top: 0.25em; width: 1.1em; color: var(--accent); }
+.part-callout .part-callout-label { color: var(--heading); text-transform: none; letter-spacing: 0; }
+.part-callout.kind-tip .part-callout-icon { color: var(--positive); }
+.part-callout.kind-warning .part-callout-icon { color: var(--warning); }
+.part-callout.kind-danger .part-callout-icon { color: var(--danger); }
+
+.post-list.style-cards li { border-color: transparent; box-shadow: var(--shadow-soft); }
+.part-footer { border-top: 0; color: var(--muted); }

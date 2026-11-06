@@ -1,0 +1,13 @@
+# Risotto's sizes (assets/css/typography.css, layout.css): everything at 16px on
+# a 1.5rem line, headings told apart only by weight and a # mark.
+description: every heading the size of the writing, on an even 24px line, like a text file
+
+screen: [360, 1240]
+body: [16, 16]
+ratio: [1, 1]
+steps: [-1, 4]
+space: [0.5, 1, 1.5, 2, 3]
+measure: 47rem   # 64rem less its 15rem aside and the gap
+wide: 47rem
+radius: 0px
+border: 1px

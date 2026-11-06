@@ -1,5 +1,5 @@
 name: universal
-version: 5
+version: 6
 
 # Every component a website needs, as contracts only: what each part is,
 # its settings and what it expects inside. Nothing here is drawn yet. Drawn
@@ -63,19 +63,19 @@ slots:
   [ # palette
    paper, ink, accent, muted, rule, tint, raised, link, heading, code-paper, code-ink, code-muted, code-accent,
    positive, warning, danger, accent-tint, positive-tint, warning-tint, danger-tint,
-   dark-paper, dark-ink, dark-accent, dark-muted, dark-rule, dark-tint, dark-accent-tint,
+   dark-paper, dark-ink, dark-accent, dark-muted, dark-rule, dark-tint, dark-accent-tint, dark-link, dark-heading, dark-raised, band, band-ink,
    dark-positive, dark-warning, dark-danger, dark-positive-tint, dark-warning-tint, dark-danger-tint,
    shadow-soft, shadow-deep,
    # pairing
    font-body, font-display, font-mono, font-ui,
    weight-body, weight-strong, weight-heading, weight-display,
    leading-body, leading-heading, leading-display,
-   tracking-display, tracking-label, label-case, numerals, quote-style, ornament, code-size,
+   tracking-body, tracking-display, tracking-label, label-case, numerals, quote-style, ornament, code-size,
    heading-case, link-line,
    # scale
    step--1, step-0, step-1, step-2, step-3, step-4,
    space-1, space-2, space-3, space-4, space-5,
-   measure, wide, radius, border, control-radius]
+   measure, wide, radius, border, control-radius, rule-style]
 
 # Descriptions are Jev's prompt and are read literally: say what the part is,
 # in the words a writer would use. Value names are sent too; name a value for
@@ -177,6 +177,17 @@ parts:
           danger: something that could cause harm or loss
       title:
         type: text
+      icon:
+        type: choice
+        default: none
+        values:
+          none: no icon
+          lightbulb: a lightbulb, for a tip or an idea
+          info: a letter i in a circle, for something to know
+          warning: a triangle with an exclamation mark, for a warning
+          check: a check mark, for something done or right
+          star: a star, for something special
+          fire: a flame, for something urgent or exciting
 
   sidenote:
     description: A note beside the writing, in the margin, about the sentence next to it.
@@ -252,10 +263,48 @@ parts:
       A line about it, shown with the player.
 
   embed:
-    description: Something from another site shown in the page, such as a social media post, a map, presentation slides or a gist.
+    description: Something from another site shown in the page, such as a social media post, presentation slides or a gist.
     children: true
     body: |
       https://
+
+  map:
+    description: A map of one place with a marker on it, from its coordinates.
+    children: true
+    settings:
+      zoom:
+        type: choice
+        default: neighborhood
+        values:
+          city: a whole city
+          neighborhood: a few streets around the place
+          street: close up, a single street
+    body: |
+      0.0000, 0.0000
+
+      A sentence about the place.
+
+  pdf:
+    description: A PDF document shown in the page for the reader to scroll through, with a link to open it.
+    children: true
+    body: |
+      /files/document.pdf
+
+  file-tree:
+    description: The files and folders of a project, drawn as a tree.
+    children: true
+    body: |
+      - folder/
+        - file
+        - file
+      - file
+
+  progress:
+    description: Labeled bars showing how far along each thing is or how much of it there is, such as goals or skills.
+    children: true
+    body: |
+      - What it measures: 50%
+      - What it measures: 50%
 
   code:
     description: A block of code with the name of its file above it, or the code of a file from the site.

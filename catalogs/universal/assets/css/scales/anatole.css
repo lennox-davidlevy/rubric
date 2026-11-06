@@ -1,0 +1,23 @@
+/* anatole: 16 to 17px writing in a modest column, with soft rounded cards. Body 16px to 17px, ratio 1.2 to 1.25, from a 360px to a 1240px screen.
+   Made by `bun scripts/theme.ts build` from themes/scales/anatole.yaml.
+   Edit that file, not this one. */
+
+:root {
+  --step--1: clamp(0.8333rem, 0.827rem + 0.03vw, 0.85rem);
+  --step-0: clamp(1rem, 0.974rem + 0.114vw, 1.0625rem);
+  --step-1: clamp(1.2rem, 1.148rem + 0.233vw, 1.3281rem);
+  --step-2: clamp(1.44rem, 1.35rem + 0.4vw, 1.6602rem);
+  --step-3: clamp(1.728rem, 1.586rem + 0.631vw, 2.0752rem);
+  --step-4: clamp(2.0736rem, 1.861rem + 0.946vw, 2.594rem);
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: clamp(2rem, 1.795rem + 0.909vw, 2.5rem);
+  --space-5: clamp(3rem, 2.591rem + 1.818vw, 4rem);
+  --measure: 42rem;
+  --wide: 46rem;
+  --radius: 8px;
+  --border: 1px;
+  --control-radius: 8px;
+  --rule-style: solid;
+}

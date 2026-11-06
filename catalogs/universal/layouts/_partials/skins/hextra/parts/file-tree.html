@@ -1,0 +1,9 @@
+{{- /* Hextra's file tree: a folder or a file icon before every line. Font Awesome
+     Free, CC BY 4.0, with its notice in assets/icons/fontawesome/. */ -}}
+{{- $folder := (resources.Get "icons/fontawesome/folder.svg").Content -}}
+{{- $file := (resources.Get "icons/fontawesome/file.svg").Content -}}
+{{- $html := replaceRE `<li>([^<\n]*/)(\s*(?:<|\n))` (printf `<li class="is-folder">%s$1$2` $folder) (string .inner) -}}
+{{- $html = replaceRE `<li>` (printf `<li>%s` $file) $html -}}
+<div class="part part-file-tree">
+{{ $html | safeHTML }}
+</div>

@@ -1,0 +1,21 @@
+# Hugo Book's type (assets/styles/normalize.css, markdown.css): the reader's own
+# UI font, with headings no heavier than the writing, told apart only by size.
+description: the reader's own interface sans, with headings no heavier than the writing
+
+faces: []
+preload: []
+
+body: [system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif]
+display: body
+mono: [ui-monospace, SF Mono, Menlo, Consolas, monospace]
+
+weight: { body: 400, strong: 700, heading: 400, display: 400 }
+leading: { body: 1.6, heading: 1.25, display: 1.2 }
+tracking: { display: 0em, label: 0em }
+
+labels: none
+numerals: lining
+quote: normal
+ornament: "* * *"
+code: 0.875em
+links: hover

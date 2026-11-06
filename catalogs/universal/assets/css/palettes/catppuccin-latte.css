@@ -1,0 +1,48 @@
+/* catppuccin-latte: a cool pale gray with vivid pastel marks.
+   Made by `bun scripts/theme.ts build` from themes/palettes/catppuccin-latte.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #eff1f5;
+  --ink: #4c4f69;
+  --accent: #8136e3;
+  --muted: #62646c;
+  --rule: #ccd0da;
+  --tint: #e6e9ef;
+  --dark-paper: #1e1e2e;
+  --dark-ink: #cdd6f4;
+  --dark-accent: #cba6f7;
+  --raised: #eff1f5;
+  --link: #1b57d2;
+  --heading: #925b50;
+  --code-paper: #e6e9ef;
+  --code-ink: #4c4f69;
+  --code-muted: #62646c;
+  --code-accent: #8136e3;
+  --positive: #2d701d;
+  --warning: #8c5a14;
+  --danger: #c80e36;
+  --accent-tint: #e6e2f4;
+  --positive-tint: #dfe7e4;
+  --warning-tint: #e7e5e3;
+  --danger-tint: #ecdfe6;
+  --dark-link: #89b4fa;
+  --dark-heading: #f5e0dc;
+  --band: #1e1e2e;
+  --band-ink: #cdd6f4;
+  --dark-muted: #848696;
+  --dark-rule: #313244;
+  --dark-tint: #181825;
+  --dark-raised: #181825;
+  --dark-accent-tint: #332e46;
+  --dark-positive: #85a893;
+  --dark-warning: #b09e8f;
+  --dark-danger: #cb7c9f;
+  --dark-positive-tint: #2a2f3a;
+  --dark-warning-tint: #2f2d3a;
+  --dark-danger-tint: #33293c;
+  --shadow-soft: 0 1px 2px rgb(76 79 105 / 0.06), 0 2px 8px rgb(76 79 105 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(76 79 105 / 0.06), 0 16px 40px rgb(76 79 105 / 0.14);
+}

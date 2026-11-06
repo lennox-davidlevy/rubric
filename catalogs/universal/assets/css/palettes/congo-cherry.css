@@ -1,0 +1,48 @@
+/* congo-cherry: white, neutral gray writing and a cherry red and a warm stone gray, with a dark neutral dark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/congo-cherry.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #404040;
+  --accent: #be123c;
+  --muted: #6d6d6d;
+  --rule: #e5e5e5;
+  --tint: #f5f5f5;
+  --dark-paper: #262626;
+  --dark-ink: #d4d4d4;
+  --dark-accent: #fb8b9c;
+  --raised: #ffffff;
+  --link: #be123c;
+  --heading: #262626;
+  --code-paper: #fafafa;
+  --code-ink: #404040;
+  --code-muted: #6e6e6e;
+  --code-accent: #404040;
+  --positive: #15803d;
+  --warning: #995d07;
+  --danger: #b91c1c;
+  --accent-tint: #faecef;
+  --positive-tint: #ecf5ef;
+  --warning-tint: #f7f2eb;
+  --danger-tint: #f9eded;
+  --dark-link: #fb8b9c;
+  --dark-heading: #e5e5e5;
+  --band: #262626;
+  --band-ink: #d4d4d4;
+  --dark-muted: #acacac;
+  --dark-rule: #525252;
+  --dark-tint: #404040;
+  --dark-raised: #404040;
+  --dark-accent-tint: #403234;
+  --dark-positive: #7eae90;
+  --dark-warning: #b99e78;
+  --dark-danger: #ce8d8d;
+  --dark-positive-tint: #313633;
+  --dark-warning-tint: #383430;
+  --dark-danger-tint: #3a3232;
+  --shadow-soft: 0 1px 2px rgb(64 64 64 / 0.06), 0 2px 8px rgb(64 64 64 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(64 64 64 / 0.06), 0 16px 40px rgb(64 64 64 / 0.14);
+}

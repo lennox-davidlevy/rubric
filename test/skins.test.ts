@@ -19,22 +19,30 @@ import { openSite } from "../src/site.ts";
 const repo = join(import.meta.dir, "..");
 const base = parseCatalog(readFileSync(join(repo, "catalogs/universal/catalog.yaml"), "utf8"));
 const blowfish = parseSkin(readFileSync(join(repo, "catalogs/universal/skins/blowfish.yaml"), "utf8"), base);
-const skins = { blowfish };
+// No real skin adds a setting now that the callout's icon is the catalog's, but
+// any skin may, so a small one stands in for that.
+const ribbons = parseSkin(
+  "name: ribbons\nversion: 3\nparts:\n  callout:\n    settings:\n      ribbon:\n        type: choice\n        default: none\n        values:\n          none: no ribbon\n          red: a red ribbon\n",
+  base,
+);
+const skins = { blowfish, ribbons };
 const inBlowfish = withSkin(base, skins, "blowfish");
+const inRibbons = withSkin(base, skins, "ribbons");
 const inPaper = withSkin(base, skins);
 
 describe("a skin's additions", () => {
   test("are in the catalog while it is the site's skin", () => {
-    expect(Object.keys(settingsOf(inBlowfish, "callout"))).toContain("icon");
+    expect(Object.keys(settingsOf(inRibbons, "callout"))).toContain("ribbon");
+    expect(inRibbons.elsewhere).toEqual({ parts: { lead: "blowfish" }, settings: {} });
     expect(inBlowfish.parts.lead?.description).toContain("opening paragraph");
-    expect(inBlowfish.skin).toEqual({ name: "blowfish", version: 1 });
-    expect(inBlowfish.elsewhere).toEqual({ parts: {}, settings: {} });
+    expect(inBlowfish.skin).toEqual({ name: "blowfish", version: 2 });
+    expect(inBlowfish.elsewhere).toEqual({ parts: {}, settings: { callout: { ribbon: "ribbons" } } });
   });
 
   test("are remembered, not offered, in any other skin", () => {
-    expect(Object.keys(settingsOf(inPaper, "callout"))).not.toContain("icon");
+    expect(Object.keys(settingsOf(inPaper, "callout"))).not.toContain("ribbon");
     expect(inPaper.parts.lead).toBeUndefined();
-    expect(inPaper.elsewhere).toEqual({ parts: { lead: "blowfish" }, settings: { callout: { icon: "blowfish" } } });
+    expect(inPaper.elsewhere).toEqual({ parts: { lead: "blowfish" }, settings: { callout: { ribbon: "ribbons" } } });
   });
 
   test("a skin may not redefine what the catalog has", () => {
@@ -44,28 +52,34 @@ describe("a skin's additions", () => {
 
   test("answers are cached per skin, and as before with none", () => {
     expect(Cache.key(inPaper, "post", "a tip")).toBe(JSON.stringify(["universal", base.version, "post", "a tip"]));
-    expect(Cache.key(inBlowfish, "post", "a tip")).toBe(JSON.stringify(["universal", base.version, "skin:blowfish@1", "post", "a tip"]));
+    expect(Cache.key(inBlowfish, "post", "a tip")).toBe(JSON.stringify(["universal", base.version, "skin:blowfish@2", "post", "a tip"]));
   });
 });
 
 describe("switching skins never breaks a page", () => {
-  const page = "::: a tip -> callout icon=lightbulb\nRest here.\n:::\n\n::: an opening -> lead\nIt began.\n:::\n";
+  const page = "::: a tip -> callout ribbon=red\nRest here.\n:::\n\n::: an opening -> lead\nIt began.\n:::\n";
 
-  test("in Blowfish, both draw, the icon with them", () => {
-    const out = preprocess(page, inBlowfish);
-    expect(out.content).toContain('{{< callout icon="lightbulb" >}}');
-    expect(out.content).toContain("{{< lead >}}");
-    expect(out.diagnostics).toEqual([]);
+  test("in its own skin, a setting or a part draws", () => {
+    expect(preprocess(page, inRibbons).content).toContain('{{< callout ribbon="red" >}}');
+    expect(preprocess(page, inBlowfish).content).toContain("{{< lead >}}");
   });
 
-  test("in another skin, the callout draws without the icon, which stays in the pin; the lead stays as text", () => {
+  test("in another skin, the callout draws without the setting, which stays in the pin; the lead stays as text", () => {
     const out = preprocess(page, inPaper);
     expect(out.content).toContain("{{< callout >}}");
     expect(out.content).toContain("::: an opening -> lead");
     expect(out.diagnostics.map((d) => [d.code, d.message])).toEqual([
-      ["other-skin", "icon comes with the blowfish skin; this site's theme leaves it out and keeps it in the pin"],
+      ["other-skin", "ribbon comes with the ribbons skin; this site's theme leaves it out and keeps it in the pin"],
       ["other-skin", "lead comes with the blowfish skin; this site's theme doesn't draw it"],
     ]);
+  });
+
+  test("the callout's icon is the catalog's, so it draws in every skin", () => {
+    for (const c of [inPaper, inBlowfish, inRibbons]) {
+      const out = preprocess("::: a tip -> callout icon=lightbulb\nRest.\n:::\n", c);
+      expect(out.content).toContain('{{< callout icon="lightbulb" >}}');
+      expect(out.diagnostics).toEqual([]);
+    }
   });
 });
 
@@ -131,7 +145,7 @@ describe("in the editor", () => {
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
   test("switching the theme in hugo.toml brings its skin in without a restart", async () => {
-    await ws.open(page(), "---\ntitle: T\n---\n::: a tip -> callout icon=lightbulb\nRest.\n:::\n");
+    await ws.open(page(), "---\ntitle: T\n---\n::: an opening -> lead\nRest.\n:::\n");
     await ws.settle();
     expect(notes.get(page())?.map((n) => n.code)).toEqual(["other-skin"]);
     writeFileSync(join(dir, "hugo.toml"), config("blowfish"));
@@ -139,8 +153,8 @@ describe("in the editor", () => {
     await ws.settle();
     expect(ws.site.skin).toBe("blowfish");
     expect(notes.get(page())).toEqual([]);
-    expect(readFileSync(join(dir, "content/posts/skin-test.md"), "utf8")).toContain('{{< callout icon="lightbulb" >}}');
-    expect(ws.complete(page(), 3, "::: a tip -> callout icon=lightbulb".length - "lightbulb".length).map((c) => c.label)).toContain("lightbulb");
+    expect(readFileSync(join(dir, "content/posts/skin-test.md"), "utf8")).toContain("{{< lead >}}");
+    expect(ws.complete(page(), 3, "::: an opening -> ".length).map((c) => c.label)).toContain("lead");
   });
 
   test("in rubric.md, nothing fitting says the frame is all that goes there", async () => {

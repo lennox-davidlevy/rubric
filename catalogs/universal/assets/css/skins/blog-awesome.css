@@ -1,0 +1,18 @@
+/* Blog Awesome's layer (github.com/hugo-sid/hugo-blog-awesome, MIT), read from
+   assets/sass/: a wide bar over a narrow column, bold links in the blue, tinted
+   contents and code. */
+
+.part-header { background: none; }
+.part-header-title { font-size: var(--step-1); font-weight: var(--weight-heading); }
+.part-header-nav ul { font-size: var(--step-0); }
+.part-header-nav a { color: var(--ink); }
+.part-header-nav a:hover, .part-header-nav a[aria-current] { color: var(--link); }
+.part-header.sticky-stays { border-bottom: var(--border) solid var(--rule); }
+
+.flow a:not([class]) { color: var(--link); }
+blockquote { padding-left: var(--space-2); border-left: calc(var(--border) * 4) solid var(--rule); font-style: italic; color: var(--muted); }
+hr { width: 100%; border-top: var(--border) solid var(--rule); }
+.part-page-contents { padding: var(--space-2); border-radius: var(--radius); background: var(--tint); }
+.post-list time { color: var(--muted); }
+.part-footer { border-top: var(--border) solid var(--rule); text-align: center; }
+.part-footer-links ul, .part-social { justify-content: center; }

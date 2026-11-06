@@ -1,0 +1,23 @@
+# Yinyang's type (github.com/joway/hugo-theme-yinyang, MIT), from
+# assets/css/index.css: Bree Serif for everything, at its one weight. SIL OFL,
+# vendored from @fontsource/bree-serif 5.3.0. No italic: a quote stays upright.
+description: Bree Serif for everything, a friendly upright slab at one weight
+
+faces:
+  - { family: Bree Serif, file: bree-serif.woff2, style: normal, weight: 400 }
+preload: [bree-serif.woff2]
+
+body: [Bree Serif, Georgia, serif]
+display: body
+mono: [ui-monospace, Menlo, Consolas, monospace]
+
+weight: { body: 400, strong: 400, heading: 400, display: 400 }
+leading: { body: 1.6, heading: 1.25, display: 1.2 }
+tracking: { display: 0em, label: 0.04em }
+
+labels: none
+numerals: lining
+quote: normal
+ornament: "~"
+code: 0.85em
+links: always

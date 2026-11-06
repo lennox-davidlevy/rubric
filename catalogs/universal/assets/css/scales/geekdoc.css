@@ -1,0 +1,23 @@
+/* geekdoc: 16px writing in a wide column with a 5px corner. Body 16px to 16px, ratio 1.17 to 1.19, from a 360px to a 1240px screen.
+   Made by `bun scripts/theme.ts build` from themes/scales/geekdoc.yaml.
+   Edit that file, not this one. */
+
+:root {
+  --step--1: clamp(0.8547rem, 0.861rem + -0.026vw, 0.8403rem);
+  --step-0: 1rem;
+  --step-1: clamp(1.17rem, 1.162rem + 0.036vw, 1.19rem);
+  --step-2: clamp(1.3689rem, 1.35rem + 0.086vw, 1.4161rem);
+  --step-3: clamp(1.6016rem, 1.567rem + 0.152vw, 1.6852rem);
+  --step-4: clamp(1.8739rem, 1.82rem + 0.239vw, 2.0053rem);
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: clamp(2rem, 1.898rem + 0.455vw, 2.25rem);
+  --space-5: clamp(2.5rem, 2.091rem + 1.818vw, 3.5rem);
+  --measure: 52rem;
+  --wide: 60rem;
+  --radius: 5px;
+  --border: 1px;
+  --control-radius: 5px;
+  --rule-style: solid;
+}

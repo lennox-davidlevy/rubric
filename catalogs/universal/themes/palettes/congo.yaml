@@ -1,0 +1,34 @@
+# Congo's congo scheme (github.com/jpanther/congo, MIT), from
+# assets/css/schemes/congo.css, assigned the way its tailwind.config.js does for
+# its prose and its dark mode.
+description: white, neutral gray writing and a violet and fuchsia, with a dark neutral dark
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#3f3f46"
+heading: "#27272a"
+link: "#6d28d9"
+accent: "#6d28d9"
+muted: "#6b6b74"  # nudged from #71717a, to read
+rule: "#e4e4e7"
+tint: "#f4f4f5"
+code-paper: "#fafafa"
+code-muted: "#737376"
+positive: "#15803d"
+warning: "#995d07"  # nudged from #a16207, to read
+danger: "#b91c1c"
+
+dark:
+  paper: "#27272a"
+  ink: "#d4d4d8"
+  heading: "#e4e4e7"
+  link: "#b39cfa"  # nudged from #a78bfa, to read
+  accent: "#b39cfa"  # nudged from #a78bfa, to read
+  muted: "#aaaab2"  # nudged from #a1a1aa, to read
+  rule: "#52525b"
+  tint: "#3f3f46"
+  danger: "#ce8d8f"
+
+shadow:
+  strength: 1

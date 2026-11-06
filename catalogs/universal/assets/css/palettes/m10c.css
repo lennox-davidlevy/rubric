@@ -1,0 +1,48 @@
+/* m10c: slate gray with pale writing, white headings and a mint accent.
+   Made by `bun scripts/theme.ts build` from themes/palettes/m10c.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: dark;
+
+  --paper: #353b43;
+  --ink: #afbac4;
+  --accent: #57cc8a;
+  --muted: #9ba6b0;
+  --rule: #4d545d;
+  --tint: #242930;
+  --dark-paper: #242930;
+  --dark-ink: #afbac4;
+  --dark-accent: #57cc8a;
+  --raised: #353b43;
+  --link: #57cc8a;
+  --heading: #ffffff;
+  --code-paper: #242930;
+  --code-ink: #afbac4;
+  --code-muted: #9ba6b0;
+  --code-accent: #57cc8a;
+  --positive: #57cc8a;
+  --warning: #e5c07b;
+  --danger: #ff9a9a;
+  --accent-tint: #384749;
+  --positive-tint: #384749;
+  --warning-tint: #434647;
+  --danger-tint: #45434a;
+  --dark-link: #57cc8a;
+  --dark-heading: #ffffff;
+  --band: #242930;
+  --band-ink: #afbac4;
+  --dark-muted: #9aa1a9;
+  --dark-rule: #40464e;
+  --dark-tint: #31363d;
+  --dark-raised: #31363d;
+  --dark-accent-tint: #2a3d3b;
+  --dark-positive: #87c2aa;
+  --dark-warning: #c7bda3;
+  --dark-danger: #d3acb1;
+  --dark-positive-tint: #303b3f;
+  --dark-warning-tint: #383b3e;
+  --dark-danger-tint: #39393f;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

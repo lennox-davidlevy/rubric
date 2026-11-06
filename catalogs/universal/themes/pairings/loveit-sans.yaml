@@ -1,0 +1,21 @@
+# LoveIt's type (assets/css/_variables.scss): the reader's own UI font in a modest,
+# even setting. Nothing to fetch.
+description: the reader's own interface sans, modest and even, with bold headings
+
+faces: []
+preload: []
+
+body: [system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif]
+display: body
+mono: [Source Code Pro, Menlo, Consolas, Monaco, monospace]
+
+weight: { body: 400, strong: 700, heading: 700, display: 700 }
+leading: { body: 1.5, heading: 1.3, display: 1.25 }
+tracking: { display: 0em, label: 0em }
+
+labels: none
+numerals: lining
+quote: normal
+ornament: "* * *"
+code: 0.875em
+links: hover

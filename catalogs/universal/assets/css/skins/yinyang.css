@@ -1,0 +1,18 @@
+/* Yinyang's layer (github.com/joway/hugo-theme-yinyang, MIT), read from
+   assets/css/index.css: a big name, links underneath, and one heavy plum line. */
+
+.part-header { background: none; border-bottom: var(--border) solid var(--rule); }
+.part-header-inner { max-width: calc(var(--wide) + 2 * var(--space-3)); padding-top: var(--space-4); flex-direction: column; align-items: flex-start; }
+.part-header-title { font-size: 2rem; font-weight: var(--weight-display); }
+.part-header-nav ul { font-size: var(--step-0); gap: 0 var(--space-2); }
+.part-header-nav a { color: var(--link); text-decoration: underline; }
+.part-header-tools { margin-left: 0; }
+.part-header.sticky-stays { border-bottom: var(--border) solid var(--rule); }
+
+.flow a:not([class]) { color: var(--link); text-decoration-color: var(--link); }
+.flow a:not([class]):hover { font-weight: var(--weight-heading); }
+blockquote { padding-left: var(--space-2); border-left: calc(var(--border) * 2) solid var(--rule); color: var(--muted); }
+hr { width: 100%; border-top: var(--border) solid var(--rule); }
+.part-footer { border-top: var(--border) solid var(--rule); }
+
+.part-header.layout-split .part-header-nav { margin-left: 0; }

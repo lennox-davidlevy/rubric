@@ -1,0 +1,48 @@
+/* tender: a soft warm charcoal with gentle yellow and blue marks.
+   Made by `bun scripts/theme.ts build` from themes/palettes/tender.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: dark;
+
+  --paper: #282828;
+  --ink: #eeeeee;
+  --accent: #d3b987;
+  --muted: #b8b8b8;
+  --rule: #484848;
+  --tint: #383838;
+  --dark-paper: #383838;
+  --dark-ink: #eeeeee;
+  --dark-accent: #d3b987;
+  --raised: #282828;
+  --link: #b3deef;
+  --heading: #e8e8e8;
+  --code-paper: #383838;
+  --code-ink: #eeeeee;
+  --code-muted: #b8b8b8;
+  --code-accent: #d3b987;
+  --positive: #c9d05c;
+  --warning: #ffc24b;
+  --danger: #f66d81;
+  --accent-tint: #363430;
+  --positive-tint: #35352c;
+  --warning-tint: #39342b;
+  --danger-tint: #382e2f;
+  --dark-link: #b3deef;
+  --dark-heading: #e8e8e8;
+  --band: #383838;
+  --band-ink: #eeeeee;
+  --dark-muted: #b8b8b8;
+  --dark-rule: #5c5c5c;
+  --dark-tint: #484848;
+  --dark-raised: #484848;
+  --dark-accent-tint: #4b4741;
+  --dark-positive: #dde1ac;
+  --dark-warning: #f6daa5;
+  --dark-danger: #f2b4bd;
+  --dark-positive-tint: #4c4c46;
+  --dark-warning-tint: #4f4b45;
+  --dark-danger-tint: #4e4748;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

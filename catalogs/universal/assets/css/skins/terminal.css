@@ -1,0 +1,35 @@
+/* Terminal's layer (github.com/panr/hugo-theme-terminal, MIT), read from its
+   assets/css/: an amber block for the site's name with a dashed line running
+   off it, quotes between two rules, hard-edged tables. Slots only. */
+
+/* The name as a filled block; a fence of short strokes fills the rest. */
+.part-header-title, .masthead-title { padding: 0.3rem 0.65rem; background: var(--accent); color: var(--paper); font-weight: var(--weight-heading); }
+.part-header-title:hover, .masthead-title:hover { color: var(--paper); }
+.part-header-inner { max-width: calc(var(--measure) + 2 * var(--space-3)); }
+.part-header-nav a, .masthead nav a { color: var(--ink); }
+.part-header-nav a[aria-current] { color: var(--accent); }
+.part-header { border-bottom: calc(var(--border) * 2) dashed var(--accent); }
+
+/* A post's title with a dotted line under it. */
+.page-header h1 { padding-bottom: var(--space-2); border-bottom: calc(var(--border) * 3) dotted var(--accent); }
+
+/* A quote: a rule above and below, and a > at its side. */
+blockquote { position: relative; padding: var(--space-3); border-left: 0; border-block: var(--border) solid var(--accent); color: var(--ink); }
+blockquote::before { content: ">"; position: absolute; left: 0; color: var(--accent); }
+hr { width: 100%; border-top: calc(var(--border) * 2) solid var(--accent); }
+
+/* List marks are dashes; tables are boxed in the ink; headings in capitals. */
+.flow > ul { list-style: "- "; }
+table, th, td { border: calc(var(--border) * 2) solid var(--ink); }
+th, td { padding: var(--space-1) var(--space-2); }
+th { text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Buttons are outlines in the accent, filled on hover. */
+.part-buttons a, .part-call-to-action a { border: calc(var(--border) * 2) solid var(--accent); background: transparent; color: var(--accent); }
+button { background: transparent; border: calc(var(--border) * 2) solid var(--accent); color: var(--accent); }
+button:hover { background: var(--accent); color: var(--paper); }
+
+/* Tags and the pager are plain, with an arrow on each side. */
+.part-pager-earlier span::before { content: "\2190 "; }
+.part-pager-later span::after { content: " \2192"; }
+.part-footer { border-top: calc(var(--border) * 2) dashed var(--accent); }

@@ -1,0 +1,30 @@
+# The windows-95-light scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/windows-95-light.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08.
+description: the silver gray of an old desktop with hard primary colors
+
+scheme: light
+
+paper: "#fcfcfc"
+ink: "#545454"
+heading: "#2a2a2a"
+link: "#0000a8"
+accent: "#a800a8"
+muted: "#626262"  # nudged from #7e7e7e, to read
+rule: "#c4c4c4"
+tint: "#e0e0e0"
+code-muted: "#626262"
+positive: "#007c00"  # nudged from #00a800, to read
+warning: "#a85400"
+danger: "#a80000"
+
+dark:
+  paper: "#000000"
+  ink: "#a8a8a8"
+  heading: "#d2d2d2"
+  link: "#7474fc"  # nudged from #5454fc, to read
+  accent: "#fc54fc"
+  muted: "#848484"  # nudged from #7e7e7e, to read
+  rule: "#383838"
+  tint: "#1c1c1c"
+  danger: "#b06c6c"

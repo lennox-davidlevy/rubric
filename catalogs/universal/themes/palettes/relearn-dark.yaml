@@ -1,0 +1,27 @@
+# Relearn's relearn-dark variant (github.com/McShelby/hugo-theme-relearn, MIT), from
+# assets/css/theme-relearn-dark.css, with relearn-light's values for what it leaves out. Its
+# menu color is the band. Its notices are its own box colors.
+description: charcoal with a soft blue link, a bright green mark and a darker menu
+
+scheme: dark
+
+paper: "#202020"
+ink: "#d2d2d2"
+band: "#2b2b2b"
+band-ink: "#ffffff"
+heading: "#ffffff"
+link: "#7392e4"  # nudged from #6c8ce3, to read
+accent: "#7dc903"
+muted: "#a0a0a0"
+rule: "#555555"
+tint: "#2b2b2b"
+positive: "#7dc903"
+warning: "#ffb74d"
+danger: "#ff8a80"
+
+dark:
+  paper: "#2b2b2b"
+  ink: "#d2d2d2"
+  link: "#93aae9"  # nudged from #6c8ce3, to read
+  accent: "#7dc903"
+  muted: "#a7a7a7"

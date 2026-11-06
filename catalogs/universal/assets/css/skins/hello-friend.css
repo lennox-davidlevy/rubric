@@ -1,0 +1,21 @@
+/* hello-friend-ng's layer (github.com/rhazdon/hugo-theme-hello-friend-ng, MIT),
+   read from assets/scss/: a pale bar across the top with a rounded name tag,
+   tag pills, centered post titles and a spaced footer. */
+
+.part-header { background: var(--tint); }
+.part-header-inner { max-width: calc(var(--measure) + 2 * var(--space-3)); padding-block: var(--space-1); }
+.part-header-title { padding: 0.15rem 0.6rem; border-radius: var(--radius); background: var(--ink); color: var(--paper); font-weight: var(--weight-strong); }
+.part-header-title:hover { color: var(--paper); }
+.part-header-nav ul { font-size: var(--step-0); }
+.part-header-nav a { color: var(--ink); }
+.part-header.sticky-stays { border-bottom: 0; }
+
+.page-header { text-align: center; }
+.part-post-meta { text-align: center; }
+blockquote { padding: var(--space-2) var(--space-3); border-left: 0; border-radius: var(--radius); background: var(--tint); color: inherit; }
+pre { border-radius: var(--radius); }
+.part-tags a { display: inline-block; margin: 0 0.3rem 0.3rem 0; padding: 0 0.6rem; border-radius: var(--radius); background: var(--tint); color: var(--ink); text-decoration: none; }
+.part-pager { border-top: var(--border) solid var(--rule); padding-top: var(--space-2); }
+.part-pager a { border-top: 0; }
+.part-footer { border-top: 0; text-align: center; }
+.part-footer-links ul, .part-social { justify-content: center; }

@@ -1,0 +1,13 @@
+# Hugo Book's sizes (assets/styles/variables.css, markdown.css): 16px, h1 at 2rem
+# and h2 at 1.5rem, a 50rem column, 4px corners. Its 16rem menu is the skin's.
+description: 16px writing in a 50rem column with plain stepped headings and small corners
+
+screen: [360, 1240]
+body: [16, 16]
+ratio: [1.17, 1.19]
+steps: [-1, 4]
+space: [0.5, 1, 1.5, [2, 2.25], [2.5, 3.5]]
+measure: 50rem
+wide: 50rem
+radius: 4px
+border: 1px

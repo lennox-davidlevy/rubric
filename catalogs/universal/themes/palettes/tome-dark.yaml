@@ -1,0 +1,28 @@
+# Relearn's tome-dark variant (github.com/McShelby/hugo-theme-relearn, MIT), from
+# assets/css/theme-tome-dark.css, with relearn-light's values for what it leaves out. Its
+# menu color is the band. Its notices are its own box colors.
+description: dark paper with a soft crimson and a gold mark
+
+scheme: dark
+
+paper: "#2f2920"  # nudged from #241e14, to read
+ink: "#ccc1af"
+band: "#2a1d1d"
+band-ink: "#ffffff"
+heading: "#a0a0a0"  # nudged from #101010, to read
+link: "#e38395"  # nudged from #d23a55, to read
+accent: "#e38395"  # nudged from #d23a55, to read
+muted: "#a0a0a0"
+rule: "#555555"
+tint: "#363636"  # nudged from #2b2b2b, to read
+code-accent: "#e38395"
+positive: "#7dc903"
+warning: "#ffb74d"
+danger: "#ff8a80"
+
+dark:
+  paper: "#2a1d1d"
+  ink: "#ccc1af"
+  link: "#e38395"  # nudged from #d23a55, to read
+  accent: "#e07589"  # nudged from #d23a55, to read
+  muted: "#a2988c"

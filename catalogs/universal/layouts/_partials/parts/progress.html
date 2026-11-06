@@ -1,0 +1,13 @@
+{{- /* The block's list, one "label: number%" a line, as labeled bars. */ -}}
+<div class="part part-progress">
+{{- range findRE `(?s)<li>.*?</li>` (string .inner) }}
+{{- $line := strings.TrimSpace (replaceRE `(?s)</?li>` "" .) -}}
+{{- $n := int (replaceRE `.*?(\d+)\s*%\s*$` "$1" (index (findRE `\d+\s*%\s*$` $line 1) 0 | default "0%")) -}}
+{{- if gt $n 100 }}{{ $n = 100 }}{{ end -}}
+{{- $label := replaceRE `\s*:?\s*\d+\s*%\s*$` "" $line }}
+<div class="part-progress-item">
+<p class="part-progress-label"><span>{{ $label | safeHTML }}</span> <span class="part-progress-value">{{ $n }}%</span></p>
+<div class="part-progress-track" role="progressbar" aria-valuenow="{{ $n }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ $label | plainify }}"><span class="part-progress-bar" style="width: {{ $n }}%"></span></div>
+</div>
+{{- end }}
+</div>

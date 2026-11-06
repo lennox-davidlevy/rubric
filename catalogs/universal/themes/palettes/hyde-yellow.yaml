@@ -1,0 +1,27 @@
+# Hyde's colors (github.com/spf13/hyde, MIT), from assets/css/hyde.css and
+# poole.css. Its sidebar is the band, kept in its own color; the writing on it
+# turns dark where white would not read. Its dark band is a plain near-black.
+description: white, soft gray writing and an ochre, with a sidebar in the same color
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#515151"
+band: "#f4bf75"
+band-ink: "#535353"  # nudged from #ffffff, to read
+heading: "#313131"
+link: "#846740"  # nudged from #f4bf75, to read
+accent: "#846740"  # nudged from #f4bf75, to read
+muted: "#717171"
+rule: "#e5e5e5"
+tint: "#f9f9f9"
+code-accent: "#8b6c43"
+positive: "#1a7f37"
+warning: "#8a5c00"
+danger: "#aa5159"  # nudged from #b3555e, to read
+
+dark:
+  paper: "#202020"
+  ink: "#e8e8e8"
+  link: "#8fc3e8"
+  accent: "#8fc3e8"

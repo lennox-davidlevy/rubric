@@ -1,0 +1,28 @@
+/* hextra-sans: the reader's own sans with a tight, heavy page title and semibold headings.
+   Made by `bun scripts/theme.ts build` from themes/pairings/hextra-sans.yaml.
+   Edit that file, not this one. */
+
+
+:root {
+  --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --weight-body: 400;
+  --weight-strong: 600;
+  --weight-heading: 600;
+  --weight-display: 700;
+  --leading-body: 1.75;
+  --leading-heading: 1.3;
+  --leading-display: 1.15;
+  --tracking-body: 0em;
+  --tracking-display: -0.02em;
+  --tracking-label: 0em;
+  --label-case: none;
+  --numerals: lining-nums;
+  --quote-style: normal;
+  --ornament: "* * *";
+  --code-size: 0.875em;
+  --heading-case: none;
+  --link-line: underline;
+}

@@ -1,0 +1,27 @@
+# The apprentice scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/apprentice.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08. The band is 01.
+description: a low-contrast dark gray with muted sage and steel
+
+scheme: dark
+
+paper: "#262626"
+ink: "#bcbcbc"
+heading: "#bcbcbc"
+link: "#9d9dbe"  # nudged from #8787af, to read
+accent: "#5fafaf"
+muted: "#989898"  # nudged from #6c6c6c, to read
+rule: "#444444"
+tint: "#303030"
+code-muted: "#989898"
+positive: "#87af87"
+warning: "#ffffaf"
+danger: "#c48a8a"  # nudged from #af5f5f, to read
+
+dark:
+  paper: "#303030"
+  ink: "#bcbcbc"
+  heading: "#bcbcbc"
+  link: "#afafca"  # nudged from #8787af, to read
+  accent: "#6fb7b7"  # nudged from #5fafaf, to read
+  muted: "#a9a9a9"

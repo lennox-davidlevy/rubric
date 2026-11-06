@@ -1,0 +1,23 @@
+/* coder: 16 to 18px writing with generous room around headings, in a broad column. Body 16px to 18px, ratio 1.2 to 1.25, from a 360px to a 1240px screen.
+   Made by `bun scripts/theme.ts build` from themes/scales/coder.yaml.
+   Edit that file, not this one. */
+
+:root {
+  --step--1: clamp(0.8333rem, 0.806rem + 0.121vw, 0.9rem);
+  --step-0: clamp(1rem, 0.949rem + 0.227vw, 1.125rem);
+  --step-1: clamp(1.2rem, 1.116rem + 0.375vw, 1.4063rem);
+  --step-2: clamp(1.44rem, 1.31rem + 0.578vw, 1.7578rem);
+  --step-3: clamp(1.728rem, 1.536rem + 0.853vw, 2.1973rem);
+  --step-4: clamp(2.0736rem, 1.798rem + 1.224vw, 2.7466rem);
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.75rem;
+  --space-4: clamp(2.25rem, 2.045rem + 0.909vw, 2.75rem);
+  --space-5: clamp(3.5rem, 3.091rem + 1.818vw, 4.5rem);
+  --measure: 50rem;
+  --wide: 56rem;
+  --radius: 3px;
+  --border: 1px;
+  --control-radius: 3px;
+  --rule-style: solid;
+}

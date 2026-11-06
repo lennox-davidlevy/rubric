@@ -1,0 +1,28 @@
+/* verdana: Verdana for everything, wide and plain, the reader's own.
+   Made by `bun scripts/theme.ts build` from themes/pairings/verdana.yaml.
+   Edit that file, not this one. */
+
+
+:root {
+  --font-body: Verdana, "DejaVu Sans", Geneva, sans-serif;
+  --font-display: Verdana, "DejaVu Sans", Geneva, sans-serif;
+  --font-mono: ui-monospace, Menlo, Consolas, monospace;
+  --font-ui: Verdana, "DejaVu Sans", Geneva, sans-serif;
+  --weight-body: 400;
+  --weight-strong: 700;
+  --weight-heading: 700;
+  --weight-display: 700;
+  --leading-body: 1.6;
+  --leading-heading: 1.25;
+  --leading-display: 1.2;
+  --tracking-body: 0em;
+  --tracking-display: 0em;
+  --tracking-label: 0em;
+  --label-case: none;
+  --numerals: lining-nums;
+  --quote-style: italic;
+  --ornament: "* * *";
+  --code-size: 0.85em;
+  --heading-case: none;
+  --link-line: none;
+}

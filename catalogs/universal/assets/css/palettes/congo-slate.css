@@ -1,0 +1,48 @@
+/* congo-slate: white, neutral gray writing and a cool slate gray with no bright color, with a dark neutral dark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/congo-slate.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #374151;
+  --accent: #334155;
+  --muted: #666c7a;
+  --rule: #e5e7eb;
+  --tint: #f3f4f6;
+  --dark-paper: #1f2937;
+  --dark-ink: #d1d5db;
+  --dark-accent: #a3b0c2;
+  --raised: #ffffff;
+  --link: #334155;
+  --heading: #1f2937;
+  --code-paper: #f9fafb;
+  --code-ink: #374151;
+  --code-muted: #696e77;
+  --code-accent: #374151;
+  --positive: #15803d;
+  --warning: #995d07;
+  --danger: #b91c1c;
+  --accent-tint: #eff0f1;
+  --positive-tint: #ecf5ef;
+  --warning-tint: #f7f2eb;
+  --danger-tint: #f9eded;
+  --dark-link: #a3b0c2;
+  --dark-heading: #e5e7eb;
+  --band: #1f2937;
+  --band-ink: #d1d5db;
+  --dark-muted: #a6acb7;
+  --dark-rule: #4b5563;
+  --dark-tint: #374151;
+  --dark-raised: #374151;
+  --dark-accent-tint: #2f3948;
+  --dark-positive: #7caf94;
+  --dark-warning: #b89f7c;
+  --dark-danger: #cc8e91;
+  --dark-positive-tint: #2a3942;
+  --dark-warning-tint: #31373f;
+  --dark-danger-tint: #343542;
+  --shadow-soft: 0 1px 2px rgb(55 65 81 / 0.06), 0 2px 8px rgb(55 65 81 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(55 65 81 / 0.06), 0 16px 40px rgb(55 65 81 / 0.14);
+}

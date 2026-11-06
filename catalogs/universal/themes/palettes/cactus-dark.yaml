@@ -1,0 +1,26 @@
+# Cactus's dark scheme (github.com/monkeyWzr/hugo-theme-cactus, MIT), from
+# assets/scss/colors/dark.scss. The band is one step up from the page.
+description: charcoal with soft gray writing, pink links and a green accent
+
+scheme: dark
+
+paper: "#1d1f21"
+ink: "#c9cacc"
+heading: "#eeeeee"
+link: "#d480aa"
+accent: "#2bbc8a"
+muted: "#979797"  # nudged from #8c8c8c, to read
+rule: "#444444"
+tint: "#2c2e31"  # nudged from #212326, to read
+code-muted: "#979797"
+positive: "#2bbc8a"
+warning: "#d9a441"
+danger: "#e06c75"
+
+dark:
+  paper: "#2b2e31"
+  ink: "#c9cacc"
+  heading: "#eeeeee"
+  link: "#dc97ba"  # nudged from #d480aa, to read
+  accent: "#2bbc8a"
+  muted: "#a5a7a9"

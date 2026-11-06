@@ -1,0 +1,24 @@
+/* Archie's layer (github.com/athul/archie, MIT), read from assets/css/main.css:
+   a mono page with sans headings, a hash mark in the accent before each
+   heading, and links that fill with the accent when touched. */
+
+.part-header { background: none; border-bottom: 0; }
+.part-header-inner { max-width: calc(var(--measure) + 2 * var(--space-3)); }
+.part-header-title { font-family: var(--font-display); font-size: var(--step-2); font-weight: var(--weight-display); }
+.part-header-nav ul { font-size: var(--step-0); }
+.part-header-nav a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); }
+.part-header.sticky-stays { border-bottom: 0; }
+
+.flow > :is(h1, h2, h3, h4)::before, .page-header h1::before { content: "# "; color: var(--accent); }
+.flow > .catalog-part::before { content: none; }
+
+/* A link is underlined in the accent, and fills with it on hover. */
+.flow a:not([class]) { color: inherit; text-decoration-color: var(--accent); text-decoration-thickness: 0.12em; }
+.flow a:not([class]):hover { background: var(--accent); color: var(--paper); text-decoration: none; }
+::selection { background: var(--accent); color: var(--paper); }
+
+blockquote { padding-left: var(--space-2); border-left: calc(var(--border) * 3) solid var(--tint); color: var(--muted); }
+hr { width: 100%; border-top: calc(var(--border) * 3) solid var(--tint); }
+:not(pre) > code { color: var(--accent); }
+pre { border: calc(var(--border) * 3) solid var(--code-paper); }
+.part-footer { border-top: 0; }

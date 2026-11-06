@@ -1,0 +1,48 @@
+/* terminal: a warm near-black ground, pale writing and amber links, like an old terminal.
+   Made by `bun scripts/theme.ts build` from themes/palettes/terminal.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: dark;
+
+  --paper: #1a170f;
+  --ink: #eceae5;
+  --accent: #eec35e;
+  --muted: #a8a59c;
+  --rule: #4a463a;
+  --tint: #28241a;
+  --dark-paper: #2a261b;
+  --dark-ink: #eceae5;
+  --dark-accent: #eec35e;
+  --raised: #1a170f;
+  --link: #eec35e;
+  --heading: #eceae5;
+  --code-paper: #28241a;
+  --code-ink: #eceae5;
+  --code-muted: #a8a59c;
+  --code-accent: #eec35e;
+  --positive: #a8c96a;
+  --warning: #eec35e;
+  --danger: #ee8a6a;
+  --accent-tint: #2b2515;
+  --positive-tint: #252516;
+  --warning-tint: #2b2515;
+  --danger-tint: #2b2016;
+  --dark-link: #eec35e;
+  --dark-heading: #eceae5;
+  --band: #2a261b;
+  --band-ink: #eceae5;
+  --dark-muted: #aeaba4;
+  --dark-rule: #514d43;
+  --dark-tint: #3b382d;
+  --dark-raised: #3b382d;
+  --dark-accent-tint: #423923;
+  --dark-positive: #cddbae;
+  --dark-warning: #eec35e;
+  --dark-danger: #edbfae;
+  --dark-positive-tint: #3e3c2d;
+  --dark-warning-tint: #423923;
+  --dark-danger-tint: #41382d;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

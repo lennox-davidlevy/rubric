@@ -1,0 +1,35 @@
+/* bree-serif: Bree Serif for everything, a friendly upright slab at one weight.
+   Made by `bun scripts/theme.ts build` from themes/pairings/bree-serif.yaml.
+   Edit that file, not this one. */
+
+@font-face {
+  font-family: "Bree Serif";
+  src: url("../fonts/bree-serif.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-body: "Bree Serif", Georgia, serif;
+  --font-display: "Bree Serif", Georgia, serif;
+  --font-mono: ui-monospace, Menlo, Consolas, monospace;
+  --font-ui: "Bree Serif", Georgia, serif;
+  --weight-body: 400;
+  --weight-strong: 400;
+  --weight-heading: 400;
+  --weight-display: 400;
+  --leading-body: 1.6;
+  --leading-heading: 1.25;
+  --leading-display: 1.2;
+  --tracking-body: 0em;
+  --tracking-display: 0em;
+  --tracking-label: 0.04em;
+  --label-case: none;
+  --numerals: lining-nums;
+  --quote-style: normal;
+  --ornament: "~";
+  --code-size: 0.85em;
+  --heading-case: none;
+  --link-line: underline;
+}

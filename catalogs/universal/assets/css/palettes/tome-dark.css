@@ -1,0 +1,48 @@
+/* tome-dark: dark paper with a soft crimson and a gold mark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/tome-dark.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: dark;
+
+  --paper: #2f2920;
+  --ink: #ccc1af;
+  --accent: #e38395;
+  --muted: #a0a0a0;
+  --rule: #555555;
+  --tint: #363636;
+  --dark-paper: #2a1d1d;
+  --dark-ink: #ccc1af;
+  --dark-accent: #e07589;
+  --raised: #2f2920;
+  --link: #e38395;
+  --heading: #a0a0a0;
+  --code-paper: #363636;
+  --code-ink: #ccc1af;
+  --code-muted: #a0a0a0;
+  --code-accent: #e38395;
+  --positive: #7dc903;
+  --warning: #ffb74d;
+  --danger: #ff8a80;
+  --accent-tint: #3d3029;
+  --positive-tint: #35361e;
+  --warning-tint: #403424;
+  --danger-tint: #403128;
+  --dark-link: #e38395;
+  --dark-heading: #ccc1af;
+  --band: #2a1d1d;
+  --band-ink: #ffffff;
+  --dark-muted: #a2988c;
+  --dark-rule: #4a3e3a;
+  --dark-tint: #392c2a;
+  --dark-raised: #392c2a;
+  --dark-accent-tint: #40282a;
+  --dark-positive: #a8c562;
+  --dark-warning: #e3bd83;
+  --dark-danger: #e3a89a;
+  --dark-positive-tint: #393125;
+  --dark-warning-tint: #403029;
+  --dark-danger-tint: #402e2c;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

@@ -1,0 +1,32 @@
+# Hextra's colors (github.com/imfing/hextra, MIT), from assets/css/styles.css: its
+# primary hsl(212 100% 50%) and hsl(204 100% 50%) for dark, on white and #111,
+# with Tailwind's gray, green, amber and red for its alerts.
+description: white and near-black gray with a vivid blue, and a near-black dark
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#111827"
+heading: "#111827"
+link: "#0069d0"  # nudged from #0080ff, to read
+accent: "#0069d0"  # nudged from #0080ff, to read
+muted: "#666c7a"  # nudged from #6b7280, to read
+rule: "#e5e7eb"
+tint: "#f3f4f6"
+code-muted: "#666c7a"
+code-accent: "#0069d0"
+positive: "#166534"
+warning: "#92400e"
+danger: "#991b1b"
+
+dark:
+  paper: "#111111"
+  ink: "#f3f4f6"
+  link: "#0099ff"
+  accent: "#0099ff"
+  muted: "#9ca3af"
+  rule: "#374151"
+  tint: "#1f2937"
+  positive: "#86efac"
+  warning: "#fcd34d"
+  danger: "#fca5a5"

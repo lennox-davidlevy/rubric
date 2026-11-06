@@ -1,0 +1,14 @@
+# XMin's sizes (static/css/style.css): the browser's 16px and headings in an
+# 800px column, 5px corners on its gray boxes, dashed rules.
+description: the browser's own 16px and heading sizes in an 800px column, with dashed rules
+
+screen: [360, 1240]
+body: [16, 16]
+ratio: [1.2, 1.25]
+steps: [-1, 4]
+space: [0.5, 1, 1.5, [2, 2.25], [2.5, 3]]
+measure: 48rem  # 800px less 1em either side
+wide: 50rem
+radius: 5px
+border: 1px
+rules: dashed

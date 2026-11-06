@@ -1,0 +1,36 @@
+/* LoveIt's layer (github.com/dillonzq/LoveIt, MIT), read from assets/css/_partial/ and
+   _core/: a pale fixed bar with the name large, teal blue links with no line,
+   admonitions with a colored title strip and a left border, tidy folds. */
+
+.part-header { background: var(--raised); }
+.part-header-inner { min-height: 3.5rem; padding-block: 0; }
+.part-header-title { font-size: 1.5rem; font-weight: var(--weight-heading); }
+.part-header-nav ul { font-size: var(--step-0); }
+.part-header-nav a { color: var(--ink); }
+.part-header-nav a:hover, .part-header-nav a[aria-current] { color: var(--accent); }
+.part-header.sticky-stays { border-bottom: 0; }
+
+.page-header h1 { font-size: 1.6rem; }
+.page-header { text-align: left; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.25rem; }
+.flow a:not([class]) { color: var(--link); text-decoration-line: none; }
+.flow a:not([class]):hover { color: var(--accent); }
+blockquote { padding: 0.25rem 0.75rem; border-left: 0.5rem solid var(--accent); background: var(--accent-tint); color: inherit; }
+hr { width: 100%; border-top: var(--border) dashed var(--rule); }
+
+/* Its admonition: a title strip with an icon and a thick border at the left. */
+.part-callout { margin-inline: 0; padding: 0; overflow: hidden; border-left: 0.25rem solid var(--accent); background: var(--accent-tint); }
+.part-callout-title { display: flex; align-items: center; gap: 0.5em; margin: 0; padding: 0.25rem 0.75rem; color: var(--accent); font-family: var(--font-ui); font-weight: var(--weight-strong); }
+.part-callout .part-callout-icon { margin: 0; }
+.part-callout .stack { padding: 0.5rem 0.75rem; }
+.part-callout.kind-tip { border-left-color: var(--positive); }
+.part-callout.kind-tip .part-callout-title { color: var(--positive); }
+.part-callout.kind-warning { border-left-color: var(--warning); }
+.part-callout.kind-warning .part-callout-title { color: var(--warning); }
+.part-callout.kind-danger { border-left-color: var(--danger); }
+.part-callout.kind-danger .part-callout-title { color: var(--danger); }
+
+.part-fold { border: 0; border-left: 0.25rem solid var(--rule); padding-left: var(--space-1); }
+.part-footer { border-top: 0; text-align: center; }
+.part-footer-links ul, .part-social { justify-content: center; }

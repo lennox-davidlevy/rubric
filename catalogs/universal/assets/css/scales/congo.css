@@ -1,0 +1,23 @@
+/* congo: 16 to 18px writing in a 44rem column with a big title and soft corners. Body 16px to 18px, ratio 1.2 to 1.3, from a 360px to a 1240px screen.
+   Made by `bun scripts/theme.ts build` from themes/scales/congo.yaml.
+   Edit that file, not this one. */
+
+:root {
+  --step--1: clamp(0.8333rem, 0.82rem + 0.058vw, 0.8654rem);
+  --step-0: clamp(1rem, 0.949rem + 0.227vw, 1.125rem);
+  --step-1: clamp(1.2rem, 1.093rem + 0.477vw, 1.4625rem);
+  --step-2: clamp(1.44rem, 1.251rem + 0.839vw, 1.9013rem);
+  --step-3: clamp(1.728rem, 1.424rem + 1.352vw, 2.4716rem);
+  --step-4: clamp(2.0736rem, 1.607rem + 2.072vw, 3.2131rem);
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: clamp(2rem, 1.795rem + 0.909vw, 2.5rem);
+  --space-5: clamp(3rem, 2.386rem + 2.727vw, 4.5rem);
+  --measure: 44rem;
+  --wide: 64rem;
+  --radius: 6px;
+  --border: 1px;
+  --control-radius: 6px;
+  --rule-style: solid;
+}

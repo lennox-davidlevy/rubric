@@ -1,0 +1,26 @@
+# The tender scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/tender.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08. The band is 01.
+description: a soft warm charcoal with gentle yellow and blue marks
+
+scheme: dark
+
+paper: "#282828"
+ink: "#eeeeee"
+heading: "#e8e8e8"
+link: "#b3deef"
+accent: "#d3b987"
+muted: "#b8b8b8"
+rule: "#484848"
+tint: "#383838"
+positive: "#c9d05c"
+warning: "#ffc24b"
+danger: "#f66d81"  # nudged from #f43753, to read
+
+dark:
+  paper: "#383838"
+  ink: "#eeeeee"
+  heading: "#e8e8e8"
+  link: "#b3deef"
+  accent: "#d3b987"
+  muted: "#b8b8b8"

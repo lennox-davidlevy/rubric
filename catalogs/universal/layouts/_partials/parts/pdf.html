@@ -1,0 +1,17 @@
+{{- /* A PDF from the block's first link or path; the rest is a caption. Where
+     the browser cannot show one in the page, as on most phones, the link is
+     what the reader gets. No script. */ -}}
+{{- $html := string .inner -}}
+{{- $url := index (findRE `(?:https?://|/)[^"<\s]+` (replaceRE `(?s)^.*?<p>` "" $html) 1) 0 | default "" | htmlUnescape -}}
+{{- $caption := trim (replaceRE `(?s)^\s*<p>.*?</p>` "" $html) " \n" -}}
+<figure class="part part-pdf">
+{{- with $url }}
+<object class="part-pdf-frame" data="{{ . | relURL }}" type="application/pdf" aria-label="A PDF document">
+<p class="part-pdf-fallback">This browser does not show PDFs in the page.</p>
+</object>
+<p class="part-pdf-link"><a href="{{ . | relURL }}">Open the PDF</a></p>
+{{- end }}
+{{- with $caption }}
+<figcaption class="stack">{{ . | safeHTML }}</figcaption>
+{{- end }}
+</figure>

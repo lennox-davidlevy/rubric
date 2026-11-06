@@ -1,0 +1,41 @@
+/* Hextra's layer (github.com/imfing/hextra, MIT), read from assets/css/components/: a
+   blurred bar over the page, hairlines and 8px boxes everywhere, a soft gray number on
+   each step, alerts as tinted boxes with a thin line round them. */
+
+.part-header { background: color-mix(in srgb, var(--paper) 85%, transparent); backdrop-filter: blur(12px); }
+.part-header-title { font-weight: var(--weight-display); color: var(--heading); }
+.part-header-nav ul { font-size: var(--step--1); }
+.part-header-nav a { color: var(--muted); }
+.part-header-nav a[aria-current] { color: var(--accent); font-weight: var(--weight-strong); }
+.part-header.sticky-stays { border-bottom: var(--border) solid var(--rule); }
+
+.flow a:not([class]) { color: var(--link); }
+h2 { padding-bottom: var(--space-1); border-bottom: var(--border) solid var(--rule); }
+.flow > .catalog-part { border-bottom: 0; }
+blockquote { padding-left: var(--space-3); border-left: calc(var(--border) * 2) solid var(--rule); font-style: italic; color: var(--muted); }
+hr { width: 100%; border-top: var(--border) solid var(--rule); }
+:not(pre) > code { border: var(--border) solid var(--rule); border-radius: var(--control-radius); }
+pre { border: var(--border) solid var(--rule); }
+
+/* An alert: a tint of its kind with a hairline in its own color. */
+.part-callout { margin-inline: 0; padding: var(--space-2); border: var(--border) solid color-mix(in srgb, var(--accent) 30%, transparent); background: var(--accent-tint); }
+.part-callout.kind-tip { border-color: color-mix(in srgb, var(--positive) 30%, transparent); }
+.part-callout.kind-warning { border-color: color-mix(in srgb, var(--warning) 30%, transparent); }
+.part-callout.kind-danger { border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+.part-callout-label { color: var(--accent); text-transform: none; letter-spacing: 0; }
+
+/* Steps: a soft gray disc on the line, the line down the whole list. */
+.part-steps { border-left: var(--border) solid var(--rule); margin-left: 1.05rem; }
+.part-steps > li { padding-left: calc(1.6rem + var(--space-1)); }
+.part-steps > li::before { left: -1.05rem; background: var(--tint); color: var(--muted); border: 0.25rem solid var(--paper); box-sizing: content-box; width: 1.6rem; height: 1.6rem; font-weight: var(--weight-body); }
+.part-steps > li:not(:last-child)::after { content: none; }
+.part-cards.edge-outlined li { transition: border-color 120ms, box-shadow 120ms; }
+.part-cards.edge-outlined li:hover { border-color: var(--muted); box-shadow: var(--shadow-soft); }
+.part-buttons :is(p > a:first-child, li:first-child > a) { background: var(--ink); }
+
+/* Its file tree: icons in the muted color, on a tinted card. */
+.part-file-tree { background: var(--tint); }
+.part-file-tree ul ul { border-left: 0; }
+.part-file-tree svg { display: inline-block; width: 1em; height: 1em; margin-right: 0.4em; vertical-align: -0.12em; color: var(--muted); }
+.part-file-tree li { list-style: none; }
+.part-footer { background: var(--tint); }

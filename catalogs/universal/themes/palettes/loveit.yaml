@@ -1,0 +1,34 @@
+# LoveIt's colors (github.com/dillonzq/LoveIt, MIT), from
+# assets/css/_variables.scss: its teal blue for links in the writing, and its
+# admonition colors for the notices.
+description: white and warm near-black with teal blue links, and a soft charcoal dark
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#161209"
+heading: "#161209"
+link: "#237592"  # nudged from #2d96bd, to read
+accent: "#237592"  # nudged from #2d96bd, to read
+muted: "#707077"  # nudged from #a9a9b3, to read
+rule: "#e4e4e4"  # nudged from #f0f0f0, to read
+tint: "#f5f5f5"
+raised: "#f8f8f8"
+code-muted: "#707077"
+code-accent: "#237592"
+positive: "#007869"  # nudged from #00bfa5, to read
+warning: "#a25b00"  # nudged from #ff9100, to read
+danger: "#d01338"  # nudged from #ff1744, to read
+
+dark:
+  paper: "#292a2d"
+  ink: "#a9a9b3"
+  heading: "#ffffff"
+  link: "#55bde2"
+  accent: "#55bde2"
+  muted: "#9e9ea0"  # nudged from #5d5d5f, to read
+  rule: "#363636"
+  raised: "#252627"
+  positive: "#00bfa5"
+  warning: "#ff9100"
+  danger: "#ff7979"  # nudged from #ff6b6b, to read

@@ -21,8 +21,8 @@
   --ink: var(--dark-ink);
   --accent: var(--dark-accent);
   --muted: var(--dark-muted);
-  --heading: var(--dark-ink);
-  --link: var(--dark-ink);
+  --heading: var(--dark-heading);
+  --link: var(--dark-link);
   background: var(--paper);
   color: var(--ink);
 }

@@ -1,0 +1,29 @@
+# Cactus's light scheme (github.com/monkeyWzr/hugo-theme-cactus, MIT), from
+# assets/scss/colors/light.scss.
+description: warm gray paper, charcoal writing, green links and a raspberry accent
+
+scheme: light
+
+paper: "#e2e0de"
+ink: "#363533"
+heading: "#111111"
+link: "#18664a"  # nudged from #2bbc8a, to read
+accent: "#9b3156"  # nudged from #d44375, to read
+muted: "#5c5c5c"  # nudged from #666666, to read
+rule: "#c0bdb9"
+tint: "#dddad8"
+code-muted: "#5c5c5c"
+code-accent: "#a3345a"
+positive: "#19664b"  # nudged from #1a6b4f, to read
+warning: "#7a5200"
+danger: "#ab2251"
+
+dark:
+  paper: "#1d1f21"
+  ink: "#c9cacc"
+  heading: "#eeeeee"
+  link: "#d480aa"
+  accent: "#2bbc8a"
+  muted: "#979797"  # nudged from #8c8c8c, to read
+  rule: "#444444"
+  danger: "#bf849a"

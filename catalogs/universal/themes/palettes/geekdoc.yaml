@@ -1,0 +1,33 @@
+# Geekdoc's colors (github.com/thegeeklab/hugo-geekdoc, MIT), from
+# src/sass/_defaults.scss and _color_mode.scss. Its deep teal header is the band; the
+# dark ground is its dark mode's, worked out from the same mix.
+description: white and charcoal with a deep teal header and a strong blue link, and a slate dark
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#343840"
+band: "#205375"
+band-ink: "#ffffff"
+heading: "#343840"
+link: "#0a539a"
+accent: "#205375"
+muted: "#6b6e74"
+rule: "#d9dbdd"
+tint: "#f4f6f7"
+positive: "#007e34"  # nudged from #00c853, to read
+warning: "#926100"  # nudged from #ffab00, to read
+danger: "#d50000"
+
+dark:
+  paper: "#29363e"
+  ink: "#bfc3c5"
+  heading: "#e0e2e3"
+  link: "#89b8dc"  # nudged from #6ea8d4, to read
+  accent: "#89b8dc"  # nudged from #6ea8d4, to read
+  muted: "#9aa0a4"
+  rule: "#4a565d"
+  tint: "#1d262b"
+  positive: "#91bda5"
+  warning: "#beae8d"
+  danger: "#dda1a2"

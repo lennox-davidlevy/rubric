@@ -1,0 +1,13 @@
+# m10c's sizes (assets/css/components/_app.scss): a narrow column beside its
+# sidebar at the browser's 16px, gently rounded.
+description: 16px writing in a narrow column, gently rounded
+
+screen: [360, 1240]
+body: [16, 16]
+ratio: [1.2, 1.25]
+steps: [-1, 4]
+space: [0.5, 1, 1.5, [2, 2.5], [3, 3.5]]
+measure: 40rem
+wide: 44rem
+radius: 4px
+border: 1px

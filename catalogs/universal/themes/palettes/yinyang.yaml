@@ -1,0 +1,25 @@
+# Yinyang's colors (github.com/joway/hugo-theme-yinyang, MIT), from
+# assets/css/index.css: pure black on white, with a plum line.
+description: pure black on pure white with a dark plum line, and a soft black dark
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#000000"
+heading: "#000000"
+link: "#000000"
+accent: "#482936"
+muted: "#57606a"
+rule: "#482936"
+tint: "#f5f5f5"
+positive: "#1a7f37"
+warning: "#8a5c00"
+danger: "#cf222e"
+
+dark:
+  paper: "#1a1a1a"
+  ink: "#e0e0e0"
+  link: "#b0b0b0"
+  accent: "#c490b0"
+  muted: "#a0a0a0"
+  rule: "#8b5a7a"

@@ -1,0 +1,23 @@
+/* etch: 16px writing in a very narrow 600px column, with small headings. Body 16px to 16px, ratio 1.12 to 1.15, from a 360px to a 1240px screen.
+   Made by `bun scripts/theme.ts build` from themes/scales/etch.yaml.
+   Edit that file, not this one. */
+
+:root {
+  --step--1: clamp(0.8929rem, 0.902rem + -0.042vw, 0.8696rem);
+  --step-0: 1rem;
+  --step-1: clamp(1.12rem, 1.108rem + 0.055vw, 1.15rem);
+  --step-2: clamp(1.2544rem, 1.227rem + 0.124vw, 1.3225rem);
+  --step-3: clamp(1.4049rem, 1.357rem + 0.211vw, 1.5209rem);
+  --step-4: clamp(1.5735rem, 1.502rem + 0.319vw, 1.749rem);
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.25rem;
+  --space-4: clamp(1.75rem, 1.648rem + 0.455vw, 2rem);
+  --space-5: clamp(2.5rem, 2.295rem + 0.909vw, 3rem);
+  --measure: 37.5rem;
+  --wide: 40rem;
+  --radius: 4px;
+  --border: 1px;
+  --control-radius: 4px;
+  --rule-style: solid;
+}
