@@ -3,7 +3,7 @@
 // Skipped when nvim is not on the path.
 
 import { expect, test } from "bun:test";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -215,12 +215,18 @@ test.skipIf(!nvim)("Neovim: switching the theme in hugo.toml reaches the server 
   const sock = join(dir, "nvim.sock");
   cpSync(join(repo, "sites/blog"), join(dir, "site"), { recursive: true, filter: (src) => !/\/(content|\.rubric|public)(\/|$)/.test(src) });
   const site = join(dir, "site");
+  // No real skin adds a part now, so a small one stands in, with a theme using it.
+  const themes = join(dir, "themes");
+  mkdirSync(join(themes, "universal/skins"), { recursive: true });
+  cpSync(join(repo, "catalogs/universal/catalog.yaml"), join(themes, "universal/catalog.yaml"));
+  writeFileSync(join(themes, "universal/skins/sashes.yaml"), "name: sashes\nversion: 1\nparts:\n  sash:\n    description: A strip across the corner of the page.\n    children: true\n    body: |\n      A word or two.\n");
+  writeFileSync(join(themes, "universal/themes.yaml"), "paper: {}\nsashy: { skin: sashes }\n");
   const config = readFileSync(join(site, "hugo.toml"), "utf8")
-    .replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(repo, "catalogs"))}`)
+    .replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(themes)}`)
     .replace(/^theme = .*$/m, `theme = "universal"`);
   writeFileSync(join(site, "hugo.toml"), config);
   const page = join(site, "pages/posts/theme.md");
-  writeFileSync(page, ["---", "title: Theme", "---", "::: an opening -> lead", "Hi.", ":::", ""].join("\n"));
+  writeFileSync(page, ["---", "title: Theme", "---", "::: a strip -> sash", "Hi.", ":::", ""].join("\n"));
 
   const editor = Bun.spawn([nvim!, "--headless", "--listen", sock, "-u", join(repo, "test/nvim/init.lua"), "-i", "NONE", page], {
     cwd: site, env: { ...process.env, RUBRIC_REPO: repo }, stdout: "ignore", stderr: "ignore",
@@ -233,7 +239,7 @@ test.skipIf(!nvim)("Neovim: switching the theme in hugo.toml reaches the server 
   };
   try {
     expect(await until(() => expr("RubricTest.codes()") === "other-skin")).toBe(true);
-    writeFileSync(join(site, "hugo.toml"), config.replace(/^theme = "paper"$/m, `theme = "blowfish"`));
+    writeFileSync(join(site, "hugo.toml"), config.replace(/^theme = "paper"$/m, `theme = "sashy"`));
     expect(await until(() => expr("RubricTest.codes()") === "")).toBe(true);
   } finally {
     remote("--remote-send", "<Esc>:qa!<CR>");

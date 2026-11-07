@@ -1,5 +1,5 @@
 name: universal
-version: 6
+version: 9
 
 # Every component a website needs, as contracts only: what each part is,
 # its settings and what it expects inside. Nothing here is drawn yet. Drawn
@@ -50,6 +50,9 @@ look:
 # place: site     chosen once in rubric.md, for every page; a page may
 #                 override it at its top
 # body:           written into an empty block once the part is picked
+# already:        look values the part has by being itself; a line's "big"
+#                 picks a lead, and does not also ask for bigger text. Not
+#                 sent to Jev. The second pass can still ask for them.
 #
 # Left out on purpose: inline pieces (a badge, an icon, a key, an
 # abbreviation), which sit inside a sentence and need their own syntax;
@@ -111,8 +114,9 @@ parts:
           raised: lifted off the page with a shadow
 
   hero:
-    description: A big opening at the top of a page, usually a large title.
+    description: A hero, the big opening at the top of a page, usually a large title.
     children: true
+    already: { text: bigger }
     body: |
       # The title
 
@@ -132,6 +136,13 @@ parts:
           center: centered on the page
       image:
         type: image
+
+  lead:
+    description: An opening paragraph set larger than the rest of the writing, to lead into it.
+    children: true
+    already: { text: bigger }
+    body: |
+      A sentence or two that sets up what follows.
 
   quote:
     description: A quotation of words someone said or wrote.
@@ -269,16 +280,16 @@ parts:
       https://
 
   map:
-    description: A map of one place with a marker on it, from its coordinates.
+    description: A map of a place or an area, with a marker on it.
     children: true
     settings:
       zoom:
         type: choice
         default: neighborhood
         values:
-          city: a whole city
-          neighborhood: a few streets around the place
-          street: close up, a single street
+          city: zoomed out to a whole city
+          neighborhood: the blocks around the place
+          street: a street map, zoomed in close
     body: |
       0.0000, 0.0000
 

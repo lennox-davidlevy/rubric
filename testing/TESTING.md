@@ -115,19 +115,19 @@ Then in `walk.md`:
 
 **Should happen:** expect `callout kind=tip icon=lightbulb`, drawn with a lightbulb. Completion after `::: callout ` offers `icon` and its values, in any theme now: the icon moved into the catalog (2026-11-06), since most imported themes have one.
 
-Then a part only Blowfish still has:
+Then an opening paragraph:
 
 ```markdown
 ::: a big opening paragraph
 ```
 
-**Should happen:** expect `lead`, drawn larger and softer than the writing.
+**Should happen:** expect plain `lead`, with no `text=bigger`, since "big" is what picked it, drawn larger and softer than the writing. It works in any theme now: it moved into the catalog (2026-11-06), so no part is left that only one theme can draw.
 
 Switch back to `theme = "paper"` and save:
 
 - The callout still draws, and now keeps its lightbulb, drawn Paper's way.
-- The lead stays as text, with the note "lead comes with the blowfish skin; this site's theme doesn't draw it".
-- Switching to Blowfish again brings the lead back.
+- The lead still draws, larger and softer, in Paper's fonts and colors, with no note.
+- Switching to Blowfish again keeps both, and the lead's lines sit a little tighter.
 
 **Fixed since your run:** the callout sometimes vanished after a switch and stayed gone until you edited it. Hugo rebuilt with the new theme a moment before Rubric rewrote the page, Paper failed on the `icon` it didn't know, and the browser kept the old page.
 
@@ -193,7 +193,7 @@ By the river.
 
 **Should happen:**
 
-- `map`, with `zoom` from words like "close up". A frame from OpenStreetMap with a marker, and a link under it. Move your cursor off and back: no reload.
+- `map`, with `zoom` from words like "a street map" or "zoomed in close". A frame from OpenStreetMap with a marker, and a link under it. Move your cursor off and back: no reload.
 - `pdf`. The frame stays empty until `/files/route.pdf` is a real file in the site's `static/`, and the link under it works once it is.
 - `file-tree` and `progress` write a starter body you edit. In `hextra`, the tree has folder and file icons.
 - These are Jev's first look at these parts: the words above have not been run through the probe. Note any line that picks the wrong part, especially a map that picks `embed`.

@@ -37,6 +37,9 @@ export interface Part {
   // still works without it.
   script: boolean;
   settings: Record<string, Setting>;
+  // Look values the part already has by being itself: a lead is already big,
+  // so a line that says "big" picks the part and does not also ask for this.
+  already?: Record<string, string>;
 }
 
 export interface Catalog {
@@ -191,7 +194,10 @@ function parsePart(rawPart: unknown, at: string): Part {
   const place = part.place ?? "writing";
   if (place !== "writing" && place !== "site") throw new CatalogError(`${at}.place must be writing or site`);
   const body = part.body === undefined ? {} : { body: string(part.body, `${at}.body`) };
-  return { description: string(part.description, `${at}.description`), place, ...body, children, script, settings };
+  const already = part.already === undefined ? {} : {
+    already: Object.fromEntries(Object.entries(record(part.already, `${at}.already`)).map(([k, v]) => [k, string(v, `${at}.already.${k}`)])),
+  };
+  return { description: string(part.description, `${at}.description`), place, ...body, children, script, settings, ...already };
 }
 
 function setting(raw: unknown, at: string): Setting {

@@ -68,6 +68,7 @@ test.skipIf(!hugo)("a part or setting another skin brings is left out, not an er
     // The icon is the catalog's, so every skin draws it; only Blowfish marks it has-icon.
     expect(html).toContain(`class="part-callout-icon"`);
     expect(html).not.toContain("has-icon");
+    expect(html).toContain(`class="part part-lead"`);
     expect(html).toContain("<p>A larger opening.</p>");
 
     const bad = build(`{{< callout nonsense="x" >}}\nHello.\n{{< /callout >}}`);

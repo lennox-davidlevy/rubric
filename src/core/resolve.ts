@@ -116,11 +116,13 @@ function candidate(answers: Answers, catalog: Catalog, part: string, probability
       if (def.type !== "choice" || !answers[lookId(name)]) continue;
       const said = noul(answers, lookSaidId(name));
       if (said < THRESHOLDS.no) continue;
+      const [best, p] = top(choiceAnswer(answers, lookId(name)).probabilities as Record<string, number>);
+      // The line's "big" is what picked a part that is already big.
+      if (catalog.parts[part]!.already?.[name] === best) continue;
       if (said <= THRESHOLDS.yes) {
         unsettled.push(name);
         continue;
       }
-      const [best, p] = top(choiceAnswer(answers, lookId(name)).probabilities as Record<string, number>);
       if (p < THRESHOLDS.settled || !Object.hasOwn(def.values, best)) unsettled.push(name);
       else if (best !== def.default) settings.push({ key: name, value: best });
     }

@@ -90,6 +90,5 @@ hr { width: 100%; border-top: var(--border) solid var(--rule); }
 .part-timeline-when { color: var(--heading); font-size: var(--step-2); font-weight: var(--weight-heading); }
 .part-timeline h3 { margin-top: var(--space-1); font-size: var(--step-0); }
 
-/* Its own lead: the opening paragraph larger and softer than the rest. */
-.part-lead { font-size: var(--step-1); line-height: var(--leading-heading); color: var(--muted); }
-.part-lead > * { margin: 0; }
+/* Its lead sits tighter than the default. */
+.part-lead { line-height: var(--leading-heading); }

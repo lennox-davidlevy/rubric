@@ -55,7 +55,7 @@ describe("parseCatalog", () => {
   test("the universal catalog", async () => {
     const u = await loadCatalog(join(import.meta.dir, "../catalogs/universal/catalog.yaml"));
     const where = Object.values(u.parts).map((p) => p.place);
-    expect([where.filter((p) => p === "writing").length, where.filter((p) => p === "site").length]).toEqual([38, 18]);
+    expect([where.filter((p) => p === "writing").length, where.filter((p) => p === "site").length]).toEqual([39, 18]);
   });
 
   test.each([
