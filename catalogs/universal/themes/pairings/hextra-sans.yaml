@@ -1,0 +1,21 @@
+# Hextra's type (assets/css/styles.css, typography.css): the reader's own sans,
+# a tight, heavy page title and semibold headings. Nothing to fetch.
+description: the reader's own sans with a tight, heavy page title and semibold headings
+
+faces: []
+preload: []
+
+body: [ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif]
+display: body
+mono: [ui-monospace, SFMono-Regular, Menlo, Consolas, monospace]
+
+weight: { body: 400, strong: 600, heading: 600, display: 700 }
+leading: { body: 1.75, heading: 1.3, display: 1.15 }
+tracking: { display: -0.02em, label: 0em }
+
+labels: none
+numerals: lining
+quote: normal
+ornament: "* * *"
+code: 0.875em
+links: always

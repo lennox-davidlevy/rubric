@@ -1,0 +1,46 @@
+{{- /* What a link shows when it's shared, as Slack shows it: the page's title,
+     description and picture, from the og: (or twitter:) tags most sites put
+     in their head, or the <title>. The picture is copied into the site, so it
+     can't break later. Hugo keeps every answer on disk, so a link is fetched
+     once. A failure isn't kept, so each try gives up after two seconds, and
+     the card falls back to the address. Returns a dict: title, description,
+     image (a resource, or nil). */ -}}
+{{- $url := . -}}
+{{- $out := dict "title" "" "description" "" "image" nil -}}
+{{- $opts := dict "timeout" "2s" "headers" (dict "User-Agent" "Mozilla/5.0 (compatible; Rubric link preview)") -}}
+{{- if hasPrefix $url "http" -}}
+{{- with try (resources.GetRemote $url $opts) -}}
+{{- with .Value -}}{{- if eq .MediaType.SubType "html" -}}
+  {{- $head := index (split .Content "</head>") 0 -}}
+  {{- $tags := dict -}}
+  {{- range findRE `(?is)<meta\s[^>]*>` $head -}}
+    {{- $key := index (index (findRESubmatch `(?i)\s(?:property|name)\s*=\s*["']?([^"'\s>]+)` . 1) 0 | default (slice "" "")) 1 | lower -}}
+    {{- $value := "" -}}
+    {{- with findRESubmatch `(?is)\scontent\s*=\s*"([^"]*)"` . 1 }}{{ $value = index (index . 0) 1 }}{{ else -}}
+    {{- with findRESubmatch `(?is)\scontent\s*=\s*'([^']*)'` . 1 }}{{ $value = index (index . 0) 1 }}{{ end }}{{ end -}}
+    {{- if and $key $value (not (index $tags $key)) }}{{ $tags = merge $tags (dict $key (htmlUnescape $value)) }}{{ end -}}
+  {{- end -}}
+  {{- $title := or (index $tags "og:title") (index $tags "twitter:title") -}}
+  {{- if not $title }}{{ with findRESubmatch `(?is)<title[^>]*>(.*?)</title>` $head 1 }}{{ $title = index (index . 0) 1 | htmlUnescape }}{{ end }}{{ end -}}
+  {{- $description := or (index $tags "og:description") (index $tags "twitter:description") (index $tags "description") -}}
+  {{- $out = merge $out (dict "title" (trim $title " \n\t" | plainify | truncate 120) "description" (trim $description " \n\t" | plainify | truncate 200)) -}}
+
+  {{- /* The picture's address may be relative to the page. */ -}}
+  {{- with or (index $tags "og:image") (index $tags "og:image:url") (index $tags "twitter:image") (index $tags "twitter:image:src") -}}
+    {{- $src := . -}}
+    {{- $u := urls.Parse $url -}}
+    {{- if hasPrefix $src "//" }}{{ $src = printf "%s:%s" $u.Scheme $src }}
+    {{- else if hasPrefix $src "/" }}{{ $src = printf "%s://%s%s" $u.Scheme $u.Host $src }}{{ end -}}
+    {{- if hasPrefix $src "http" -}}
+    {{- with try (resources.GetRemote $src $opts) -}}
+    {{- /* Only pictures Hugo can measure and shrink; an SVG has no size. */ -}}
+    {{- with .Value -}}{{- if and (eq .MediaType.MainType "image") (in (slice "jpeg" "png" "webp" "gif") .MediaType.SubType) -}}
+      {{- with try (.Fit "1200x1200") }}{{ with .Value }}{{ $out = merge $out (dict "image" .) }}{{ end }}{{ end -}}
+    {{- end }}{{ end -}}
+    {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end }}{{ end -}}
+{{- end -}}
+{{- end -}}
+{{- return $out -}}

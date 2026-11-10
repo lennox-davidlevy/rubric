@@ -1,14 +1,10 @@
 {{- /* Blowfish's alert: an icon beside the note on a pale blue card, and no
-     label unless the line gives a title. The icon is the skin's own
-     setting (skins/blowfish.yaml). */ -}}
-{{- $icons := dict "lightbulb" "lightbulb" "info" "circle-info" "warning" "triangle-exclamation" "check" "check" "star" "star" "fire" "fire" -}}
+     label unless the line gives a title. */ -}}
 {{- $labels := dict "note" "Note" "tip" "Tip" "warning" "Warning" "danger" "Danger" -}}
 {{- $label := .s.title | default (index $labels .s.kind) -}}
-{{- $icon := index $icons (.s.icon | default "none") -}}
+{{- $icon := partial "rubric/callout-icon.html" .s.icon -}}
 <aside class="part part-callout kind-{{ .s.kind }}{{ if $icon }} has-icon{{ end }}" aria-label="{{ $label }}">
-{{- with $icon }}{{ with resources.Get (printf "icons/fontawesome/%s.svg" .) }}
-<span class="part-callout-icon" aria-hidden="true">{{ .Content | safeHTML }}</span>
-{{- end }}{{ end }}
+{{ $icon }}
 <div class="stack">
 {{- with $.s.title }}<p class="part-callout-label">{{ . }}</p>{{ end }}
 {{ .inner }}

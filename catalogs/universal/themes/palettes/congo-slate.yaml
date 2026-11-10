@@ -1,0 +1,34 @@
+# Congo's slate scheme (github.com/jpanther/congo, MIT), from
+# assets/css/schemes/slate.css, assigned the way its tailwind.config.js does for
+# its prose and its dark mode.
+description: white, neutral gray writing and a cool slate gray with no bright color, with a dark neutral dark
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#374151"
+heading: "#1f2937"
+link: "#334155"
+accent: "#334155"
+muted: "#666c7a"  # nudged from #6b7280, to read
+rule: "#e5e7eb"
+tint: "#f3f4f6"
+code-paper: "#f9fafb"
+code-muted: "#696e77"
+positive: "#15803d"
+warning: "#995d07"  # nudged from #a16207, to read
+danger: "#b91c1c"
+
+dark:
+  paper: "#1f2937"
+  ink: "#d1d5db"
+  heading: "#e5e7eb"
+  link: "#a3b0c2"  # nudged from #94a3b8, to read
+  accent: "#a3b0c2"  # nudged from #94a3b8, to read
+  muted: "#a6acb7"  # nudged from #9ca3af, to read
+  rule: "#4b5563"
+  tint: "#374151"
+  danger: "#cc8e91"
+
+shadow:
+  strength: 1

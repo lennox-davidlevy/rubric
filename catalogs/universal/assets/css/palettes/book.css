@@ -1,0 +1,48 @@
+/* book: plain black on white with one web blue, and the cool Nord slate for dark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/book.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #000000;
+  --accent: #0055bb;
+  --muted: #64748b;
+  --rule: #e9ecef;
+  --tint: #f8f9fa;
+  --dark-paper: #2e3440;
+  --dark-ink: #eceff4;
+  --dark-accent: #98b2cd;
+  --raised: #ffffff;
+  --link: #0055bb;
+  --heading: #000000;
+  --code-paper: #f8f9fa;
+  --code-ink: #000000;
+  --code-muted: #64748b;
+  --code-accent: #0055bb;
+  --positive: #2c7f2c;
+  --warning: #935f28;
+  --danger: #c34040;
+  --accent-tint: #ebf1fa;
+  --positive-tint: #eef5ee;
+  --warning-tint: #f6f2ee;
+  --danger-tint: #faf0f0;
+  --dark-link: #9db6d0;
+  --dark-heading: #eceff4;
+  --band: #2e3440;
+  --band-ink: #eceff4;
+  --dark-muted: #d8dee9;
+  --dark-rule: #434c5e;
+  --dark-tint: #3b4252;
+  --dark-raised: #3b4252;
+  --dark-accent-tint: #3b4351;
+  --dark-positive: #a3be8c;
+  --dark-warning: #daa290;
+  --dark-danger: #d8a1a6;
+  --dark-positive-tint: #3c4549;
+  --dark-warning-tint: #43414a;
+  --dark-danger-tint: #42414c;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

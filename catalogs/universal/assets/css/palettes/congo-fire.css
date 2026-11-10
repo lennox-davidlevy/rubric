@@ -1,0 +1,48 @@
+/* congo-fire: white, neutral gray writing and a fire orange and a warm stone gray, with a dark neutral dark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/congo-fire.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #44403c;
+  --accent: #c2410c;
+  --muted: #726b67;
+  --rule: #e7e5e4;
+  --tint: #f5f5f4;
+  --dark-paper: #292524;
+  --dark-ink: #d6d3d1;
+  --dark-accent: #fb923c;
+  --raised: #ffffff;
+  --link: #c2410c;
+  --heading: #292524;
+  --code-paper: #fafaf9;
+  --code-ink: #44403c;
+  --code-muted: #706e6b;
+  --code-accent: #44403c;
+  --positive: #15803d;
+  --warning: #995d07;
+  --danger: #b91c1c;
+  --accent-tint: #faf0ec;
+  --positive-tint: #ecf5ef;
+  --warning-tint: #f7f2eb;
+  --danger-tint: #f9eded;
+  --dark-link: #fb923c;
+  --dark-heading: #e7e5e4;
+  --band: #292524;
+  --band-ink: #d6d3d1;
+  --dark-muted: #b0aba8;
+  --dark-rule: #57534e;
+  --dark-tint: #44403c;
+  --dark-raised: #44403c;
+  --dark-accent-tint: #423227;
+  --dark-positive: #7fae8e;
+  --dark-warning: #bb9e76;
+  --dark-danger: #cf8d8c;
+  --dark-positive-tint: #333531;
+  --dark-warning-tint: #3a342e;
+  --dark-danger-tint: #3d3130;
+  --shadow-soft: 0 1px 2px rgb(68 64 60 / 0.06), 0 2px 8px rgb(68 64 60 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(68 64 60 / 0.06), 0 16px 40px rgb(68 64 60 / 0.14);
+}

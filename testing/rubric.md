@@ -1,22 +1,10 @@
-warm, paper and ink, quiet, lots of room to read
+::: an announcement -> banner
+A short notice. [Read more](#)
+:::
 
-::: a nav bar at the top with links -> header
+::: a top navigation bar -> header
 - [Posts](/posts/)
 - [About](/about/)
-:::
-
-::: breadcrumbs
-:::
-
-::: the date, reading time and author under the title -> post-meta shows=everything
-:::
-
-::: tags under the post -> tags
-:::
-
-::: a footer with the copyright -> footer
-- [About](/about/)
-- [RSS](/index.xml)
 :::
 
 ::: a search box -> search
@@ -25,11 +13,29 @@ warm, paper and ink, quiet, lots of room to read
 ::: a dark mode toggle -> theme-switch
 :::
 
-::: the headings of the page on the side as you scroll -> page-contents
+::: a trail of links back -> breadcrumbs
 :::
 
-::: previous and next links -> pager
+::: a featured image at the top -> cover
 :::
 
-::: let readers reply under posts -> comments
+::: the date, reading time, and author -> post-meta shows=everything
 :::
+
+::: a sidebar with sections -> sidebar
+### A heading
+
+- [A page](/)
+- [Another page](/)
+:::
+
+::: a floating table of contents -> page-contents
+:::
+
+::: an about the author box -> author
+![Your name](/images/)
+
+A line or two about you.
+:::
+
+

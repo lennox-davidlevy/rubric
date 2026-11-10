@@ -1,0 +1,74 @@
+# The five parts plan step 5 added, each asked in several ways, and the parts
+# nearest them, to see whether the new ones take lines they should not.
+- directive: a big opening paragraph
+  want: lead
+- directive: an intro paragraph in larger type
+  want: lead
+- directive: the first paragraph, bigger and softer, to draw the reader in
+  want: lead
+- directive: a standfirst
+  want: lead
+- directive: a map of where we stayed
+  want: map
+- directive: show the cafe's location
+  want: map
+- directive: a street map of the venue
+  want: map zoom=street
+- directive: the menu as a pdf
+  want: pdf
+- directive: show my resume document in the page
+  want: pdf
+- directive: let people read the report without downloading it
+  want: pdf
+- directive: the folder structure of the project
+  want: file-tree
+- directive: a tree of the files in this repo
+  want: file-tree
+- directive: which files go where
+  want: file-tree
+- directive: bars showing how far along each goal is
+  want: progress
+- directive: my skills with percentages
+  want: progress
+- directive: how much of the budget each team has used
+  want: progress
+- directive: a big title at the top of the page
+  want: hero
+- directive: an embedded video
+  want: video
+- directive: a tip with a lightbulb
+  want: callout kind=tip icon=lightbulb
+- directive: a pull quote from the interview
+  want: quote size=large
+- directive: a bulleted list of what to bring
+  want: nothing
+# Added after the first run's fixes, not used to tune them.
+- directive: a map of the whole city
+  want: map zoom=city
+- directive: a map zoomed in close on the front door
+  want: map zoom=street
+- directive: where to find us
+  want: map
+- directive: an intro paragraph with a shadow
+  want: lead shadow=soft
+- directive: a hero with a thin outline
+  want: hero border=outlined
+- directive: a small quote in smaller text
+  want: quote text=smaller
+# Hero lines from the earlier sets, to catch the new wording breaking them.
+- directive: a hero
+  want: hero
+- directive: a cover photo for the page with the title over it
+  want: hero
+- directive: a splash header for the landing page
+  want: hero
+- directive: a big opening for the top of the page
+  want: hero
+- directive: a huge title that fills the screen
+  want: hero size=tall
+- directive: a centered landing header with a photo behind it
+  want: hero align=center
+- directive: a section with a big heading
+  want: section
+- directive: a map of the neighborhood
+  want: map

@@ -3,12 +3,14 @@
 // editor. Works from the text the editor holds, never from the saved file, and
 // only ever writes content/, .rubric/ and nothing the writer edits.
 
-import { readFile, readdir } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { unlinkSync } from "node:fs";
+import { readFile, readdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import {
   applyRefine, atPlace, Cache, frontMatterProblem, liveContent, settingsOf, formatPlain, frame, FRAME_PAGE, framePage, parsePlain, preprocess, refineWords, scan, lines as splitLines,
   THRESHOLDS, writeWhole,
-  type Catalog, type Diagnostic, type Directive, type Entry, type PageKind, type Place, type Refined, type Resolution,
+  type Catalog, type Diagnostic, type Directive, type Entry, type PageKind, type Place, type Refined, type Resolution, type Resolve,
 } from "../core/index.ts";
 import { pageKind, pagePath, type Site } from "../site.ts";
 import { fileExists, isSiteAddress, pictures } from "./files.ts";
@@ -29,8 +31,9 @@ export interface Ghost {
   text: string;
   line: number;
   character: number;
-  // For a refinement, the line as it should read once accepted: the editor
-  // replaces the whole line with it, since the pin it changes is mid-line.
+  // The line as it should read once accepted: the editor replaces the whole
+  // line with it. Accepting puts the part in place of the words, which have
+  // done their job; the ghost text only shows what is picked.
   replace?: string;
 }
 
@@ -49,6 +52,9 @@ export interface Completion {
 // A Markdown picture up to the cursor, with its address so far: ![alt](/ima
 const PICTURE_BEFORE = /!\[[^\]]*\]\(\s*<?([^)\s>]*)$/;
 const PICTURES = /!\[[^\]]*\]\(\s*<?([^)\s>]+)/g;
+// A file's address alone on a line in a block, as a PDF, video or audio part
+// takes it: /files/route.pdf. One with no extension is a page's.
+const BARE_FILE = /^\s*(\/[^\s/][^\s]*\.[A-Za-z0-9]+)\s*$/;
 
 interface Doc {
   text: string;
@@ -56,17 +62,17 @@ interface Doc {
   page: PageKind;
   // The line the last edit was on, which is asked about only after a pause.
   editing?: number;
-  // Refinements on the page when it was opened. Their answer is already in
-  // the pin, so they are asked only once the writer changes their words.
-  known: Set<string>;
+  // The pick the writer has moved to with the next-pick key, drawn in place
+  // of the first until they accept it, change the line or stop looking.
+  chosen?: { words: string; plain: string };
 }
 
 export interface Options {
   // The longest the writer pauses on a words line before it is sent to Jev.
   // Leaving the line, Esc, or the accept key with nothing shown sends it at
   // once (askNow). Once the server has seen enough of the writer's typing,
-  // the pause is fitted to it: half again the gap the writer leaves between
-  // keys nine times in ten, never under minIdleMs.
+  // the pause is fitted to it: a quarter again the gap the writer leaves
+  // between keys nine times in ten, never under minIdleMs.
   idleMs?: number;
   minIdleMs?: number;
   // Each edit to a words line, for `bun run play` to log, so the pause can
@@ -108,14 +114,16 @@ export class Workspace {
   #waitMs: number;
   #drawMs: number;
   #refiner: Refiner | undefined;
+  // This server's list of open pages in .rubric/open/, for the others.
+  #claim = `${process.pid}-${randomUUID().slice(0, 8)}.json`;
 
   constructor(site: Site, cache: Cache, resolver: Resolver, publish: (file: string, notes: Note[]) => void, opts: Options = {}) {
     this.site = site;
     this.#cache = cache;
     this.#resolver = resolver;
     this.#publish = publish;
-    this.#idleMs = opts.idleMs ?? 1000;
-    this.#minIdleMs = Math.min(opts.minIdleMs ?? 400, this.#idleMs);
+    this.#idleMs = opts.idleMs ?? 600;
+    this.#minIdleMs = Math.min(opts.minIdleMs ?? 300, this.#idleMs);
     this.#onEdit = opts.onEdit;
     this.#waitMs = opts.waitMs ?? 5000;
     this.#drawMs = opts.drawMs ?? 100;
@@ -124,14 +132,54 @@ export class Workspace {
 
   // Writes content/ for every page on disk, from the cache only. Run once at
   // start, so the preview is whole before any page is opened.
+  // A page open in another editor is that editor's server's to draw.
   async buildAll(): Promise<void> {
+    const elsewhere = await this.#openElsewhere();
+    const mine = (file: string) => !this.#docs.has(file) && !elsewhere.has(file);
     const files = (await readdir(this.site.pages, { recursive: true })).filter((f) => f.endsWith(".md"));
     for (const f of files) {
       const file = join(this.site.pages, f);
-      if (!this.#docs.has(file)) await this.#write(f, pageKind(f), await readFile(file, "utf8"));
+      if (mine(file)) await this.#write(f, pageKind(f), await readFile(file, "utf8"));
     }
     const rubric = join(this.site.root, "rubric.md");
-    if (!this.#docs.has(rubric)) await this.#write("rubric.md", "site", await readFile(rubric, "utf8").catch(() => ""));
+    if (mine(rubric)) await this.#write("rubric.md", "site", await readFile(rubric, "utf8").catch(() => ""));
+  }
+
+  // Each Neovim runs its own server, and each draws every page it doesn't
+  // have open from disk: when it starts, and on every theme switch. Without
+  // this, a page open with unsaved changes in one editor was drawn from disk
+  // by another's server, and its preview lost them until the next keystroke.
+  // So each server lists its open pages in .rubric/open/, and leaves the
+  // pages another live server lists alone.
+  get #claims(): string {
+    return join(this.site.root, ".rubric/open");
+  }
+
+  #claimOpen(): Promise<void> {
+    const list = JSON.stringify({ pid: process.pid, files: [...this.#docs.keys()] }) + "\n";
+    return writeWhole(join(this.#claims, this.#claim), list, join(this.site.root, ".rubric/tmp")).catch(() => {});
+  }
+
+  async #openElsewhere(): Promise<Set<string>> {
+    const open = new Set<string>();
+    const names = await readdir(this.#claims).catch(() => [] as string[]);
+    for (const name of names) {
+      if (name === this.#claim || !name.endsWith(".json")) continue;
+      const path = join(this.#claims, name);
+      try {
+        const { pid, files } = JSON.parse(await readFile(path, "utf8")) as { pid: number; files: string[] };
+        if (alive(pid)) for (const f of files) open.add(f);
+        else await unlink(path);
+      } catch {}
+    }
+    return open;
+  }
+
+  // The server is stopping: its pages are no longer open anywhere.
+  dispose(): void {
+    try {
+      unlinkSync(join(this.#claims, this.#claim));
+    } catch {}
   }
 
   // The site again, after hugo.toml changed: a new theme may bring another
@@ -175,8 +223,8 @@ export class Workspace {
   async open(file: string, text: string): Promise<void> {
     const rel = pagePath(this.site, file);
     if (rel === undefined) return;
-    const known = new Set(scan(text, this.site.catalog).directives.flatMap((d) => (d.plain && d.refine ? [this.#rkey(d.plain.part, d.refine.words)] : [])));
-    this.#docs.set(file, { text, rel, page: pageKind(rel), known });
+    this.#docs.set(file, { text, rel, page: pageKind(rel) });
+    await this.#claimOpen();
     await this.#render(file);
     // Lines on disk are finished; ask about them now.
     this.#askAll(file);
@@ -187,6 +235,10 @@ export class Workspace {
     if (!doc) return this.open(file, text);
     doc.editing = firstChangedLine(doc.text, text);
     doc.text = text;
+    // Accepted or reworded: the line no longer holds the words it was for.
+    if (doc.chosen && !scan(text, this.site.catalog).directives.some((d) => d.kind === "words" && d.words === doc.chosen!.words)) {
+      doc.chosen = undefined;
+    }
     this.#timeEdit(file, doc);
     this.#drawSoon(file);
     // Half-typed words are not worth an answer: the line being edited waits
@@ -205,13 +257,28 @@ export class Workspace {
     this.#askAll(file);
   }
 
+  // The writer moved to another pick (index from 0), or stopped looking at
+  // one (no index): the page shows what the ghost text shows. Never written
+  // to the cache or the file; only accepting does that.
+  choose(file: string, line: number, index?: number): void {
+    const doc = this.#docs.get(file);
+    if (!doc) return;
+    const d = this.#directiveAt(doc, line);
+    const hit = d?.kind === "words" && d.words !== undefined ? this.#cache.get(this.site.catalog, doc.page, d.words) : undefined;
+    const pick = index === undefined ? undefined : hit?.candidates[index];
+    if (!pick && !doc.chosen) return;
+    if (pick) doc.chosen = { words: d!.words!, plain: pick.plain };
+    else doc.chosen = undefined;
+    this.#drawSoon(file);
+  }
+
   // How long to wait for a pause on the line being typed: fitted to the
   // writer once there are enough gaps to go on, the most otherwise.
   pause(): number {
     if (this.#gaps.length < 20) return this.#idleMs;
     const sorted = [...this.#gaps].sort((a, b) => a - b);
     const p90 = sorted[Math.floor(0.9 * (sorted.length - 1))]!;
-    return Math.round(Math.min(this.#idleMs, Math.max(this.#minIdleMs, 1.5 * p90)));
+    return Math.round(Math.min(this.#idleMs, Math.max(this.#minIdleMs, 1.25 * p90)));
   }
 
   #timeEdit(file: string, doc: Doc): void {
@@ -238,6 +305,7 @@ export class Workspace {
     const doc = this.#docs.get(file);
     if (!doc) return;
     this.#docs.delete(file);
+    await this.#claimOpen();
     clearTimeout(this.#timers.get(file));
     this.#timers.delete(file);
     clearTimeout(this.#draws.get(file));
@@ -269,6 +337,17 @@ export class Workspace {
   // so this waits for it, but gives up if the line changes first: a pick for
   // words that are no longer there would be pinned onto the wrong ones.
   async ghost(file: string, line: number): Promise<Ghost[]> {
+    const ghosts = await this.#ghost(file, line);
+    // Neovim goes back to the first pick with every answer, so the page does.
+    const doc = this.#docs.get(file);
+    if (doc?.chosen) {
+      doc.chosen = undefined;
+      this.#drawSoon(file);
+    }
+    return ghosts;
+  }
+
+  async #ghost(file: string, line: number): Promise<Ghost[]> {
     const doc = this.#docs.get(file);
     const at = doc && this.#directiveAt(doc, line);
     if (doc && at?.plain && at.refine) return this.#refineGhost(file, line);
@@ -291,20 +370,21 @@ export class Workspace {
     const lineText = splitLines(doc.text)[line] ?? "";
     const end = lineText.length;
     const sep = lineText.endsWith(" ") ? PIN.trimStart() : PIN;
+    const lead = opener(lineText);
     // An empty block gets the part's starter body with the pin, so the writer
     // sees what the part expects; a block with anything in it gets nothing.
     const d = this.#directiveAt(doc, line);
     const empty = d?.close !== undefined && splitLines(doc.text).slice(line + 1, d.close).every((l) => l.trim() === "");
     return hit.candidates.map((c) => {
       const body = empty ? this.site.catalog.parts[c.part]?.body?.replace(/\n+$/, "") : undefined;
-      return { text: `${sep}${c.plain}${body ? `\n${body}` : ""}`, line, character: end };
+      return { text: `${sep}${c.plain}${body ? `\n${body}` : ""}`, line, character: end, replace: `${lead} ${c.plain}` };
     });
   }
 
   // Ghost text for words after a pin's ":": the settings they would change,
-  // shown at the end of the line. Accepting rewrites the pin in place and
-  // keeps the words, the record of what was asked. Nothing when the pin
-  // already says what the words ask.
+  // shown at the end of the line. Accepting rewrites the pin and drops the
+  // words, and any before an arrow: the pin then says all they asked.
+  // Nothing when the pin already says what the words ask.
   async #refineGhost(file: string, line: number): Promise<Ghost[]> {
     const current = () => {
       const doc = this.#docs.get(file);
@@ -344,7 +424,7 @@ export class Workspace {
       text: `${sep}⇒ ${changes.join(" ")}`,
       line,
       character: lineText.length,
-      replace: `${lineText.slice(0, now.plain.partSpan.start)}${after} ${lineText.slice(now.refine.colon)}`,
+      replace: `${opener(lineText)} ${after}`,
     }];
   }
 
@@ -453,10 +533,8 @@ export class Workspace {
       }
       if (d.refine && refineWords(d.refine.words) !== "") {
         const hit = this.#cache.getRefine(this.site.catalog, d.plain.part, d.refine.words);
-        const known = doc.known.has(this.#rkey(d.plain.part, d.refine.words));
         out.push("", `After the colon, "${d.refine.words}": ${
           hit ? `asked; ${this.#refineSummary(d.plain.part, hit)}`
-          : known ? "already in the pin; change the words to ask again"
           : "waiting for Jev"}.`);
       }
       if (d.kind === "pinned") out.push("", "Pinned: the part is never sent to Jev again.");
@@ -551,7 +629,6 @@ export class Workspace {
       if (
         this.#refiner && d.plain && d.refine && d.line !== except && d.problems.length === 0 &&
         refineWords(d.refine.words) !== "" && Object.hasOwn(this.site.catalog.parts, d.plain.part) &&
-        !doc.known.has(this.#rkey(d.plain.part, d.refine.words)) &&
         !this.#cache.getRefine(this.site.catalog, d.plain.part, d.refine.words)
       ) {
         void this.#askRefine(doc.page, d.plain.part, d.refine.words);
@@ -625,7 +702,7 @@ export class Workspace {
   async #render(file: string): Promise<void> {
     const doc = this.#docs.get(file);
     if (!doc) return;
-    const { entries, diagnostics } = await this.#write(doc.rel, doc.page, doc.text);
+    const { entries, diagnostics } = await this.#write(doc.rel, doc.page, doc.text, doc.chosen);
     this.#publish(file, [
       ...diagnostics.map((d): Note => ({ ...d, severity: d.code === "other-skin" ? "information" : "warning" })),
       ...this.#wordsNotes(doc, entries),
@@ -635,9 +712,15 @@ export class Workspace {
     ].sort((a, b) => a.line - b.line || a.start - b.start));
   }
 
-  async #write(rel: string, page: PageKind, text: string) {
-    if (page === "site") return this.#writeFrame(text);
-    const out = preprocess(text, this.site.catalog, this.#cache.resolver(this.site.catalog, page));
+  // The cache's lookup, with the pick the writer has moved to in its place.
+  #resolve(page: PageKind, chosen: Doc["chosen"]): Resolve {
+    const cached = this.#cache.resolver(this.site.catalog, page);
+    return (words) => (chosen?.words === words ? parsePlain(chosen.plain) : cached(words));
+  }
+
+  async #write(rel: string, page: PageKind, text: string, chosen?: Doc["chosen"]) {
+    if (page === "site") return this.#writeFrame(text, chosen);
+    const out = preprocess(text, this.site.catalog, this.#resolve(page, chosen));
     // Half-typed front matter is never handed to Hugo; the page it last read
     // stays until the front matter parses again.
     const broken = frontMatterProblem(text);
@@ -661,8 +744,8 @@ export class Workspace {
 
   // rubric.md becomes the frame page, a list the layout draws around every
   // page; Hugo reads it but never publishes it.
-  async #writeFrame(text: string) {
-    const { entries, output } = frame(text, this.site.catalog, this.#cache.resolver(this.site.catalog, "site"));
+  async #writeFrame(text: string, chosen?: Doc["chosen"]) {
+    const { entries, output } = frame(text, this.site.catalog, this.#resolve("site", chosen));
     const tmp = join(this.site.root, ".rubric/tmp");
     const target = join(this.site.content, FRAME_PAGE);
     const page = framePage(entries);
@@ -688,9 +771,11 @@ export class Workspace {
       }
     };
     const fences = new Set<number>();
+    const inside = new Set<number>();
     for (const d of s.directives) {
       fences.add(d.line);
       if (d.close !== undefined) fences.add(d.close);
+      for (let l = d.line + 1; l < (d.close ?? d.line + 1); l++) inside.add(l);
       const part = d.plain && Object.hasOwn(this.site.catalog.parts, d.plain.part) ? this.site.catalog.parts[d.plain.part]! : undefined;
       for (const set of d.plain?.settings ?? []) {
         if (part?.settings[set.key]?.type !== "image") continue;
@@ -702,6 +787,8 @@ export class Workspace {
     src.forEach((text, line) => {
       if (s.code.has(line) || fences.has(line)) return;
       for (const m of text.matchAll(PICTURES)) check(line, m.index + m[0].length - m[1]!.length, m[1]!);
+      const bare = inside.has(line) ? BARE_FILE.exec(text) : null;
+      if (bare) check(line, text.indexOf(bare[1]!), bare[1]!);
     });
     return notes;
   }
@@ -784,6 +871,12 @@ export class Workspace {
 // The first line that differs between two versions of a page: where the edit
 // was. Enter at the end of a line puts it on the new line, which leaves the
 // line above.
+// What starts a directive line, kept when accepting rewrites it: the indent
+// and the colons, which may be more than three in a nested block.
+function opener(line: string): string {
+  return /^\s*:{3,}/.exec(line)?.[0] ?? ":::";
+}
+
 function firstChangedLine(before: string, after: string): number {
   const a = splitLines(before);
   const b = splitLines(after);
@@ -805,4 +898,14 @@ export function pageUrl(rel: string, text: string): string {
   if (last !== "_index" && last !== "index") parts.push(field("slug") ?? last);
   const path = parts.map((p) => p.toLowerCase().replace(/\s+/g, "-")).join("/");
   return path ? `/${path}/` : "/";
+}
+
+// Whether a process is still running. EPERM means it is, as someone else's.
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
 }

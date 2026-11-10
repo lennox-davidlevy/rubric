@@ -1,0 +1,27 @@
+# Coder's colors (github.com/luizdepra/hugo-coder, MIT), from
+# assets/scss/_variables.scss, with its notice colors.
+description: off-white, near-black and a strong blue, with a neutral charcoal dark
+
+scheme: light
+
+paper: "#fafafa"
+ink: "#212121"
+heading: "#000000"
+link: "#1460b6"  # nudged from #1565c0, to read
+accent: "#1460b6"  # nudged from #1565c0, to read
+muted: "#5f5f5f"
+rule: "#cccccc"
+tint: "#e0e0e0"
+code-accent: "#1460b6"
+positive: "#007669"  # nudged from #00897b, to read
+warning: "#8b6100"  # nudged from #ffb300, to read
+danger: "#c5302e"  # nudged from #e53935, to read
+
+dark:
+  paper: "#212121"
+  ink: "#dadada"
+  link: "#65b6f6"  # nudged from #42a5f5, to read
+  accent: "#65b6f6"  # nudged from #42a5f5, to read
+  muted: "#b1b1b1"
+  rule: "#4f4f4f"
+  tint: "#424242"

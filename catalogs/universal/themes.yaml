@@ -24,3 +24,479 @@ blowfish:
   pairing: blowfish-sans
   scale: blowfish
   skin: blowfish
+
+terminal:
+  description: a warm near-black ground with amber links, in a programmer's monospace, with dashed lines; after Terminal
+  palette: terminal
+  pairing: fira-code
+  scale: terminal
+  skin: terminal
+
+bear:
+  description: plain white with gray writing and one blue, in Verdana, with almost nothing else; after Bear Blog
+  palette: bear
+  pairing: verdana
+  scale: bear
+  skin: bear
+
+xmin:
+  description: the browser's own black and blue on white in a humanist sans, centered, with gray boxes; after XMin
+  palette: xmin
+  pairing: optima
+  scale: xmin
+  skin: xmin
+
+coder:
+  description: off-white and a strong blue in the reader's own sans, with a tall bar and generous room; after Coder
+  palette: coder
+  pairing: coder-sans
+  scale: coder
+  skin: coder
+
+hello-friend:
+  description: white and gray with no accent in Inter, broad and spaced out, with a pale top bar; after hello-friend-ng
+  palette: hello-friend
+  pairing: inter
+  scale: broad
+  skin: hello-friend
+
+archie:
+  description: white with crimson marks in a monospace with sans headings, and hash marks on headings; after Archie
+  palette: archie
+  pairing: archie-mono
+  scale: archie
+  skin: archie
+
+anatole:
+  description: white and steel blue in the reader's own sans, with posts on lifted cards; after Anatole
+  palette: anatole
+  pairing: system-sans
+  scale: anatole
+  skin: anatole
+
+m10c:
+  description: slate with pale writing and mint, in the reader's own sans, with a darker column on the left; after m10c
+  palette: m10c
+  pairing: system-sans
+  scale: m10c
+  skin: m10c
+
+blog-awesome:
+  description: white with navy headings and an electric blue, in loosely set Roboto; after Blog Awesome
+  palette: blog-awesome
+  pairing: roboto
+  scale: awesome
+  skin: blog-awesome
+
+etch:
+  description: white with cool slate and azure in the reader's own sans, in a very narrow column with no boxes; after Etch
+  palette: etch
+  pairing: system-sans
+  scale: etch
+  skin: etch
+
+yinyang:
+  description: pure black on white in a friendly slab serif, with one heavy plum line; after Yinyang
+  palette: yinyang
+  pairing: bree-serif
+  scale: yinyang
+  skin: yinyang
+
+github:
+  description: white with a code-host blue and thin gray lines in the reader's own sans; after GitHub Style
+  palette: github
+  pairing: system-sans
+  scale: github
+  skin: github
+
+cactus-dark:
+  description: charcoal with pink links and a green accent, in JetBrains Mono, with dotted lines; after Cactus
+  palette: cactus-dark
+  pairing: jetbrains-mono
+  scale: cactus
+  skin: cactus
+
+cactus-classic:
+  description: off-white with a sage link and a cherry accent, in JetBrains Mono, with dotted lines; after Cactus
+  palette: cactus-classic
+  pairing: jetbrains-mono
+  scale: cactus
+  skin: cactus
+
+cactus-light:
+  description: warm gray paper with green links and a raspberry accent, in JetBrains Mono, with dotted lines; after Cactus
+  palette: cactus-light
+  pairing: jetbrains-mono
+  scale: cactus
+  skin: cactus
+
+cactus-white:
+  description: white with pink links and a green accent, in JetBrains Mono, with dotted lines; after Cactus
+  palette: cactus-white
+  pairing: jetbrains-mono
+  scale: cactus
+  skin: cactus
+
+hyde:
+  description: white with a near-black column on the left and a huge display name, in PT Sans; after Hyde
+  palette: hyde
+  pairing: pt-abril
+  scale: hyde
+  skin: hyde
+
+hyde-red:
+  description: white with a brick red column on the left and a huge display name, in PT Sans; after Hyde
+  palette: hyde-red
+  pairing: pt-abril
+  scale: hyde
+  skin: hyde
+
+hyde-orange:
+  description: white with a burnt orange column on the left and a huge display name, in PT Sans; after Hyde
+  palette: hyde-orange
+  pairing: pt-abril
+  scale: hyde
+  skin: hyde
+
+hyde-yellow:
+  description: white with a ochre column on the left and a huge display name, in PT Sans; after Hyde
+  palette: hyde-yellow
+  pairing: pt-abril
+  scale: hyde
+  skin: hyde
+
+hyde-green:
+  description: white with a olive green column on the left and a huge display name, in PT Sans; after Hyde
+  palette: hyde-green
+  pairing: pt-abril
+  scale: hyde
+  skin: hyde
+
+hyde-teal:
+  description: white with a sea green column on the left and a huge display name, in PT Sans; after Hyde
+  palette: hyde-teal
+  pairing: pt-abril
+  scale: hyde
+  skin: hyde
+
+hyde-blue:
+  description: white with a dusty blue column on the left and a huge display name, in PT Sans; after Hyde
+  palette: hyde-blue
+  pairing: pt-abril
+  scale: hyde
+  skin: hyde
+
+hyde-purple:
+  description: white with a muted purple column on the left and a huge display name, in PT Sans; after Hyde
+  palette: hyde-purple
+  pairing: pt-abril
+  scale: hyde
+  skin: hyde
+
+hyde-brown:
+  description: white with a saddle brown column on the left and a huge display name, in PT Sans; after Hyde
+  palette: hyde-brown
+  pairing: pt-abril
+  scale: hyde
+  skin: hyde
+
+apprentice:
+  description: a low-contrast dark gray with muted sage and steel, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: apprentice
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+base16-dark:
+  description: a neutral near-black with the classic base16 rainbow of soft marks, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: base16-dark
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+base16-light:
+  description: a neutral off-white with the classic base16 rainbow of soft marks, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: base16-light
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+catppuccin-frappe:
+  description: a dusty blue-gray with soft pastel marks, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: catppuccin-frappe
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+catppuccin-latte:
+  description: a cool pale gray with vivid pastel marks, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: catppuccin-latte
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+catppuccin-macchiato:
+  description: a deep indigo gray with soft pastel marks, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: catppuccin-macchiato
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+catppuccin-mocha:
+  description: a deep violet-black with soft pastel marks, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: catppuccin-mocha
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+dracula:
+  description: a dark purple-gray with neon pink, green and cyan, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: dracula
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+gruvbox-dark:
+  description: a warm retro dark brown with orange and yellow marks, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: gruvbox-dark
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+gruvbox-light:
+  description: a warm retro cream with rust and olive marks, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: gruvbox-light
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+material:
+  description: a deep blue-gray with bright candy marks, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: material
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+papercolor-dark:
+  description: a true dark with bright pink and blue marks, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: papercolor-dark
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+papercolor-light:
+  description: a printed-paper light gray with magenta and blue marks, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: papercolor-light
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+solarized-dark:
+  description: the deep teal ground of Solarized with its precise blue and cyan, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: solarized-dark
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+solarized-light:
+  description: the pale cream ground of Solarized with its precise blue and cyan, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: solarized-light
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+tender:
+  description: a soft warm charcoal with gentle yellow and blue marks, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: tender
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+tokyo-night-dark:
+  description: a midnight navy with neon blue and purple, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: tokyo-night-dark
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+tokyo-night-light:
+  description: a pale blue-gray with deep navy and indigo, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: tokyo-night-light
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+windows-95-light:
+  description: the silver gray of an old desktop with hard primary colors, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: windows-95-light
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+windows-95:
+  description: the black terminal of an old desktop with hard primary colors, in plain monospace with every heading the size of the writing, like a text file; after Risotto
+  palette: windows-95
+  pairing: system-mono
+  scale: flat
+  skin: risotto
+
+book:
+  description: plain black on white with a web blue in the reader's own sans, a menu down the left, tidy notices; after Hugo Book
+  palette: book
+  pairing: book-sans
+  scale: book
+  skin: book
+
+congo:
+  description: white and neutral gray with violet and fuchsia, extra-bold titles in the reader's own sans, soft alerts with an icon; after Congo
+  palette: congo
+  pairing: congo-sans
+  scale: congo
+  skin: congo
+
+congo-avocado:
+  description: white and neutral gray with avocado green, extra-bold titles in the reader's own sans, soft alerts with an icon; after Congo
+  palette: congo-avocado
+  pairing: congo-sans
+  scale: congo
+  skin: congo
+
+congo-cherry:
+  description: white and neutral gray with cherry red, extra-bold titles in the reader's own sans, soft alerts with an icon; after Congo
+  palette: congo-cherry
+  pairing: congo-sans
+  scale: congo
+  skin: congo
+
+congo-fire:
+  description: white and neutral gray with fire orange, extra-bold titles in the reader's own sans, soft alerts with an icon; after Congo
+  palette: congo-fire
+  pairing: congo-sans
+  scale: congo
+  skin: congo
+
+congo-ocean:
+  description: white and neutral gray with ocean blue, extra-bold titles in the reader's own sans, soft alerts with an icon; after Congo
+  palette: congo-ocean
+  pairing: congo-sans
+  scale: congo
+  skin: congo
+
+congo-sapphire:
+  description: white and neutral gray with sapphire blue, extra-bold titles in the reader's own sans, soft alerts with an icon; after Congo
+  palette: congo-sapphire
+  pairing: congo-sans
+  scale: congo
+  skin: congo
+
+congo-slate:
+  description: white and neutral gray with cool slate gray, extra-bold titles in the reader's own sans, soft alerts with an icon; after Congo
+  palette: congo-slate
+  pairing: congo-sans
+  scale: congo
+  skin: congo
+
+relearn:
+  description: documentation with a near-black menu and a blue link, light headings in Roboto Flex, notices with a filled title; after Relearn
+  palette: relearn
+  pairing: roboto-flex
+  scale: relearn
+  skin: relearn
+
+relearn-dark:
+  description: documentation with charcoal and a darker menu, light headings in Roboto Flex, notices with a filled title; after Relearn
+  palette: relearn-dark
+  pairing: roboto-flex
+  scale: relearn
+  skin: relearn
+
+relearn-bright:
+  description: documentation with a bright green menu, light headings in Roboto Flex, notices with a filled title; after Relearn
+  palette: relearn-bright
+  pairing: roboto-flex
+  scale: relearn
+  skin: relearn
+
+relearn-learn:
+  description: documentation with a deep plum menu and a cyan link, light headings in Roboto Flex, notices with a filled title; after Relearn
+  palette: relearn-learn
+  pairing: roboto-flex
+  scale: relearn
+  skin: relearn
+
+relearn-blue:
+  description: documentation with a blue-gray menu and a bright blue link, light headings in Roboto Flex, notices with a filled title; after Relearn
+  palette: relearn-blue
+  pairing: roboto-flex
+  scale: relearn
+  skin: relearn
+
+relearn-green:
+  description: documentation with a green-gray menu and a green link, light headings in Roboto Flex, notices with a filled title; after Relearn
+  palette: relearn-green
+  pairing: roboto-flex
+  scale: relearn
+  skin: relearn
+
+relearn-red:
+  description: documentation with a red-brown menu and a red link, light headings in Roboto Flex, notices with a filled title; after Relearn
+  palette: relearn-red
+  pairing: roboto-flex
+  scale: relearn
+  skin: relearn
+
+relearn-neon:
+  description: documentation with near-black with neon pink and cyan, light headings in Roboto Flex, notices with a filled title; after Relearn
+  palette: relearn-neon
+  pairing: roboto-flex
+  scale: relearn
+  skin: relearn
+
+zen-light:
+  description: documentation with a calm blue and a pale gray menu, light headings in Roboto Flex, notices with a filled title; after Relearn
+  palette: zen-light
+  pairing: roboto-flex
+  scale: relearn
+  skin: relearn
+
+zen-dark:
+  description: documentation with soft black, a calm blue and a charcoal menu, light headings in Roboto Flex, notices with a filled title; after Relearn
+  palette: zen-dark
+  pairing: roboto-flex
+  scale: relearn
+  skin: relearn
+
+tome-light:
+  description: documentation with pale paper, deep crimson and gold, light headings in Roboto Flex, notices with a filled title; after Relearn
+  palette: tome-light
+  pairing: roboto-flex
+  scale: relearn
+  skin: relearn
+
+tome-dark:
+  description: documentation with dark paper, soft crimson and gold, light headings in Roboto Flex, notices with a filled title; after Relearn
+  palette: tome-dark
+  pairing: roboto-flex
+  scale: relearn
+  skin: relearn
+
+hextra:
+  description: white with a vivid blue, hairlines and 8px boxes in the reader's own sans, a blurred bar; after Hextra
+  palette: hextra
+  pairing: hextra-sans
+  scale: hextra
+  skin: hextra
+
+loveit:
+  description: white with teal blue links, a pale bar and compact titles, in the reader's own sans; after LoveIt
+  palette: loveit
+  pairing: loveit-sans
+  scale: loveit
+  skin: loveit
+
+geekdoc:
+  description: white with a deep teal bar and a geometric sans for headings, a darker footer; after Geekdoc
+  palette: geekdoc
+  pairing: metropolis-arimo
+  scale: geekdoc
+  skin: geekdoc

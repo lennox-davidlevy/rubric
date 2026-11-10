@@ -1,0 +1,28 @@
+/* Cactus's layer (github.com/monkeyWzr/hugo-theme-cactus, MIT), read from
+   assets/scss/style.scss: small capitals for links and the name, dotted lines
+   around code and tables, links underlined in their own color. */
+
+.part-header { background: none; }
+.part-header-inner { max-width: calc(var(--measure) + 2 * var(--space-3)); }
+.part-header-title { font-weight: var(--weight-strong); color: var(--heading); }
+.part-header-nav ul { text-transform: lowercase; }
+.part-header-nav a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); }
+.part-header-nav a:hover { color: var(--accent); }
+.part-header.sticky-stays { border-bottom: 0; }
+
+/* Headings are the writing's size, with their own color; a small mark ahead. */
+h2, h3 { color: var(--heading); }
+.flow > :is(h2, h3)::before { content: "# "; color: var(--accent); }
+.flow > .catalog-part::before { content: none; }
+.flow a:not([class]) { color: var(--link); }
+.flow a:not([class]):hover { color: var(--accent); }
+
+blockquote { padding-left: var(--space-2); border-left: calc(var(--border) * 3) solid var(--accent); font-style: italic; color: var(--muted); }
+hr { width: 100%; border-top: var(--border) dotted var(--muted); }
+pre, :not(pre) > code { border: var(--border) dotted var(--muted); }
+:not(pre) > code { background: none; }
+pre code { border: 0; }
+th, td { border: var(--border) dotted var(--muted); padding: var(--space-1); }
+
+.post-list time { color: var(--muted); }
+.part-footer { border-top: 0; }

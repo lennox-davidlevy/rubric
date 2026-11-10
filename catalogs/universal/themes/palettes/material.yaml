@@ -1,0 +1,25 @@
+# The material scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/material.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08. The band is 01.
+description: a deep blue-gray with bright candy marks
+
+scheme: dark
+
+paper: "#263238"
+ink: "#eeffff"
+heading: "#eeffff"
+link: "#82aaff"
+accent: "#c792ea"
+muted: "#b2ccd6"
+rule: "#314549"
+tint: "#2e3c43"
+positive: "#c3e88d"
+warning: "#ffcb6b"
+danger: "#f27f85"  # nudged from #f07178, to read
+
+dark:
+  paper: "#2e3c43"
+  ink: "#eeffff"
+  heading: "#eeffff"
+  link: "#a8c3ff"  # nudged from #82aaff, to read
+  accent: "#d6aef0"  # nudged from #c792ea, to read

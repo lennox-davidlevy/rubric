@@ -1,0 +1,27 @@
+# Hyde's type (github.com/spf13/hyde, MIT), from assets/css/hyde.css: PT Sans
+# for the writing and headings, Abril Fatface for the site's name. Both SIL
+# OFL, vendored from @fontsource/pt-sans and @fontsource/abril-fatface 5.3.0.
+description: PT Sans for the writing with Abril Fatface, a heavy display serif, for the largest titles
+
+faces:
+  - { family: PT Sans, file: pt-sans-400-normal.woff2, style: normal, weight: 400 }
+  - { family: PT Sans, file: pt-sans-400-italic.woff2, style: italic, weight: 400 }
+  - { family: PT Sans, file: pt-sans-700-normal.woff2, style: normal, weight: 700 }
+  - { family: Abril Fatface, file: abril-fatface.woff2, style: normal, weight: 400 }
+preload: [pt-sans-400-normal.woff2]
+
+body: [PT Sans, Helvetica, Arial, sans-serif]
+display: [Abril Fatface, Georgia, serif]
+ui: [PT Sans, Helvetica, Arial, sans-serif]
+mono: [Menlo, Monaco, Courier New, monospace]
+
+weight: { body: 400, strong: 700, heading: 400, display: 400 }
+leading: { body: 1.5, heading: 1.25, display: 1.15 }
+tracking: { display: 0em, label: 0.02em }
+
+labels: none
+numerals: lining
+quote: italic
+ornament: "* * *"
+code: 0.85em
+links: hover

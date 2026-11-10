@@ -1,0 +1,29 @@
+# The tokyo-night-dark scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/tokyo-night-dark.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08. The band is 01.
+# Its base16 numbers hold no red, amber and green for notices, so those are the
+# scheme's own published ones.
+description: a midnight navy with neon blue and purple
+
+scheme: dark
+
+paper: "#252631"  # nudged from #1a1b26, to read
+ink: "#a9b1d6"
+heading: "#cbccd1"
+link: "#2ac3de"
+accent: "#bb9af7"
+muted: "#8b8fa8"  # nudged from #787c99, to read
+rule: "#2f3549"
+tint: "#16161e"
+code-muted: "#7f839e"
+positive: "#9ece6a"
+warning: "#e0af68"
+danger: "#f7768e"
+
+dark:
+  paper: "#16161e"
+  ink: "#a9b1d6"
+  heading: "#cbccd1"
+  link: "#2ac3de"
+  accent: "#bb9af7"
+  muted: "#878ba5"

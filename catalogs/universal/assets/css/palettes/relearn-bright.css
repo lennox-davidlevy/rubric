@@ -1,0 +1,48 @@
+/* relearn-bright: white with a blue link and a bright green menu.
+   Made by `bun scripts/theme.ts build` from themes/palettes/relearn-bright.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #262626;
+  --accent: #000000;
+  --muted: #6b6b6b;
+  --rule: #d0d0d0;
+  --tint: #f8f8f8;
+  --dark-paper: #202020;
+  --dark-ink: #d2d2d2;
+  --dark-accent: #7a97e5;
+  --raised: #ffffff;
+  --link: #4d64a2;
+  --heading: #101010;
+  --code-paper: #f8f8f8;
+  --code-ink: #262626;
+  --code-muted: #6b6b6b;
+  --code-accent: #000000;
+  --positive: #2e7d32;
+  --warning: #ab4f09;
+  --danger: #c62828;
+  --accent-tint: #ebebeb;
+  --positive-tint: #eef5ef;
+  --warning-tint: #f8f1eb;
+  --danger-tint: #faeeee;
+  --dark-link: #7a97e5;
+  --dark-heading: #d2d2d2;
+  --band: #83c932;
+  --band-ink: #474747;
+  --dark-muted: #999999;
+  --dark-rule: #444444;
+  --dark-tint: #303030;
+  --dark-raised: #303030;
+  --dark-accent-tint: #2b2e38;
+  --dark-positive: #88ac8a;
+  --dark-warning: #c09778;
+  --dark-danger: #cd8686;
+  --dark-positive-tint: #2d312d;
+  --dark-warning-tint: #332e2b;
+  --dark-danger-tint: #352c2c;
+  --shadow-soft: 0 1px 2px rgb(38 38 38 / 0.06), 0 2px 8px rgb(38 38 38 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(38 38 38 / 0.06), 0 16px 40px rgb(38 38 38 / 0.14);
+}

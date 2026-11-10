@@ -1,0 +1,59 @@
+/* Relearn's layer (github.com/McShelby/hugo-theme-relearn, MIT), read from
+   assets/css/theme.css: a dark menu down the left with a colored block at its head,
+   light headings, notices with a filled title bar. */
+
+/* The page's own ground and mark, kept for the name's block: the menu below
+   redefines both for what sits on the band. */
+:root { --page: var(--paper); --mark: var(--accent); }
+
+body > :is(.part-header, .masthead) {
+  --paper: var(--band);
+  --accent: var(--band-ink);
+  --ink: var(--band-ink);
+  --heading: var(--band-ink);
+  --muted: var(--band-ink);
+  --link: var(--band-ink);
+  --rule: var(--band-ink);
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: var(--band);
+  color: var(--band-ink);
+}
+.part-header-inner { display: block; max-width: none; padding: 0 0 var(--space-3); }
+.part-header-title, .masthead-title { display: block; margin-bottom: var(--space-2); padding: var(--space-3); background: var(--mark); color: var(--page); font-size: var(--step-1); }
+.part-header-title:hover, .masthead-title:hover { color: var(--page); }
+.part-header-nav { padding-inline: var(--space-3); }
+.part-header-nav ul { display: block; font-size: var(--step--1); }
+.part-header-nav li + li { margin-top: var(--space-1); }
+.part-header-nav a, .masthead nav a { color: var(--band-ink); }
+.part-header-tools { margin: var(--space-3) 0 0; padding-inline: var(--space-3); }
+.part-header.layout-split .part-header-nav { margin-left: 0; }
+.part-header.sticky-stays { position: static; border-bottom: 0; }
+.masthead nav { display: block; padding-inline: var(--space-3); }
+
+@media (min-width: 48rem) {
+  body { padding-left: 18.75rem; }
+  body > :is(.part-header, .masthead) { position: fixed; inset: 0 auto 0 0; width: 18.75rem; overflow-y: auto; }
+}
+
+.flow a:not([class]) { color: var(--link); }
+h2 { font-size: var(--step-3); }
+h3 { font-size: var(--step-2); }
+blockquote { padding-left: var(--space-2); border-left: calc(var(--border) * 3) solid var(--rule); color: inherit; }
+hr { width: 100%; border-top: var(--border) solid var(--rule); }
+
+/* Its own notice: a filled title with an icon on a box with a colored edge. */
+.part-callout { margin-inline: 0; padding: 0; overflow: hidden; border: var(--border) solid var(--link); background: var(--paper); }
+.part-callout-title { display: flex; align-items: center; gap: var(--space-1); margin: 0; padding: 0.4em var(--space-2); background: var(--link); color: var(--paper); font-family: var(--font-ui); font-weight: var(--weight-strong); }
+.part-callout .part-callout-icon { margin: 0; }
+.part-callout .stack { padding: var(--space-2); }
+.part-callout.kind-tip, .part-callout.kind-warning, .part-callout.kind-danger { background: var(--paper); }
+.part-callout.kind-tip { border-color: var(--positive); }
+.part-callout.kind-tip .part-callout-title { background: var(--positive); }
+.part-callout.kind-warning { border-color: var(--warning); }
+.part-callout.kind-warning .part-callout-title { background: var(--warning); }
+.part-callout.kind-danger { border-color: var(--danger); }
+.part-callout.kind-danger .part-callout-title { background: var(--danger); }
+
+.part-footer { margin-top: var(--space-4); }

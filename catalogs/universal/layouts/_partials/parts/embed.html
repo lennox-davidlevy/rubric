@@ -13,9 +13,20 @@
 {{- else if or (findRE `google\.[a-z.]+/maps/embed` $url) (findRE `[?&]output=embed` $url) (findRE `openstreetmap\.org/export/embed` $url) }}
 <div class="part-embed-frame"><iframe src="{{ $url }}" title="A map" loading="lazy"></iframe></div>
 {{- else if $url }}
-<a class="part-embed-card" href="{{ $url }}">
+{{- $card := partial "rubric/unfurl.html" $url }}
+<a class="part-embed-card{{ with $card.image }} has-image{{ end }}{{ with $card.title }} has-title{{ end }}" href="{{ $url }}">
+{{- with $card.image }}
+<img class="part-embed-image" src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="" loading="lazy">
+{{- end }}
 <span class="part-embed-host">{{ $host }}</span>
+{{- with $card.title }}
+<span class="part-embed-title">{{ . }}</span>
+{{- end }}
+{{- with $card.description }}
+<span class="part-embed-description">{{ . }}</span>
+{{- else }}{{ if not $card.title }}
 <span class="part-embed-url">{{ $url }}</span>
+{{- end }}{{ end }}
 </a>
 {{- end }}
 {{- with trim $caption " \n" }}

@@ -1,0 +1,13 @@
+# Coder's sizes (assets/scss/_base.scss): 16px on a phone, 18px on a screen, a
+# 900px container, and generous space around headings.
+description: 16 to 18px writing with generous room around headings, in a broad column
+
+screen: [360, 1240]
+body: [16, 18]
+ratio: [1.2, 1.25]
+steps: [-1, 4]
+space: [0.5, 1, 1.75, [2.25, 2.75], [3.5, 4.5]]
+measure: 50rem   # its container is 90rem at a 10px root, 900px; less the padding
+wide: 56rem
+radius: 3px
+border: 1px

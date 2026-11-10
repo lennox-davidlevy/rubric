@@ -1,0 +1,48 @@
+/* coder: off-white, near-black and a strong blue, with a neutral charcoal dark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/coder.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #fafafa;
+  --ink: #212121;
+  --accent: #1460b6;
+  --muted: #5f5f5f;
+  --rule: #cccccc;
+  --tint: #e0e0e0;
+  --dark-paper: #212121;
+  --dark-ink: #dadada;
+  --dark-accent: #65b6f6;
+  --raised: #fafafa;
+  --link: #1460b6;
+  --heading: #000000;
+  --code-paper: #e0e0e0;
+  --code-ink: #212121;
+  --code-muted: #5f5f5f;
+  --code-accent: #1460b6;
+  --positive: #007669;
+  --warning: #8b6100;
+  --danger: #c5302e;
+  --accent-tint: #e8eef5;
+  --positive-tint: #e6efee;
+  --warning-tint: #f1eee6;
+  --danger-tint: #f6eaea;
+  --dark-link: #65b6f6;
+  --dark-heading: #dadada;
+  --band: #212121;
+  --band-ink: #dadada;
+  --dark-muted: #b1b1b1;
+  --dark-rule: #4f4f4f;
+  --dark-tint: #424242;
+  --dark-raised: #424242;
+  --dark-accent-tint: #29333b;
+  --dark-positive: #78ada7;
+  --dark-warning: #b6a478;
+  --dark-danger: #d18e8d;
+  --dark-positive-tint: #2b3231;
+  --dark-warning-tint: #33312b;
+  --dark-danger-tint: #362e2e;
+  --shadow-soft: 0 1px 2px rgb(33 33 33 / 0.06), 0 2px 8px rgb(33 33 33 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(33 33 33 / 0.06), 0 16px 40px rgb(33 33 33 / 0.14);
+}

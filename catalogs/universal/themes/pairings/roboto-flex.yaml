@@ -1,0 +1,23 @@
+# Relearn's type (assets/css/fonts.css, variables.css): Roboto Flex at a light
+# weight of heading. SIL OFL, vendored from @fontsource-variable/roboto-flex
+# 5.3.0, the Latin subset. It has no italic of its own; a slant stands in.
+description: Roboto Flex for everything, a tidy sans, with light, airy headings
+
+faces:
+  - { family: Roboto Flex, file: roboto-flex-normal.woff2, style: normal, weight: [100, 1000] }
+preload: [roboto-flex-normal.woff2]
+
+body: [Roboto Flex, Helvetica, Tahoma, Geneva, Arial, sans-serif]
+display: body
+mono: [Consolas, Menlo, monospace]
+
+weight: { body: 400, strong: 600, heading: 300, display: 300 }
+leading: { body: 1.7, heading: 1.25, display: 1.2 }
+tracking: { display: -0.005em, label: 0.02em }
+
+labels: none
+numerals: lining
+quote: normal
+ornament: "* * *"
+code: 0.89em
+links: hover

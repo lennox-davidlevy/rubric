@@ -1,0 +1,29 @@
+# The base16-light scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/base16-light.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08.
+description: a neutral off-white with the classic base16 rainbow of soft marks
+
+scheme: light
+
+paper: "#f8f8f8"
+ink: "#383838"
+heading: "#282828"
+link: "#4a6975"  # nudged from #7cafc2, to read
+accent: "#7c5c75"  # nudged from #ba8baf, to read
+muted: "#585858"
+rule: "#d8d8d8"
+tint: "#e8e8e8"
+code-accent: "#7c5c75"
+positive: "#606c41"  # nudged from #a1b56c, to read
+warning: "#7e6846"  # nudged from #f7ca88, to read
+danger: "#ab4642"
+
+dark:
+  paper: "#181818"
+  ink: "#d8d8d8"
+  heading: "#e8e8e8"
+  link: "#7cafc2"
+  accent: "#ba8baf"
+  muted: "#b8b8b8"
+  rule: "#383838"
+  tint: "#282828"

@@ -1,0 +1,35 @@
+/* fira-code: Fira Code for everything, a programmer's monospace with joined symbols.
+   Made by `bun scripts/theme.ts build` from themes/pairings/fira-code.yaml.
+   Edit that file, not this one. */
+
+@font-face {
+  font-family: "Fira Code";
+  src: url("../fonts/fira-code-normal.woff2") format("woff2");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-body: "Fira Code", Monaco, Consolas, "Ubuntu Mono", monospace;
+  --font-display: "Fira Code", Monaco, Consolas, "Ubuntu Mono", monospace;
+  --font-mono: "Fira Code", Monaco, Consolas, "Ubuntu Mono", monospace;
+  --font-ui: "Fira Code", Monaco, Consolas, "Ubuntu Mono", monospace;
+  --weight-body: 400;
+  --weight-strong: 700;
+  --weight-heading: 700;
+  --weight-display: 700;
+  --leading-body: 1.54;
+  --leading-heading: 1.3;
+  --leading-display: 1.3;
+  --tracking-body: 0em;
+  --tracking-display: 0em;
+  --tracking-label: 0em;
+  --label-case: none;
+  --numerals: lining-nums;
+  --quote-style: normal;
+  --ornament: "- - -";
+  --code-size: 1em;
+  --heading-case: none;
+  --link-line: underline;
+}

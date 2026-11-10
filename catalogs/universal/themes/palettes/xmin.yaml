@@ -1,0 +1,25 @@
+# XMin's colors (github.com/yihui/hugo-xmin, MIT), from static/css/style.css:
+# the browser's own black and blue, with gray boxes. It has no dark mode, so
+# the band is a plain charcoal.
+description: the browser's own black writing and blue links on white, with pale gray boxes
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#000000"
+heading: "#000000"
+link: "#0000ee"
+accent: "#0000ee"
+muted: "#666666"
+rule: "#dddddd"
+tint: "#eeeeee"
+code-paper: "#f9f9f9"
+positive: "#1a7f37"
+warning: "#8a5c00"
+danger: "#cc0000"
+
+dark:
+  paper: "#222222"
+  ink: "#eeeeee"
+  link: "#9db8ff"
+  accent: "#9db8ff"

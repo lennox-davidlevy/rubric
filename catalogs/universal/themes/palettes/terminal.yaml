@@ -1,0 +1,24 @@
+# Terminal's colors (github.com/panr/hugo-theme-terminal, MIT), from assets/css/main.css:
+# its one scheme, a warm near-black with an amber accent. It has no light mode.
+# The dark band is one step up from the page.
+description: a warm near-black ground, pale writing and amber links, like an old terminal
+
+scheme: dark
+
+paper: "#1a170f"
+ink: "#eceae5"
+heading: "#eceae5"
+link: "#eec35e"
+accent: "#eec35e"
+muted: "#a8a59c"
+rule: "#4a463a"
+tint: "#28241a"
+positive: "#a8c96a"
+warning: "#eec35e"
+danger: "#ee8a6a"
+
+dark:
+  paper: "#2a261b"
+  ink: "#eceae5"
+  link: "#eec35e"
+  accent: "#eec35e"

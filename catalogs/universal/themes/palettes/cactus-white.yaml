@@ -1,0 +1,28 @@
+# Cactus's white scheme (github.com/monkeyWzr/hugo-theme-cactus, MIT), from
+# assets/scss/colors/white.scss.
+description: white, soft charcoal, pink links and a green accent
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#383838"
+heading: "#383838"
+link: "#935a77"  # nudged from #d480aa, to read
+accent: "#1b7756"  # nudged from #2bbc8a, to read
+muted: "#6c6c6c"  # nudged from #8c8c8c, to read
+rule: "#dddddd"
+tint: "#eeeeee"  # nudged from #fafafa, to read
+code-muted: "#6c6c6c"
+code-accent: "#1b7756"
+positive: "#1c7d5b"  # nudged from #2bbc8a, to read
+warning: "#8a5c00"
+danger: "#cf222e"
+
+dark:
+  paper: "#1d1f21"
+  ink: "#c9cacc"
+  heading: "#eeeeee"
+  link: "#d480aa"
+  accent: "#2bbc8a"
+  muted: "#979797"  # nudged from #8c8c8c, to read
+  rule: "#444444"

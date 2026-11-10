@@ -5,7 +5,7 @@
 // has, asked once a line.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -18,23 +18,32 @@ import { openSite } from "../src/site.ts";
 
 const repo = join(import.meta.dir, "..");
 const base = parseCatalog(readFileSync(join(repo, "catalogs/universal/catalog.yaml"), "utf8"));
-const blowfish = parseSkin(readFileSync(join(repo, "catalogs/universal/skins/blowfish.yaml"), "utf8"), base);
-const skins = { blowfish };
-const inBlowfish = withSkin(base, skins, "blowfish");
+// No real skin adds anything now that the icon and the lead are the catalog's,
+// but any skin may, so two small ones stand in: one adds a setting, one a part.
+const ribbons = parseSkin(
+  "name: ribbons\nversion: 3\nparts:\n  callout:\n    settings:\n      ribbon:\n        type: choice\n        default: none\n        values:\n          none: no ribbon\n          red: a red ribbon\n",
+  base,
+);
+const SASHES = "name: sashes\nversion: 2\nparts:\n  sash:\n    description: A strip across the corner of the page.\n    children: true\n    body: |\n      A word or two.\n";
+const sashes = parseSkin(SASHES, base);
+const skins = { ribbons, sashes };
+const inSashes = withSkin(base, skins, "sashes");
+const inRibbons = withSkin(base, skins, "ribbons");
 const inPaper = withSkin(base, skins);
 
 describe("a skin's additions", () => {
   test("are in the catalog while it is the site's skin", () => {
-    expect(Object.keys(settingsOf(inBlowfish, "callout"))).toContain("icon");
-    expect(inBlowfish.parts.lead?.description).toContain("opening paragraph");
-    expect(inBlowfish.skin).toEqual({ name: "blowfish", version: 1 });
-    expect(inBlowfish.elsewhere).toEqual({ parts: {}, settings: {} });
+    expect(Object.keys(settingsOf(inRibbons, "callout"))).toContain("ribbon");
+    expect(inRibbons.elsewhere).toEqual({ parts: { sash: "sashes" }, settings: {} });
+    expect(inSashes.parts.sash?.description).toContain("strip");
+    expect(inSashes.skin).toEqual({ name: "sashes", version: 2 });
+    expect(inSashes.elsewhere).toEqual({ parts: {}, settings: { callout: { ribbon: "ribbons" } } });
   });
 
   test("are remembered, not offered, in any other skin", () => {
-    expect(Object.keys(settingsOf(inPaper, "callout"))).not.toContain("icon");
-    expect(inPaper.parts.lead).toBeUndefined();
-    expect(inPaper.elsewhere).toEqual({ parts: { lead: "blowfish" }, settings: { callout: { icon: "blowfish" } } });
+    expect(Object.keys(settingsOf(inPaper, "callout"))).not.toContain("ribbon");
+    expect(inPaper.parts.sash).toBeUndefined();
+    expect(inPaper.elsewhere).toEqual({ parts: { sash: "sashes" }, settings: { callout: { ribbon: "ribbons" } } });
   });
 
   test("a skin may not redefine what the catalog has", () => {
@@ -44,28 +53,63 @@ describe("a skin's additions", () => {
 
   test("answers are cached per skin, and as before with none", () => {
     expect(Cache.key(inPaper, "post", "a tip")).toBe(JSON.stringify(["universal", base.version, "post", "a tip"]));
-    expect(Cache.key(inBlowfish, "post", "a tip")).toBe(JSON.stringify(["universal", base.version, "skin:blowfish@1", "post", "a tip"]));
+    expect(Cache.key(inSashes, "post", "a tip")).toBe(JSON.stringify(["universal", base.version, "skin:sashes@2", "post", "a tip"]));
   });
 });
 
 describe("switching skins never breaks a page", () => {
-  const page = "::: a tip -> callout icon=lightbulb\nRest here.\n:::\n\n::: an opening -> lead\nIt began.\n:::\n";
+  const page = "::: a tip -> callout ribbon=red\nRest here.\n:::\n\n::: a strip -> sash\nIt began.\n:::\n";
 
-  test("in Blowfish, both draw, the icon with them", () => {
-    const out = preprocess(page, inBlowfish);
-    expect(out.content).toContain('{{< callout icon="lightbulb" >}}');
-    expect(out.content).toContain("{{< lead >}}");
-    expect(out.diagnostics).toEqual([]);
+  test("in its own skin, a setting or a part draws", () => {
+    expect(preprocess(page, inRibbons).content).toContain('{{< callout ribbon="red" >}}');
+    expect(preprocess(page, inSashes).content).toContain("{{< sash >}}");
   });
 
-  test("in another skin, the callout draws without the icon, which stays in the pin; the lead stays as text", () => {
+  test("in another skin, the callout draws without the setting, which stays in the pin; the sash stays as text", () => {
     const out = preprocess(page, inPaper);
     expect(out.content).toContain("{{< callout >}}");
-    expect(out.content).toContain("::: an opening -> lead");
+    expect(out.content).toContain("::: a strip -> sash");
     expect(out.diagnostics.map((d) => [d.code, d.message])).toEqual([
-      ["other-skin", "icon comes with the blowfish skin; this site's theme leaves it out and keeps it in the pin"],
-      ["other-skin", "lead comes with the blowfish skin; this site's theme doesn't draw it"],
+      ["other-skin", "ribbon comes with the ribbons skin; this site's theme leaves it out and keeps it in the pin"],
+      ["other-skin", "sash comes with the sashes skin; this site's theme doesn't draw it"],
     ]);
+  });
+
+  test("the callout's icon and the lead are the catalog's, so they draw in every skin", () => {
+    for (const c of [inPaper, inSashes, inRibbons]) {
+      const lead = preprocess("::: an opening -> lead\nIt began.\n:::\n", c);
+      expect(lead.content).toContain("{{< lead >}}");
+      expect(lead.diagnostics).toEqual([]);
+      const out = preprocess("::: a tip -> callout icon=lightbulb\nRest.\n:::\n", c);
+      expect(out.content).toContain('{{< callout icon="lightbulb" >}}');
+      expect(out.diagnostics).toEqual([]);
+    }
+  });
+});
+
+describe("a part that already has a look", () => {
+  const answers = (text: Record<string, number>, said: number): Answers => ({
+    part: { type: "choice", choice: "lead", probabilities: { lead: 1 } },
+    "fits:lead": { type: "noul", noul: 0.95 },
+    "look-said:text": { type: "noul", noul: said },
+    "look:text": { type: "choice", choice: "x", probabilities: text },
+  } as unknown as Answers);
+  const plain = (a: Answers) => resolve(a, atPlace(inPaper, "writing"));
+  const placed = (a: Answers) => {
+    const r = plain(a);
+    return r.outcome === "placed" ? r.candidates[0] : undefined;
+  };
+
+  test("a line's big picks the lead without also asking for bigger text, however sure", () => {
+    for (const said of [0.5, 0.9]) {
+      const c = placed(answers({ normal: 0, smaller: 0, bigger: 1 }, said));
+      expect(c?.plain).toBe("lead");
+      expect(c?.unsettled).toEqual([]);
+    }
+  });
+
+  test("the look it does not have is still asked for", () => {
+    expect(placed(answers({ normal: 0, smaller: 1, bigger: 0 }, 0.9))?.plain).toBe("lead text=smaller");
   });
 });
 
@@ -110,17 +154,24 @@ describe("the look settings", () => {
 describe("in the editor", () => {
   let dir: string;
   let ws: Workspace;
+  let themes: string;
   const notes = new Map<string, Note[]>();
   const page = () => join(dir, "pages/posts/skin-test.md");
   const config = (theme: string) =>
     readFileSync(join(repo, "sites/blog/hugo.toml"), "utf8")
-      .replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(repo, "catalogs"))}`)
+      .replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(themes)}`)
       .replace(/^theme = .*$/m, `theme = "universal"`)
       .replace(/^\[params\.rubric\][^[]*/m, "") + `\n[params.rubric]\ntheme = "${theme}"\n`;
 
   beforeAll(async () => {
     dir = mkdtempSync(join(tmpdir(), "rubric-skins-"));
     cpSync(join(repo, "sites/blog"), dir, { recursive: true, filter: (src) => !/\/(content|\.rubric|public)(\/|$)/.test(src) });
+    // The catalog, with a skin that adds a part and a theme that uses it.
+    themes = join(dir, "fixture-themes");
+    mkdirSync(join(themes, "universal/skins"), { recursive: true });
+    cpSync(join(repo, "catalogs/universal/catalog.yaml"), join(themes, "universal/catalog.yaml"));
+    writeFileSync(join(themes, "universal/skins/sashes.yaml"), SASHES);
+    writeFileSync(join(themes, "universal/themes.yaml"), "paper: {}\nsashy: { skin: sashes }\n");
     writeFileSync(join(dir, "hugo.toml"), config("paper"));
     const site = await openSite(dir);
     ws = new Workspace(site, await Cache.load(site.cache), stubResolver(atPlace(site.catalog, "writing"), 5), (f, n) => notes.set(f, n), {
@@ -131,16 +182,16 @@ describe("in the editor", () => {
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
   test("switching the theme in hugo.toml brings its skin in without a restart", async () => {
-    await ws.open(page(), "---\ntitle: T\n---\n::: a tip -> callout icon=lightbulb\nRest.\n:::\n");
+    await ws.open(page(), "---\ntitle: T\n---\n::: a strip -> sash\nRest.\n:::\n");
     await ws.settle();
     expect(notes.get(page())?.map((n) => n.code)).toEqual(["other-skin"]);
-    writeFileSync(join(dir, "hugo.toml"), config("blowfish"));
+    writeFileSync(join(dir, "hugo.toml"), config("sashy"));
     await ws.reload(await openSite(dir));
     await ws.settle();
-    expect(ws.site.skin).toBe("blowfish");
+    expect(ws.site.skin).toBe("sashes");
     expect(notes.get(page())).toEqual([]);
-    expect(readFileSync(join(dir, "content/posts/skin-test.md"), "utf8")).toContain('{{< callout icon="lightbulb" >}}');
-    expect(ws.complete(page(), 3, "::: a tip -> callout icon=lightbulb".length - "lightbulb".length).map((c) => c.label)).toContain("lightbulb");
+    expect(readFileSync(join(dir, "content/posts/skin-test.md"), "utf8")).toContain("{{< sash >}}");
+    expect(ws.complete(page(), 3, "::: a strip -> ".length).map((c) => c.label)).toContain("sash");
   });
 
   test("in rubric.md, nothing fitting says the frame is all that goes there", async () => {

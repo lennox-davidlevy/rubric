@@ -1,0 +1,29 @@
+# The dracula scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/dracula.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08. The band is 01.
+# Its base16 numbers hold no red, amber and green for notices, so those are the
+# scheme's own published ones.
+description: a dark purple-gray with neon pink, green and cyan
+
+scheme: dark
+
+paper: "#282936"
+ink: "#e9e9f4"
+heading: "#f1f2f8"
+link: "#62d6e8"
+accent: "#ce92df"  # nudged from #b45bcf, to read
+muted: "#62d6e8"
+rule: "#4d4f68"
+tint: "#3a3c4e"
+code-accent: "#ce92df"
+positive: "#50fa7b"
+warning: "#ffb86c"
+danger: "#ff6666"  # nudged from #ff5555, to read
+
+dark:
+  paper: "#3a3c4e"
+  ink: "#e9e9f4"
+  heading: "#f1f2f8"
+  link: "#62d6e8"
+  accent: "#daaee7"  # nudged from #b45bcf, to read
+  muted: "#bdbdc8"

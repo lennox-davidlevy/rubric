@@ -1,0 +1,29 @@
+# GitHub Style's colors (github.com/MeiK2333/github-style, MIT), from
+# static/css/light.css and dark.css: the Primer tokens GitHub itself used.
+description: white, slate writing, a code-host blue and cool gray lines, with a dim blue-black dark
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#24292f"
+heading: "#24292f"
+link: "#0969da"
+accent: "#0969da"
+muted: "#57606a"
+rule: "#d0d7de"
+tint: "#f6f8fa"
+positive: "#1a7f37"
+warning: "#926200"  # nudged from #9a6700, to read
+danger: "#cf222e"
+
+dark:
+  paper: "#0d1117"
+  ink: "#c9d1d9"
+  link: "#58a6ff"
+  accent: "#58a6ff"
+  muted: "#8b949e"
+  rule: "#30363d"
+  tint: "#161b22"
+  positive: "#3fb950"
+  warning: "#d29922"
+  danger: "#f85149"

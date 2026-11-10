@@ -1,0 +1,31 @@
+# The gruvbox-light scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/gruvbox-light.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08.
+description: a warm retro cream with rust and olive marks
+
+scheme: light
+
+paper: "#fbf1c7"
+ink: "#504945"
+heading: "#3c3836"
+link: "#076678"
+accent: "#8f3f71"
+muted: "#665c54"
+rule: "#d5c4a1"
+tint: "#ebdbb2"
+positive: "#6d690c"  # nudged from #79740e, to read
+warning: "#8c5b0f"  # nudged from #b57614, to read
+danger: "#9d0006"
+
+dark:
+  paper: "#282828"
+  ink: "#d5c4a1"
+  heading: "#ebdbb2"
+  link: "#89aa9d"  # nudged from #83a598, to read
+  accent: "#d792a5"  # nudged from #d3869b, to read
+  muted: "#bdae93"
+  rule: "#504945"
+  tint: "#3c3836"
+  positive: "#aaa066"
+  warning: "#b89a67"
+  danger: "#ce9386"

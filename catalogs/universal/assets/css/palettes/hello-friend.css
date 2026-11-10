@@ -1,0 +1,48 @@
+/* hello-friend: white, near-black and gray with no accent color, and a soft slate dark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/hello-friend.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #222222;
+  --accent: #222222;
+  --muted: #656565;
+  --rule: #dcdcdc;
+  --tint: #eaeaea;
+  --dark-paper: #232425;
+  --dark-ink: #b5b5be;
+  --dark-accent: #ffffff;
+  --raised: #ffffff;
+  --link: #222222;
+  --heading: #000000;
+  --code-paper: #eaeaea;
+  --code-ink: #222222;
+  --code-muted: #656565;
+  --code-accent: #222222;
+  --positive: #1a7f37;
+  --warning: #8a5c00;
+  --danger: #cf222e;
+  --accent-tint: #ededed;
+  --positive-tint: #edf5ef;
+  --warning-tint: #f6f2eb;
+  --danger-tint: #fbedee;
+  --dark-link: #ffffff;
+  --dark-heading: #ffffff;
+  --band: #232425;
+  --band-ink: #b5b5be;
+  --dark-muted: #b3b3bd;
+  --dark-rule: #4e4e57;
+  --dark-tint: #3b3d42;
+  --dark-raised: #3b3d42;
+  --dark-accent-tint: #3d3e3f;
+  --dark-positive: #7fa58e;
+  --dark-warning: #aa9778;
+  --dark-danger: #c98d96;
+  --dark-positive-tint: #2e3332;
+  --dark-warning-tint: #33322f;
+  --dark-danger-tint: #373133;
+  --shadow-soft: 0 1px 2px rgb(34 34 34 / 0.06), 0 2px 8px rgb(34 34 34 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(34 34 34 / 0.06), 0 16px 40px rgb(34 34 34 / 0.14);
+}

@@ -1,0 +1,27 @@
+# Relearn's zen-light variant (github.com/McShelby/hugo-theme-relearn, MIT), from
+# assets/css/theme-zen-light.css, with relearn-light's values for what it leaves out. Its
+# menu color is the band. Its notices are its own box colors.
+description: white with a calm blue and a pale gray menu
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#262626"
+band: "#f7f7f7"
+band-ink: "#717171"  # nudged from #ffffff, to read
+heading: "#101010"
+link: "#1868d1"  # nudged from #1a73e8, to read
+accent: "#6c6c6c"  # nudged from #f7f7f7, to read
+muted: "#6b6b6b"
+rule: "#d0d0d0"
+tint: "#f8f8f8"
+code-accent: "#727272"
+positive: "#2e7d32"
+warning: "#ab4f09"  # nudged from #b45309, to read
+danger: "#c62828"
+
+dark:
+  paper: "#202020"
+  ink: "#d2d2d2"
+  link: "#7a97e5"  # nudged from #6c8ce3, to read
+  accent: "#7a97e5"  # nudged from #6c8ce3, to read

@@ -1,0 +1,13 @@
+{{- /* LoveIt's admonition: a colored title with an icon, a strip with a thick left border. An
+     icon comes with its kind unless the line names one. */ -}}
+{{- $labels := dict "note" "Note" "tip" "Tip" "warning" "Warning" "danger" "Danger" -}}
+{{- $kinds := dict "note" "info" "tip" "lightbulb" "warning" "warning" "danger" "fire" -}}
+{{- $label := .s.title | default (index $labels .s.kind) -}}
+{{- $name := .s.icon | default "none" -}}
+{{- if eq $name "none" }}{{ $name = index $kinds .s.kind }}{{ end -}}
+<aside class="part part-callout kind-{{ .s.kind }}" aria-label="{{ $label }}">
+<p class="part-callout-title">{{ partial "rubric/callout-icon.html" $name }}<span>{{ $label }}</span></p>
+<div class="stack">
+{{ .inner }}
+</div>
+</aside>

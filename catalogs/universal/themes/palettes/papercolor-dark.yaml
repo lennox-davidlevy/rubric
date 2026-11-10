@@ -1,0 +1,34 @@
+# The papercolor-dark scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/papercolor-dark.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08. The band is 01.
+# Its base16 numbers hold no red, amber and green for notices, so those are the
+# scheme's own published ones.
+description: a true dark with bright pink and blue marks
+
+scheme: dark
+
+paper: "#1c1c1c"
+ink: "#cfcfcf"  # nudged from #808080, to read
+heading: "#edcaba"  # nudged from #d7875f, to read
+link: "#ffbdde"  # nudged from #ff5faf, to read
+accent: "#95dede"  # nudged from #00afaf, to read
+muted: "#aed6ea"  # nudged from #5fafd7, to read
+rule: "#5faf00"
+tint: "#af005f"
+code-ink: "#d5d5d5"
+code-muted: "#aed6ea"
+code-accent: "#95dede"
+positive: "#5faf5f"
+warning: "#d7af5f"
+danger: "#ff5faf"
+
+dark:
+  paper: "#af005f"
+  ink: "#e1e1e1"  # nudged from #808080, to read
+  heading: "#f0d2c3"  # nudged from #d7875f, to read
+  link: "#ffd1e7"  # nudged from #ff5faf, to read
+  accent: "#a4e3e3"  # nudged from #00afaf, to read
+  muted: "#e9d3e1"
+  positive: "#cadfca"
+  warning: "#e5d9c1"
+  danger: "#f6d4e5"

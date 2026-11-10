@@ -1,0 +1,48 @@
+/* zen-dark: soft black with a calm blue and a charcoal menu.
+   Made by `bun scripts/theme.ts build` from themes/palettes/zen-dark.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: dark;
+
+  --paper: #363636;
+  --ink: #d2d2d2;
+  --accent: #aaaaaa;
+  --muted: #a0a0a0;
+  --rule: #555555;
+  --tint: #272727;
+  --dark-paper: #272727;
+  --dark-ink: #d2d2d2;
+  --dark-accent: #a0a0a0;
+  --raised: #363636;
+  --link: #7caff4;
+  --heading: #ffffff;
+  --code-paper: #272727;
+  --code-ink: #d2d2d2;
+  --code-muted: #a0a0a0;
+  --code-accent: #909090;
+  --positive: #7dc903;
+  --warning: #ffb74d;
+  --danger: #ff8a80;
+  --accent-tint: #3f3f3f;
+  --positive-tint: #3c4232;
+  --warning-tint: #464038;
+  --danger-tint: #463d3c;
+  --dark-link: #6ea7f2;
+  --dark-heading: #d2d2d2;
+  --band: #272727;
+  --band-ink: #ffffff;
+  --dark-muted: #a0a0a0;
+  --dark-rule: #494949;
+  --dark-tint: #363636;
+  --dark-raised: #363636;
+  --dark-accent-tint: #363636;
+  --dark-positive: #acce75;
+  --dark-warning: #e6c696;
+  --dark-danger: #e6b2ad;
+  --dark-positive-tint: #373b30;
+  --dark-warning-tint: #3e3a34;
+  --dark-danger-tint: #3e3837;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

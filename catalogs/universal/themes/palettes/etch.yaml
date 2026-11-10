@@ -1,0 +1,28 @@
+# Etch's colors (github.com/LukasJoswiak/etch, MIT), from assets/css/main.css
+# and dark.css.
+description: white, cool slate writing and a bright azure, with a true black dark
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#313a3d"
+heading: "#3d3d3d"
+link: "#006bd7"  # nudged from #007dfa, to read
+accent: "#2871bc"  # nudged from #369aff, to read
+muted: "#707070"  # nudged from #767676, to read
+rule: "#d8d8d8"
+tint: "#f5f5f5"
+code-muted: "#707070"
+code-accent: "#2871bc"
+positive: "#1a7f37"
+warning: "#8a5c00"
+danger: "#cf222e"
+
+dark:
+  paper: "#121212"
+  ink: "#ebebeb"
+  heading: "#f5f5f5"
+  link: "#00b1ed"
+  accent: "#21c7ff"
+  muted: "#a7a7a7"
+  rule: "#5c5c5c"

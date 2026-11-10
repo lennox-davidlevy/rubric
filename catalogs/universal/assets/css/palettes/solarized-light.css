@@ -1,0 +1,48 @@
+/* solarized-light: the pale cream ground of Solarized with its precise blue and cyan.
+   Made by `bun scripts/theme.ts build` from themes/palettes/solarized-light.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #fdf6e3;
+  --ink: #54696f;
+  --accent: #5d61a8;
+  --muted: #566970;
+  --rule: #93a1a1;
+  --tint: #eee8d5;
+  --dark-paper: #002b36;
+  --dark-ink: #98a6a6;
+  --dark-accent: #9397d4;
+  --raised: #fdf6e3;
+  --link: #1d6ba3;
+  --heading: #073642;
+  --code-paper: #eee8d5;
+  --code-ink: #506469;
+  --code-muted: #566970;
+  --code-accent: #5d61a8;
+  --positive: #627000;
+  --warning: #856500;
+  --danger: #bd2c29;
+  --accent-tint: #f0eade;
+  --positive-tint: #f1ebd1;
+  --warning-tint: #f3ead1;
+  --danger-tint: #f8e6d4;
+  --dark-link: #57a6dc;
+  --dark-heading: #eee8d5;
+  --band: #002b36;
+  --band-ink: #98a6a6;
+  --dark-muted: #8f9ea0;
+  --dark-rule: #586e75;
+  --dark-tint: #073642;
+  --dark-raised: #073642;
+  --dark-accent-tint: #123849;
+  --dark-positive: #96a178;
+  --dark-warning: #a7a17f;
+  --dark-danger: #bd9392;
+  --dark-positive-tint: #12393e;
+  --dark-warning-tint: #14393f;
+  --dark-danger-tint: #173741;
+  --shadow-soft: 0 1px 2px rgb(84 105 111 / 0.06), 0 2px 8px rgb(84 105 111 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(84 105 111 / 0.06), 0 16px 40px rgb(84 105 111 / 0.14);
+}

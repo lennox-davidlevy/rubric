@@ -1,0 +1,30 @@
+# The catppuccin-latte scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/catppuccin-latte.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08.
+description: a cool pale gray with vivid pastel marks
+
+scheme: light
+
+paper: "#eff1f5"
+ink: "#4c4f69"
+heading: "#925b50"  # nudged from #dc8a78, to read
+link: "#1b57d2"  # nudged from #1e66f5, to read
+accent: "#8136e3"  # nudged from #8839ef, to read
+muted: "#62646c"  # nudged from #acb0be, to read
+rule: "#ccd0da"
+tint: "#e6e9ef"
+code-muted: "#62646c"
+code-accent: "#8136e3"
+positive: "#2d701d"  # nudged from #40a02b, to read
+warning: "#8c5a14"  # nudged from #df8e1d, to read
+danger: "#c80e36"  # nudged from #d20f39, to read
+
+dark:
+  paper: "#1e1e2e"
+  ink: "#cdd6f4"
+  heading: "#f5e0dc"
+  link: "#89b4fa"
+  accent: "#cba6f7"
+  muted: "#848696"  # nudged from #585b70, to read
+  rule: "#313244"
+  tint: "#181825"

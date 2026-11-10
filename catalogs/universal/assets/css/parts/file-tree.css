@@ -1,0 +1,8 @@
+/* file-tree: a list drawn as folders and files, with a line down each level. */
+.part-file-tree { padding: var(--space-2) var(--space-3); border: var(--border) solid var(--rule); border-radius: var(--radius); font-family: var(--font-mono); font-size: var(--step--1); overflow-x: auto; }
+.part-file-tree ul { margin: 0; padding: 0; list-style: none; }
+.part-file-tree ul ul { margin-left: 0.4em; padding-left: 1em; border-left: var(--border) solid var(--rule); }
+.part-file-tree li { margin: 0.15em 0 0; white-space: nowrap; }
+.part-file-tree li.is-folder { font-weight: var(--weight-strong); }
+.part-file-tree li li { font-weight: var(--weight-body); }
+.part-file-tree li.is-folder li.is-folder { font-weight: var(--weight-strong); }

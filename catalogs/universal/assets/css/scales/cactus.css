@@ -1,0 +1,23 @@
+/* cactus: 16px writing on long loose lines in a 48rem column. Body 16px to 16px, ratio 1.15 to 1.2, from a 360px to a 1240px screen.
+   Made by `bun scripts/theme.ts build` from themes/scales/cactus.yaml.
+   Edit that file, not this one. */
+
+:root {
+  --step--1: clamp(0.8696rem, 0.884rem + -0.066vw, 0.8333rem);
+  --step-0: 1rem;
+  --step-1: clamp(1.15rem, 1.13rem + 0.091vw, 1.2rem);
+  --step-2: clamp(1.3225rem, 1.274rem + 0.214vw, 1.44rem);
+  --step-3: clamp(1.5209rem, 1.436rem + 0.377vw, 1.728rem);
+  --step-4: clamp(1.749rem, 1.616rem + 0.59vw, 2.0736rem);
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: clamp(2rem, 1.795rem + 0.909vw, 2.5rem);
+  --space-5: clamp(3rem, 2.591rem + 1.818vw, 4rem);
+  --measure: 48rem;
+  --wide: 48rem;
+  --radius: 2px;
+  --border: 1px;
+  --control-radius: 2px;
+  --rule-style: dotted;
+}

@@ -1,0 +1,13 @@
+# GitHub Style's sizes (static/css/github-style.css): GitHub's 14px lifted to 16px
+# for a phone, its 6px corners, thin gray lines, a 768px column.
+description: 16px writing in a 768px column with GitHub's 6px corners and thin gray lines
+
+screen: [360, 1240]
+body: [16, 16]
+ratio: [1.2, 1.25]
+steps: [-1, 4]
+space: [0.25, 1, 1.5, [2, 2.25], [2.5, 3.5]]
+measure: 48rem
+wide: 60rem
+radius: 6px
+border: 1px

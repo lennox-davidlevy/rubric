@@ -1,0 +1,31 @@
+# hello-friend-ng's colors (github.com/rhazdon/hugo-theme-hello-friend-ng, MIT),
+# from assets/scss/_variables.scss: gray only, with no accent of its own.
+description: white, near-black and gray with no accent color, and a soft slate dark
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#222222"
+heading: "#000000"
+link: "#222222"
+accent: "#222222"
+muted: "#656565"  # nudged from #999999, to read
+rule: "#dcdcdc"
+tint: "#eaeaea"
+code-muted: "#656565"
+positive: "#1a7f37"
+warning: "#8a5c00"
+danger: "#cf222e"
+
+dark:
+  paper: "#232425"
+  ink: "#b5b5be"  # nudged from #a9a9b3, to read
+  heading: "#ffffff"
+  link: "#ffffff"
+  accent: "#ffffff"
+  muted: "#b3b3bd"
+  rule: "#4e4e57"
+  tint: "#3b3d42"
+  positive: "#7fa58e"
+  warning: "#aa9778"
+  danger: "#c98d96"

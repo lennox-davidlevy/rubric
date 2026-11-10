@@ -1,0 +1,21 @@
+# XMin's type (github.com/yihui/hugo-xmin, MIT), from static/css/fonts.css: a
+# humanist list, Optima first, with Lucida Console for code. Nothing to fetch.
+description: Optima or its nearest, a humanist sans with some calligraphy in it, the reader's own
+
+faces: []
+preload: []
+
+body: [Optima, Candara, Calibri, Arial, sans-serif]
+display: body
+mono: [Lucida Console, Monaco, monospace]
+
+weight: { body: 400, strong: 700, heading: 700, display: 700 }
+leading: { body: 1.5, heading: 1.25, display: 1.2 }
+tracking: { display: 0em, label: 0em }
+
+labels: none
+numerals: lining
+quote: normal
+ornament: "* * *"
+code: 0.85em
+links: always

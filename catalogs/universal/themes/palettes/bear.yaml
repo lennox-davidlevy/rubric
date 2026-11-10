@@ -1,0 +1,26 @@
+# Bear Blog's colors (github.com/janraasch/hugo-bearblog, MIT), from
+# layouts/partials/style.html: gray writing on white, one blue, and a deep
+# teal dark mode. It has no tint or notices; those are plain ones.
+description: white, soft gray writing and one clear blue, with a deep teal dark
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#444444"
+heading: "#222222"
+link: "#2e68c7"  # nudged from #3273dc, to read
+accent: "#2e68c7"  # nudged from #3273dc, to read
+muted: "#6f6f6f"
+rule: "#d9d9d9"
+tint: "#f4f4f4"
+code-accent: "#306dd1"
+positive: "#1a7f37"
+warning: "#8a5c00"
+danger: "#cf222e"
+
+dark:
+  paper: "#01242e"
+  ink: "#dddddd"
+  heading: "#eeeeee"
+  link: "#8cc2dd"
+  accent: "#8cc2dd"

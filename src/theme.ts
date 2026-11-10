@@ -77,7 +77,7 @@ export type Pairing = {
   mono: string[];
   weight: { body: number; strong: number; heading: number; display: number };
   leading: { body: number; heading: number; display: number };
-  tracking: { display: string; label: string };
+  tracking: { body: string; display: string; label: string };
   labels: "uppercase" | "none";
   numerals: "oldstyle" | "lining";
   quote: "italic" | "normal";
@@ -105,6 +105,8 @@ export type Scale = {
   // (a pill is 999px).
   border: string;
   controlRadius: string;
+  // How lines between things are drawn: some themes dash or dot them.
+  rules: "solid" | "dashed" | "dotted";
 };
 
 // A skin, optionally: the theme's own small CSS layer, drawn after the parts,
@@ -182,9 +184,18 @@ export function parsePalette(name: string, raw: Raw): Palette {
     "positive-tint": () => mix(c.positive!, c.paper!, 0.08),
     "warning-tint": () => mix(c.warning!, c.paper!, 0.08),
     "danger-tint": () => mix(c.danger!, c.paper!, 0.08),
+    // Links and headings in dark. Left out, they are the dark band's ink.
+    "dark-link": () => c["dark-ink"]!,
+    "dark-heading": () => c["dark-ink"]!,
+    // A colored ground some themes give a sidebar or header, which stays in
+    // dark mode. Left out, it is the dark band.
+    band: () => c["dark-paper"]!,
+    "band-ink": () => c["dark-ink"]!,
     "dark-muted": () => mix(c["dark-ink"]!, c["dark-paper"]!, 0.68),
     "dark-rule": () => mix(c["dark-ink"]!, c["dark-paper"]!, 0.2),
     "dark-tint": () => mix(c["dark-ink"]!, c["dark-paper"]!, 0.09),
+    // A raised box in dark, which is the dark tint unless the theme has its own.
+    "dark-raised": () => c["dark-tint"]!,
     "dark-accent-tint": () => mix(c["dark-accent"]!, c["dark-paper"]!, 0.12),
     // On the dark ground a notice color is lifted toward the light ink, or
     // is the dark band's accent when it was the page's accent.
@@ -238,7 +249,7 @@ export function parsePairing(name: string, raw: Raw): Pairing {
       heading: num(weight, "heading", where), display: num(weight, "display", where),
     },
     leading: { body: num(leading, "body", where), heading: num(leading, "heading", where), display: num(leading, "display", where) },
-    tracking: { display: str(tracking, "display", where), label: str(tracking, "label", where) },
+    tracking: { body: tracking.body === undefined ? "0em" : str(tracking, "body", where), display: str(tracking, "display", where), label: str(tracking, "label", where) },
     labels: oneOf(raw, "labels", where, ["uppercase", "none"] as const),
     numerals: oneOf(raw, "numerals", where, ["oldstyle", "lining"] as const),
     quote: oneOf(raw, "quote", where, ["italic", "normal"] as const),
@@ -270,6 +281,7 @@ export function parseScale(name: string, raw: Raw): Scale {
     radius: str(raw, "radius", where),
     border: raw.border === undefined ? "1px" : str(raw, "border", where),
     controlRadius: raw.controls === undefined ? str(raw, "radius", where) : str(raw, "controls", where),
+    rules: raw.rules === undefined ? "solid" : oneOf(raw, "rules", where, ["solid", "dashed", "dotted"] as const),
   };
 }
 
@@ -369,6 +381,7 @@ export function pairingCss(p: Pairing): string {
     ["leading-body", String(p.leading.body)],
     ["leading-heading", String(p.leading.heading)],
     ["leading-display", String(p.leading.display)],
+    ["tracking-body", p.tracking.body],
     ["tracking-display", p.tracking.display],
     ["tracking-label", p.tracking.label],
     ["label-case", p.labels],
@@ -388,7 +401,7 @@ export function scaleCss(s: Scale): string {
     vars.push([`step-${i}`, fluid(s.body[0] * s.ratio[0] ** i, s.body[1] * s.ratio[1] ** i, s.screen)]);
   }
   s.space.forEach((v, i) => vars.push([`space-${i + 1}`, Array.isArray(v) ? fluid(v[0] * 16, v[1] * 16, s.screen) : `${v}rem`]));
-  vars.push(["measure", s.measure], ["wide", s.wide], ["radius", s.radius], ["border", s.border], ["control-radius", s.controlRadius]);
+  vars.push(["measure", s.measure], ["wide", s.wide], ["radius", s.radius], ["border", s.border], ["control-radius", s.controlRadius], ["rule-style", s.rules]);
   const what = `${s.name}: ${s.description}. Body ${s.body[0]}px to ${s.body[1]}px, ratio ${s.ratio[0]} to ${s.ratio[1]}, from a ${s.screen[0]}px to a ${s.screen[1]}px screen.`;
   return header("scales", s.name, what) + "\n" + block(vars);
 }
@@ -435,9 +448,22 @@ const TEXT_PAIRS: [string, string, string][] = [
   ["ink", "accent-tint", "a warning callout"],
   ["accent", "accent-tint", "a warning callout's label"],
   ["ink", "raised", "a raised box"],
+  ["heading", "tint", "a heading in a tinted box"],
+  ["heading", "raised", "a heading in a raised box"],
+  ["ink", "positive-tint", "a tip callout"],
+  ["ink", "warning-tint", "a warning callout"],
+  ["link", "positive-tint", "links in a tip callout"],
+  ["link", "warning-tint", "links in a warning callout"],
+  ["link", "danger-tint", "links in a danger callout"],
   ["paper", "ink", "a filled button"],
   ["paper", "accent", "a filled button, on hover"],
   ["dark-ink", "dark-paper", "a dark band"],
+  ["band-ink", "band", "writing on a colored sidebar or header"],
+  ["dark-link", "dark-paper", "links in a dark band"],
+  ["dark-link", "dark-tint", "links in a tinted box in a dark band"],
+  ["dark-heading", "dark-paper", "headings in a dark band"],
+  ["dark-ink", "dark-raised", "a raised box in a dark band"],
+  ["dark-muted", "dark-raised", "captions in a raised box in a dark band"],
   ["dark-muted", "dark-paper", "captions in a dark band"],
   ["dark-accent", "dark-paper", "quote marks, ornaments and links in a dark band"],
   ["dark-ink", "dark-tint", "a tinted box in a dark band"],
@@ -446,7 +472,17 @@ const TEXT_PAIRS: [string, string, string][] = [
   ["dark-ink", "dark-accent-tint", "a warning callout in a dark band"],
   ["dark-accent", "dark-accent-tint", "a warning callout's label in a dark band"],
   ["dark-paper", "dark-accent", "a filled button in a dark band, on hover"],
+  ["dark-heading", "dark-tint", "a heading in a tinted box in a dark band"],
+  ["dark-ink", "dark-positive-tint", "a tip callout in a dark band"],
+  ["dark-ink", "dark-warning-tint", "a warning callout in a dark band"],
+  ["dark-ink", "dark-danger-tint", "a danger callout in a dark band"],
+  ["dark-link", "dark-positive-tint", "links in a tip callout in a dark band"],
+  ["dark-link", "dark-warning-tint", "links in a warning callout in a dark band"],
+  ["dark-link", "dark-danger-tint", "links in a danger callout in a dark band"],
   ["dark-positive", "dark-paper", "marks for what went well in a dark band"],
+  ["dark-link", "dark-accent-tint", "links in a warning callout in a dark band"],
+  ["dark-link", "dark-raised", "links in a raised box in a dark band"],
+  ["dark-positive", "dark-positive-tint", "a tip's label in a dark band"],
   ["dark-warning", "dark-warning-tint", "a warning's label in a dark band"],
   ["dark-danger", "dark-danger-tint", "a danger's label in a dark band"],
 ];
@@ -454,7 +490,6 @@ const TEXT_PAIRS: [string, string, string][] = [
 // Grounds that must read as different from the page, not just be different.
 const APART: [string, string, number, string][] = [
   ["tint", "paper", 1.05, "a tinted box would not show against the page"],
-  ["dark-paper", "paper", 1.6, "a dark band would not stand out from the page"],
   ["rule", "paper", 1.15, "rules and borders would be too faint to see"],
   ["dark-rule", "dark-paper", 1.15, "rules in a dark band would be too faint to see"],
 ];
@@ -467,10 +502,19 @@ export function checkPalette(p: Palette): Problem[] {
     const r = contrast(c(fg), c(bg));
     if (r < AA) out.push({ where, level: "error", message: `${fg} on ${bg} (${inside}) has contrast ${r.toFixed(2)}, below ${AA}` });
   }
+  // A code block's file name sits on the code's ground with a little of its ink
+  // mixed in (parts/code.css), so that ground is not a slot of its own.
+  for (const [fg, bg] of [["code-ink", "code-paper"], ["dark-ink", "dark-tint"]] as const) {
+    const r = contrast(c(fg), mix(c(fg), c(bg), 0.08));
+    if (r < AA) out.push({ where, level: "error", message: `${fg} on ${bg} (the name of a file above code, on a ground 8% toward the ink) has contrast ${r.toFixed(2)}, below ${AA}` });
+  }
   for (const [a, b, min, why] of APART) {
     const r = contrast(c(a), c(b));
     if (r < min) out.push({ where, level: "warning", message: `${a} and ${b} are ${r.toFixed(2)} apart, under ${min}: ${why}` });
   }
+  // On a dark page the band is another dark ground, so it can sit closer.
+  const band = contrast(c("dark-paper"), c("paper")), least = p.scheme === "dark" ? 1.1 : 1.6;
+  if (band < least) out.push({ where, level: "warning", message: `dark-paper and paper are ${band.toFixed(2)} apart, under ${least}: a dark band would not stand out from the page` });
   if (p.scheme === "dark" && contrast(c("paper"), [0, 0, 0]) > contrast(c("paper"), [255, 255, 255])) {
     out.push({ where, level: "warning", message: `scheme is dark, but paper is a light color` });
   }

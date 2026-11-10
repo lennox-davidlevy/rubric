@@ -1,0 +1,48 @@
+/* etch: white, cool slate writing and a bright azure, with a true black dark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/etch.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #313a3d;
+  --accent: #2871bc;
+  --muted: #707070;
+  --rule: #d8d8d8;
+  --tint: #f5f5f5;
+  --dark-paper: #121212;
+  --dark-ink: #ebebeb;
+  --dark-accent: #21c7ff;
+  --raised: #ffffff;
+  --link: #006bd7;
+  --heading: #3d3d3d;
+  --code-paper: #f5f5f5;
+  --code-ink: #313a3d;
+  --code-muted: #707070;
+  --code-accent: #2871bc;
+  --positive: #1a7f37;
+  --warning: #8a5c00;
+  --danger: #cf222e;
+  --accent-tint: #eef4fa;
+  --positive-tint: #edf5ef;
+  --warning-tint: #f6f2eb;
+  --danger-tint: #fbedee;
+  --dark-link: #00b1ed;
+  --dark-heading: #f5f5f5;
+  --band: #121212;
+  --band-ink: #ebebeb;
+  --dark-muted: #a7a7a7;
+  --dark-rule: #5c5c5c;
+  --dark-tint: #262626;
+  --dark-raised: #262626;
+  --dark-accent-tint: #14282e;
+  --dark-positive: #8dba9a;
+  --dark-warning: #bfab81;
+  --dark-danger: #de9196;
+  --dark-positive-tint: #212622;
+  --dark-warning-tint: #27241f;
+  --dark-danger-tint: #2b2122;
+  --shadow-soft: 0 1px 2px rgb(49 58 61 / 0.06), 0 2px 8px rgb(49 58 61 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(49 58 61 / 0.06), 0 16px 40px rgb(49 58 61 / 0.14);
+}

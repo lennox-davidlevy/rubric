@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Cache } from "../src/core/index.ts";
 import { stubResolver } from "../src/server/stub.ts";
-import { Workspace, type Note } from "../src/server/workspace.ts";
+import { Workspace, type Note, type Resolver } from "../src/server/workspace.ts";
 import { openSite } from "../src/site.ts";
 
 const repo = join(import.meta.dir, "..");
@@ -83,6 +83,8 @@ describe("the document flow", () => {
     await counting.settle();
     expect(content()).toContain("Edited.");
     expect(asked).toBe(1); // only the offline line, whose error is not cached
+    // It isn't open anywhere, and the other server's tests need it so.
+    counting.dispose();
   });
 
   test("closing a page draws it from disk again", async () => {
@@ -91,11 +93,31 @@ describe("the document flow", () => {
     await ws.open(page, text);
     await ws.settle();
   });
+
+  // Each Neovim runs its own server. One with another page open draws every
+  // page again on a theme switch, and drew this one from disk, over the
+  // unsaved buffer open in the other: the cover in its front matter went.
+  test("another editor's server leaves a page this one has open alone", async () => {
+    await ws.open(page, "---\ntitle: Test\ncover: /images/unsaved.jpg\n---\n");
+    await ws.settle();
+    const site = await openSite(dir);
+    const other = new Workspace(site, await Cache.load(join(dir, "other-cache.json")), stubResolver(site.catalog, 5), () => {}, { idleMs: 5, waitMs: 1000, drawMs: 5 });
+    await other.reload(await openSite(dir));
+    expect(content()).toContain("cover: /images/unsaved.jpg");
+    // Once it's closed, it's anyone's to draw from disk.
+    await ws.close(page);
+    writeFileSync(join(dir, "content/posts/test.md"), "stale\n");
+    await other.buildAll();
+    expect(content()).toBe("on disk\n");
+    other.dispose();
+    await ws.open(page, text);
+    await ws.settle();
+  });
 });
 
 describe("ghost text", () => {
-  test("a placed line offers its plain form at the end of the line", async () => {
-    expect(await ws.ghost(page, 6)).toEqual([{ text: " -> quote size=large", line: 6, character: "::: a big quote please".length }]);
+  test("a placed line offers its plain form at the end of the line, and accepting puts it in place of the words", async () => {
+    expect(await ws.ghost(page, 6)).toEqual([{ text: " -> quote size=large", line: 6, character: "::: a big quote please".length, replace: "::: quote size=large" }]);
   });
 
   test("a line ending in a space gets no second space", async () => {
@@ -215,10 +237,10 @@ describe("when Jev is asked", () => {
   test("the pause is fitted to the writer's typing, and never shorter than the floor", async () => {
     const edits: number[] = [];
     const w = new Workspace(ws.site, await Cache.load(join(dir, "no-cache.json")), stubResolver(ws.site.catalog, 1), () => {}, {
-      idleMs: 1000, minIdleMs: 400, onEdit: (e) => edits.push(e.pause),
+      idleMs: 600, minIdleMs: 300, onEdit: (e) => edits.push(e.pause),
     });
     await w.open(page, draft("a"));
-    expect(w.pause()).toBe(1000);
+    expect(w.pause()).toBe(600);
     // A fast typist: about 100 ms between keys, 200 now and then.
     let words = "a";
     for (let i = 0; i < 30; i++) {
@@ -226,8 +248,8 @@ describe("when Jev is asked", () => {
       await w.change(page, draft(words));
       await Bun.sleep(i % 10 === 9 ? 200 : 100);
     }
-    expect(w.pause()).toBeGreaterThanOrEqual(400);
-    expect(w.pause()).toBeLessThan(1000);
+    expect(w.pause()).toBeGreaterThanOrEqual(300);
+    expect(w.pause()).toBeLessThan(600);
     expect(edits.at(-1)).toBe(w.pause());
     await w.close(page);
   });
@@ -256,6 +278,64 @@ describe("when Jev is asked", () => {
     await Bun.sleep(100);
     expect(content()).toContain("\nHello world\n");
     expect(statSync(join(dir, "content/posts/test.md")).mtimeMs).toBeGreaterThan(before);
+    await w.close(page);
+  });
+
+  test("the page shows the pick the writer moved to, until the line changes", async () => {
+    const two: Resolver = async () => ({
+      model: "stub",
+      resolution: {
+        outcome: "placed", fits: 0.9, parts: { quote: 0.6, callout: 0.3 },
+        candidates: [
+          { part: "quote", probability: 0.6, plain: "quote", unsettled: [] },
+          { part: "callout", probability: 0.3, plain: "callout kind=warning", unsettled: [] },
+        ],
+      },
+    });
+    const w = new Workspace(ws.site, await Cache.load(join(dir, "no-cache.json")), two, () => {}, { idleMs: 5, waitMs: 1000, drawMs: 5 });
+    const words = (line: string) => `---\ntitle: Test\n---\n::: ${line}\nBody.\n:::\n`;
+    const drawn = async (shortcode: string) => {
+      await Bun.sleep(40);
+      expect(content()).toContain(shortcode);
+    };
+    await w.open(page, words("two close picks"));
+    await w.settle();
+    await drawn(`{{< quote >}}`);
+
+    w.choose(page, 3, 1);
+    await drawn(`{{< callout kind="warning" >}}`);
+    w.choose(page, 3, 0);
+    await drawn(`{{< quote >}}`);
+    w.choose(page, 3, 1);
+    await drawn(`{{< callout kind="warning" >}}`);
+    // Leaving insert mode: back to what the line resolved to.
+    w.choose(page, 3);
+    await drawn(`{{< quote >}}`);
+
+    // A new answer for the line: Neovim is back on the first pick, so the page is.
+    w.choose(page, 3, 1);
+    await drawn(`{{< callout kind="warning" >}}`);
+    expect((await w.ghost(page, 3)).length).toBe(2);
+    await drawn(`{{< quote >}}`);
+
+    // A pick that isn't there, and a line of no words, change nothing.
+    w.choose(page, 3, 5);
+    w.choose(page, 0, 1);
+    await drawn(`{{< quote >}}`);
+
+    // Changing the words drops the choice; the same words typed again start over.
+    w.choose(page, 3, 1);
+    await drawn(`{{< callout kind="warning" >}}`);
+    await w.change(page, words("two close picks now"));
+    await w.settle();
+    await w.change(page, words("two close picks"));
+    await w.settle();
+    await drawn(`{{< quote >}}`);
+
+    // Accepting the second pick pins it, and nothing is held over.
+    w.choose(page, 3, 1);
+    await w.change(page, words("two close picks -> callout kind=warning"));
+    await drawn(`{{< callout kind="warning" >}}`);
     await w.close(page);
   });
 
@@ -307,7 +387,7 @@ describe("pictures", () => {
     expect(c.map((x) => x.newText)).toEqual(["/images/placeholder-field.jpg"]);
   });
 
-  test("an address with no file behind it is a warning, in a setting and in Markdown", async () => {
+  test("an address with no file behind it is a warning, in a setting, in Markdown and alone in a block", async () => {
     await bw.open(bpage, doc([
       '::: hero image="/image/sample.jpg"',         // 3: missing
       "# Title",                                     // 4
@@ -317,12 +397,20 @@ describe("pictures", () => {
       "```",                                         // 8
       "![in code](/nope.png)",                       // 9: code, ignored
       "```",                                         // 10
+      "::: pdf",                                     // 11
+      "/files/document.pdf",                         // 12: the starter, missing
+      ":::",                                         // 13
+      "::: audio",                                   // 14
+      "/audio/",                                     // 15: still being typed, no file named yet
+      ":::",                                         // 16
+      "/files/outside.pdf",                          // 17: not in a block, so just text
     ]));
     await bw.settle();
     const missing = (bnotes.get(bpage) ?? []).filter((n) => n.code === "missing-file");
     expect(missing.map((n) => [n.line, n.start, n.message])).toEqual([
       [3, 16, "no file at /image/sample.jpg in static/"],
       [7, 8, "no file at /images/nowhere.png in static/"],
+      [12, 0, "no file at /files/document.pdf in static/"],
     ]);
   });
 });

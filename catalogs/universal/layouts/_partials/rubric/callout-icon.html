@@ -1,0 +1,9 @@
+{{- /* The icon a callout's setting names, as inline SVG, or nothing. A skin's
+     own callout uses this too. Font Awesome Free, CC BY 4.0, with its notice in
+     assets/icons/fontawesome/. */ -}}
+{{- $icons := dict "lightbulb" "lightbulb" "info" "circle-info" "warning" "triangle-exclamation" "check" "check" "star" "star" "fire" "fire" -}}
+{{- with index $icons (. | default "none") -}}
+  {{- with resources.Get (printf "icons/fontawesome/%s.svg" .) -}}
+    <span class="part-callout-icon" aria-hidden="true">{{ .Content | safeHTML }}</span>
+  {{- end -}}
+{{- end -}}

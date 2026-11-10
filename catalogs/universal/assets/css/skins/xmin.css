@@ -1,0 +1,31 @@
+/* XMin's layer (github.com/yihui/hugo-xmin, MIT), read from static/css/style.css:
+   a centered menu of gray tabs, a centered date, a shadow behind code, quotes
+   and table rows on a pale gray. */
+
+.part-header-inner { flex-direction: column; text-align: center; max-width: calc(var(--measure) + 2 * var(--space-3)); }
+.part-header-title { font-size: var(--step-1); }
+.part-header-nav ul { justify-content: center; gap: var(--space-1); }
+.part-header-nav a, .masthead nav a { padding: 5px; border-radius: var(--radius); background: var(--tint); color: var(--ink); }
+.part-header-tools { margin: 0; }
+.part-header.sticky-stays { border-bottom: 0; }
+
+.page-header { text-align: center; }
+.part-post-meta, .byline { text-align: center; }
+main { hyphens: auto; }
+
+/* Code in a thin box with a hard shadow; quotes on gray with a thick bar. */
+pre { border: var(--border) solid var(--rule); border-radius: 0; box-shadow: 5px 5px 5px var(--tint); }
+.flow > .highlight > pre, .flow > pre { margin-inline: 0; }
+blockquote { padding: 3px var(--space-2); background: var(--code-paper); border-left: 5px solid var(--rule); color: inherit; }
+hr { width: 100%; border-top: var(--border) var(--rule-style) var(--rule); }
+
+/* Tables: rules above and below, and alternating rows. */
+table { border-block: var(--border) solid var(--muted); }
+thead, tr:nth-child(even) { background: var(--tint); }
+th, td { padding: 5px; }
+td { border-bottom: 0; }
+
+.part-footer { border-top: 0; text-align: center; }
+.part-footer-links ul, .part-social { justify-content: center; }
+
+.part-header.layout-split .part-header-nav { margin-left: 0; }

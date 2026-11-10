@@ -1,0 +1,48 @@
+/* gruvbox-light: a warm retro cream with rust and olive marks.
+   Made by `bun scripts/theme.ts build` from themes/palettes/gruvbox-light.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #fbf1c7;
+  --ink: #504945;
+  --accent: #8f3f71;
+  --muted: #665c54;
+  --rule: #d5c4a1;
+  --tint: #ebdbb2;
+  --dark-paper: #282828;
+  --dark-ink: #d5c4a1;
+  --dark-accent: #d792a5;
+  --raised: #fbf1c7;
+  --link: #076678;
+  --heading: #3c3836;
+  --code-paper: #ebdbb2;
+  --code-ink: #504945;
+  --code-muted: #665c54;
+  --code-accent: #8f3f71;
+  --positive: #6d690c;
+  --warning: #8c5b0f;
+  --danger: #9d0006;
+  --accent-tint: #f2e3c0;
+  --positive-tint: #f0e6b8;
+  --warning-tint: #f2e5b8;
+  --danger-tint: #f3deb8;
+  --dark-link: #89aa9d;
+  --dark-heading: #ebdbb2;
+  --band: #282828;
+  --band-ink: #d5c4a1;
+  --dark-muted: #bdae93;
+  --dark-rule: #504945;
+  --dark-tint: #3c3836;
+  --dark-raised: #3c3836;
+  --dark-accent-tint: #3d3537;
+  --dark-positive: #aaa066;
+  --dark-warning: #b89a67;
+  --dark-danger: #ce9386;
+  --dark-positive-tint: #38362f;
+  --dark-warning-tint: #393630;
+  --dark-danger-tint: #3c3533;
+  --shadow-soft: 0 1px 2px rgb(80 73 69 / 0.06), 0 2px 8px rgb(80 73 69 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(80 73 69 / 0.06), 0 16px 40px rgb(80 73 69 / 0.14);
+}

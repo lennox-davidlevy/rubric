@@ -1,0 +1,23 @@
+/* github: 16px writing in a 768px column with GitHub's 6px corners and thin gray lines. Body 16px to 16px, ratio 1.2 to 1.25, from a 360px to a 1240px screen.
+   Made by `bun scripts/theme.ts build` from themes/scales/github.yaml.
+   Edit that file, not this one. */
+
+:root {
+  --step--1: clamp(0.8333rem, 0.847rem + -0.061vw, 0.8rem);
+  --step-0: 1rem;
+  --step-1: clamp(1.2rem, 1.18rem + 0.091vw, 1.25rem);
+  --step-2: clamp(1.44rem, 1.39rem + 0.223vw, 1.5625rem);
+  --step-3: clamp(1.728rem, 1.636rem + 0.409vw, 1.9531rem);
+  --step-4: clamp(2.0736rem, 1.923rem + 0.669vw, 2.4414rem);
+  --space-1: 0.25rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: clamp(2rem, 1.898rem + 0.455vw, 2.25rem);
+  --space-5: clamp(2.5rem, 2.091rem + 1.818vw, 3.5rem);
+  --measure: 48rem;
+  --wide: 60rem;
+  --radius: 6px;
+  --border: 1px;
+  --control-radius: 6px;
+  --rule-style: solid;
+}

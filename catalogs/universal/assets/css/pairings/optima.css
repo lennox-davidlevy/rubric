@@ -1,0 +1,28 @@
+/* optima: Optima or its nearest, a humanist sans with some calligraphy in it, the reader's own.
+   Made by `bun scripts/theme.ts build` from themes/pairings/optima.yaml.
+   Edit that file, not this one. */
+
+
+:root {
+  --font-body: Optima, Candara, Calibri, Arial, sans-serif;
+  --font-display: Optima, Candara, Calibri, Arial, sans-serif;
+  --font-mono: "Lucida Console", Monaco, monospace;
+  --font-ui: Optima, Candara, Calibri, Arial, sans-serif;
+  --weight-body: 400;
+  --weight-strong: 700;
+  --weight-heading: 700;
+  --weight-display: 700;
+  --leading-body: 1.5;
+  --leading-heading: 1.25;
+  --leading-display: 1.2;
+  --tracking-body: 0em;
+  --tracking-display: 0em;
+  --tracking-label: 0em;
+  --label-case: none;
+  --numerals: lining-nums;
+  --quote-style: normal;
+  --ornament: "* * *";
+  --code-size: 0.85em;
+  --heading-case: none;
+  --link-line: underline;
+}

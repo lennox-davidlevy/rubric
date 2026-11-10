@@ -1,0 +1,22 @@
+# Bear Blog's type (github.com/janraasch/hugo-bearblog, MIT), from
+# layouts/partials/style.html: Verdana, which most readers already have, and
+# a plain monospace for dates and code. Nothing to fetch.
+description: Verdana for everything, wide and plain, the reader's own
+
+faces: []
+preload: []
+
+body: [Verdana, DejaVu Sans, Geneva, sans-serif]
+display: body
+mono: [ui-monospace, Menlo, Consolas, monospace]
+
+weight: { body: 400, strong: 700, heading: 700, display: 700 }
+leading: { body: 1.6, heading: 1.25, display: 1.2 }
+tracking: { display: 0em, label: 0em }
+
+labels: none
+numerals: lining
+quote: italic
+ornament: "* * *"
+code: 0.85em
+links: hover

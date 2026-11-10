@@ -1,0 +1,35 @@
+/* roboto-flex: Roboto Flex for everything, a tidy sans, with light, airy headings.
+   Made by `bun scripts/theme.ts build` from themes/pairings/roboto-flex.yaml.
+   Edit that file, not this one. */
+
+@font-face {
+  font-family: "Roboto Flex";
+  src: url("../fonts/roboto-flex-normal.woff2") format("woff2");
+  font-weight: 100 1000;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-body: "Roboto Flex", Helvetica, Tahoma, Geneva, Arial, sans-serif;
+  --font-display: "Roboto Flex", Helvetica, Tahoma, Geneva, Arial, sans-serif;
+  --font-mono: Consolas, Menlo, monospace;
+  --font-ui: "Roboto Flex", Helvetica, Tahoma, Geneva, Arial, sans-serif;
+  --weight-body: 400;
+  --weight-strong: 600;
+  --weight-heading: 300;
+  --weight-display: 300;
+  --leading-body: 1.7;
+  --leading-heading: 1.25;
+  --leading-display: 1.2;
+  --tracking-body: 0em;
+  --tracking-display: -0.005em;
+  --tracking-label: 0.02em;
+  --label-case: none;
+  --numerals: lining-nums;
+  --quote-style: normal;
+  --ornament: "* * *";
+  --code-size: 0.89em;
+  --heading-case: none;
+  --link-line: none;
+}

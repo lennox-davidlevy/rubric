@@ -1,0 +1,12 @@
+# Yinyang's sizes (assets/css/index.css): 18px writing, 2rem titles, an 800px page.
+description: 18px writing in a generous column with plain 32px titles
+
+screen: [360, 1240]
+body: [17, 18]
+ratio: [1.15, 1.2]
+steps: [-1, 4]
+space: [0.5, 1, 1.5, [2, 2.5], [3, 4]]
+measure: 44rem
+wide: 50rem
+radius: 3px
+border: 2px

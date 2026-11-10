@@ -1,0 +1,31 @@
+/* GitHub Style's layer (github.com/MeiK2333/github-style, MIT), read from
+   static/css/github-style.css: a tinted top bar with a line under it, gray
+   boxes with thin lines around code and quotes, tags as blue pills, callouts
+   with a colored bar. */
+
+.part-header { background: var(--tint); border-bottom: var(--border) solid var(--rule); }
+.part-header-title { font-weight: var(--weight-strong); color: var(--heading); }
+.part-header-nav ul { font-size: var(--step--1); }
+.part-header-nav a { color: var(--ink); }
+.part-header-nav a[aria-current] { font-weight: var(--weight-strong); text-decoration: underline; text-decoration-color: var(--danger); text-decoration-thickness: 2px; text-underline-offset: 0.6rem; }
+
+.flow a:not([class]) { color: var(--link); text-decoration-line: none; }
+.flow a:not([class]):hover { text-decoration-line: underline; color: var(--link); }
+h2 { padding-bottom: var(--space-1); border-bottom: var(--border) solid var(--rule); }
+.flow > .catalog-part { border-bottom: 0; }
+
+blockquote { padding-left: var(--space-2); border-left: calc(var(--border) * 4) solid var(--rule); color: var(--muted); }
+hr { width: 100%; border-top: calc(var(--border) * 4) solid var(--rule); }
+pre { border-radius: var(--radius); }
+th, td { padding: var(--space-1) var(--space-2); border: var(--border) solid var(--rule); }
+tr:nth-child(even) { background: var(--tint); }
+
+.part-tags a { display: inline-block; margin: 0 0.3rem 0.3rem 0; padding: 0 0.6rem; border-radius: 999px; background: var(--accent-tint); color: var(--link); font-size: var(--step--1); text-decoration: none; }
+
+/* A notice: a thick colored bar at its side, no ground of its own. */
+.part-callout { margin-inline: 0; padding: var(--space-1) var(--space-2); border-left: calc(var(--border) * 4) solid var(--accent); border-radius: 0; background: none; }
+.part-callout.kind-tip { background: none; border-left-color: var(--positive); }
+.part-callout.kind-warning { background: none; border-left-color: var(--warning); }
+.part-callout.kind-danger { background: none; border-left-color: var(--danger); }
+
+.part-footer { border-top: var(--border) solid var(--rule); }

@@ -1,0 +1,48 @@
+/* dracula: a dark purple-gray with neon pink, green and cyan.
+   Made by `bun scripts/theme.ts build` from themes/palettes/dracula.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: dark;
+
+  --paper: #282936;
+  --ink: #e9e9f4;
+  --accent: #ce92df;
+  --muted: #62d6e8;
+  --rule: #4d4f68;
+  --tint: #3a3c4e;
+  --dark-paper: #3a3c4e;
+  --dark-ink: #e9e9f4;
+  --dark-accent: #daaee7;
+  --raised: #282936;
+  --link: #62d6e8;
+  --heading: #f1f2f8;
+  --code-paper: #3a3c4e;
+  --code-ink: #e9e9f4;
+  --code-muted: #62d6e8;
+  --code-accent: #ce92df;
+  --positive: #50fa7b;
+  --warning: #ffb86c;
+  --danger: #ff6666;
+  --accent-tint: #353144;
+  --positive-tint: #2b3a3c;
+  --warning-tint: #39343a;
+  --danger-tint: #392e3a;
+  --dark-link: #62d6e8;
+  --dark-heading: #f1f2f8;
+  --band: #3a3c4e;
+  --band-ink: #e9e9f4;
+  --dark-muted: #bdbdc8;
+  --dark-rule: #5d5f6f;
+  --dark-tint: #4a4c5d;
+  --dark-raised: #4a4c5d;
+  --dark-accent-tint: #4d4a60;
+  --dark-positive: #a4f1be;
+  --dark-warning: #f3d3b7;
+  --dark-danger: #f3aeb4;
+  --dark-positive-tint: #47525b;
+  --dark-warning-tint: #504e5b;
+  --dark-danger-tint: #504a5a;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

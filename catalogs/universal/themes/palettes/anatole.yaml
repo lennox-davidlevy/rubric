@@ -1,0 +1,31 @@
+# Anatole's colors (github.com/lxndrblz/anatole, MIT), from
+# assets/scss/modules/_variables.scss: gray on white, its muted blue, and a deep
+# blue-black dark.
+description: white, charcoal and a muted steel blue, with a deep blue-black dark
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#464646"
+heading: "#464646"
+link: "#4e6d92"  # nudged from #6086b4, to read
+accent: "#4e6d92"  # nudged from #6086b4, to read
+muted: "#6f6f6f"  # nudged from #9f9f9f, to read
+rule: "#eeeeee"
+tint: "#f5f5f5"
+code-muted: "#6f6f6f"
+code-accent: "#52739a"
+positive: "#2e7b4e"  # nudged from #51d88a, to read
+warning: "#8b6907"  # nudged from #ffc107, to read
+danger: "#b94340"  # nudged from #ef5753, to read
+
+dark:
+  paper: "#152028"
+  ink: "#eeeeee"
+  link: "#8fb0d6"
+  accent: "#8fb0d6"
+  muted: "#9f9f9f"
+  rule: "#464646"
+
+shadow:
+  strength: 1

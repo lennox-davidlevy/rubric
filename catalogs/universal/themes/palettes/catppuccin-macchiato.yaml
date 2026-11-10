@@ -1,0 +1,26 @@
+# The catppuccin-macchiato scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/catppuccin-macchiato.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08. The band is 01.
+description: a deep indigo gray with soft pastel marks
+
+scheme: dark
+
+paper: "#2f3244"  # nudged from #24273a, to read
+ink: "#cad3f5"
+heading: "#f4dbd6"
+link: "#8aadf4"
+accent: "#c6a0f6"
+muted: "#979baa"  # nudged from #5b6078, to read
+rule: "#404458"  # nudged from #363a4f, to read
+tint: "#1e2030"
+code-muted: "#868a9c"
+positive: "#a6da95"
+warning: "#eed49f"
+danger: "#ee8d9b"  # nudged from #ed8796, to read
+
+dark:
+  paper: "#1e2030"
+  ink: "#cad3f5"
+  heading: "#f4dbd6"
+  link: "#8aadf4"
+  accent: "#c6a0f6"

@@ -1,5 +1,5 @@
 ---
-title: Rubric playground
+title: Field Notes
 ---
 
-A scratch site for trying Rubric live. The steps are in `testing/TESTING.md`.
+Notes on walking, reading and the slow work of paying attention.

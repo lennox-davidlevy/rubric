@@ -1,0 +1,28 @@
+# Relearn's neon variant (github.com/McShelby/hugo-theme-relearn, MIT), from
+# assets/css/theme-neon.css, with relearn-light's values for what it leaves out. Its
+# menu color is the band. Its notices are its own box colors.
+description: near-black with neon pink, cyan and yellow
+
+scheme: dark
+
+paper: "#101010"
+ink: "#d2d2d2"
+band: "#1e1e1e"
+band-ink: "#f3f3f3"
+heading: "#f3f3f3"
+link: "#32bdf3"
+accent: "#f64dc9"  # nudged from #f300b2, to read
+muted: "#a0a0a0"
+rule: "#555555"
+tint: "#2b2b2b"
+code-accent: "#f64dc9"
+positive: "#7dc903"
+warning: "#ffb74d"
+danger: "#ff8a80"
+
+dark:
+  paper: "#262626"
+  ink: "#d2d2d2"
+  link: "#32bdf3"
+  accent: "#9f9f9f"  # nudged from #000000, to read
+  muted: "#a0a0a0"

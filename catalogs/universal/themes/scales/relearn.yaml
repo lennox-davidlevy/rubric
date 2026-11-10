@@ -1,0 +1,13 @@
+# Relearn's sizes (assets/css/theme.css): the browser's 16px, wide content beside a
+# 18.75rem menu, large light headings, small corners.
+description: 16px writing in a wide column with large, light headings
+
+screen: [360, 1240]
+body: [16, 16]
+ratio: [1.25, 1.3]
+steps: [-1, 4]
+space: [0.5, 1, 1.5, [2, 2.5], [3, 4]]
+measure: 50rem
+wide: 50rem
+radius: 2px
+border: 1px

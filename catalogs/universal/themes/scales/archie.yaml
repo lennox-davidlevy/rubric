@@ -1,0 +1,13 @@
+# Archie's sizes (assets/css/main.css): an 800px column, tight headings. Its 15px
+# writing is lifted to 16px here, for a phone.
+description: 16px writing in an 800px column with tight headings, sharp corners
+
+screen: [360, 1240]
+body: [16, 16]
+ratio: [1.15, 1.2]
+steps: [-1, 4]
+space: [0.5, 1, 1.5, [2, 2.25], [2.5, 3.5]]
+measure: 50rem
+wide: 50rem
+radius: 0px
+border: 1px

@@ -1,0 +1,27 @@
+# The windows-95 scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/windows-95.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08. The band is 01.
+description: the black terminal of an old desktop with hard primary colors
+
+scheme: dark
+
+paper: "#000000"
+ink: "#a8a8a8"
+heading: "#d2d2d2"
+link: "#7474fc"  # nudged from #5454fc, to read
+accent: "#fc54fc"
+muted: "#848484"  # nudged from #7e7e7e, to read
+rule: "#383838"
+tint: "#1c1c1c"
+code-muted: "#848484"
+positive: "#54fc54"
+warning: "#fcfc54"
+danger: "#fc5454"
+
+dark:
+  paper: "#1c1c1c"
+  ink: "#a8a8a8"
+  heading: "#d2d2d2"
+  link: "#8e8efc"  # nudged from #5454fc, to read
+  accent: "#fc54fc"
+  muted: "#949494"

@@ -1,0 +1,23 @@
+/* awesome: 16px writing in a 720px column with wide spacing. Body 16px to 16px, ratio 1.2 to 1.25, from a 360px to a 1240px screen.
+   Made by `bun scripts/theme.ts build` from themes/scales/awesome.yaml.
+   Edit that file, not this one. */
+
+:root {
+  --step--1: clamp(0.8333rem, 0.847rem + -0.061vw, 0.8rem);
+  --step-0: 1rem;
+  --step-1: clamp(1.2rem, 1.18rem + 0.091vw, 1.25rem);
+  --step-2: clamp(1.44rem, 1.39rem + 0.223vw, 1.5625rem);
+  --step-3: clamp(1.728rem, 1.636rem + 0.409vw, 1.9531rem);
+  --step-4: clamp(2.0736rem, 1.923rem + 0.669vw, 2.4414rem);
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.875rem;
+  --space-4: clamp(2.5rem, 2.295rem + 0.909vw, 3rem);
+  --space-5: clamp(3.5rem, 3.091rem + 1.818vw, 4.5rem);
+  --measure: 45rem;
+  --wide: 55.625rem;
+  --radius: 4px;
+  --border: 1px;
+  --control-radius: 4px;
+  --rule-style: solid;
+}

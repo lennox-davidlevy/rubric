@@ -1,0 +1,23 @@
+/* flat: every heading the size of the writing, on an even 24px line, like a text file. Body 16px to 16px, ratio 1 to 1, from a 360px to a 1240px screen.
+   Made by `bun scripts/theme.ts build` from themes/scales/flat.yaml.
+   Edit that file, not this one. */
+
+:root {
+  --step--1: 1rem;
+  --step-0: 1rem;
+  --step-1: 1rem;
+  --step-2: 1rem;
+  --step-3: 1rem;
+  --step-4: 1rem;
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: 2rem;
+  --space-5: 3rem;
+  --measure: 47rem;
+  --wide: 47rem;
+  --radius: 0px;
+  --border: 1px;
+  --control-radius: 0px;
+  --rule-style: solid;
+}

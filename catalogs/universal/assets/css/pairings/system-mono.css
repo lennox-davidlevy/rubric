@@ -1,0 +1,28 @@
+/* system-mono: the reader's own monospace for everything, like a text file.
+   Made by `bun scripts/theme.ts build` from themes/pairings/system-mono.yaml.
+   Edit that file, not this one. */
+
+
+:root {
+  --font-body: "Fira Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-display: "Fira Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-mono: "Fira Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-ui: "Fira Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --weight-body: 400;
+  --weight-strong: 700;
+  --weight-heading: 600;
+  --weight-display: 600;
+  --leading-body: 1.5;
+  --leading-heading: 1.5;
+  --leading-display: 1.5;
+  --tracking-body: 0em;
+  --tracking-display: 0em;
+  --tracking-label: 0em;
+  --label-case: none;
+  --numerals: lining-nums;
+  --quote-style: normal;
+  --ornament: "* * *";
+  --code-size: 1em;
+  --heading-case: none;
+  --link-line: underline;
+}

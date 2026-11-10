@@ -29,8 +29,8 @@
   --tint: var(--dark-tint);
   --accent-tint: var(--dark-accent-tint);
   --raised: var(--dark-paper);
-  --link: var(--dark-ink);
-  --heading: var(--dark-ink);
+  --link: var(--dark-link);
+  --heading: var(--dark-heading);
   --code-paper: var(--dark-tint);
   --code-ink: var(--dark-ink);
   --code-muted: var(--dark-muted);

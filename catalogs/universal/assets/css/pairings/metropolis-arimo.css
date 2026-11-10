@@ -1,0 +1,63 @@
+/* metropolis-arimo: Metropolis, a geometric sans, for headings, with Arimo, a plain Helvetica-like sans, for the writing.
+   Made by `bun scripts/theme.ts build` from themes/pairings/metropolis-arimo.yaml.
+   Edit that file, not this one. */
+
+@font-face {
+  font-family: "Arimo";
+  src: url("../fonts/arimo-normal.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Arimo";
+  src: url("../fonts/arimo-italic.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Metropolis";
+  src: url("../fonts/metropolis-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Metropolis";
+  src: url("../fonts/metropolis-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Metropolis";
+  src: url("../fonts/metropolis-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-body: Arimo, "Liberation Sans", Arial, Helvetica, sans-serif;
+  --font-display: Metropolis, Arial, Helvetica, sans-serif;
+  --font-mono: "Liberation Mono", Menlo, Consolas, monospace;
+  --font-ui: Arimo, "Liberation Sans", Arial, Helvetica, sans-serif;
+  --weight-body: 400;
+  --weight-strong: 700;
+  --weight-heading: 600;
+  --weight-display: 700;
+  --leading-body: 1.6;
+  --leading-heading: 1.25;
+  --leading-display: 1.2;
+  --tracking-body: 0em;
+  --tracking-display: 0em;
+  --tracking-label: 0.03em;
+  --label-case: none;
+  --numerals: lining-nums;
+  --quote-style: normal;
+  --ornament: "* * *";
+  --code-size: 0.875em;
+  --heading-case: none;
+  --link-line: none;
+}

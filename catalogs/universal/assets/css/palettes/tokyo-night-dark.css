@@ -1,0 +1,48 @@
+/* tokyo-night-dark: a midnight navy with neon blue and purple.
+   Made by `bun scripts/theme.ts build` from themes/palettes/tokyo-night-dark.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: dark;
+
+  --paper: #252631;
+  --ink: #a9b1d6;
+  --accent: #bb9af7;
+  --muted: #8b8fa8;
+  --rule: #2f3549;
+  --tint: #16161e;
+  --dark-paper: #16161e;
+  --dark-ink: #a9b1d6;
+  --dark-accent: #bb9af7;
+  --raised: #252631;
+  --link: #2ac3de;
+  --heading: #cbccd1;
+  --code-paper: #16161e;
+  --code-ink: #a9b1d6;
+  --code-muted: #7f839e;
+  --code-accent: #bb9af7;
+  --positive: #9ece6a;
+  --warning: #e0af68;
+  --danger: #f7768e;
+  --accent-tint: #312f41;
+  --positive-tint: #2f3336;
+  --warning-tint: #343135;
+  --danger-tint: #362c38;
+  --dark-link: #2ac3de;
+  --dark-heading: #cbccd1;
+  --band: #16161e;
+  --band-ink: #a9b1d6;
+  --dark-muted: #878ba5;
+  --dark-rule: #333543;
+  --dark-tint: #23242f;
+  --dark-raised: #23242f;
+  --dark-accent-tint: #2a2638;
+  --dark-positive: #a4bea5;
+  --dark-warning: #c2b0a5;
+  --dark-danger: #cc96b6;
+  --dark-positive-tint: #272a2e;
+  --dark-warning-tint: #2b282e;
+  --dark-danger-tint: #2c2530;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

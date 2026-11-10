@@ -1,0 +1,14 @@
+# Hyde's sizes (assets/css/hyde.css, poole.css): 16px growing to 20px on a large
+# screen, a 38rem column, h1 at 2rem. The 18rem column for the sidebar is drawn
+# by the skin.
+description: 16 to 20px writing in a short 38rem column, modest headings
+
+screen: [360, 1240]
+body: [16, 20]
+ratio: [1.2, 1.25]
+steps: [-1, 4]
+space: [0.5, 1, 1.5, [2, 2.5], [3, 4]]
+measure: 38rem
+wide: 38rem      # nothing goes wider than the column, with a sidebar beside it
+radius: 3px
+border: 1px

@@ -17,6 +17,7 @@ body {
   font-size: var(--step-0);
   font-weight: var(--weight-body);
   line-height: var(--leading-body);
+  letter-spacing: var(--tracking-body);
   font-kerning: normal;
   font-variant-numeric: var(--numerals) proportional-nums;
   overflow-wrap: break-word;
@@ -128,7 +129,7 @@ hr {
   height: 0;
   margin-inline: auto;
   border: 0;
-  border-top: var(--border) solid var(--muted);
+  border-top: var(--border) var(--rule-style) var(--muted);
 }
 .flow > hr { margin-block: calc(1lh + var(--space-2)); }
 
@@ -173,7 +174,7 @@ table {
 }
 th, td { padding: var(--space-1) var(--space-2) var(--space-1) 0; text-align: left; vertical-align: top; }
 th { font-weight: var(--weight-heading); border-bottom: var(--border) solid currentColor; }
-td { border-bottom: var(--border) solid var(--rule); }
+td { border-bottom: var(--border) var(--rule-style) var(--rule); }
 
 abbr[title] { text-decoration: underline dotted var(--muted); }
 mark { background: var(--tint); color: inherit; padding: 0 0.1em; }
@@ -291,10 +292,10 @@ sup a[role="doc-noteref"], .footnote-ref {
   --muted: var(--dark-muted);
   --rule: var(--dark-rule);
   --tint: var(--dark-tint);
-  --raised: var(--dark-tint);
+  --raised: var(--dark-raised);
   --accent-tint: var(--dark-accent-tint);
-  --link: var(--dark-ink);
-  --heading: var(--dark-ink);
+  --link: var(--dark-link);
+  --heading: var(--dark-heading);
   --code-paper: var(--dark-tint);
   --code-ink: var(--dark-ink);
   --code-muted: var(--dark-muted);

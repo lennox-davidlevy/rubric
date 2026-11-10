@@ -1,0 +1,27 @@
+# Blog Awesome's colors (github.com/hugo-sid/hugo-blog-awesome, MIT), from
+# assets/sass/main.scss: soft gray writing, navy headings and an electric blue.
+description: white, soft gray writing, navy headings and an electric blue, with a blue-black dark
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#434648"
+heading: "#0d122b"
+link: "#003fff"
+accent: "#003fff"
+muted: "#6f6f6f"
+rule: "#ececec"
+tint: "#f6f6f6"
+positive: "#1a7f37"
+warning: "#8a5c00"
+danger: "#cf222e"
+
+dark:
+  paper: "#131418"
+  ink: "#babdc4"
+  heading: "#eaeaea"
+  link: "#77a8fd"
+  accent: "#77a8fd"
+  muted: "#9b9ba3"
+  rule: "#4a4d56"
+  tint: "#2d2d2d"

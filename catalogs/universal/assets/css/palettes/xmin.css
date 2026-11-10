@@ -1,0 +1,48 @@
+/* xmin: the browser's own black writing and blue links on white, with pale gray boxes.
+   Made by `bun scripts/theme.ts build` from themes/palettes/xmin.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #000000;
+  --accent: #0000ee;
+  --muted: #666666;
+  --rule: #dddddd;
+  --tint: #eeeeee;
+  --dark-paper: #222222;
+  --dark-ink: #eeeeee;
+  --dark-accent: #9db8ff;
+  --raised: #ffffff;
+  --link: #0000ee;
+  --heading: #000000;
+  --code-paper: #f9f9f9;
+  --code-ink: #000000;
+  --code-muted: #5f5f5f;
+  --code-accent: #000000;
+  --positive: #1a7f37;
+  --warning: #8a5c00;
+  --danger: #cc0000;
+  --accent-tint: #ebebfe;
+  --positive-tint: #edf5ef;
+  --warning-tint: #f6f2eb;
+  --danger-tint: #fbebeb;
+  --dark-link: #9db8ff;
+  --dark-heading: #eeeeee;
+  --band: #222222;
+  --band-ink: #eeeeee;
+  --dark-muted: #adadad;
+  --dark-rule: #4b4b4b;
+  --dark-tint: #343434;
+  --dark-raised: #343434;
+  --dark-accent-tint: #31343d;
+  --dark-positive: #8fbc9c;
+  --dark-warning: #c1ac83;
+  --dark-danger: #df8383;
+  --dark-positive-tint: #2f3431;
+  --dark-warning-tint: #35332e;
+  --dark-danger-tint: #392e2e;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

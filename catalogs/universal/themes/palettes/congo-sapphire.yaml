@@ -1,0 +1,34 @@
+# Congo's sapphire scheme (github.com/jpanther/congo, MIT), from
+# assets/css/schemes/sapphire.css, assigned the way its tailwind.config.js does for
+# its prose and its dark mode.
+description: white, neutral gray writing and a sapphire blue, with a dark neutral dark
+
+scheme: light
+
+paper: "#ffffff"
+ink: "#334155"
+heading: "#1e293b"
+link: "#4338ca"
+accent: "#4338ca"
+muted: "#5f6e84"  # nudged from #64748b, to read
+rule: "#e2e8f0"
+tint: "#f1f5f9"
+code-paper: "#f8fafc"
+code-muted: "#6c747f"
+positive: "#15803d"
+warning: "#995d07"  # nudged from #a16207, to read
+danger: "#b91c1c"
+
+dark:
+  paper: "#1e293b"
+  ink: "#cbd5e1"
+  heading: "#e2e8f0"
+  link: "#9da6f8"  # nudged from #818cf8, to read
+  accent: "#9da6f8"  # nudged from #818cf8, to read
+  muted: "#a3b0c2"  # nudged from #94a3b8, to read
+  rule: "#475569"
+  tint: "#334155"
+  danger: "#cc9499"
+
+shadow:
+  strength: 1

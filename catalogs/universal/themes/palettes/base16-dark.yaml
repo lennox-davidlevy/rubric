@@ -1,0 +1,26 @@
+# The base16-dark scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/base16-dark.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08. The band is 01.
+description: a neutral near-black with the classic base16 rainbow of soft marks
+
+scheme: dark
+
+paper: "#181818"
+ink: "#d8d8d8"
+heading: "#e8e8e8"
+link: "#7cafc2"
+accent: "#ba8baf"
+muted: "#b8b8b8"
+rule: "#383838"
+tint: "#282828"
+positive: "#a1b56c"
+warning: "#f7ca88"
+danger: "#c17774"  # nudged from #ab4642, to read
+
+dark:
+  paper: "#282828"
+  ink: "#d8d8d8"
+  heading: "#e8e8e8"
+  link: "#7cafc2"
+  accent: "#c097b7"  # nudged from #ba8baf, to read
+  muted: "#a5a5a5"

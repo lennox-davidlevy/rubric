@@ -70,3 +70,22 @@ function RubricTest.picks()
   end
   return ""
 end
+
+-- The words spell checking stops on with ]s, from the top, in order.
+function RubricTest.misspelled()
+  local view = vim.fn.winsaveview()
+  local found = {}
+  vim.api.nvim_win_set_cursor(0, { 1, 0 })
+  vim.o.wrapscan = false
+  while true do
+    local before = vim.api.nvim_win_get_cursor(0)
+    pcall(vim.cmd, "silent normal! ]s")
+    local after = vim.api.nvim_win_get_cursor(0)
+    if before[1] == after[1] and before[2] == after[2] then
+      break
+    end
+    table.insert(found, vim.fn.expand("<cword>"))
+  end
+  vim.fn.winrestview(view)
+  return table.concat(found, ",")
+end

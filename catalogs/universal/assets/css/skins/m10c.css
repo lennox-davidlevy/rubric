@@ -1,0 +1,36 @@
+/* m10c's layer (github.com/vaga/hugo-theme-m10c, MIT), read from
+   assets/css/components/: a darker column on the left holding the name and
+   links, the writing beside it. On a small screen the column sits on top. */
+
+body > :is(.part-header, .masthead) {
+  --paper: var(--dark-paper);
+  --tint: var(--dark-tint);
+  max-width: none;
+  margin: 0;
+  padding: var(--space-4) var(--space-3);
+  background: var(--dark-paper);
+  text-align: center;
+}
+.part-header-inner { display: block; max-width: none; padding: 0; }
+.part-header-title, .masthead-title { display: block; margin-bottom: var(--space-2); font-size: var(--step-2); color: var(--heading); }
+.part-header-nav ul { display: block; font-size: var(--step-0); }
+.part-header-nav li + li { margin-top: var(--space-1); }
+.part-header-nav a, .masthead nav a { color: var(--link); }
+.part-header-nav a:hover { color: var(--heading); }
+.part-header-tools { justify-content: center; margin: var(--space-3) 0 0; }
+.part-header.sticky-stays { position: static; border-bottom: 0; }
+.masthead nav { display: block; }
+
+@media (min-width: 58.75rem) {
+  body { padding-left: 20rem; }
+  body > :is(.part-header, .masthead) { position: fixed; inset: 0 auto 0 0; width: 20rem; overflow-y: auto; }
+}
+
+/* Headings white, links the accent with no line until touched. */
+.flow a:not([class]) { color: var(--link); }
+.flow a:not([class]):hover { color: var(--heading); }
+blockquote { padding-left: var(--space-2); border-left: calc(var(--border) * 3) solid var(--accent); color: inherit; }
+hr { width: 100%; border-top: var(--border) solid var(--rule); }
+.part-footer { border-top: 0; }
+
+.part-header.layout-split .part-header-nav { margin-left: 0; }

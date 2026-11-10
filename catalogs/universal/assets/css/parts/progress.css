@@ -1,0 +1,6 @@
+/* progress: labeled bars, each showing how far along something is. */
+.part-progress { display: grid; gap: var(--space-2); font-family: var(--font-ui); }
+.part-progress-label { display: flex; justify-content: space-between; gap: var(--space-2); margin: 0 0 0.3em; font-size: var(--step--1); }
+.part-progress-value { flex: none; color: var(--muted); font-variant-numeric: lining-nums tabular-nums; }
+.part-progress-track { height: 0.6rem; border-radius: var(--control-radius); background: var(--tint); overflow: hidden; }
+.part-progress-bar { display: block; height: 100%; border-radius: inherit; background: var(--accent); }

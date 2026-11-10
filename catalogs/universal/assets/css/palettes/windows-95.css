@@ -1,0 +1,48 @@
+/* windows-95: the black terminal of an old desktop with hard primary colors.
+   Made by `bun scripts/theme.ts build` from themes/palettes/windows-95.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: dark;
+
+  --paper: #000000;
+  --ink: #a8a8a8;
+  --accent: #fc54fc;
+  --muted: #848484;
+  --rule: #383838;
+  --tint: #1c1c1c;
+  --dark-paper: #1c1c1c;
+  --dark-ink: #a8a8a8;
+  --dark-accent: #fc54fc;
+  --raised: #000000;
+  --link: #7474fc;
+  --heading: #d2d2d2;
+  --code-paper: #1c1c1c;
+  --code-ink: #a8a8a8;
+  --code-muted: #848484;
+  --code-accent: #fc54fc;
+  --positive: #54fc54;
+  --warning: #fcfc54;
+  --danger: #fc5454;
+  --accent-tint: #140714;
+  --positive-tint: #071407;
+  --warning-tint: #141407;
+  --danger-tint: #140707;
+  --dark-link: #8e8efc;
+  --dark-heading: #d2d2d2;
+  --band: #1c1c1c;
+  --band-ink: #a8a8a8;
+  --dark-muted: #949494;
+  --dark-rule: #383838;
+  --dark-tint: #292929;
+  --dark-raised: #292929;
+  --dark-accent-tint: #372337;
+  --dark-positive: #82ce82;
+  --dark-warning: #cece82;
+  --dark-danger: #ce8282;
+  --dark-positive-tint: #283128;
+  --dark-warning-tint: #313128;
+  --dark-danger-tint: #312828;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

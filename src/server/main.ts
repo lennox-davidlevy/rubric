@@ -146,6 +146,13 @@ export function serve(opts: { stub: boolean }): void {
     if (f && workspace) workspace.askNow(f);
   });
 
+  // The writer moved to another pick, or left insert mode with one showing:
+  // the preview follows the ghost text.
+  connection.onNotification("rubric/choose", (params: { uri: string; line: number; index?: number }) => {
+    const f = file(params.uri);
+    if (f && workspace) workspace.choose(f, params.line, params.index);
+  });
+
   connection.languages.inlineCompletion.on(async (params) => {
     const f = file(params.textDocument.uri);
     if (!f || !workspace) return [];
@@ -181,6 +188,8 @@ export function serve(opts: { stub: boolean }): void {
     return value ? { contents: { kind: MarkupKind.Markdown, value } } : null;
   });
 
+  // Other servers on the site then draw this one's pages from disk again.
+  process.on("exit", () => workspace?.dispose());
   documents.listen(connection);
   connection.listen();
 }

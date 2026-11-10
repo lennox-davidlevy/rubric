@@ -1,0 +1,14 @@
+# Cactus's sizes (assets/scss/_variables.scss): a 48rem column on long lines.
+# Its 14px writing is lifted to 16px here, for a phone.
+description: 16px writing on long loose lines in a 48rem column
+
+screen: [360, 1240]
+body: [16, 16]
+ratio: [1.15, 1.2]
+steps: [-1, 4]
+space: [0.5, 1, 1.5, [2, 2.5], [3, 4]]
+measure: 48rem
+wide: 48rem
+radius: 2px
+border: 1px
+rules: dotted

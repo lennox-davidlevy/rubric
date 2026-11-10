@@ -1,0 +1,14 @@
+# Terminal's sizes (assets/css/main.css): 16px at every width, headings only a
+# little larger (h1 1.45 times the writing), a wide 864px column, square corners.
+description: 16px writing with headings barely larger, in a wide column with square corners
+
+screen: [360, 1240]
+body: [16, 16]
+ratio: [1.1, 1.13]
+steps: [-1, 4]
+space: [0.5, 1, 1.5, [1.75, 2], [2.5, 3]]
+measure: 54rem   # 864px
+wide: 64rem
+radius: 0px
+border: 1px
+rules: dashed

@@ -105,6 +105,34 @@ embed:
 
     Where the walk starts.
 
+map:
+  md: |
+    51.5055, -0.0754
+
+    Where the walk starts, by the river.
+
+pdf:
+  md: |
+    /files/sample.pdf
+
+    The route, to print and take along.
+
+file-tree:
+  md: |
+    - pages/
+      - posts/
+        - first-walk.md
+        - second-walk.md
+      - about.md
+    - rubric.md
+    - hugo.toml
+
+progress:
+  md: |
+    - Miles walked this year: 72%
+    - Books read: 40%
+    - A very long label for something that has to wrap on a phone and still line up: 100%
+
 code:
   md: |
     ```go
@@ -234,7 +262,7 @@ social:
   md: |
     - https://github.com/example
     - https://mastodon.social/@example
-    - https://bsky.app/profile/example.com
+    - https://x.com/example
 
 header:
   md: |

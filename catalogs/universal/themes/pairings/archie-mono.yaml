@@ -1,0 +1,27 @@
+# Archie's type (github.com/athul/archie, MIT), from assets/css/main.css: Roboto
+# Mono for the writing, Fira Sans for headings. Both SIL OFL, vendored from
+# Fontsource 5.3.0.
+description: Roboto Mono for the writing with Fira Sans for the headings
+
+faces:
+  - { family: Roboto Mono, file: roboto-mono-normal.woff2, style: normal, weight: [100, 700] }
+  - { family: Roboto Mono, file: roboto-mono-italic.woff2, style: italic, weight: [100, 700] }
+  - { family: Fira Sans, file: fira-sans-500.woff2, style: normal, weight: 500 }
+  - { family: Fira Sans, file: fira-sans-700.woff2, style: normal, weight: 700 }
+preload: [roboto-mono-normal.woff2]
+
+body: [Roboto Mono, Courier New, monospace]
+display: [Fira Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif]
+ui: [Roboto Mono, Courier New, monospace]
+mono: [Roboto Mono, Courier New, monospace]
+
+weight: { body: 400, strong: 700, heading: 500, display: 700 }
+leading: { body: 1.7, heading: 1.3, display: 1.2 }
+tracking: { display: 0em, label: 0em }
+
+labels: none
+numerals: lining
+quote: normal
+ornament: "* * *"
+code: 0.9em
+links: always

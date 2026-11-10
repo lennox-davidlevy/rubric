@@ -1,0 +1,48 @@
+/* hextra: white and near-black gray with a vivid blue, and a near-black dark.
+   Made by `bun scripts/theme.ts build` from themes/palettes/hextra.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --ink: #111827;
+  --accent: #0069d0;
+  --muted: #666c7a;
+  --rule: #e5e7eb;
+  --tint: #f3f4f6;
+  --dark-paper: #111111;
+  --dark-ink: #f3f4f6;
+  --dark-accent: #0099ff;
+  --raised: #ffffff;
+  --link: #0069d0;
+  --heading: #111827;
+  --code-paper: #f3f4f6;
+  --code-ink: #111827;
+  --code-muted: #666c7a;
+  --code-accent: #0069d0;
+  --positive: #166534;
+  --warning: #92400e;
+  --danger: #991b1b;
+  --accent-tint: #ebf3fb;
+  --positive-tint: #ecf3ef;
+  --warning-tint: #f6f0ec;
+  --danger-tint: #f7eded;
+  --dark-link: #0099ff;
+  --dark-heading: #f3f4f6;
+  --band: #111111;
+  --band-ink: #f3f4f6;
+  --dark-muted: #9ca3af;
+  --dark-rule: #374151;
+  --dark-tint: #1f2937;
+  --dark-raised: #1f2937;
+  --dark-accent-tint: #0f212e;
+  --dark-positive: #86efac;
+  --dark-warning: #fcd34d;
+  --dark-danger: #fca5a5;
+  --dark-positive-tint: #1f2c24;
+  --dark-warning-tint: #2d2818;
+  --dark-danger-tint: #2d2323;
+  --shadow-soft: 0 1px 2px rgb(17 24 39 / 0.06), 0 2px 8px rgb(17 24 39 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(17 24 39 / 0.06), 0 16px 40px rgb(17 24 39 / 0.14);
+}

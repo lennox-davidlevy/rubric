@@ -1,11 +1,27 @@
 baseURL = "/"
-title = "Rubric playground"
+title = "Field Notes"
 theme = "universal"
 themesDir = "../catalogs"
 disableKinds = ["sitemap"]
+defaultContentLanguage = "en"
+
+[params]
+author = "A. Writer"
+# The comments part offers a reply by email when this is set.
+email = "writer@example.com"
 
 [params.rubric]
-theme = "paper"
+theme = "gruvbox-dark"
+
+# Two languages, so the languages part has something to switch between. Only
+# About has a French page.
+[languages.en]
+languageName = "English"
+weight = 1
+
+[languages.fr]
+languageName = "Français"
+weight = 2
 
 # Nested parts hand their HTML to the outer part's RenderString.
 [markup.goldmark.renderer]

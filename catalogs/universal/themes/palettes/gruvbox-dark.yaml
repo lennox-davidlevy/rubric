@@ -1,0 +1,28 @@
+# The gruvbox-dark scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/gruvbox-dark.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08. The band is 01.
+description: a warm retro dark brown with orange and yellow marks
+
+scheme: dark
+
+paper: "#282828"
+ink: "#d5c4a1"
+heading: "#ebdbb2"
+link: "#89aa9d"  # nudged from #83a598, to read
+accent: "#d792a5"  # nudged from #d3869b, to read
+muted: "#bdae93"
+rule: "#504945"
+tint: "#3c3836"
+code-accent: "#d792a5"
+positive: "#b8bb26"
+warning: "#fabd2f"
+danger: "#fb6b5a"  # nudged from #fb4934, to read
+
+dark:
+  paper: "#3c3836"
+  ink: "#d5c4a1"
+  heading: "#ebdbb2"
+  link: "#a9c0b7"  # nudged from #83a598, to read
+  accent: "#dfa6b6"  # nudged from #d3869b, to read
+  muted: "#bdb2a1"
+  danger: "#e8a68d"

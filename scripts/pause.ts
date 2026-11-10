@@ -31,10 +31,10 @@ const q = (p: number) => sorted[Math.floor(p * (sorted.length - 1))] ?? 0;
 console.log(`${edits.length} edits to words lines; between keys: median ${q(0.5)} ms, 90% under ${q(0.9)} ms, 99% under ${q(0.99)} ms\n`);
 
 // The workspace's fitted pause, from the gaps seen so far.
-function fitted(seen: number[], most = 1000, least = 400): number {
+function fitted(seen: number[], most = 600, least = 300): number {
   if (seen.length < 20) return most;
   const s = seen.slice(-200).sort((a, b) => a - b);
-  return Math.round(Math.min(most, Math.max(least, 1.5 * s[Math.floor(0.9 * (s.length - 1))]!)));
+  return Math.round(Math.min(most, Math.max(least, 1.25 * s[Math.floor(0.9 * (s.length - 1))]!)));
 }
 
 function run(name: string, wait: (seen: number[]) => number): void {
@@ -63,6 +63,5 @@ function run(name: string, wait: (seen: number[]) => number): void {
   console.log(`${name.padEnd(22)} ${String(calls).padStart(4)} calls, ${String(half).padStart(3)} half-typed; a finished line waits ${median} ms`);
 }
 
-run("1000 ms (before)", () => 1000);
-for (const ms of [700, 500, 400, 300]) run(`${ms} ms`, () => ms);
+for (const ms of [1000, 700, 500, 400, 300]) run(`${ms} ms`, () => ms);
 run("fitted (now)", (seen) => fitted(seen));

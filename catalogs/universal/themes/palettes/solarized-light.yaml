@@ -1,0 +1,34 @@
+# The solarized-light scheme, as Risotto ships it (github.com/joeroe/risotto, MIT), from
+# assets/css/palettes/solarized-light.css. Risotto reads base16 colors: ground 00 to 02,
+# writing 04 to 06, links 0D, marks 0E, notices 0B, 0A and 08.
+description: the pale cream ground of Solarized with its precise blue and cyan
+
+scheme: light
+
+paper: "#fdf6e3"
+ink: "#54696f"  # nudged from #586e75, to read
+heading: "#073642"
+link: "#1d6ba3"  # nudged from #268bd2, to read
+accent: "#5d61a8"  # nudged from #6c71c4, to read
+muted: "#566970"  # nudged from #657b83, to read
+rule: "#93a1a1"
+tint: "#eee8d5"
+code-ink: "#506469"
+code-muted: "#566970"
+code-accent: "#5d61a8"
+positive: "#627000"  # nudged from #859900, to read
+warning: "#856500"  # nudged from #b58900, to read
+danger: "#bd2c29"  # nudged from #dc322f, to read
+
+dark:
+  paper: "#002b36"
+  ink: "#98a6a6"  # nudged from #93a1a1, to read
+  heading: "#eee8d5"
+  link: "#57a6dc"  # nudged from #268bd2, to read
+  accent: "#9397d4"  # nudged from #6c71c4, to read
+  muted: "#8f9ea0"  # nudged from #839496, to read
+  rule: "#586e75"
+  tint: "#073642"
+  positive: "#96a178"
+  warning: "#a7a17f"
+  danger: "#bd9392"

@@ -65,7 +65,10 @@ test.skipIf(!hugo)("a part or setting another skin brings is left out, not an er
     expect(ok.exitCode).toBe(0);
     const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");
     expect(html).toContain(`class="part part-callout kind-tip"`);
+    // The icon is the catalog's, so every skin draws it; only Blowfish marks it has-icon.
+    expect(html).toContain(`class="part-callout-icon"`);
     expect(html).not.toContain("has-icon");
+    expect(html).toContain(`class="part part-lead"`);
     expect(html).toContain("<p>A larger opening.</p>");
 
     const bad = build(`{{< callout nonsense="x" >}}\nHello.\n{{< /callout >}}`);
@@ -74,3 +77,102 @@ test.skipIf(!hugo)("a part or setting another skin brings is left out, not an er
     rmSync(site, { recursive: true, force: true });
   }
 });
+
+// The parts the imported themes brought: each reads its plain block, and says
+// so when the block has nothing it can use.
+test.skipIf(!hugo)("a map, a PDF, a file tree and progress bars draw from their blocks", () => {
+  const site = mkdtempSync(join(tmpdir(), "rubric-hugo-parts-"));
+  try {
+    writeFileSync(
+      join(site, "hugo.toml"),
+      readFileSync(join(root, "testing/hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(root, "catalogs"))}`),
+    );
+    mkdirSync(join(site, "content/posts"), { recursive: true });
+    writeFileSync(
+      join(site, "content/posts/p.md"),
+      [
+        "---", "title: P", "---", "",
+        `{{< map zoom="street" >}}\n51.5055, -0.0754\n\nBy the river.\n{{< /map >}}`,
+        "{{< map >}}\nsomewhere nice\n{{< /map >}}",
+        "{{< pdf >}}\n/files/route.pdf\n\nThe route.\n{{< /pdf >}}",
+        "{{< file-tree >}}\n- pages/\n  - about.md\n- hugo.toml\n{{< /file-tree >}}",
+        "{{< progress >}}\n- Miles: 72%\n- Too many: 140%\n{{< /progress >}}",
+      ].join("\n\n"),
+    );
+    const build = Bun.spawnSync([hugo!, "--quiet", "-s", site, "-d", join(site, "public")]);
+    expect(build.stderr.toString()).toBe("");
+    const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");
+    expect(html).toContain(`class="part part-map zoom-street"`);
+    expect(html).toMatch(/embed\.html\?bbox=-0\.0799.*marker=51\.50550/);
+    expect(html).toContain("By the river.");
+    expect(html).toContain("This map needs its place as a first line");
+    expect(html).toContain(`data="/files/route.pdf"`);
+    expect(html).toContain(`<li class="is-folder">pages/`);
+    expect(html).not.toContain(`<li class="is-folder">hugo.toml`);
+    expect(html).toContain(`aria-valuenow="72"`);
+    expect(html).toContain(`<span>Miles</span>`);
+    expect(html).toContain(`aria-valuenow="100"`);
+  } finally {
+    rmSync(site, { recursive: true, force: true });
+  }
+});
+
+// A link in an embed is drawn as a chat app draws a shared one: the page's
+// title, description and picture, the picture copied into the site. A page
+// that gives none, or a fetch that fails, leaves the plain card. Served from
+// here, so the test needs no network.
+test.skipIf(!hugo)("an embed's link shows the page's title, description and picture", async () => {
+  const png = await Bun.file(join(root, "testing/static/images/path.png")).bytes();
+  const server = Bun.serve({
+    port: 0,
+    fetch(req) {
+      const path = new URL(req.url).pathname;
+      if (path === "/talk") {
+        return new Response(
+          `<html><head><title>Fallback</title><meta content="The talk &amp; its slides" property="og:title">` +
+          `<meta name='description' content='Forty slides on walking home.'><meta property="og:image" content="/pic.png"></head><body>Hi</body></html>`,
+          { headers: { "Content-Type": "text/html; charset=utf-8" } },
+        );
+      }
+      if (path === "/titled") return new Response("<html><head><title>Only a title</title></head></html>", { headers: { "Content-Type": "text/html" } });
+      if (path === "/pic.png") return new Response(png, { headers: { "Content-Type": "image/png" } });
+      return new Response("not here", { status: 404 });
+    },
+  });
+  const at = `http://127.0.0.1:${server.port}`;
+  const site = mkdtempSync(join(tmpdir(), "rubric-hugo-embed-"));
+  try {
+    writeFileSync(
+      join(site, "hugo.toml"),
+      readFileSync(join(root, "testing/hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(root, "catalogs"))}`) +
+        // Hugo fetches from no IP address unless a site allows it.
+        `\n[security.http]\nurls = ["^http://127\\\\.0\\\\.0\\\\.1:"]\n`,
+    );
+    mkdirSync(join(site, "content/posts"), { recursive: true });
+    writeFileSync(
+      join(site, "content/posts/p.md"),
+      ["---", "title: P", "---", "",
+        `{{< embed >}}\n${at}/talk\n{{< /embed >}}`,
+        `{{< embed >}}\n${at}/titled\n{{< /embed >}}`,
+        `{{< embed >}}\n${at}/gone\n{{< /embed >}}`,
+      ].join("\n\n"),
+    );
+    const build = Bun.spawn([hugo!, "--quiet", "-s", site, "-d", join(site, "public"), "--cacheDir", join(site, "cache")], { stderr: "pipe" });
+    await build.exited;
+    expect(await new Response(build.stderr).text()).toBe("");
+    const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");
+    const cards = html.split(`<a class="part-embed-card`).slice(1);
+    expect(cards).toHaveLength(3);
+    expect(cards[0]).toContain(`<span class="part-embed-title">The talk &amp; its slides</span>`);
+    expect(cards[0]).toContain(`<span class="part-embed-description">Forty slides on walking home.</span>`);
+    expect(cards[0]).toMatch(/<img class="part-embed-image" src="\/pic_[^"]+\.png" width="\d+" height="\d+"/);
+    expect(cards[1]).toContain(`<span class="part-embed-title">Only a title</span>`);
+    expect(cards[1]).not.toContain("<img");
+    expect(cards[2]).toContain(`<span class="part-embed-url">${at}/gone</span>`);
+    expect(cards[2]).not.toContain("part-embed-title");
+  } finally {
+    server.stop(true);
+    rmSync(site, { recursive: true, force: true });
+  }
+});
+

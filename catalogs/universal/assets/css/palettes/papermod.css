@@ -28,9 +28,14 @@
   --positive-tint: #edf5ef;
   --warning-tint: #f6f2eb;
   --danger-tint: #fbedee;
+  --dark-link: #dadadb;
+  --dark-heading: #dadadb;
+  --band: #1d1e20;
+  --band-ink: #dadadb;
   --dark-muted: #9b9c9d;
   --dark-rule: #414244;
   --dark-tint: #2e2e33;
+  --dark-raised: #2e2e33;
   --dark-accent-tint: #343536;
   --dark-positive: #84b191;
   --dark-warning: #b6a178;

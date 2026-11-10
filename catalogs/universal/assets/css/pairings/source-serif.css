@@ -29,6 +29,7 @@
   --leading-body: 1.6;
   --leading-heading: 1.2;
   --leading-display: 1.1;
+  --tracking-body: 0em;
   --tracking-display: -0.015em;
   --tracking-label: 0.09em;
   --label-case: uppercase;

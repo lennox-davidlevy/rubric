@@ -1,0 +1,43 @@
+/* Hyde's layer (github.com/spf13/hyde, MIT), read from assets/css/hyde.css: a
+   fixed colored column down the left with the site's name in a huge display
+   face, the writing in a short column beside it. On a small screen the column
+   becomes a colored block on top. */
+
+body > :is(.part-header, .masthead) {
+  --paper: var(--band);
+  --ink: var(--band-ink);
+  --heading: var(--band-ink);
+  --muted: var(--band-ink);
+  --link: var(--band-ink);
+  --accent: var(--band-ink);
+  --rule: var(--band-ink);
+  max-width: none;
+  margin: 0;
+  padding: var(--space-4) var(--space-3);
+  background: var(--band);
+  color: var(--band-ink);
+}
+.part-header-inner { display: block; max-width: none; padding: 0; }
+.part-header-title, .masthead-title { display: block; margin-bottom: var(--space-3); font-family: var(--font-display); font-size: 3.25rem; font-weight: var(--weight-display); line-height: 1.1; }
+.part-header-nav ul { display: block; font-size: var(--step-0); }
+.part-header-nav li + li { margin-top: var(--space-1); }
+.part-header-nav a, .masthead nav a { color: var(--band-ink); }
+.part-header-nav a[aria-current] { font-weight: var(--weight-strong); }
+.part-header-tools { margin: var(--space-3) 0 0; }
+.part-header.sticky-stays { position: static; border-bottom: 0; }
+.masthead nav { display: block; }
+
+@media (min-width: 48rem) {
+  body { padding-left: 18rem; }
+  body > :is(.part-header, .masthead) { position: fixed; inset: 0 auto 0 0; width: 18rem; overflow-y: auto; }
+}
+
+/* Headings in the sans; only the site's name and a page's title are display. */
+h2, h3, h4 { font-family: var(--font-ui); font-weight: var(--weight-strong); }
+.page-header h1 { font-size: var(--step-3); }
+blockquote { padding-left: 1.25rem; border-left: 0.25rem solid var(--rule); color: var(--muted); }
+hr { width: 100%; border-top: var(--border) solid var(--rule); }
+:not(pre) > code { background: var(--tint); color: var(--danger); }
+.part-footer { border-top: 0; }
+
+.part-header.layout-split .part-header-nav { margin-left: 0; }

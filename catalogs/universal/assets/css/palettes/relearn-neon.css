@@ -1,0 +1,48 @@
+/* relearn-neon: near-black with neon pink, cyan and yellow.
+   Made by `bun scripts/theme.ts build` from themes/palettes/relearn-neon.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: dark;
+
+  --paper: #101010;
+  --ink: #d2d2d2;
+  --accent: #f64dc9;
+  --muted: #a0a0a0;
+  --rule: #555555;
+  --tint: #2b2b2b;
+  --dark-paper: #262626;
+  --dark-ink: #d2d2d2;
+  --dark-accent: #9f9f9f;
+  --raised: #101010;
+  --link: #32bdf3;
+  --heading: #f3f3f3;
+  --code-paper: #2b2b2b;
+  --code-ink: #d2d2d2;
+  --code-muted: #a0a0a0;
+  --code-accent: #f64dc9;
+  --positive: #7dc903;
+  --warning: #ffb74d;
+  --danger: #ff8a80;
+  --accent-tint: #22151f;
+  --positive-tint: #191f0f;
+  --warning-tint: #231d15;
+  --danger-tint: #231a19;
+  --dark-link: #32bdf3;
+  --dark-heading: #d2d2d2;
+  --band: #1e1e1e;
+  --band-ink: #f3f3f3;
+  --dark-muted: #a0a0a0;
+  --dark-rule: #484848;
+  --dark-tint: #353535;
+  --dark-raised: #353535;
+  --dark-accent-tint: #353535;
+  --dark-positive: #acce75;
+  --dark-warning: #e6c696;
+  --dark-danger: #e6b2ad;
+  --dark-positive-tint: #363a2f;
+  --dark-warning-tint: #3d3933;
+  --dark-danger-tint: #3d3736;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

@@ -1,0 +1,29 @@
+/* Risotto's layer (github.com/joeroe/risotto, MIT), read from
+   assets/css/typography.css, logo.css and header.css: a page that looks like a
+   text file. # marks on headings, a shell prompt for the site's name, ./ on
+   each link, > beside each quote. */
+
+h1::before { content: "# "; opacity: 0.6; }
+h2::before { content: "## "; opacity: 0.6; }
+h3::before { content: "### "; opacity: 0.6; }
+h4::before { content: "#### "; opacity: 0.6; }
+.catalog-part::before { content: none; }
+
+/* The name as a prompt: [site] $, on a block of the notice green. */
+.part-header-title, .masthead-title { padding: 0.25rem; background: var(--positive); color: var(--paper); }
+.part-header-title:hover, .masthead-title:hover { color: var(--paper); }
+.part-header-title::before, .masthead-title::before { content: "["; }
+.part-header-title::after, .masthead-title::after { content: "] $"; }
+.part-header { background: none; }
+.part-header-inner { max-width: calc(var(--measure) + 2 * var(--space-3)); }
+.part-header-nav ul, .masthead nav { font-size: var(--step-0); text-transform: lowercase; }
+.part-header-nav a, .masthead nav a { color: var(--link); }
+.part-header-nav a::before, .masthead nav a::before { content: "./"; color: var(--muted); }
+.part-header.sticky-stays { border-bottom: 0; }
+
+.flow a:not([class]) { color: var(--link); }
+.flow > ul { list-style: "\2217\00A0"; }
+blockquote { position: relative; padding-left: var(--space-3); border-left: 0; color: inherit; }
+blockquote::before { content: ">"; position: absolute; left: 0; color: var(--muted); }
+hr { width: 100%; border-top: var(--border) solid var(--rule); }
+.part-footer { border-top: 0; }

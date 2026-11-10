@@ -1,0 +1,48 @@
+/* catppuccin-macchiato: a deep indigo gray with soft pastel marks.
+   Made by `bun scripts/theme.ts build` from themes/palettes/catppuccin-macchiato.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: dark;
+
+  --paper: #2f3244;
+  --ink: #cad3f5;
+  --accent: #c6a0f6;
+  --muted: #979baa;
+  --rule: #404458;
+  --tint: #1e2030;
+  --dark-paper: #1e2030;
+  --dark-ink: #cad3f5;
+  --dark-accent: #c6a0f6;
+  --raised: #2f3244;
+  --link: #8aadf4;
+  --heading: #f4dbd6;
+  --code-paper: #1e2030;
+  --code-ink: #cad3f5;
+  --code-muted: #868a9c;
+  --code-accent: #c6a0f6;
+  --positive: #a6da95;
+  --warning: #eed49f;
+  --danger: #ee8d9b;
+  --accent-tint: #3b3b52;
+  --positive-tint: #393f4a;
+  --warning-tint: #3e3f4b;
+  --danger-tint: #3e394b;
+  --dark-link: #8aadf4;
+  --dark-heading: #f4dbd6;
+  --band: #1e2030;
+  --band-ink: #cad3f5;
+  --dark-muted: #939ab6;
+  --dark-rule: #404457;
+  --dark-tint: #2d3042;
+  --dark-raised: #2d3042;
+  --dark-accent-tint: #322f48;
+  --dark-positive: #bad6ca;
+  --dark-warning: #dad3ce;
+  --dark-danger: #dab4cd;
+  --dark-positive-tint: #313642;
+  --dark-warning-tint: #353643;
+  --dark-danger-tint: #353243;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.05);
+  --shadow-deep: 0 2px 4px rgb(0 0 0 / 0.06), 0 16px 40px rgb(0 0 0 / 0.14);
+}

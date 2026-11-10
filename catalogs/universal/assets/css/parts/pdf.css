@@ -1,0 +1,5 @@
+/* pdf: a document in the page, in a frame with its own scrolling. */
+.part-pdf-frame { display: block; width: 100%; height: 36rem; max-height: 80vh; border: var(--border) solid var(--rule); border-radius: var(--radius); background: var(--tint); }
+.part-pdf-fallback { margin: 0; padding: var(--space-3); color: var(--muted); }
+.part-pdf-link { margin: var(--space-1) 0 0; font-family: var(--font-ui); font-size: var(--step--1); }
+.part-pdf figcaption { margin-top: var(--space-1); font-size: var(--step--1); color: var(--muted); }
