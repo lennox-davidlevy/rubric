@@ -77,6 +77,13 @@
       live.nodeValue = next.nodeValue;
       return;
     }
+    // An object (a PDF) loads its file once: Chrome keeps the fallback after a
+    // missing file even when `data` changes to one that's there. A new one
+    // loads afresh. Only when it changed, so an unchanged PDF keeps its place.
+    if (/^(OBJECT|EMBED)$/.test(live.nodeName)) {
+      live.replaceWith(document.importNode(next, true));
+      return;
+    }
     // Only what the page itself changed: an attribute a script set stays.
     for (const { name, value } of next.attributes) if (was.getAttribute(name) !== value) live.setAttribute(name, value);
     for (const { name } of was.attributes) if (!next.hasAttribute(name)) live.removeAttribute(name);

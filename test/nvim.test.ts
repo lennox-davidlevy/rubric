@@ -69,15 +69,15 @@ test.skipIf(!nvim)("Neovim: attach, diagnostics, completion, ghost text, accept,
     // (remote output is trimmed, so the ghost's leading space is not compared.)
     expect(await until(() => expr("RubricTest.ghost()") === "-> quote size=large")).toBe(true);
     keys("<M-l>");
-    expect(await until(() => expr("RubricTest.line(2)") === "::: a big quote please -> quote size=large")).toBe(true);
+    expect(await until(() => expr("RubricTest.line(2)") === "::: quote size=large")).toBe(true);
     keys("<Esc>");
 
-    // The server reads the line as pinned, and places it.
+    // The server reads the line as a plain form, and places it.
     const sidecar = join(site, ".rubric/sidecar/posts/smoke.md.json");
     expect(await until(() => {
       try {
         const [first] = JSON.parse(readFileSync(sidecar, "utf8"));
-        return first.kind === "pinned" && first.placed === true;
+        return first.kind === "plain" && first.placed === true;
       } catch {
         return false;
       }
@@ -118,11 +118,15 @@ test.skipIf(!nvim)("Neovim: accepting a pick on an empty block writes the part's
     await Bun.sleep(600);
     expect(await until(() => expr("RubricTest.ghost()").startsWith("-> steps"))).toBe(true);
     keys("<M-l>");
-    expect(await until(() => expr("RubricTest.line(4)") === "::: steps please -> steps")).toBe(true);
+    expect(await until(() => expr("RubricTest.line(4)") === "::: steps")).toBe(true);
     keys("<Esc>");
     const lines = () => Array.from({ length: 9 }, (_, i) => expr(`RubricTest.line(${i + 4})`));
     expect(await until(() => lines()[8] === ":::")).toBe(true);
-    expect(lines()).toEqual(["::: steps please -> steps", "### The first step", "", "What to do.", "", "### The second step", "", "What to do next.", ":::"]);
+    expect(lines()).toEqual(["::: steps", "### The first step", "", "What to do.", "", "### The second step", "", "What to do next.", ":::"]);
+    // The cursor stays at the end of the starter, and one undo brings the words back.
+    expect(expr("vim.api.nvim_win_get_cursor(0)[1]")).toBe("11");
+    keys("u");
+    expect(await until(() => expr("RubricTest.line(4)") === "::: steps please" && expr("RubricTest.line(5)") === ":::")).toBe(true);
   } finally {
     keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);
@@ -131,7 +135,7 @@ test.skipIf(!nvim)("Neovim: accepting a pick on an empty block writes the part's
   }
 }, 60_000);
 
-test.skipIf(!nvim)("Neovim: accepting words after a pin's colon rewrites the pin and keeps the words", async () => {
+test.skipIf(!nvim)("Neovim: accepting words after a pin's colon rewrites the pin and drops the words", async () => {
   const dir = mkdtempSync(join(tmpdir(), "rubric-nvim-refine-"));
   const sock = join(dir, "nvim.sock");
   cpSync(join(repo, "sites/blog"), join(dir, "site"), { recursive: true, filter: (src) => !/\/(content|\.rubric|public)(\/|$)/.test(src) });
@@ -158,7 +162,7 @@ test.skipIf(!nvim)("Neovim: accepting words after a pin's colon rewrites the pin
     await Bun.sleep(600);
     expect(await until(() => expr("RubricTest.ghost()").includes("width=wide"))).toBe(true);
     keys("<M-l>");
-    expect(await until(() => expr("RubricTest.line(4)") === "::: a video -> video width=wide : make it wide")).toBe(true);
+    expect(await until(() => expr("RubricTest.line(4)") === "::: video width=wide")).toBe(true);
     keys("<Esc>");
     expect(expr("RubricTest.line(5)")).toBe("https://youtu.be/x");
   } finally {
@@ -200,8 +204,24 @@ test.skipIf(!nvim)("Neovim: when Jev offers two picks, a hint beside the ghost t
     keys("<M-n>");
     expect(await until(() => expr("RubricTest.ghost()").startsWith("-> callout"))).toBe(true);
     expect(expr("RubricTest.picks()")).toBe("");
+    // The preview shows the pick the ghost text is on, in both directions,
+    // and goes back to what the line resolved to when insert mode ends.
+    const written = () => readFileSync(join(site, "content/posts/picks.md"), "utf8");
+    expect(await until(() => written().includes("{{< callout >}}"))).toBe(true);
+    keys("<M-p>");
+    expect(await until(() => expr("RubricTest.ghost()").startsWith("-> sidenote"))).toBe(true);
+    expect(await until(() => written().includes("{{< sidenote >}}") && !written().includes("{{< callout >}}"))).toBe(true);
+    keys("<M-n>");
+    expect(await until(() => written().includes("{{< callout >}}"))).toBe(true);
+    keys("<Esc>");
+    expect(await until(() => !written().includes("{{< callout >}}") && written().includes("::: a sidenote or a callout"))).toBe(true);
+    keys("A");
+    expect(await until(() => expr("RubricTest.ghost()").startsWith("-> sidenote"))).toBe(true);
+    keys("<M-n>");
+    expect(await until(() => expr("RubricTest.ghost()").startsWith("-> callout"))).toBe(true);
     keys("<M-l>");
-    expect(await until(() => expr("RubricTest.line(4)") === "::: a sidenote or a callout -> callout")).toBe(true);
+    expect(await until(() => expr("RubricTest.line(4)") === "::: callout")).toBe(true);
+    expect(await until(() => written().includes("{{< callout >}}"))).toBe(true);
   } finally {
     keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);
@@ -280,7 +300,104 @@ test.skipIf(!nvim)("Neovim: the accept key before any ghost text asks at once, w
     expect(await until(() => expr("RubricTest.ghost()").startsWith("-> quote"), 900)).toBe(true);
     expect(Date.now() - started).toBeLessThan(900);
     keys("<M-l>");
-    expect(await until(() => expr("RubricTest.line(4)").startsWith("::: a big quote please -> quote"))).toBe(true);
+    expect(await until(() => expr("RubricTest.line(4)").startsWith("::: quote"))).toBe(true);
+  } finally {
+    keys("<Esc>:qa!<CR>");
+    await Promise.race([editor.exited, Bun.sleep(2000)]);
+    editor.kill();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, 60_000);
+
+test.skipIf(!nvim)("Neovim: typing on after the ghost text shows takes it away, and the next answer lands at the new end", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "rubric-nvim-typing-"));
+  const sock = join(dir, "nvim.sock");
+  cpSync(join(repo, "sites/slice"), join(dir, "site"), { recursive: true, filter: (src) => !/\/(content|\.rubric)(\/|$)/.test(src) });
+  const site = join(dir, "site");
+  writeFileSync(join(site, "hugo.toml"), readFileSync(join(site, "hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(repo, "catalogs"))}`));
+  const page = join(site, "pages/posts/typing.md");
+  writeFileSync(page, ["Intro.", "::: a big quote", "Text.", ":::", ""].join("\n"));
+
+  const editor = Bun.spawn([nvim!, "--headless", "--listen", sock, "-u", join(repo, "test/nvim/init.lua"), "-i", "NONE", page], {
+    cwd: site, env: { ...process.env, RUBRIC_REPO: repo }, stdout: "ignore", stderr: "ignore",
+  });
+  const remote = (flag: string, arg: string) => Bun.spawnSync([nvim!, "--server", sock, flag, arg]).stdout.toString().trim();
+  const expr = (lua: string) => remote("--remote-expr", `luaeval("${lua.replace(/"/g, '\\"')}")`);
+  const keys = (k: string) => remote("--remote-send", k);
+  const until = async (f: () => boolean, ms = 10_000) => {
+    for (const end = Date.now() + ms; Date.now() < end; await Bun.sleep(50)) if (f()) return true;
+    return false;
+  };
+  const whole = "-> quote size=large";
+
+  try {
+    expect(await until(() => expr("RubricTest.attached()") === "true")).toBe(true);
+    keys(":call cursor(2, 1)<CR>A");
+    expect(await until(() => expr("RubricTest.ghost()") === whole)).toBe(true);
+
+    // Typing on: the ghost never loses its first letters to what was typed.
+    keys(" please");
+    const seen = expr("RubricTest.ghost()");
+    expect(seen === "" || seen === whole).toBe(true);
+    expect(expr("RubricTest.line(2)")).toBe("::: a big quote please");
+
+    // One more letter and a pause: the line is asked again, and accepting
+    // puts the pin after the words, not where the line used to end.
+    expect(await until(() => expr("RubricTest.ghost()") === whole)).toBe(true);
+    keys("s");
+    expect(await until(() => expr("RubricTest.ghost()") !== whole, 1000)).toBe(true);
+    expect(await until(() => expr("RubricTest.ghost()") === whole)).toBe(true);
+    keys("<M-l>");
+    expect(await until(() => expr("RubricTest.line(2)") === "::: quote size=large")).toBe(true);
+  } finally {
+    keys("<Esc>:qa!<CR>");
+    await Promise.race([editor.exited, Bun.sleep(2000)]);
+    editor.kill();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, 60_000);
+
+test.skipIf(!nvim)("Neovim: spell checking skips part names and settings, and keeps the writer's words", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "rubric-nvim-spell-"));
+  const sock = join(dir, "nvim.sock");
+  cpSync(join(repo, "sites/slice"), join(dir, "site"), { recursive: true, filter: (src) => !/\/(content|\.rubric)(\/|$)/.test(src) });
+  const site = join(dir, "site");
+  writeFileSync(join(site, "hugo.toml"), readFileSync(join(site, "hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(repo, "catalogs"))}`));
+  const page = join(site, "pages/posts/spell.md");
+  writeFileSync(page, [
+    "The wrods stay checked.",
+    "::: a big qoute -> callout icon=lightbulb : make it biggr",
+    ":::",
+    "::: callout icon=lightbulb cite=\"Ch. 2: Hme\"",
+    ":::",
+    "::: callout icon=",
+    ":::",
+    "::: first -> secnd thing -> callout icon=lightbulb",
+    ":::",
+    "",
+  ].join("\n"));
+
+  const editor = Bun.spawn([nvim!, "--headless", "--listen", sock, "-u", join(repo, "test/nvim/init.lua"), "-i", "NONE", "--cmd", "set spell spelllang=en", page], {
+    cwd: site, env: { ...process.env, RUBRIC_REPO: repo }, stdout: "ignore", stderr: "ignore",
+  });
+  const remote = (flag: string, arg: string) => Bun.spawnSync([nvim!, "--server", sock, flag, arg]).stdout.toString().trim();
+  const expr = (lua: string) => remote("--remote-expr", `luaeval("${lua.replace(/"/g, '\\"')}")`);
+  const keys = (k: string) => remote("--remote-send", k);
+  const until = async (f: () => boolean, ms = 10_000) => {
+    for (const end = Date.now() + ms; Date.now() < end; await Bun.sleep(50)) if (f()) return true;
+    return false;
+  };
+
+  try {
+    expect(await until(() => expr("RubricTest.attached()") === "true")).toBe(true);
+    expect(await until(() => expr("RubricTest.misspelled()") === "wrods,qoute,biggr,secnd")).toBe(true);
+
+    // A line typed now is marked as it changes, and words stay words.
+    keys("Go::: callout icon=lightbulbb<Esc>");
+    expect(await until(() => expr("RubricTest.line(10)") === "::: callout icon=lightbulbb")).toBe(true);
+    expect(expr("RubricTest.misspelled()")).toBe("wrods,qoute,biggr,secnd");
+    keys("cc::: a wooden lightbulbb<Esc>");
+    expect(await until(() => expr("RubricTest.misspelled()") === "wrods,qoute,biggr,secnd,lightbulbb")).toBe(true);
   } finally {
     keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);

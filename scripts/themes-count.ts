@@ -62,7 +62,7 @@ const BLOCKS: Record<string, string[]> = {
   "keyboard / abbr / mark (inline)": ["kbd", "abbr", "mark", "highlight-text", "sup", "sub"],
   "sidenote / footnote": ["sidenote", "marginnote", "footnote"],
   "contact / form": ["contact", "form", "contact-form", "newsletter", "subscribe"],
-  "social / share embeds": ["tweet", "twitter", "x", "instagram", "mastodon", "bluesky"],
+  "social / share embeds": ["tweet", "twitter", "x", "instagram", "mastodon"],
   "typing / animated text": ["typeit", "typed", "typewriter"],
   "divider / spacer": ["divider", "spacer", "hr", "separator", "br"],
 };

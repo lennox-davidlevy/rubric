@@ -109,11 +109,12 @@ describe("in the editor", () => {
 
   const head = "---\ntitle: T\n---\n";
 
-  test("words already on the page when it opens are never asked", async () => {
+  test("words left after the colon on a page when it opens are asked, like any others", async () => {
     await ws.open(page(), `${head}::: a video -> video : make it wide\nhttps://youtu.be/x\n:::\n`);
     await ws.settle();
-    expect(asked).toEqual([]);
-    expect(await ws.ghost(page(), 3)).toEqual([]);
+    expect(asked).toEqual(["video: make it wide"]);
+    expect((await ws.ghost(page(), 3))[0]?.replace).toBe("::: video width=wide");
+    asked = [];
   });
 
   test("changed words are asked, once, and the ghost shows what changes", async () => {
@@ -122,11 +123,11 @@ describe("in the editor", () => {
     await ws.settle();
     expect(asked).toEqual(["video: make it full"]);
     const [g] = await ws.ghost(page(), 3);
-    expect(g).toEqual({ text: " ⇒ width=full", line: 3, character: line.length, replace: "::: a video -> video width=full : make it full" });
+    expect(g).toEqual({ text: " ⇒ width=full", line: 3, character: line.length, replace: "::: video width=full" });
   });
 
-  test("once accepted, the pin says it, so there is nothing more to offer", async () => {
-    await ws.change(page(), `${head}::: a video -> video width=full : make it full\nhttps://youtu.be/x\n:::\n`);
+  test("once accepted, the words are gone and the pin says it, so there is nothing more to offer", async () => {
+    await ws.change(page(), `${head}::: video width=full\nhttps://youtu.be/x\n:::\n`);
     await ws.settle();
     expect(await ws.ghost(page(), 3)).toEqual([]);
     expect(readFileSync(join(dir, "content/posts/refine-test.md"), "utf8")).toContain('{{< video width="full" >}}');
@@ -143,7 +144,7 @@ describe("in the editor", () => {
     await ws.change(page(), `${head}::: a video -> video : with a soft shadow\nhttps://youtu.be/x\n:::\n`);
     await ws.settle();
     const [g] = await ws.ghost(page(), 3);
-    expect(g?.replace).toBe("::: a video -> video shadow=soft : with a soft shadow");
+    expect(g?.replace).toBe("::: video shadow=soft");
   });
 
   test("words asking for more than the part can do get a note on them", async () => {

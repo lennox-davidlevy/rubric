@@ -102,6 +102,9 @@ end
 -- the line changes, the cursor leaves it, or insert mode ends.
 local picks_ns = vim.api.nvim_create_namespace("rubric.picks")
 local picks_shown = {}
+-- Which pick the ghost text is on, for the preview to show the same one.
+-- Neovim keeps this to itself, and goes back to the first with every answer.
+local picks_at = {}
 
 local function clear_picks(bufnr)
   if picks_shown[bufnr] then
@@ -114,9 +117,11 @@ local function picks_handler(next_key)
   return function(_, params)
     local bufnr = vim.uri_to_bufnr(params.uri)
     clear_picks(bufnr)
+    picks_at[bufnr] = nil
     if params.count < 2 or not vim.startswith(vim.api.nvim_get_mode().mode, "i") then
       return
     end
+    picks_at[bufnr] = { line = params.line, count = params.count, index = 1 }
     local text = vim.api.nvim_buf_get_lines(bufnr, params.line, params.line + 1, false)[1]
     if not text then
       return
@@ -152,6 +157,84 @@ local function watch_picks(bufnr)
     buffer = bufnr,
     callback = function()
       clear_picks(bufnr)
+    end,
+  })
+end
+
+-- Part names and settings aren't writing, so spell checking leaves them alone,
+-- and stays on for the writer's words on either side. Worked out here, not by
+-- the server, so a pick accepted or a setting typed never flashes a squiggle
+-- while the change is on its way. Without the catalog, a lone word reads as a
+-- part name, and a setting still being typed as a setting.
+local spell_ns = vim.api.nvim_create_namespace("rubric.spell")
+
+-- Where the plain form starting at `pos` ends: past its last token, before any
+-- ":" and the words after it. Nil when the text isn't shaped like a plain form.
+local function plain_end(line, pos)
+  local stop = line:match("^%l[%l%d-]*()", pos)
+  if not stop or not line:find("^%s", stop) and stop <= #line then
+    return nil
+  end
+  while true do
+    pos = line:match("^%s*()", stop)
+    if pos > #line or line:find("^:%s", pos) or line:find("^:$", pos) then
+      return stop
+    end
+    stop = line:match('^%l[%l%d-]*="[^"]*"()', pos)
+      or line:match('^%l[%l%d-]*="[^"]*$', pos) and #line + 1
+      or line:match('^%l[%l%d-]*=[^%s"]*()', pos)
+    if not stop then
+      return nil
+    end
+  end
+end
+
+-- The columns of a directive line's plain form, as the scanner reads it: after
+-- the first " -> " with a plain form on its right, or the last when none has.
+local function plain_span(line)
+  local from = line:match("^%s*:::+%s*()%S")
+  if not from then
+    return nil
+  end
+  local arrow, at = nil, from
+  while true do
+    local s, e = line:find(" -> ", at, true)
+    if not s then
+      break
+    end
+    local stop = plain_end(line, e + 1)
+    if stop then
+      return e + 1, stop
+    end
+    arrow, at = e + 1, s + 1
+  end
+  if arrow then
+    return arrow, #line + 1
+  end
+  local stop = plain_end(line, from)
+  if stop then
+    return from, stop
+  end
+end
+
+local function mark_plain(bufnr)
+  vim.api.nvim_buf_clear_namespace(bufnr, spell_ns, 0, -1)
+  for row, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)) do
+    local start, stop = plain_span(line)
+    if start then
+      -- Above treesitter, which marks a Markdown line's text as spellable.
+      vim.api.nvim_buf_set_extmark(bufnr, spell_ns, row - 1, start - 1, { end_col = stop - 1, spell = false, priority = 200 })
+    end
+  end
+end
+
+local function watch_spell(bufnr)
+  mark_plain(bufnr)
+  vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", "TextChangedP" }, {
+    group = vim.api.nvim_create_augroup("RubricSpell" .. bufnr, { clear = true }),
+    buffer = bufnr,
+    callback = function()
+      mark_plain(bufnr)
     end,
   })
 end
@@ -224,17 +307,19 @@ function M.setup(opts)
   })
   vim.lsp.enable("rubric")
 
-  -- Accepting a refinement (words after a pin's ":") first inserts the ghost
-  -- text, which only shows what changes; this then writes the whole line,
-  -- since the pin it changes sits in the middle of it.
+  -- Accepting first inserts the ghost text, which only shows what is picked
+  -- or what changes; this then writes the whole line, the part in place of
+  -- the words. One undo brings the words back. The cursor stays at the end
+  -- of a starter body, if the ghost text brought one.
   vim.lsp.commands["rubric.pin"] = function(command, ctx)
     local arg = command.arguments and command.arguments[1]
     if not arg then
       return
     end
+    pcall(vim.cmd.undojoin)
     vim.api.nvim_buf_set_lines(ctx.bufnr, arg.line, arg.line + 1, false, { arg.text })
     local win = vim.fn.bufwinid(ctx.bufnr)
-    if win ~= -1 then
+    if win ~= -1 and vim.api.nvim_win_get_cursor(win)[1] == arg.line + 1 then
       vim.api.nvim_win_set_cursor(win, { arg.line + 1, #arg.text })
     end
   end
@@ -252,6 +337,7 @@ function M.setup(opts)
       end
       reopen_completion(event.buf)
       watch_picks(event.buf)
+      watch_spell(event.buf)
       send_cursor(event.buf, client.id)
       -- The line is done: ask now rather than after the pause.
       local function ask_now()
@@ -263,8 +349,51 @@ function M.setup(opts)
       vim.api.nvim_create_autocmd("InsertLeave", {
         group = vim.api.nvim_create_augroup("RubricAsk" .. event.buf, { clear = true }),
         buffer = event.buf,
-        callback = ask_now,
+        callback = function()
+          ask_now()
+          -- The ghost text goes with insert mode, and the page goes back to
+          -- the first pick with it.
+          local at = picks_at[event.buf]
+          local c = vim.lsp.get_client_by_id(client.id)
+          if at and c then
+            c:notify("rubric/choose", { uri = vim.uri_from_bufnr(event.buf), line = at.line })
+          end
+          picks_at[event.buf] = nil
+        end,
       })
+      -- Typing on makes the ghost text wrong: it's for the words as they were.
+      -- Neovim would keep it at the old end of the line, hide one letter of it
+      -- per letter typed, and accept it there. So it goes with the first key.
+      -- Neovim has no call to drop it, but accepting into nothing does, and
+      -- also stops the request it was about to send, so that's sent again.
+      vim.api.nvim_create_autocmd({ "TextChangedI", "TextChangedP" }, {
+        group = vim.api.nvim_create_augroup("RubricStale" .. event.buf, { clear = true }),
+        buffer = event.buf,
+        callback = function()
+          vim.lsp.inline_completion.get({
+            bufnr = event.buf,
+            on_accept = function()
+              picks_at[event.buf] = nil
+              vim.api.nvim_exec_autocmds("CursorMovedI", {
+                group = "nvim.lsp.inline_completion:" .. event.buf,
+                buffer = event.buf,
+              })
+            end,
+          })
+        end,
+      })
+      -- Moves the ghost text to another pick, and tells the server, so the
+      -- preview shows the same one. Index from 0 for the server.
+      local function move(count)
+        clear_picks(event.buf)
+        vim.lsp.inline_completion.select({ count = count })
+        local at = picks_at[event.buf]
+        local c = vim.lsp.get_client_by_id(client.id)
+        if at and c then
+          at.index = (at.index - 1 + count) % at.count + 1
+          c:notify("rubric/choose", { uri = vim.uri_from_bufnr(event.buf), line = at.line, index = at.index - 1 })
+        end
+      end
       local function map(lhs, rhs, desc)
         vim.keymap.set("i", lhs, rhs, { buffer = event.buf, desc = desc })
       end
@@ -274,12 +403,10 @@ function M.setup(opts)
         end
       end, "Rubric: accept and pin, or ask now")
       map(opts.next, function()
-        clear_picks(event.buf)
-        vim.lsp.inline_completion.select({ count = 1 })
+        move(1)
       end, "Rubric: next pick")
       map(opts.prev, function()
-        clear_picks(event.buf)
-        vim.lsp.inline_completion.select({ count = -1 })
+        move(-1)
       end, "Rubric: previous pick")
     end,
   })

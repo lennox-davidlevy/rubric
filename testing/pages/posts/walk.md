@@ -1,44 +1,21 @@
 ---
 title: The walk home
-date: 2026-11-02
+date: 2026-11-07
 tags: [walking, notes]
 hide: [comments, pager]
+cover: /images/path.png
 ---
 
-::: a big opening for the top of the page -> hero size=tall
-# The title
-
-A line or two about what this is.
+::: callout kind=tip shadow=soft border=outlined
+Be a smarty!
 :::
 
-::: a flowchart of the route -> diagram
-flowchart LR
-  A[Start] --> B[Finish]
-:::
+::: steps
+### The first step
 
-::: the youtube video of the walk -> video
-https://youtu.be/33sWQpPCFZU
+What to do.
 
-A line about it, shown under the video.
-:::
+### The second step
 
-::: tabs for summer and winter routes -> tabs
-## First tab
-
-What the first tab shows.
-
-## Second tab
-
-What the second tab shows.
-:::
-
-
-::: the podcast episode -> audio shadow=deep border=outlined : with a hard shadow and bright border 
-/audio/
-
-A line about it, shown with the player.
-:::
-
-::: a tip with a lightbulb -> callout kind=tip icon=lightbulb
-A good idea!
+What to do next.
 :::

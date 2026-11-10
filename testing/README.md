@@ -2,10 +2,13 @@
 
 What to test, and what should happen, is in [TESTING.md](TESTING.md).
 
-A live Rubric site for trying the editor by hand. It uses the universal catalog in `../catalogs/universal`, in the theme named under `[params.rubric]` in `hugo.toml` (paper, papermod or blowfish), and calls the real Jev with `TYPESAFE_API_KEY` from the repo's `.env`.
+A live Rubric site for trying the editor by hand. It uses the universal catalog in `../catalogs/universal`, in the theme named under `[params.rubric]` in `hugo.toml` (any of the 71 in `themes.yaml`), and calls the real Jev with `TYPESAFE_API_KEY` from the repo's `.env`.
 
-- `rubric.md` holds the frame around every page: its `:::` lines choose the header, footer and the rest.
-- `pages/posts/walk.md` is the post to write in; `pages/posts/first-walk.md` is plain writing, there so the pager, search and post list have a second post.
+- `rubric.md` holds the frame around every page: its `:::` lines choose the header, footer and the rest. It starts empty.
+- `pages/posts/walk.md` is the post to write in, and starts empty.
+- `pages/parts.md` is every part for the writing, filled in, in plain form, for looking at themes. `pages/broken.md` is every mistake a line can make.
+- `pages/posts/reservoir.md`, `night-bus.md` and `first-walk.md` are finished posts, for the frame, the pager, related posts and search. `pages/about.md` is a page with no date, and `about.fr.md` its translation, for the language switch.
+- `static/` holds what the parts need: pictures, logos, a PDF, a GPS track, a sound and a video.
 
 1. Start the preview, from the repo root:
 
@@ -13,7 +16,7 @@ A live Rubric site for trying the editor by hand. It uses the universal catalog 
    bun run play
    ```
 
-   That writes `testing/content/` from `testing/pages/` and `rubric.md` once and serves it at http://localhost:1415/posts/walk/.
+   That writes `testing/content/` from `testing/pages/` and `rubric.md` once and serves it at http://localhost:1415/.
 
    The same terminal prints every call to Jev: the line sent, each part's probability and fit with its settings' answers, and what the line became; a second-pass block for the words after a pin's colon. The full request and response of each call are in `testing/.rubric/jev.jsonl`, which `bun run play` empties when it starts. A line answered from the cache makes no call and prints nothing.
 
@@ -29,9 +32,9 @@ Typing `::: ` on an empty line adds the closing `:::` below it, the way autopair
 
 Keys, in insert mode on a `:::` line:
 
-- `<M-l>` accepts the ghost text: pins the line, or writes a second pass's settings into the pin. Before any ghost text shows, it asks Jev about the line at once instead of waiting for you to pause; Esc does too
-- `<M-n>` / `<M-p>` switch between the pick and the runner-up
+- `<M-l>` accepts the ghost text: puts the part in place of your words, or writes a second pass's settings into the part and drops those words. `u` brings the words back. Before any ghost text shows, it asks Jev about the line at once instead of waiting for you to pause; Esc does too
+- `<M-n>` / `<M-p>` switch between the pick and the runner-up, in the ghost text and on the page
 - `K` in normal mode shows what a line became and why
 - `<leader>e` shows the line's note
 
-Jev's answers are cached in `testing/.rubric/cache.json`, per catalog version and theme. Delete it to ask again. A line goes to Jev when you leave it, or after you pause on it for a second. Changing the theme in `hugo.toml` needs no restart: Hugo and the language server both pick it up when the file is saved. To try without Jev, set `args = { "--stub" }` in the plugin's setup.
+Jev's answers are cached in `testing/.rubric/cache.json`, per catalog version and theme. Delete it to ask again. A line goes to Jev when you leave it, or after you pause on it for up to 0.6 s. Changing the theme in `hugo.toml` needs no restart: Hugo and the language server both pick it up when the file is saved. To try without Jev, set `args = { "--stub" }` in the plugin's setup.
