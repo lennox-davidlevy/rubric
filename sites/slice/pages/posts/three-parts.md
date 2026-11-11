@@ -28,7 +28,7 @@ A section with a heading and two paragraphs, and parts nested inside it.
 An aside inside a section.
 :::
 
-::: a pinned line, where the words stay as a record -> quote size=large
+::: quote size=large
 A quote inside a section.
 
 With a second paragraph.

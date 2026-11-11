@@ -1,9 +1,7 @@
 {{- /*
-  The skin a page is drawn in: its theme's skin in themes.yaml, or "". A
-  page may name its own theme, as the catalog and stress pages do.
+  The skin a page is drawn in: its theme's skin in themes.yaml, or ""; the
+  theme is worked out in rubric/theme.html.
 
   Usage: {{ $skin := partial "rubric/skin.html" .page }}
 */ -}}
-{{- $theme := . | default site.Home -}}
-{{- $name := $theme.Params.rubric.theme | default site.Params.rubric.theme | default "paper" -}}
-{{- return ((index hugo.Data.themes $name).skin | default "") -}}
+{{- return (partial "rubric/theme.html" .).skin -}}

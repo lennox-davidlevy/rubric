@@ -157,10 +157,6 @@ describe("completion", () => {
     expect((await at("::: quote size=large ")).sort()).toEqual(["align=", "cite="]);
   });
 
-  test("after a pin's arrow, the same", async () => {
-    expect(await at("::: a box -> sec")).toEqual(["section"]);
-  });
-
   test("words get nothing, and neither does code", async () => {
     expect(await at("::: a big ")).toEqual([]);
     expect(ws.complete(page, 19, 5)).toEqual([]);
@@ -332,9 +328,9 @@ describe("when Jev is asked", () => {
     await w.settle();
     await drawn(`{{< quote >}}`);
 
-    // Accepting the second pick pins it, and nothing is held over.
+    // Accepting the second pick puts it in place of the words, and nothing is held over.
     w.choose(page, 3, 1);
-    await w.change(page, words("two close picks -> callout kind=warning"));
+    await w.change(page, words("callout kind=warning"));
     await drawn(`{{< callout kind="warning" >}}`);
     await w.close(page);
   });
@@ -376,10 +372,10 @@ describe("pictures", () => {
     const all = await at("::: hero image=");
     expect(all.map((c) => c.newText)).toContain('"/images/placeholder-field.jpg"');
     expect(all.every((c) => c.kind === "file" && !c.label.includes("fonts"))).toBe(true);
-    const some = await at('::: a big opening -> hero image="/images/gal');
+    const some = await at('::: hero image="/images/gal');
     expect(some.length).toBeGreaterThan(0);
     expect(some.every((c) => c.label.startsWith("/images/gallery/"))).toBe(true);
-    expect(some[0]!.start).toBe('::: a big opening -> hero image='.length);
+    expect(some[0]!.start).toBe('::: hero image='.length);
   });
 
   test("a Markdown picture's address offers them too, unquoted", async () => {

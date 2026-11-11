@@ -93,7 +93,7 @@ Type each line and press `<M-l>` twice: once to ask, once to accept. Watch `/pos
 Then the lines that don't belong here:
 
 - `::: a quote from a book` is nothing for the frame. The note says "nothing for the frame fits; rubric.md holds only what goes around every page, and parts for the writing go in a page".
-- `::: a quote from a book -> quote` pinned by hand. The note says quote goes in a page.
+- `::: quote` typed by hand. The note says quote goes in a page.
 
 Delete both, and try changing the header: `::: a menu across the top that stays when scrolling` should give `header sticky=stays`, and the header stays as you scroll.
 
@@ -121,7 +121,7 @@ Each of these is a new line in `walk.md`.
 | Type it, delete it, type it again | `::: a helpful hint` | Instant, and no new `── Jev` block: it's cached |
 | **New: restart Neovim once to get this.** Stop on `::: a big quote` until the ghost text shows, then keep typing ` from a friend` | | The ghost text goes with your first key and nothing you type lands on it. It comes back after your next pause, after the new words. `<M-l>` right after typing asks, and doesn't accept the old pick |
 
-**Should happen:** one `── Jev` block per line in the play terminal. Note any block with half-typed words in it, like "a flowchart of the ro". A pinned line never makes one, even when you edit its body.
+**Should happen:** one `── Jev` block per line in the play terminal. Note any block with half-typed words in it, like "a flowchart of the ro". A line that starts with a part never makes one, even when you edit its body.
 
 ## 5. Choosing, and asking why
 
@@ -154,7 +154,7 @@ Delete what's in `walk.md`'s body from section 4.
 **Asking why.** In normal mode, on each of those lines:
 
 - `K` on a line of words: the pick or "not sure", its fit, how every part scored, and the model.
-- `K` on a pinned line: the part's description, what each setting means, and "Pinned".
+- `K` on an accepted line: the part's description and what each setting means.
 - `<leader>e` on a line with a note: the note.
 
 Delete the unsure lines when you're done, or section 11's page will be busy.
@@ -170,13 +170,12 @@ All on new lines in `walk.md`. Each of these should make no `── Jev` block.
 | `::: quote size=` | Offers `normal` and `large`, with what each means |
 | Backspace over `large` | The menu comes back |
 | `::: quote size=large cite="My grandmother"` | Draws at once: a value with spaces is quoted |
-| `::: some words -> ca` | After a pin's arrow, offers `callout`, `cards`, `call-to-action` |
 | `::: hero image=` | Offers the site's pictures |
 | `![A picture](/images/` | Offers the site's pictures, on any line |
 | `::: a line of words` | Offers nothing: words are for Jev. This one does make a block |
 | Inside a code fence, `::: ` | Offers nothing, and the closer isn't a problem |
 
-**New: restart Neovim once to get this.** With spell checking on, on `::: a big qoute -> callout icon=lightbulb : make it biggr` only `qoute` and `biggr` get a squiggle. `::: callout icon=lightbulb` gets none, and neither does a value in quotes. A line of words like `::: a wooden lightbulbb` keeps its squiggle.
+**New: restart Neovim once to get this.** With spell checking on, `::: a big qoute` gets a squiggle on `qoute`, and on `::: callout icon=lightbulb : make it biggr` only `biggr` does. `::: callout icon=lightbulb` gets none, and neither does a value in quotes. A line of words like `::: a wooden lightbulbb` keeps its squiggle.
 
 ## 7. The second pass
 
@@ -336,10 +335,8 @@ With a video, a diagram and tabs on the page from section 9, start the video pla
 | `::: quote size=huge` | `value-not-allowed`: allowed: normal, large |
 | `::: quote flavor=sweet` | `unknown-setting` |
 | `::: quote size=large size=normal` | `duplicate-setting` |
-| `::: a blockquote -> blockquote` | `unknown-part` |
-| `::: a quote -> not a plain form` | `bad-pin` |
-| `::: a nav bar -> header` | `wrong-place`: choose it in rubric.md |
-| `::: quote` inside `::: divider` | `no-children` |
+| `::: header` | `wrong-place`: choose it in rubric.md |
+| The `:::` under `::: divider` | `stray-closer`: divider takes nothing inside |
 | `::: contact-form` | `needs-setting`: where it sends |
 | `![A missing picture](/images/nothing-here.jpg)` | `missing-file`: no file at… in static/ |
 | A lone `:::` | `stray-closer` |
@@ -416,7 +413,7 @@ Type a line you haven't used: `::: a rotating slider of screenshots`.
 
 - The note says "could not reach Jev: HTTP 401…", and `K` says the same.
 - The line stays as text, and nothing else on the page changes.
-- Every pinned part still draws, and editing one still updates the page.
+- Every accepted part still draws, and editing one still updates the page.
 - Lines you've used before still give ghost text, from the cache.
 
 Quit, and open Neovim normally: the same line resolves.

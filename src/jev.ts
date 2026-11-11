@@ -7,7 +7,7 @@
 // types are still used for the questions and answers.
 
 import {
-  buildQuestions, buildState, detailQuestions, lookQuestions, MODEL, PART, partQuestion, refineQuestions, refineState, resolve, resolveRefine,
+  buildQuestions, buildState, detailQuestions, THEME_CHOICE, themeQuestion, lookQuestions, MODEL, PART, partQuestion, refineQuestions, refineState, resolve, resolveRefine,
   type Answers, type Catalog, type PageKind, type Question, type Refined, type Resolution,
 } from "./core/index.ts";
 
@@ -145,4 +145,19 @@ export async function refine(
   } catch (err) {
     return { error: `could not read Jev's answers: ${(err as Error).message}`, request, response: res.body, ms: res.ms };
   }
+}
+
+// How likely each theme is for the words on rubric.md's theme line, to put
+// the editor's list in order. One small request; a failure is thrown, and
+// the list is shown in its own order.
+export async function rankThemes(
+  themes: { name: string; description: string }[], words: string, key = process.env.TYPESAFE_API_KEY,
+): Promise<{ order: Record<string, number>; request: Request; response?: unknown; model?: string; ms: number }> {
+  const request: Request = { model: MODEL, state: buildState(words, "site"), questions: themeQuestion(themes) };
+  if (!key) throw new Error("could not reach Jev: TYPESAFE_API_KEY is not set");
+  const res = await call(request, key);
+  if (!res.ok) throw new Error(res.message);
+  const order = (res.answers[THEME_CHOICE] as { probabilities?: Record<string, number> } | undefined)?.probabilities;
+  if (!order) throw new Error("could not read Jev's answer: no probabilities for the theme");
+  return { order, request, response: res.body, model: res.model, ms: res.ms };
 }

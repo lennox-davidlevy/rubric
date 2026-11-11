@@ -1,41 +1,37 @@
-::: an announcement -> banner
+::: theme terminal palette=gruvbox-dark
+
+::: banner
 A short notice. [Read more](#)
 :::
 
-::: a top navigation bar -> header
+::: header
 - [Posts](/posts/)
 - [About](/about/)
 :::
 
-::: a search box -> search
-:::
+::: search
 
-::: a dark mode toggle -> theme-switch
-:::
+::: theme-switch
 
-::: a trail of links back -> breadcrumbs
-:::
+::: breadcrumbs
 
-::: a featured image at the top -> cover
-:::
+::: cover
 
-::: the date, reading time, and author -> post-meta shows=everything
-:::
+::: post-meta shows=everything
 
-::: a sidebar with sections -> sidebar
+::: sidebar
 ### A heading
 
 - [A page](/)
 - [Another page](/)
 :::
 
-::: a floating table of contents -> page-contents
+::: page-contents
+
+::: author
+![Your name](/images/gallery/sample-1.jpg)
+
+I am a dude who thinks hes a dude playing a dude who does cool things
+
+Don't worry about it.
 :::
-
-::: an about the author box -> author
-![Your name](/images/)
-
-A line or two about you.
-:::
-
-

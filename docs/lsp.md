@@ -8,7 +8,7 @@ In a site folder with `hugo server` running and Neovim open on a page:
 
 1. You type `::: a quote from the book, big and centered` and stop.
 2. Within a moment, gray text appears at the end of the line: `-> quote size=large align=center`, and the preview shows the block drawn as a large centered quote.
-3. You press the accept key. The gray text becomes real text. The line is pinned and never goes to the network again.
+3. You press the accept key. The line becomes `::: quote size=large align=center`, the plain form in place of your words, and never goes to the network again.
 4. You press the swap key instead, and the second pick shows, in the editor and in the preview.
 5. You type a line nothing fits, `::: a spreadsheet of my taxes`, and the editor marks it with "nothing in the catalog fits" and the preview shows the line as plain text.
 6. You stop Jev (bad key, no network) and the editor says "could not reach Jev" and nothing else changes.
@@ -107,11 +107,12 @@ While deciding, the ghost text shows the pick after the words, with an arrow:
 ::: a quote from the book, big and centered -> quote size=large align=center
 ```
 
-Accepting puts the plain form in place of the words: `::: quote size=large align=center` (since the fourth run, 2026-11-08). Once a line is pinned nothing reads its words again, so they were only clutter, and they went stale when the pin was edited by hand. What the words asked for stays in `.rubric/cache.json`, which is where a re-ask after a catalog change, or examples for training a model, would come from. The same goes for words after a lone `:` (the second pass): accepting writes their settings into the pin and drops them, and any words before an arrow with them.
+Accepting puts the plain form in place of the words: `::: quote size=large align=center` (since the fourth run, 2026-11-08). The words used to stay before the arrow as a record, but nothing read them again; they were clutter, and went stale when the part was edited by hand. What the words asked for stays in `.rubric/cache.json`, which is where a re-ask after a catalog change, or examples for training a model, would come from. The same goes for words after a lone `:` (the second pass): accepting writes their settings into the part and drops them.
 
-- A line with no `->` whose first token is a part and whose other tokens are `key=value` is plain form, written by hand, by completion, or by accepting. Words after a lone `:` ask Jev about its look.
-- A line with `->` is pinned: left of it are words, right of it is the plain form, and code reads only the right side. Accepting no longer writes it, but lines that have one still work. It may go from the syntax later.
-- Any other line is words, and live.
+There are two kinds of line, and the arrow is no longer one of them (2026-11-09): it only shows in the ghost text.
+
+- A line whose first token is a part and whose other tokens are `key=value` is plain form, written by hand, by completion, or by accepting. Words after a lone `:` ask Jev about its look.
+- Any other line is words, and live. An arrow in it is words too.
 
 The ghost text is the text Neovim inserts at the end of the line, ` -> quote size=large align=center`. The item carries the `rubric.pin` command, which then writes the whole line, joined to the same undo step, so one `u` brings the words back. The cursor stays at the end of a starter body if the ghost brought one.
 
@@ -134,7 +135,7 @@ Every feature is a standard protocol method, so VS Code and the browser editor g
 
 Typing `:::` and a space offers every part in the catalog, with its description as the detail. Choosing one inserts the part's name only. The planned snippet, with every setting as a choice placeholder, was dropped in the slice: it wrote every default into the line, and the plain form leaves defaults out.
 
-Inside a plain-form line, completion is contextual: after the part name it offers that part's settings not yet given, each with its type and default; after `key=` it offers that setting's values, each with its description. After a pin's ` -> ` it works the same way. Typing words instead of a part name offers nothing, by design, because words are for Jev. Lines in code fences and front matter get nothing.
+Inside a plain-form line, completion is contextual: after the part name it offers that part's settings not yet given, each with its type and default; after `key=` it offers that setting's values, each with its description. Typing words instead of a part name offers nothing, by design, because words are for Jev. Lines in code fences and front matter get nothing.
 
 ## What goes to Jev
 
@@ -209,15 +210,15 @@ Three sets: the 120 above for tuning; `probe/universal-holdout.yaml`, 68 lines w
 
 ## The document flow inside the server
 
-1. On open and on every change, the server scans the buffer: code fences tracked, directive lines found, blocks matched to their closers, each line classified as pinned, plain or words.
-2. The preprocessor writes `content/<page>.md` from the buffer: pinned and plain lines become shortcode calls, resolved words lines become their cached shortcode calls, unresolved words lines are copied as text, everything else is copied byte for byte. Hugo rebuilds and the preview shows the page as it is in the editor right now.
+1. On open and on every change, the server scans the buffer: code fences tracked, directive lines found, blocks matched to their closers, each line classified as plain or words.
+2. The preprocessor writes `content/<page>.md` from the buffer: plain lines become shortcode calls, resolved words lines become their cached shortcode calls, unresolved words lines are copied as text, everything else is copied byte for byte. Hugo rebuilds and the preview shows the page as it is in the editor right now.
 3. A words line that is not cached goes to Jev when the writer leaves it (an edit lands on another line), or after a one-second pause on it. One request per distinct line. A line shaped like a plain form being typed (`quot`, `quote size=large ci`) is not words and is never sent; it gets an `unfinished-part` or `unfinished-setting` diagnostic instead. The first version asked on every 200 ms pause, and a morning in the playground cached 115 answers, most of them fragments like `a raised box that is kin`.
 4. When an answer comes back, the resolver runs, the cache is written, and the page is drawn again: content file, sidecar and diagnostics, 100 ms after the last change to it. The same wait applies to typing: a burst of keystrokes is one drawing. Hugo and the browser then take about 215 ms more, so the page shows about a third of a second after the writer stops.
 
    **The stale preview.** The live tests found the browser a keystroke or two behind: `Hello wor` for `Hello world`, and later `my grandm` for `cite="my grandma"`. The buffer, the server's text, content/ and the page Hugo served were all right; only the browser was stale. The first explanation was that a browser still reloading misses livereload's next message, so drawing was slowed to 300 ms. That made it rarer, not gone. The real cause, reproduced with two writes and a browser on a copy of the site (2026-11-01): `hugo server` sends `Last-Modified` to the second. When two builds land in the same second, the browser's reload asks `If-Modified-Since`, Hugo answers 304, and the browser keeps the older page. Before the fix, 4 of 12 paired writes ended stale; with `Cache-Control: no-store` from the site's `[[server.headers]]`, 0 of 18, and bursts of twelve writes 150 ms apart ended on the last one every time. Hugo reads `server` settings from the site's own config only, never from a theme, so every Rubric site carries the header, and the command that creates sites must write it. With the cause fixed, the wait came down to 100 ms.
 
    `scripts/live-repro.ts` types blocks through the real Neovim config and compares the buffer, the server's text, content/ and what Hugo serves, and checks the no-store header. With `RUBRIC_HOLD` set it keeps the page up for a look in a browser attached to livereload.
-5. The accept key inserts the ghost text. The next change notification shows the line is pinned, and the loop never asks about it again.
+5. The accept key puts the plain form in place of the words. The next change notification shows a plain line, and the loop never asks about it again.
 
 **What the second live test found (2026-11-02), and what changed:**
 
@@ -233,6 +234,7 @@ Three sets: the 120 above for tuning; `probe/universal-holdout.yaml`, 68 lines w
 - **A theme switch sometimes lost a page's cover** (the fourth run, 2026-11-08). Each Neovim runs its own server, and on a theme switch (and when it starts) each draws every page it doesn't have open from disk. The writer had `walk.md` open with an unsaved `cover:`, and a second Neovim open on `TESTING.md`; whichever server wrote `walk.md` last won. Hugo alone, and one server alone, kept the cover through every switch, which is why only some switches lost it. Now each server lists the pages it has open in `.rubric/open/<pid>-<id>.json`, and draws from disk only pages no live server lists (`Workspace.buildAll`). A list whose process is gone is removed; a server removes its own when it exits.
 - **A PDF showed only after a refresh** (the fourth run). The block held the starter `/files/document.pdf`, which isn't there, so the `<object>` showed its fallback; changing the address patched `data` in place, and Chrome never loads an `<object>` again once it has fallen back. The live page now swaps in a new `<object>` or `<embed>` when its HTML changes, and leaves an unchanged one alone (`rubric-live.js`). The fallback no longer blames the browser, and an address alone on a line in a block, as a PDF, video or audio part takes it, gets the "no file in static/" warning.
 - **A link in an embed is a card with the page's picture** (the fourth run asked). `_partials/rubric/unfurl.html` fetches the page with `resources.GetRemote`, reads its `og:`/`twitter:` tags or `<title>`, and copies the picture into the site, shrunk to fit 1200 px. Hugo keeps every answer on disk, so a link is fetched once. A failure isn't kept, so each fetch gives up after 2 s and the card falls back to the address. Hugo's own policy fetches no IP address or localhost.
+- **Sites that turn away the card's request** (the fourth run's retest: Reddit didn't work). Checked against 24 popular sites as the card asks: about a third refuse (403: Reddit, Medium, NYT, Stack Overflow, npm, Etsy) or rate-limit (429: YouTube, Instagram). The big media sites among them publish an oEmbed address for exactly this, listed in the oEmbed registry, so the card asks a link the registry knows there first (`catalogs/universal/data/oembed.json`, copied from oembed.com on 2026-11-09, about 400 sites), and reads the page only for the rest. YouTube, Reddit and Vimeo now give a title and "By" their author, and YouTube and Vimeo a picture. A site with no oEmbed address that turns us away keeps the plain card: the card says who it is (`Rubric link preview`) rather than pretend to be a browser or Slack.
 - **A switch back to Paper sometimes lost a Blowfish callout** until it was edited (the third run). Hugo watches `hugo.toml` too, and when its rebuild came before the server's rewrite, Paper's shortcode met `icon="lightbulb"` and failed the build; Hugo kept the old page, and the browser never got the good one. Reproduced on a copy of the playground: one switch in six failed. Now a part or setting that another skin brings is left out by the shortcode instead of failing (`_partials/rubric/settings.html`; a part draws only its writing), which is what the server's rewrite does a moment later anyway. Truly unknown settings still fail. Ten switches at varied timing, all right; `test/hugo.test.ts` covers it.
 
 **Faster ghost text (after the third run, 2026-11-02).** A ghost took about 1.25 s: a 1 s wait for the writer to pause, about 215 ms for Jev (360 ms on the first call of a session), and up to 25 ms to notice the answer. So the wait was the slow part, and it already sent half-typed lines when the writer paused mid-line ("a flowchart of the ro"). Neovim keeps its ghost text request open while the server waits for Jev, so asking sooner is all it takes:
@@ -293,7 +295,7 @@ These feed the fifty-line gate in the plan, which is run against the real blog c
 
 ## Settled in the slice
 
-- ~~The pin format~~: `->`, settled in the slice; the second pass added `: more words` after it.
+- ~~The pin format~~: `->`, settled in the slice; the second pass added `: more words` after it. Since 2026-11-09 accepting writes the plain form alone, and the arrow is shown only in the ghost text.
 - ~~The debounce length~~: a pause fitted to the writer, 400 ms to 1 s, and `<M-l>` or Esc to ask at once (2026-11-02).
 - ~~The nested-shortcode pattern in Hugo~~: settled 2026-10-31 in step 1. Every part renders `.Inner | .Page.RenderString (dict "display" "block")` with goldmark's `unsafe` on, so a nested part's HTML passes through the outer part's Markdown intact. Parts nest in a section with Markdown, headings and multiple paragraphs inside, all as expected.
 - ~~Whether the inline completion refresh is needed~~: no; the server holds Neovim's request open until the answer arrives.

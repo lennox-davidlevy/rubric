@@ -124,6 +124,11 @@ export function openShortcode(form: PlainForm): string {
   return `{{< ${[form.part, ...form.settings.map((s) => `${s.key}="${s.value}"`)].join(" ")} >}}`;
 }
 
+// A part that takes nothing inside: one call, closed in itself.
+export function aloneShortcode(form: PlainForm): string {
+  return openShortcode(form).replace(/ >\}\}$/, " />}}");
+}
+
 export function closeShortcode(form: PlainForm): string {
   return `{{< /${form.part} >}}`;
 }

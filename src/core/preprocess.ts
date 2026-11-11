@@ -6,12 +6,13 @@
 
 import type { Catalog, Place } from "./catalog.ts";
 import type { Diagnostic } from "./diagnostic.ts";
-import { closeShortcode, formatPlain, openShortcode, validatePlain, type PlainForm } from "./plain.ts";
+import { aloneShortcode, closeShortcode, formatPlain, openShortcode, validatePlain, type PlainForm } from "./plain.ts";
 import { scan, type Kind } from "./scan.ts";
+import { formatThemeLine, type ThemeChoice } from "./theme-line.ts";
 
 // Why a directive was left as text. "unresolved" is a words line with no
 // answer yet; the others carry a diagnostic.
-export type Reason = "unresolved" | "invalid" | "bad-pin" | "unclosed" | "no-children" | "wrong-place";
+export type Reason = "unresolved" | "invalid" | "unclosed" | "no-children" | "wrong-place";
 
 // What each directive became and why: the sidecar, for the editor and for
 // re-resolving later.
@@ -29,6 +30,8 @@ export interface Output {
   content: string;
   entries: Entry[];
   diagnostics: Diagnostic[];
+  // The theme chosen in rubric.md, when one is.
+  theme?: ThemeChoice;
 }
 
 // Looks up the plain form a words line resolved to: the cache, in the server.
@@ -46,8 +49,32 @@ export function preprocess(text: string, catalog: Catalog, resolve: Resolve = ()
   const diagnostics: Diagnostic[] = [];
   const forms: (PlainForm | undefined)[] = [];
   const entries: Entry[] = [];
+  let theme: ThemeChoice | undefined;
 
   for (const d of directives) {
+    if (d.kind === "theme") {
+      const entry: Entry = { line: d.line, kind: "theme", placed: false };
+      if (!d.theme!.words && Object.keys(d.theme!.choice).length > 0) entry.plain = formatThemeLine(d.theme!.choice);
+      entries.push(entry);
+      forms.push(undefined);
+      if (place !== "site") {
+        entry.reason = "wrong-place";
+        diagnostics.push({ ...whole(d.line), code: "wrong-place", message: "the theme is the whole site's: choose it in rubric.md" });
+      } else if (d.problems.length > 0) {
+        entry.reason = "invalid";
+        diagnostics.push(...d.problems);
+      } else if (d.theme!.words || Object.keys(d.theme!.choice).length === 0) {
+        entry.reason = "unresolved";
+        diagnostics.push({ ...whole(d.line), code: "theme-unpicked", message: "no theme chosen yet: open the list on this line (the accept key, or :Rubric theme)" });
+      } else if (theme) {
+        entry.reason = "invalid";
+        diagnostics.push({ ...whole(d.line), code: "second-theme", message: "the site already has a theme, chosen above; this line is not used" });
+      } else {
+        entry.placed = true;
+        theme = d.theme!.choice;
+      }
+      continue;
+    }
     let form = d.plain;
     let problems = d.problems;
     if (!form && d.kind === "words" && d.words !== undefined) {
@@ -88,7 +115,10 @@ export function preprocess(text: string, catalog: Catalog, resolve: Resolve = ()
     const parentForm = d.parent === undefined ? undefined : forms[d.parent];
     const parentPart = parentForm && catalog.parts[parentForm.part];
 
-    if (d.close === undefined) {
+    // Takes nothing inside: from the line, or from what its words picked.
+    const empty = form !== undefined && Object.hasOwn(catalog.parts, form.part) && catalog.parts[form.part]!.empty === true;
+
+    if (d.close === undefined && !d.alone) {
       entry.reason = "unclosed";
       diagnostics.push({ ...whole(d.line), code: "unclosed-block", message: "this block has no closing ::: line" });
     } else if (wrongPlace) {
@@ -102,7 +132,7 @@ export function preprocess(text: string, catalog: Catalog, resolve: Resolve = ()
           : `${form!.part} goes in a page; rubric.md holds the frame around every page, such as the header, footer and sidebar`,
       });
     } else if (problems.length > 0) {
-      entry.reason = problems.some((p) => p.code === "bad-pin") ? "bad-pin" : "invalid";
+      entry.reason = "invalid";
       diagnostics.push(...problems);
     } else if (!form) {
       entry.reason = "unresolved";
@@ -111,15 +141,28 @@ export function preprocess(text: string, catalog: Catalog, resolve: Resolve = ()
       diagnostics.push({ ...whole(d.line), code: "no-children", message: `a directive cannot go inside a ${parentForm!.part}` });
     } else {
       entry.placed = true;
-      set(d.line, openShortcode(form));
-      set(d.close, closeShortcode(form));
+      if (empty) {
+        // Words that picked such a part had a block: what's in it stays
+        // as writing, after the part, and its closer goes.
+        set(d.line, aloneShortcode(form));
+        if (d.close !== undefined) set(d.close, "");
+      } else {
+        set(d.line, openShortcode(form));
+        set(d.close!, closeShortcode(form));
+      }
     }
   }
 
   for (const i of strayClosers) {
-    diagnostics.push({ ...whole(i), code: "stray-closer", message: "this ::: closes no block" });
+    // Most often the closer of a part that takes nothing inside, from before
+    // such parts had none, or typed by habit.
+    let above = i - 1;
+    while (above >= 0 && raw[above]!.trim() === "") above--;
+    const alone = directives.find((d) => d.line === above && d.alone && d.kind === "plain");
+    const message = alone ? `${alone.plain!.part} takes nothing inside, so it has no closing :::` : "this ::: closes no block";
+    diagnostics.push({ ...whole(i), code: "stray-closer", message });
   }
   diagnostics.sort((a, b) => a.line - b.line || a.start - b.start);
 
-  return { content: out.join("\n"), entries, diagnostics };
+  return { content: out.join("\n"), entries, diagnostics, ...(theme ? { theme } : {}) };
 }

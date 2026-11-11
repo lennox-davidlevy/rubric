@@ -51,3 +51,12 @@ export function stubRefiner(catalog: Catalog, delayMs = 50): Refiner {
     return { refined: { settings, unsettled: [], beyond: said.includes("sparkles") ? 0.9 : 0.1 }, model: "stub" };
   };
 }
+
+// The theme list's order, without Jev: a theme scores by how many of the
+// line's words its name and description share.
+export async function stubThemeRanker(words: string, themes: { name: string; description: string }[]): Promise<Record<string, number>> {
+  const said = new Set(words.toLowerCase().split(/\W+/).filter((w) => w.length > 2));
+  const scores = themes.map((t) => [t.name, `${t.name} ${t.description}`.toLowerCase().split(/\W+/).filter((w) => said.has(w)).length] as const);
+  const total = scores.reduce((n, [, s]) => n + s, 0) || 1;
+  return Object.fromEntries(scores.map(([n, s]) => [n, s / total]));
+}

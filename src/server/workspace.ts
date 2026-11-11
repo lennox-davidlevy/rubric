@@ -9,10 +9,11 @@ import { readFile, readdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import {
   applyRefine, atPlace, Cache, frontMatterProblem, liveContent, settingsOf, formatPlain, frame, FRAME_PAGE, framePage, parsePlain, preprocess, refineWords, scan, lines as splitLines,
-  THRESHOLDS, writeWhole,
-  type Catalog, type Diagnostic, type Directive, type Entry, type PageKind, type Place, type Refined, type Resolution, type Resolve,
+  formatThemeLine, PIECES, THEME, THRESHOLDS, writeWhole, type Piece,
+  type Catalog, type Diagnostic, type Directive, type Entry, type PageKind, type Place, type Refined, type Resolution, type Resolve, type ThemeChoice,
 } from "../core/index.ts";
-import { pageKind, pagePath, type Site } from "../site.ts";
+import { openSite, pageKind, pagePath, type Site } from "../site.ts";
+import { themeList, type ThemeList, type ThemeRanker } from "./themes.ts";
 import { fileExists, isSiteAddress, pictures } from "./files.ts";
 
 export type Resolver = (directive: string, page: PageKind) => Promise<{ resolution: Resolution; model: string }>;
@@ -35,6 +36,9 @@ export interface Ghost {
   // line with it. Accepting puts the part in place of the words, which have
   // done their job; the ghost text only shows what is picked.
   replace?: string;
+  // A closing ":::" the editor takes away on accepting: the block's, when the
+  // part picked takes nothing inside.
+  drop?: number;
 }
 
 export interface Completion {
@@ -89,9 +93,13 @@ export interface Options {
   drawMs?: number;
   // Asks the second pass; without one, words after a ":" are never asked.
   refiner?: Refiner;
+  // The site was opened again, from hugo.toml or rubric.md's theme line: its
+  // skin may bring other parts, which the editor needs to know about.
+  onReload?: (site: Site) => void;
 }
 
-const PIN = " -> ";
+// Only shown, before the pick in the ghost text: accepting replaces the words.
+const ARROW = " -> ";
 
 export class Workspace {
   // Replaced by reload() when hugo.toml changes, as when the theme does.
@@ -114,6 +122,7 @@ export class Workspace {
   #waitMs: number;
   #drawMs: number;
   #refiner: Refiner | undefined;
+  #onReload: Options["onReload"];
   // This server's list of open pages in .rubric/open/, for the others.
   #claim = `${process.pid}-${randomUUID().slice(0, 8)}.json`;
 
@@ -128,6 +137,7 @@ export class Workspace {
     this.#waitMs = opts.waitMs ?? 5000;
     this.#drawMs = opts.drawMs ?? 100;
     this.#refiner = opts.refiner;
+    this.#onReload = opts.onReload;
   }
 
   // Writes content/ for every page on disk, from the cache only. Run once at
@@ -188,6 +198,7 @@ export class Workspace {
   // lines already asked in it cost nothing.
   async reload(site: Site): Promise<void> {
     this.site = site;
+    this.#onReload?.(site);
     this.#errors.clear();
     this.#written.clear();
     await this.buildAll();
@@ -369,15 +380,19 @@ export class Workspace {
 
     const lineText = splitLines(doc.text)[line] ?? "";
     const end = lineText.length;
-    const sep = lineText.endsWith(" ") ? PIN.trimStart() : PIN;
+    const sep = lineText.endsWith(" ") ? ARROW.trimStart() : ARROW;
     const lead = opener(lineText);
     // An empty block gets the part's starter body with the pin, so the writer
     // sees what the part expects; a block with anything in it gets nothing.
     const d = this.#directiveAt(doc, line);
     const empty = d?.close !== undefined && splitLines(doc.text).slice(line + 1, d.close).every((l) => l.trim() === "");
     return hit.candidates.map((c) => {
-      const body = empty ? this.site.catalog.parts[c.part]?.body?.replace(/\n+$/, "") : undefined;
-      return { text: `${sep}${c.plain}${body ? `\n${body}` : ""}`, line, character: end, replace: `${lead} ${c.plain}` };
+      const part = this.site.catalog.parts[c.part];
+      const body = empty ? part?.body?.replace(/\n+$/, "") : undefined;
+      // Anything written inside stays, as writing after the part, as the
+      // preview drew it before accepting.
+      const drop = part?.empty && d?.close !== undefined ? { drop: d.close } : {};
+      return { text: `${sep}${c.plain}${body ? `\n${body}` : ""}`, line, character: end, replace: `${lead} ${c.plain}`, ...drop };
     });
   }
 
@@ -428,8 +443,7 @@ export class Workspace {
     }];
   }
 
-  // Completion of the plain form, on a line starting with ::: and after a pin's
-  // arrow: the parts, then a part's settings, then a setting's values. Words
+  // Completion of the plain form, on a line starting with ::: : the parts, then a part's settings, then a setting's values. Words
   // get nothing, by design: words are for Jev. An image setting's value, and
   // the address in a Markdown picture, get the site's pictures.
   complete(file: string, line: number, character: number): Completion[] {
@@ -442,25 +456,42 @@ export class Workspace {
     const colons = /^:{3,}/.exec(lineText);
     if (!colons || character < colons[0].length) return [];
 
-    let segStart = colons[0].length;
-    const before = lineText.slice(0, character);
-    const pin = before.lastIndexOf(PIN);
-    if (pin >= segStart) segStart = pin + PIN.length;
-    const seg = before.slice(segStart);
-    // Words after a lone ":" are for Jev, like words before the pin.
+    const seg = lineText.slice(colons[0].length, character);
+    // Words after a lone ":" are for Jev.
     if (/(^|\s):(\s|$)/.test(seg)) return [];
     const body = seg.trimStart();
     const bodyStart = character - body.length;
     const parts = this.#parts(doc.page);
 
-    // The first token: a part name.
+    // The first token: a part name, or `theme` in rubric.md.
     if (!/\s/.test(body)) {
-      return Object.entries(parts)
+      const theme = doc.page === "site" && this.site.catalog.themes && THEME.startsWith(body)
+        ? [{ label: THEME, detail: "the whole site's look, chosen from a list", kind: "part" as const, start: bodyStart, end: character, newText: THEME }]
+        : [];
+      return [...theme, ...Object.entries(parts)
         .filter(([name]) => name.startsWith(body))
-        .map(([name, p]) => ({ label: name, detail: p.description, kind: "part", start: bodyStart, end: character, newText: name }));
+        .map(([name, p]) => ({ label: name, detail: p.description, kind: "part" as const, start: bodyStart, end: character, newText: name }))];
     }
 
     const [first] = body.split(/\s+/);
+    // The theme line, for an editor with no list of its own: the themes, and
+    // the pieces after `palette=`, `pairing=` or `scale=`.
+    const names = this.site.catalog.themes;
+    if (first === THEME && names && doc.page === "site") {
+      const token = body.split(/\s+/).at(-1)!;
+      const tokenStart = character - token.length;
+      const eq = token.indexOf("=");
+      if (eq < 0) {
+        return [
+          ...names.themes.filter((n) => n.startsWith(token)).map((n) => ({ label: n, detail: "theme", kind: "value" as const, start: tokenStart, end: character, newText: n })),
+          ...PIECES.filter((p) => p.startsWith(token)).map((p) => ({ label: `${p}=`, detail: `swap the theme's ${p}`, kind: "setting" as const, start: tokenStart, end: character, newText: `${p}=` })),
+        ];
+      }
+      const key = token.slice(0, eq) as Piece;
+      return (PIECES.includes(key) ? names[key] : [])
+        .filter((n) => n.startsWith(token.slice(eq + 1)))
+        .map((n) => ({ label: n, detail: key, kind: "value" as const, start: tokenStart + eq + 1, end: character, newText: n }));
+    }
     // Settings and values are offered for any part, so a part in the wrong
     // place still reads as what it is; its diagnostic says where it goes.
     const all = this.site.catalog.parts;
@@ -537,7 +568,6 @@ export class Workspace {
           hit ? `asked; ${this.#refineSummary(d.plain.part, hit)}`
           : "waiting for Jev"}.`);
       }
-      if (d.kind === "pinned") out.push("", "Pinned: the part is never sent to Jev again.");
       return out.join("\n");
     }
 
@@ -704,7 +734,7 @@ export class Workspace {
     if (!doc) return;
     const { entries, diagnostics } = await this.#write(doc.rel, doc.page, doc.text, doc.chosen);
     this.#publish(file, [
-      ...diagnostics.map((d): Note => ({ ...d, severity: d.code === "other-skin" ? "information" : "warning" })),
+      ...diagnostics.map((d): Note => ({ ...d, severity: d.code === "other-skin" || d.code === "theme-unpicked" ? "information" : "warning" })),
       ...this.#wordsNotes(doc, entries),
       ...this.#neededNotes(doc, entries),
       ...this.#refineNotes(doc),
@@ -743,19 +773,83 @@ export class Workspace {
   }
 
   // rubric.md becomes the frame page, a list the layout draws around every
-  // page; Hugo reads it but never publishes it.
+  // page; Hugo reads it but never publishes it. It carries the theme too: the
+  // one the writer is looking at in the editor's list, else the theme line's.
+  // A new theme on the line may bring another skin, so the site is opened
+  // again in it, as when hugo.toml changes.
   async #writeFrame(text: string, chosen?: Doc["chosen"]) {
+    this.#frame = { text, ...(chosen ? { chosen } : {}) };
     const { entries, output } = frame(text, this.site.catalog, this.#resolve("site", chosen));
+    // The writer chose the theme they were looking at: the line has it now.
+    if (this.#themePreview && formatThemeLine(this.#themePreview) === formatThemeLine(output.theme ?? {})) this.#themePreview = undefined;
     const tmp = join(this.site.root, ".rubric/tmp");
     const target = join(this.site.content, FRAME_PAGE);
-    const page = framePage(entries);
+    const page = framePage(entries, this.#themePreview ?? output.theme);
     const writes = [writeWhole(join(this.site.root, ".rubric/sidecar/rubric.md.json"), JSON.stringify(output.entries, null, 2) + "\n", tmp)];
     if (this.#written.get(target) !== page) {
       this.#written.set(target, page);
       writes.push(writeWhole(target, page, tmp));
     }
     await Promise.all(writes);
+    if (output.theme?.name !== this.lineTheme) {
+      this.lineTheme = output.theme?.name;
+      const wanted = this.lineTheme ?? (typeof this.site.params.theme === "string" ? this.site.params.theme : "paper");
+      if (wanted !== this.site.theme) void this.#retheme();
+    }
     return output;
+  }
+
+  // The theme rubric.md's line names, if it names one; hugo.toml's is used
+  // without one.
+  lineTheme: string | undefined;
+  #frame: { text: string; chosen?: Doc["chosen"] } | undefined;
+  #themePreview: ThemeChoice | undefined;
+  #retheming: Promise<void> | undefined;
+
+  async #retheme(): Promise<void> {
+    if (this.#retheming) return this.#retheming;
+    this.#retheming = (async () => {
+      try {
+        const site = await openSite(this.site.root, this.lineTheme);
+        if (site.theme !== this.site.theme) await this.reload(site);
+      } catch {}
+    })();
+    try {
+      await this.#retheming;
+    } finally {
+      this.#retheming = undefined;
+    }
+    // The line may have changed again while the site was opened.
+    const wanted = this.lineTheme ?? (typeof this.site.params.theme === "string" ? this.site.params.theme : "paper");
+    if (wanted !== this.site.theme) await this.#retheme();
+  }
+
+  // The writer is looking at a theme in the editor's list: every page is
+  // drawn in it, until they choose one (and the line says so) or close the
+  // list (undefined).
+  async previewTheme(choice: ThemeChoice | undefined | null): Promise<void> {
+    this.#themePreview = choice ?? undefined;
+    if (this.#frame) await this.#writeFrame(this.#frame.text, this.#frame.chosen);
+  }
+
+  // Everything the editor's list shows, and the order to show it in: the
+  // words on the theme line at `line`, if any, put the likely ones first.
+  async themes(file: string, line?: number, rank?: ThemeRanker): Promise<ThemeList | undefined> {
+    const doc = this.#docs.get(file);
+    const d = doc && line !== undefined ? this.#directiveAt(doc, line) : undefined;
+    const words = d?.kind === "theme" ? d.theme?.words : undefined;
+    const list = themeList(this.site);
+    if (words && rank) {
+      try {
+        const order = await rank(words, list.themes);
+        list.themes.sort((a, b) => (order[b.name] ?? 0) - (order[a.name] ?? 0));
+        list.ranked = words;
+      } catch (err) {
+        list.error = (err as Error).message;
+      }
+    }
+    if (d?.kind === "theme") list.current = d.theme!.choice;
+    return list;
   }
 
   // A picture address at the site's root that no static file answers, in an

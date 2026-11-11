@@ -114,7 +114,7 @@ describe("a page", () => {
 describe("frame", () => {
   test("reads settings from a pinned line and fills the rest from the catalog", () => {
     const c = parseCatalog("name: x\nversion: 1\nparts:\n  footer:\n    description: d\n    place: site\n    children: true\n    settings:\n      layout: { type: choice, default: simple, values: { simple: s, columns: c } }\n");
-    const { entries } = frame("::: a footer -> footer layout=columns\nSmall print.\n:::\n", c, () => undefined);
+    const { entries } = frame("::: footer layout=columns\nSmall print.\n:::\n", c, () => undefined);
     expect(entries).toEqual([{ part: "footer", settings: { layout: "columns" }, body: "Small print." }]);
   });
 });

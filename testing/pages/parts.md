@@ -17,7 +17,6 @@ I kept a list of every walk I took for a year. The list was less interesting tha
 ## Contents
 
 ::: contents
-:::
 
 ## Writing
 
@@ -348,18 +347,14 @@ Get new posts by email.
 :::
 
 ::: contact-form to=https://example.com/form
-:::
 
 ## The latest posts
 
 ::: post-list count=2
-:::
 
 ::: post-list style=cards tag=water
-:::
 
 ::: divider style=ornament
-:::
 
 ## How any part can look
 

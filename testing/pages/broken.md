@@ -32,36 +32,20 @@ The same setting twice:
 Words.
 :::
 
-A pin naming a part that doesn't exist:
-
-::: a blockquote -> blockquote
-Words.
-:::
-
-A pin that isn't a plain form:
-
-::: a quote -> not a plain form
-Words.
-:::
-
 A part from the frame, in a page:
 
-::: a nav bar -> header
+::: header
 - [Posts](/posts/)
 :::
 
-A part that takes nothing inside it, with something inside it:
+A part that takes nothing inside it, with a closer anyway:
 
 ::: divider
-::: quote
-Words.
-:::
 :::
 
 A form with nowhere to send:
 
 ::: contact-form
-:::
 
 A picture that isn't there:
 
