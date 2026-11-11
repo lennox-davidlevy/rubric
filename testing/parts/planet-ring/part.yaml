@@ -1,0 +1,18 @@
+name: planet-ring
+description: A heading surrounded by a ring of orbiting planets.
+children: true
+settings:
+  count:
+    type: choice
+    default: four
+    values:
+      four: four orbiting planets
+      six: six orbiting planets
+  pace:
+    type: choice
+    default: slow
+    values:
+      slow: a slow orbit
+      steady: a steady orbit
+body: |
+  ## Your heading

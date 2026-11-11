@@ -1,0 +1,15 @@
+name: trail-steps
+description: Stops along a hike, each shown as a numbered trail marker beside the story of the route.
+children: true
+body: |
+  ### Starting point
+
+  Describe where the hike began.
+
+  ### Along the trail
+
+  Describe the next stretch and what you noticed.
+
+  ### Journey's end
+
+  Describe where the trail led you.

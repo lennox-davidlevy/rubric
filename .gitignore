@@ -11,3 +11,4 @@ testing/content/
 probe/runs/
 .rubric/
 catalogs/*/shots/
+.cache

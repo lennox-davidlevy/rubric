@@ -43,6 +43,10 @@ export interface Part {
   // Look values the part already has by being itself: a lead is already big,
   // so a line that says "big" picks the part and does not also ask for this.
   already?: Record<string, string>;
+  // Not the catalog's: the site's own part (`parts/<name>/` in the site), or
+  // a draft the writer is looking at, which only its `::: new:` line draws
+  // and Jev is never asked about.
+  origin?: "site" | "draft";
 }
 
 export interface Catalog {
@@ -62,6 +66,9 @@ export interface Catalog {
   // The themes a site can name with `::: theme` in rubric.md, and the pieces
   // it can swap: from themes.yaml and themes/, when the catalog has them.
   themes?: ThemeNames;
+  // A fingerprint of the site's own parts, which Jev reads too, so it is part
+  // of every cached answer's key.
+  own?: string;
 }
 
 export interface ThemeNames {
@@ -87,7 +94,7 @@ export class CatalogError extends Error {}
 export function atPlace(catalog: Catalog, place: Place): Catalog {
   return {
     ...catalog,
-    parts: Object.fromEntries(Object.entries(catalog.parts).filter(([, p]) => p.place === place)),
+    parts: Object.fromEntries(Object.entries(catalog.parts).filter(([, p]) => p.place === place && p.origin !== "draft")),
     look: place === "writing" ? catalog.look : {},
   };
 }
@@ -154,6 +161,41 @@ export function parseSkin(text: string, catalog: Catalog): Skin {
     }
   }
   return { name, version, settings, parts };
+}
+
+// The catalog with the site's own parts and the drafts being looked at added.
+// A name the catalog already has stays the catalog's.
+export function withOwn(catalog: Catalog, own: Record<string, Part>): Catalog {
+  const added = Object.entries(own).filter(([name]) => !Object.hasOwn(catalog.parts, name));
+  if (added.length === 0) return catalog;
+  const kept = added.filter(([, p]) => p.origin === "site").sort(([a], [b]) => a.localeCompare(b));
+  return {
+    ...catalog,
+    parts: { ...catalog.parts, ...Object.fromEntries(added) },
+    ...(kept.length ? { own: fingerprint(JSON.stringify(kept)) } : {}),
+  };
+}
+
+// One part's entry on its own, as a draft or a site's part is written:
+// `name:` and then what catalog.yaml has under the part's name.
+export function parseOwnPart(text: string, catalog: Catalog): { name: string; part: Part } {
+  const root = record(parse(text) as unknown, "part.yaml");
+  const name = string(root.name, "name");
+  named(name, "name");
+  const { name: _, ...rest } = root;
+  const part = parsePart(rest, name);
+  if (part.place !== "writing") throw new CatalogError(`${name}: a part of your own goes in the writing, for now`);
+  for (const k of Object.keys(part.settings)) {
+    if (Object.hasOwn(catalog.look, k)) throw new CatalogError(`${name}.settings.${k}: every part already has it, from look`);
+  }
+  return { name, part };
+}
+
+// A short, stable fingerprint of some text (FNV-1a).
+function fingerprint(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(16).padStart(8, "0");
 }
 
 // Part, setting and value names end up in shortcode calls and CSS classes.

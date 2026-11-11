@@ -1,0 +1,13 @@
+<div class="part part-planet-ring count-{{ .s.count }} pace-{{ .s.pace }}">
+  <div class="part-planet-ring-orbit" aria-hidden="true">
+    <span class="part-planet-ring-planet planet-one"></span>
+    <span class="part-planet-ring-planet planet-two"></span>
+    <span class="part-planet-ring-planet planet-three"></span>
+    <span class="part-planet-ring-planet planet-four"></span>
+    {{- if eq .s.count "six" }}
+    <span class="part-planet-ring-planet planet-five"></span>
+    <span class="part-planet-ring-planet planet-six"></span>
+    {{- end }}
+  </div>
+  <div class="part-planet-ring-heading">{{ .inner }}</div>
+</div>

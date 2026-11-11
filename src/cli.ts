@@ -1,7 +1,9 @@
 #!/usr/bin/env bun
 // The rubric command.
 //
-//   bun src/cli.ts lsp [--stub]     the language server, over stdio
+//   bun src/cli.ts lsp [--stub] [--harness claude|opencode] [--model <model>] [--effort <level>]
+//                                   the language server, over stdio; what drafts
+//                                   new parts unless one is chosen for a draft
 //   bun src/cli.ts build <site>     write pages/ into content/ once
 //   bun src/cli.ts watch <site>     the same on every save, for editors without the server
 //
@@ -12,13 +14,27 @@ import { watch } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { Cache, frame, FRAME_PAGE, framePage, preprocess } from "./core/index.ts";
+import { HARNESSES, type Drafter, type HarnessName } from "./server/harness.ts";
 import { serve } from "./server/main.ts";
+import { writeHugoTree } from "./parts.ts";
 import { openSite, pageKind, type Site } from "./site.ts";
 
 const [command, ...args] = process.argv.slice(2);
 
 if (command === "lsp") {
-  serve({ stub: args.includes("--stub") });
+  const flag = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
+  // The drafter named on the command line, whole: what isn't given is the
+  // tool's default, not the built-in drafter's.
+  const harness = flag("--harness");
+  const model = flag("--model");
+  const effort = flag("--effort");
+  if (harness !== undefined && !HARNESSES.includes(harness as HarnessName)) {
+    console.error(`--harness is one of ${HARNESSES.join(", ")}`);
+    process.exit(2);
+  }
+  const named = harness !== undefined || model !== undefined || effort !== undefined;
+  const drafter: Drafter = { harness: (harness as HarnessName | undefined) ?? "claude", ...(model ? { model } : {}), ...(effort ? { effort } : {}) };
+  serve({ stub: args.includes("--stub"), ...(named ? { drafter } : {}) });
 } else if ((command === "build" || command === "watch") && args[0]) {
   const site = await openSite(args[0]);
   const cache = await Cache.load(site.cache);
@@ -46,7 +62,7 @@ if (command === "lsp") {
     });
   }
 } else {
-  console.error("usage: rubric lsp [--stub] | rubric build|watch <site>");
+  console.error("usage: rubric lsp [--stub] [--harness claude|opencode] [--model <model>] [--effort <level>] | rubric build|watch <site>");
   process.exit(2);
 }
 
@@ -76,6 +92,9 @@ async function writeFrame(site: Site, cache: Cache): Promise<void> {
 // Rewrites content/ in place and removes only pages that are gone. Deleting
 // the folder itself would leave a running `hugo server` watching nothing.
 async function build(site: Site, cache: Cache): Promise<void> {
+  // The site's own parts, where its hugo.toml has Hugo look for them.
+  await writeHugoTree(site.root, site.own);
+  for (const p of site.ownProblems) console.log(`left out: ${p}`);
   const files = (await readdir(site.pages, { recursive: true })).filter((f) => f.endsWith(".md"));
   for (const f of files) await writePage(site, cache, join(site.pages, f));
   await writeFrame(site, cache);

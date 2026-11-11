@@ -1,0 +1,7 @@
+name: moon-ring
+description: A heading surrounded by a ring of little orbiting moons.
+children: true
+body: |
+  ## Your heading
+
+  A short introduction beneath the heading.

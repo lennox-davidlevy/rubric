@@ -8,6 +8,8 @@
 
 local M = {}
 local themes = require("rubric.themes")
+local drafts = require("rubric.drafts")
+local starters = require("rubric.starters")
 
 local defaults = {
   -- Accept the ghost text: pins the line. Before any ghost text shows, it
@@ -24,6 +26,14 @@ local defaults = {
   args = {},
   -- Typing "::: " on an empty line adds the closing ":::" below it.
   close = true,
+  -- What drafts a new part for a `::: new:` line unless another setup is
+  -- chosen for one draft: a tool, "claude" (Claude Code) or "opencode"; a
+  -- model, in the tool's own form ("opus"; "openai/gpt-6.1-sol"); and an
+  -- effort, Claude Code's --effort or an OpenCode variant ("low", "high").
+  -- No model or effort is the tool's default. A choice made with :Rubric
+  -- harness or :Rubric model is kept and used instead, in every session,
+  -- until :Rubric harness goes back to this one.
+  draft = { harness = "claude", model = "sonnet", effort = "low" },
 }
 
 -- The parts that take nothing inside (`::: divider`), from the server: their
@@ -270,23 +280,27 @@ end
 -- the two, so the closer is looked for past it.
 --
 -- In rubric.md, with the cursor on the theme line, a hint at the end says
--- the accept key opens the list (the palette's, on `palette=`).
+-- the accept key opens the list (the palette's, on `palette=`). On a
+-- `::: new:` line in a page, it says the key is how a new part is drafted.
 local theme_ns = vim.api.nvim_create_namespace("rubric.theme-hint")
 
 local function watch_alone_lines(bufnr, accept, on_rubric_md)
   local function hint()
     vim.api.nvim_buf_clear_namespace(bufnr, theme_ns, 0, -1)
-    if not on_rubric_md or vim.api.nvim_get_current_buf() ~= bufnr then
+    if vim.api.nvim_get_current_buf() ~= bufnr then
       return
     end
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
     local line = vim.api.nvim_get_current_line()
-    if not themes.is_theme_line(line) then
+    local text
+    if on_rubric_md and themes.is_theme_line(line) then
+      local key = themes.piece_at(line, col) or themes.piece_at(line, col - 1)
+      text = ("  %s opens the %s list"):format(accept, key or "theme")
+    else
       return
     end
-    local key = themes.piece_at(line, col) or themes.piece_at(line, col - 1)
     vim.api.nvim_buf_set_extmark(bufnr, theme_ns, row - 1, 0, {
-      virt_text = { { ("  %s opens the %s list"):format(accept, key or "theme"), "ComplHintMore" } },
+      virt_text = { { text, "ComplHintMore" } },
       virt_text_pos = "eol",
       hl_mode = "combine",
     })
@@ -434,8 +448,15 @@ function M.setup(opts)
   opts = vim.tbl_extend("force", defaults, opts or {})
   local root = repo_root()
 
+  -- The setup's choice, unless :Rubric harness or :Rubric model made
+  -- one since, which is kept in Neovim's data folder.
+  local chosen = drafts.drafter(defaults.draft, opts.draft)
+  drafts.remember_setup(defaults.draft, opts.draft)
+  drafts.set_keys({ accept = opts.accept, next = opts.next, prev = opts.prev })
+  starters.set_accept(opts.accept)
+  local draft_args = drafts.args(chosen)
   vim.lsp.config("rubric", {
-    cmd = vim.list_extend({ "bun", root .. "/src/cli.ts", "lsp" }, opts.args),
+    cmd = vim.list_extend(vim.list_extend({ "bun", root .. "/src/cli.ts", "lsp" }, draft_args), opts.args),
     -- Bun loads .env from the working directory; the repo's holds TYPESAFE_API_KEY.
     cmd_cwd = root,
     filetypes = { "markdown" },
@@ -447,6 +468,9 @@ function M.setup(opts)
       ["rubric/alone"] = function(_, params)
         set_alone(params.parts)
       end,
+      -- A new part's draft finished, or failed.
+      ["rubric/drafted"] = drafts.drafted,
+      ["rubric/starters"] = starters.handler,
     },
   })
   vim.lsp.enable("rubric")
@@ -475,12 +499,22 @@ function M.setup(opts)
     if win ~= -1 and vim.api.nvim_win_get_cursor(win)[1] == arg.line + 1 then
       vim.api.nvim_win_set_cursor(win, { arg.line + 1, #arg.text })
     end
+    -- Nothing in the catalog fitted, and the writer took the offer of a new
+    -- part: the line is a `new:` line now, and they choose how to draft it.
+    local client = arg.build and vim.lsp.get_client_by_id(ctx.client_id)
+    if client then
+      drafts.act(client, ctx.bufnr, arg.line)
+    end
   end
 
-  -- :Rubric theme opens the theme list for rubric.md's theme line.
+  -- :Rubric theme opens the theme list for rubric.md's theme line. :Rubric
+  -- harness chooses the tool that drafts new parts and its model, and
+  -- :Rubric model another model for that tool; both last across sessions.
+  -- :Rubric log follows what the draft on the cursor's line is doing.
+  local commands = { "theme", "harness", "model", "log" }
   vim.api.nvim_create_user_command("Rubric", function(cmd)
-    if cmd.args ~= "theme" then
-      vim.notify("rubric: :Rubric theme is the only command so far", vim.log.levels.INFO)
+    if not vim.tbl_contains(commands, cmd.args) then
+      vim.notify("rubric: :Rubric " .. table.concat(commands, ", :Rubric "), vim.log.levels.INFO)
       return
     end
     local bufnr = vim.api.nvim_get_current_buf()
@@ -489,13 +523,25 @@ function M.setup(opts)
       vim.notify("rubric: the server is not running in this buffer", vim.log.levels.WARN)
       return
     end
-    themes.command(bufnr, client, open_blocks)
+    if cmd.args == "model" then
+      drafts.choose_model(client, bufnr)
+    elseif cmd.args == "harness" then
+      drafts.choose_harness(client, bufnr)
+    elseif cmd.args == "log" then
+      drafts.log(client, bufnr, vim.api.nvim_win_get_cursor(0)[1] - 1)
+    else
+      themes.command(bufnr, client, open_blocks)
+    end
   end, {
     nargs = 1,
-    complete = function()
-      return { "theme" }
+    complete = function(lead, line)
+      local words = vim.split(line:gsub("^%S+%s*", ""), "%s+")
+      local options = #words <= 1 and commands or {}
+      return vim.tbl_filter(function(c)
+        return vim.startswith(c, lead)
+      end, options)
     end,
-    desc = "Rubric: open the theme list",
+    desc = "Rubric: open the theme list, choose what drafts new parts, or follow a draft's log",
   })
 
   vim.api.nvim_create_autocmd("LspAttach", {
@@ -517,6 +563,10 @@ function M.setup(opts)
       set_alone(experimental and experimental.rubric and experimental.rubric.alone)
       local on_rubric_md = themes.is_rubric_md(event.buf)
       watch_alone_lines(event.buf, opts.accept, on_rubric_md)
+      if not on_rubric_md then
+        drafts.watch(event.buf)
+        starters.watch(event.buf)
+      end
       -- The list for the theme line the cursor is on, from either mode.
       local function open_theme()
         local c = vim.lsp.get_client_by_id(client.id)
@@ -530,13 +580,96 @@ function M.setup(opts)
       local function on_theme_line()
         return on_rubric_md and themes.is_theme_line(vim.api.nvim_get_current_line())
       end
-      if on_rubric_md then
-        vim.keymap.set("n", opts.accept, function()
-          if on_theme_line() then
-            open_theme()
-          end
-        end, { buffer = event.buf, desc = "Rubric: open the theme list" })
+      local function on_new_line()
+        return not on_rubric_md and drafts.is_new_line(vim.api.nvim_get_current_line())
       end
+      -- A `::: new:` line: draft its part, or say what to do with the draft.
+      local function act_new()
+        local c = vim.lsp.get_client_by_id(client.id)
+        local row = vim.api.nvim_win_get_cursor(0)[1] - 1
+        if c then
+          vim.schedule(function()
+            drafts.act(c, event.buf, row)
+          end)
+        end
+      end
+      -- A line of the site's own part: another take of it, keep, or remove.
+      local function own_line()
+        return not on_rubric_md and starters.own_at(event.buf, vim.api.nvim_win_get_cursor(0)[1] - 1)
+      end
+      local function act_own()
+        local c = vim.lsp.get_client_by_id(client.id)
+        local row = vim.api.nvim_win_get_cursor(0)[1] - 1
+        local s = starters.at(event.buf, row)
+        if c then
+          vim.schedule(function()
+            drafts.act_own(c, event.buf, row, s and function()
+              starters.fill(event.buf, s)
+            end)
+          end)
+        end
+      end
+      -- Where the keys that move between picks move between takes instead.
+      local function has_takes()
+        if on_new_line() then
+          return true
+        end
+        local o = own_line()
+        return o and (o.takes or 0) > 1
+      end
+      -- Normal-mode keys do their own thing anywhere else on the page.
+      local function normal(lhs, rhs, desc)
+        vim.keymap.set("n", lhs, function()
+          if rhs() then
+            return ""
+          end
+          return lhs
+        end, { buffer = event.buf, expr = true, desc = desc })
+      end
+      normal(opts.accept, function()
+        if on_theme_line() then
+          open_theme()
+          return true
+        elseif on_new_line() then
+          act_new()
+          return true
+        elseif own_line() then
+          act_own()
+          return true
+        end
+        -- Anywhere in an empty block, its part's line too: its starter, filled in.
+        local s = starters.at(event.buf, vim.api.nvim_win_get_cursor(0)[1] - 1)
+        if s then
+          vim.schedule(function()
+            starters.fill(event.buf, s)
+          end)
+          return true
+        end
+      end, "Rubric: open the theme list, draft a new part, redraft the site's own part, or fill in a part's starter")
+      -- On a `new:` line, the keys that move between picks move between takes.
+      local function cycle(step)
+        local c = vim.lsp.get_client_by_id(client.id)
+        local row = vim.api.nvim_win_get_cursor(0)[1] - 1
+        if c then
+          drafts.cycle(c, event.buf, row, step)
+        end
+      end
+      normal(opts.next, function()
+        if has_takes() then
+          vim.schedule(function()
+            cycle(1)
+          end)
+          return true
+        end
+      end, "Rubric: the next take of a new part")
+      normal(opts.prev, function()
+        if has_takes() then
+          vim.schedule(function()
+            cycle(-1)
+          end)
+          return true
+        end
+      end, "Rubric: the take before, of a new part")
       -- The line is done: ask now rather than after the pause.
       local function ask_now()
         local c = vim.lsp.get_client_by_id(client.id)
@@ -601,16 +734,42 @@ function M.setup(opts)
           open_theme()
           return
         end
-        if not vim.lsp.inline_completion.get() then
-          ask_now()
+        if on_new_line() then
+          vim.cmd.stopinsert()
+          act_new()
+          return
         end
-      end, "Rubric: accept and pin, ask now, or open the theme list")
+        -- Ghost text first: on the part's line, accepting a pick comes before
+        -- filling in the starter.
+        if vim.lsp.inline_completion.get() then
+          return
+        end
+        if own_line() then
+          vim.cmd.stopinsert()
+          act_own()
+          return
+        end
+        local s = starters.at(event.buf, vim.api.nvim_win_get_cursor(0)[1] - 1)
+        if s then
+          starters.fill(event.buf, s)
+          return
+        end
+        ask_now()
+      end, "Rubric: accept and pin, ask now, open the theme list, draft a new part, or fill in a starter")
       map(opts.next, function()
-        move(1)
-      end, "Rubric: next pick")
+        if has_takes() then
+          cycle(1)
+        else
+          move(1)
+        end
+      end, "Rubric: next pick, or next take of a new part")
       map(opts.prev, function()
-        move(-1)
-      end, "Rubric: previous pick")
+        if has_takes() then
+          cycle(-1)
+        else
+          move(-1)
+        end
+      end, "Rubric: previous pick, or take before of a new part")
     end,
   })
 end

@@ -1,0 +1,16 @@
+{{- /* A heading with a hand-sketched dirt path winding around it: in from the
+   lower left, up and over the top, down the right side and back along the
+   bottom until it wanders off. The drawing stretches to the block; its strokes
+   keep their width. */ -}}
+{{- $d := "M -12 150 C 6 154, 22 142, 18 122 C 14 102, 30 90, 22 68 C 14 46, 6 24, 30 14 C 70 0, 112 20, 160 12 C 210 4, 250 18, 300 10 C 350 2, 394 8, 386 40 C 380 66, 396 84, 384 108 C 374 132, 360 148, 318 146 C 276 144, 250 156, 214 150 C 186 146, 170 158, 160 172" -}}
+<div class="part part-dirt-path align-{{ .s.align }}">
+<svg class="dirt-path-trail" viewBox="0 0 400 160" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+<path class="dirt-path-ground" d="{{ $d }}" vector-effect="non-scaling-stroke"/>
+<path class="dirt-path-edge" d="{{ $d }}" vector-effect="non-scaling-stroke"/>
+<path class="dirt-path-edge dirt-path-sketch" d="{{ $d }}" transform="translate(2.5 2)" vector-effect="non-scaling-stroke"/>
+<path class="dirt-path-stones" d="{{ $d }}" transform="translate(-1 1)" vector-effect="non-scaling-stroke"/>
+</svg>
+<div class="dirt-path-inner stack">
+{{ .inner }}
+</div>
+</div>

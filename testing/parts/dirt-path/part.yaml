@@ -1,0 +1,14 @@
+name: dirt-path
+description: A heading with a sketched dirt path winding around it.
+children: true
+settings:
+  align:
+    type: choice
+    default: center
+    values:
+      center: the heading centered inside the path
+      left: the heading aligned left inside the path
+body: |
+  ## A heading for the path to wind around
+
+  A short line under it, if you like.

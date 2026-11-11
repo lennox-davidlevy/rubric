@@ -5,6 +5,28 @@ themesDir = "../catalogs"
 disableKinds = ["sitemap"]
 defaultContentLanguage = "en"
 
+# The site's own parts and the draft being looked at, which the language
+# server writes into .rubric/hugo/ (src/parts.ts), beside the site's own
+# folders. A mount replaces Hugo's default for its folder, so each is named.
+[[module.mounts]]
+source = "layouts"
+target = "layouts"
+[[module.mounts]]
+source = ".rubric/hugo/layouts"
+target = "layouts"
+[[module.mounts]]
+source = "assets"
+target = "assets"
+[[module.mounts]]
+source = ".rubric/hugo/assets"
+target = "assets"
+[[module.mounts]]
+source = "data"
+target = "data"
+[[module.mounts]]
+source = ".rubric/hugo/data"
+target = "data"
+
 [params]
 author = "A. Writer"
 # The comments part offers a reply by email when this is set.

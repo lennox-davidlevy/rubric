@@ -72,8 +72,12 @@ export function isPlain(form: PlainForm | undefined, catalog: Catalog): form is 
 
 // Problems with a plain form. A part or a setting another skin adds is an
 // "other-skin" note, not a mistake: switching skins never breaks a page.
-export function validatePlain(form: PlainForm, catalog: Catalog, line: number): Diagnostic[] {
+// A draft is drawn only on its own `new:` line (`draft`), until it is kept.
+export function validatePlain(form: PlainForm, catalog: Catalog, line: number, draft = false): Diagnostic[] {
   const part = Object.hasOwn(catalog.parts, form.part) ? catalog.parts[form.part] : undefined;
+  if (part?.origin === "draft" && !draft) {
+    return [{ line, ...form.partSpan, code: "unknown-part", message: `${form.part} is a draft, drawn only on its new: line until it is kept` }];
+  }
   if (!part) {
     const skin = catalog.elsewhere.parts[form.part];
     if (skin) return [{ line, ...form.partSpan, code: "other-skin", message: `${form.part} comes with the ${skin} skin; this site's theme doesn't draw it` }];

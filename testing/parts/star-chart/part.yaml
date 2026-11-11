@@ -1,0 +1,28 @@
+name: star-chart
+description: A star chart with many dim stars and bright, gently pulsing stars labeled with your writing.
+children: true
+settings:
+  density:
+    type: choice
+    default: dense
+    values:
+      scattered: fewer dim stars in the background
+      dense: many dim stars in the background
+  pace:
+    type: choice
+    default: slow
+    values:
+      slow: bright stars pulse slowly
+      lively: bright stars pulse more quickly
+body: |
+  ### Star name
+
+  What this star represents.
+
+  ### Another star name
+
+  A thought attached to this star.
+
+  ### One more star name
+
+  The story behind this star.

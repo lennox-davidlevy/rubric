@@ -1,0 +1,19 @@
+name: tree-frame
+description: A heading with trees surrounding it.
+children: true
+body: |
+  ## A heading in the trees
+settings:
+  density:
+    type: choice
+    default: some
+    values:
+      few: a handful of trees
+      some: a modest row of trees
+      many: a thick row of trees
+  kind:
+    type: choice
+    default: pine
+    values:
+      pine: tall pointed evergreens
+      round: round leafy trees
