@@ -71,6 +71,21 @@ function RubricTest.picks()
   return ""
 end
 
+-- The hint on rubric.md's theme line, or "".
+function RubricTest.theme_hint()
+  local ns = vim.api.nvim_get_namespaces()["rubric.theme-hint"]
+  if not ns then
+    return ""
+  end
+  for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })) do
+    local vt = m[4].virt_text
+    if vt and vt[1] then
+      return vt[1][1]
+    end
+  end
+  return ""
+end
+
 -- The words spell checking stops on with ]s, from the top, in order.
 function RubricTest.misspelled()
   local view = vim.fn.winsaveview()
@@ -88,4 +103,14 @@ function RubricTest.misspelled()
   end
   vim.fn.winrestview(view)
   return table.concat(found, ",")
+end
+
+-- The theme list without snacks is vim.ui.select: this takes the first
+-- choice offered, and remembers how many there were.
+function RubricTest.take_first()
+  vim.ui.select = function(items, _, on_choice)
+    RubricTest.offered = #items
+    on_choice(items[1])
+  end
+  return true
 end

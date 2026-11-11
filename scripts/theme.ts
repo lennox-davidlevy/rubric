@@ -4,7 +4,10 @@
 //   bun scripts/theme.ts check              build, then check every piece
 //   bun scripts/theme.ts look [theme…]      check, then draw each theme's catalog
 //                                           and stress pages in a browser, at
-//                                           three widths, and check what is drawn
+//                                           three widths, and check what is drawn;
+//                                           then make their pictures, as previews
+//   bun scripts/theme.ts previews [theme…]  the picture of each theme in the
+//                                           editor's theme list: previews/<theme>.png
 //   bun scripts/theme.ts new palette <name> [--from <name>]
 //   bun scripts/theme.ts new pairing <name> [--from <name>]
 //   bun scripts/theme.ts new scale <name> [--from <name>]
@@ -15,7 +18,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { check, KINDS, load, outputs, type Kind, type Problem, ThemeError } from "../src/theme.ts";
-import { look } from "./look.ts";
+import { look, previews } from "./look.ts";
 
 const repo = join(import.meta.dir, "..");
 const dir = join(repo, "catalogs", process.env.RUBRIC_CATALOG ?? "universal");
@@ -78,7 +81,13 @@ try {
     const themes = args.length ? args : Object.keys(load(dir).themes);
     const drawn = await look(dir, themes);
     const fine = report(drawn);
+    await previews(dir, themes);
     process.exit(ok && fine ? 0 : 1);
+  } else if (command === "previews") {
+    build();
+    const themes = args.length ? args : Object.keys(load(dir).themes);
+    const made = await previews(dir, themes);
+    console.log(dim(`${made.length} pictures in ${join(dir, "previews")}`));
   } else if (command === "new") {
     const [what, name, ...rest] = args;
     const from = rest[rest.indexOf("--from") + 1];

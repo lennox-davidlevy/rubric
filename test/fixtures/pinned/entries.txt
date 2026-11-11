@@ -1,6 +1,0 @@
-5-7 | pinned | placed | quote size=large align=center | "a quote from the book, big and centered"
-9-11 | pinned | placed | quote cite="J. R. R. Tolkien" | "a quote with who said it"
-13-15 | pinned | placed | callout kind=aside | "words with -> an arrow in them"
-17-19 | pinned | left (bad-pin) | - | "a pin that is not plain form"
-21-23 | pinned | left (invalid) | blockquote size=large | "a part that does not exist"
-25-27 | pinned | left (invalid) | callout kind=shout | "a value that is not allowed"

@@ -7,17 +7,13 @@
 {{- with .Description | default .Summary | plainify }}
 <meta name="description" content="{{ . | truncate 160 }}">
 {{- end }}
-{{- /* A page may name its own theme, as the catalog and stress pages do.
-     A theme is a palette, a pairing and a scale (themes.yaml); a site may
-     swap any one of them. */}}
+{{- /* A theme is a palette, a pairing and a scale (themes.yaml); which one,
+     and any piece swapped, is worked out in rubric/theme.html. */}}
 {{- $catalog := .Params.rubric.catalog | default false }}
-{{- $theme := .Params.rubric.theme | default site.Params.rubric.theme | default "paper" }}
-{{- $t := index hugo.Data.themes $theme }}
-{{- if not $t }}{{ errorf "rubric: %q is not a theme in this catalog" $theme }}{{ end }}
-{{- $own := and (not .Params.rubric.theme) site.Params.rubric }}
-{{- $palette := cond (and $own site.Params.rubric.palette) site.Params.rubric.palette $t.palette }}
-{{- $pairing := cond (and $own site.Params.rubric.pairing) site.Params.rubric.pairing $t.pairing }}
-{{- $scale := cond (and $own site.Params.rubric.scale) site.Params.rubric.scale $t.scale }}
+{{- $t := partial "rubric/theme.html" . }}
+{{- $palette := $t.palette }}
+{{- $pairing := $t.pairing }}
+{{- $scale := $t.scale }}
 {{- $css := slice }}
 {{- range slice (printf "palettes/%s" $palette) (printf "pairings/%s" $pairing) (printf "scales/%s" $scale) }}
   {{- with resources.Get (printf "css/%s.css" .) }}{{ $css = $css | append . }}{{ else }}{{ errorf "rubric: no %s in this catalog" . }}{{ end }}

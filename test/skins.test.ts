@@ -58,7 +58,7 @@ describe("a skin's additions", () => {
 });
 
 describe("switching skins never breaks a page", () => {
-  const page = "::: a tip -> callout ribbon=red\nRest here.\n:::\n\n::: a strip -> sash\nIt began.\n:::\n";
+  const page = "::: callout ribbon=red\nRest here.\n:::\n\n::: sash\nIt began.\n:::\n";
 
   test("in its own skin, a setting or a part draws", () => {
     expect(preprocess(page, inRibbons).content).toContain('{{< callout ribbon="red" >}}');
@@ -68,7 +68,7 @@ describe("switching skins never breaks a page", () => {
   test("in another skin, the callout draws without the setting, which stays in the pin; the sash stays as text", () => {
     const out = preprocess(page, inPaper);
     expect(out.content).toContain("{{< callout >}}");
-    expect(out.content).toContain("::: a strip -> sash");
+    expect(out.content).toContain("::: sash");
     expect(out.diagnostics.map((d) => [d.code, d.message])).toEqual([
       ["other-skin", "ribbon comes with the ribbons skin; this site's theme leaves it out and keeps it in the pin"],
       ["other-skin", "sash comes with the sashes skin; this site's theme doesn't draw it"],
@@ -77,10 +77,10 @@ describe("switching skins never breaks a page", () => {
 
   test("the callout's icon and the lead are the catalog's, so they draw in every skin", () => {
     for (const c of [inPaper, inSashes, inRibbons]) {
-      const lead = preprocess("::: an opening -> lead\nIt began.\n:::\n", c);
+      const lead = preprocess("::: lead\nIt began.\n:::\n", c);
       expect(lead.content).toContain("{{< lead >}}");
       expect(lead.diagnostics).toEqual([]);
-      const out = preprocess("::: a tip -> callout icon=lightbulb\nRest.\n:::\n", c);
+      const out = preprocess("::: callout icon=lightbulb\nRest.\n:::\n", c);
       expect(out.content).toContain('{{< callout icon="lightbulb" >}}');
       expect(out.diagnostics).toEqual([]);
     }
@@ -182,7 +182,7 @@ describe("in the editor", () => {
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
   test("switching the theme in hugo.toml brings its skin in without a restart", async () => {
-    await ws.open(page(), "---\ntitle: T\n---\n::: a strip -> sash\nRest.\n:::\n");
+    await ws.open(page(), "---\ntitle: T\n---\n::: sash\nRest.\n:::\n");
     await ws.settle();
     expect(notes.get(page())?.map((n) => n.code)).toEqual(["other-skin"]);
     writeFileSync(join(dir, "hugo.toml"), config("sashy"));
@@ -191,7 +191,7 @@ describe("in the editor", () => {
     expect(ws.site.skin).toBe("sashes");
     expect(notes.get(page())).toEqual([]);
     expect(readFileSync(join(dir, "content/posts/skin-test.md"), "utf8")).toContain("{{< sash >}}");
-    expect(ws.complete(page(), 3, "::: a strip -> ".length).map((c) => c.label)).toContain("sash");
+    expect(ws.complete(page(), 3, "::: s".length).map((c) => c.label)).toContain("sash");
   });
 
   test("in rubric.md, nothing fitting says the frame is all that goes there", async () => {

@@ -50,6 +50,8 @@ look:
 # place: site     chosen once in rubric.md, for every page; a page may
 #                 override it at its top
 # body:           written into an empty block once the part is picked
+# empty: true     the part takes nothing inside, so its line has no closing
+#                 `:::`, like `::: divider`. Not sent to Jev.
 # already:        look values the part has by being itself; a line's "big"
 #                 picks a lead, and does not also ask for bigger text. Not
 #                 sent to Jev. The second pass can still ask for them.
@@ -573,6 +575,7 @@ parts:
 
   post-list:
     description: A list of posts or articles from this site, such as the latest ones.
+    empty: true
     children: false
     settings:
       style:
@@ -589,10 +592,12 @@ parts:
 
   contents:
     description: A table of contents, listing what is on this page.
+    empty: true
     children: false
 
   divider:
     description: A break between parts of the writing.
+    empty: true
     children: false
     settings:
       style:
@@ -605,6 +610,7 @@ parts:
 
   contact-form:
     description: A form for readers to send a message, with their name, their email and the message.
+    empty: true
     children: false
     settings:
       to:
@@ -687,21 +693,25 @@ parts:
 
   breadcrumbs:
     description: The trail of pages above this one, from the home page down to here.
+    empty: true
     place: site
     children: false
 
   page-contents:
     description: This page's headings kept in view beside the writing as the reader scrolls, to jump between them.
+    empty: true
     place: site
     children: false
 
   cover:
     description: A post's own picture across the top of the page, above its title.
+    empty: true
     place: site
     children: false
 
   post-meta:
     description: A post's details next to its title, such as its date, reading time or author.
+    empty: true
     place: site
     children: false
     settings:
@@ -724,16 +734,19 @@ parts:
 
   tags:
     description: The post's tags as links, each leading to the other posts with that tag.
+    empty: true
     place: site
     children: false
 
   pager:
     description: Links to the previous and the next post, at the end of a post.
+    empty: true
     place: site
     children: false
 
   related:
     description: Other posts like this one, at the end of a post.
+    empty: true
     place: site
     children: false
     settings:
@@ -742,6 +755,7 @@ parts:
 
   comments:
     description: A place for readers to leave comments under a post.
+    empty: true
     place: site
     children: false
     settings:
@@ -750,11 +764,13 @@ parts:
 
   share:
     description: Buttons to share the page on other sites or to copy its link.
+    empty: true
     place: site
     children: false
 
   search:
     description: A search box that finds pages on this site as the reader types.
+    empty: true
     place: site
     children: false
     script: true
@@ -769,11 +785,13 @@ parts:
 
   theme-switch:
     description: A switch between a light and a dark look for the site.
+    empty: true
     place: site
     children: false
     script: true
 
   languages:
     description: A way to switch the site to another language.
+    empty: true
     place: site
     children: false

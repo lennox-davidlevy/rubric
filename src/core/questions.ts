@@ -109,6 +109,20 @@ export function refineQuestions(catalog: Catalog, partName: string): Record<stri
   return questions;
 }
 
+// The theme list, put in order by the words on rubric.md's theme line: one
+// Choice among the themes, by their descriptions. Only its order is used;
+// the writer chooses by looking, so a near miss costs a step, not a site.
+export const THEME_CHOICE = "theme";
+export function themeQuestion(themes: { name: string; description: string }[]): Record<string, Question> {
+  return {
+    [THEME_CHOICE]: {
+      type: "choice",
+      instructions: "Which look for a whole website does `directive` describe?",
+      criteria: Object.fromEntries(themes.map((t) => [t.name, t.description])),
+    },
+  };
+}
+
 // Which part `directive` asks for: one Choice among the catalog's parts.
 export function partQuestion(catalog: Catalog): Record<string, Question> {
   const parts = Object.fromEntries(Object.entries(catalog.parts).map(([name, p]) => [name, p.description]));

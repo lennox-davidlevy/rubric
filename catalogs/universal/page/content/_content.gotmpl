@@ -1,6 +1,9 @@
-{{- /* One catalog page and one stress page for each theme in themes.yaml,
-     so a new theme has both as soon as it is added. */}}
+{{- /* One catalog page, one stress page and one sample post for each theme
+     in themes.yaml, so a new theme has all three as soon as it is added. The
+     sample post's first screen is the theme's picture in the editor's theme
+     list (`bun scripts/theme.ts previews`). */}}
 {{- $stress := os.ReadFile "stress.md" }}
+{{- $sample := os.ReadFile "sample.md" }}
 {{- range $name, $t := hugo.Data.themes }}
   {{- $.AddPage (dict
       "path" $name
@@ -14,4 +17,11 @@
       "kind" "page"
       "params" (dict "rubric" (dict "theme" $name))
       "content" (dict "mediaType" "text/markdown" "value" $stress)) }}
+  {{- $.AddPage (dict
+      "path" (printf "sample/%s" $name)
+      "title" "A year of evening walks"
+      "kind" "page"
+      "dates" (dict "date" (time.AsTime "2026-09-14"))
+      "params" (dict "rubric" (dict "theme" $name) "tags" (slice "walking" "notes"))
+      "content" (dict "mediaType" "text/markdown" "value" $sample)) }}
 {{- end }}

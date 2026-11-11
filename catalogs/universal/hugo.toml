@@ -18,6 +18,11 @@ target = "data/pairings"
 source = "samples.yaml"
 target = "data/samples.yaml"
 
+# The oEmbed registry, for the embed part's link cards (_partials/rubric/unfurl.html).
+[[module.mounts]]
+source = "data/oembed.json"
+target = "data/oembed.json"
+
 [[module.mounts]]
 source = "layouts"
 target = "layouts"

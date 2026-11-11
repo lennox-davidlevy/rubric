@@ -121,7 +121,7 @@ test.skipIf(!hugo)("a map, a PDF, a file tree and progress bars draw from their 
 // title, description and picture, the picture copied into the site. A page
 // that gives none, or a fetch that fails, leaves the plain card. Served from
 // here, so the test needs no network.
-test.skipIf(!hugo)("an embed's link shows the page's title, description and picture", async () => {
+test.skipIf(!hugo)("an embed's link shows the page's title, description and picture, from the site's oEmbed address when it has one", async () => {
   const png = await Bun.file(join(root, "testing/static/images/path.png")).bytes();
   const server = Bun.serve({
     port: 0,
@@ -135,6 +135,14 @@ test.skipIf(!hugo)("an embed's link shows the page's title, description and pict
         );
       }
       if (path === "/titled") return new Response("<html><head><title>Only a title</title></head></html>", { headers: { "Content-Type": "text/html" } });
+      // A site that turns away a request for the page, as Reddit does, and
+      // answers at its oEmbed address instead.
+      if (path.startsWith("/walls/")) return new Response("go away", { status: 403 });
+      if (path === "/oembed") {
+        const asked = new URL(req.url).searchParams;
+        if (asked.get("format") !== "json" || !asked.get("url")?.includes("/walls/")) return new Response("bad", { status: 400 });
+        return Response.json({ type: "rich", title: "Behind a wall", author_name: "A. Writer", thumbnail_url: "/pic.png" });
+      }
       if (path === "/pic.png") return new Response(png, { headers: { "Content-Type": "image/png" } });
       return new Response("not here", { status: 404 });
     },
@@ -149,9 +157,15 @@ test.skipIf(!hugo)("an embed's link shows the page's title, description and pict
         `\n[security.http]\nurls = ["^http://127\\\\.0\\\\.0\\\\.1:"]\n`,
     );
     mkdirSync(join(site, "content/posts"), { recursive: true });
+    // The site's own registry, in place of the catalog's, naming the stand-in.
+    mkdirSync(join(site, "data"));
+    writeFileSync(join(site, "data/oembed.json"), JSON.stringify([
+      { provider_name: "Walls", provider_url: at, endpoints: [{ schemes: [`${at}/walls/*`], url: `${at}/oembed` }] },
+    ]));
     writeFileSync(
       join(site, "content/posts/p.md"),
       ["---", "title: P", "---", "",
+        `{{< embed >}}\n${at}/walls/post\n{{< /embed >}}`,
         `{{< embed >}}\n${at}/talk\n{{< /embed >}}`,
         `{{< embed >}}\n${at}/titled\n{{< /embed >}}`,
         `{{< embed >}}\n${at}/gone\n{{< /embed >}}`,
@@ -161,8 +175,12 @@ test.skipIf(!hugo)("an embed's link shows the page's title, description and pict
     await build.exited;
     expect(await new Response(build.stderr).text()).toBe("");
     const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");
-    const cards = html.split(`<a class="part-embed-card`).slice(1);
-    expect(cards).toHaveLength(3);
+    const walled = html.split(`<a class="part-embed-card`).slice(1);
+    expect(walled).toHaveLength(4);
+    expect(walled[0]).toContain(`<span class="part-embed-title">Behind a wall</span>`);
+    expect(walled[0]).toContain(`<span class="part-embed-description">By A. Writer</span>`);
+    expect(walled[0]).toContain(`<img class="part-embed-image"`);
+    const cards = walled.slice(1);
     expect(cards[0]).toContain(`<span class="part-embed-title">The talk &amp; its slides</span>`);
     expect(cards[0]).toContain(`<span class="part-embed-description">Forty slides on walking home.</span>`);
     expect(cards[0]).toMatch(/<img class="part-embed-image" src="\/pic_[^"]+\.png" width="\d+" height="\d+"/);

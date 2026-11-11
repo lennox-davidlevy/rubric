@@ -3,7 +3,7 @@
 // Skipped when nvim is not on the path.
 
 import { expect, test } from "bun:test";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -37,7 +37,7 @@ test.skipIf(!nvim)("Neovim: attach, diagnostics, completion, ghost text, accept,
     // Typing a new line: "::: " adds its closer below, and completion offers
     // the parts.
     keys("Go::: <Esc>");
-    expect(await until(() => expr("RubricTest.line(10)") === ":::")).toBe(true);
+    expect(await until(() => expr("RubricTest.line(9)") === ":::")).toBe(true);
     await Bun.sleep(400);
     expect(expr("RubricTest.complete(8, 4)")).toBe("callout,quote,section");
     keys("2dd");
@@ -144,7 +144,7 @@ test.skipIf(!nvim)("Neovim: accepting words after a pin's colon rewrites the pin
     .replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(repo, "catalogs"))}`)
     .replace(/^theme = .*$/m, `theme = "universal"`));
   const page = join(site, "pages/posts/refine.md");
-  writeFileSync(page, ["---", "title: Refine", "---", "::: a video -> video :", "https://youtu.be/x", ":::", ""].join("\n"));
+  writeFileSync(page, ["---", "title: Refine", "---", "::: video :", "https://youtu.be/x", ":::", ""].join("\n"));
 
   const editor = Bun.spawn([nvim!, "--headless", "--listen", sock, "-u", join(repo, "test/nvim/init.lua"), "-i", "NONE", page], {
     cwd: site, env: { ...process.env, RUBRIC_REPO: repo }, stdout: "ignore", stderr: "ignore",
@@ -246,7 +246,7 @@ test.skipIf(!nvim)("Neovim: switching the theme in hugo.toml reaches the server 
     .replace(/^theme = .*$/m, `theme = "universal"`);
   writeFileSync(join(site, "hugo.toml"), config);
   const page = join(site, "pages/posts/theme.md");
-  writeFileSync(page, ["---", "title: Theme", "---", "::: a strip -> sash", "Hi.", ":::", ""].join("\n"));
+  writeFileSync(page, ["---", "title: Theme", "---", "::: sash", "Hi.", ":::", ""].join("\n"));
 
   const editor = Bun.spawn([nvim!, "--headless", "--listen", sock, "-u", join(repo, "test/nvim/init.lua"), "-i", "NONE", page], {
     cwd: site, env: { ...process.env, RUBRIC_REPO: repo }, stdout: "ignore", stderr: "ignore",
@@ -263,6 +263,180 @@ test.skipIf(!nvim)("Neovim: switching the theme in hugo.toml reaches the server 
     expect(await until(() => expr("RubricTest.codes()") === "")).toBe(true);
   } finally {
     remote("--remote-send", "<Esc>:qa!<CR>");
+    await Promise.race([editor.exited, Bun.sleep(2000)]);
+    editor.kill();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, 60_000);
+
+test.skipIf(!nvim)("Neovim: the accept key on rubric.md's theme line opens the theme list, in order for its words", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "rubric-nvim-themes-"));
+  const sock = join(dir, "nvim.sock");
+  cpSync(join(repo, "sites/blog"), join(dir, "site"), { recursive: true, filter: (src) => !/\/(content|\.rubric|public)(\/|$)/.test(src) });
+  const site = join(dir, "site");
+  writeFileSync(join(site, "hugo.toml"), readFileSync(join(site, "hugo.toml"), "utf8")
+    .replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(repo, "catalogs"))}`)
+    .replace(/^theme = .*$/m, `theme = "universal"`));
+  const rubric = join(site, "rubric.md");
+  // The closer below is the one "::: " puts there; a theme line has none.
+  writeFileSync(rubric, ["::: theme solarized cream", ":::", "", "::: header", "- [Posts](/posts/)", ":::", ""].join("\n"));
+
+  const editor = Bun.spawn([nvim!, "--headless", "--listen", sock, "-u", join(repo, "test/nvim/init.lua"), "-i", "NONE", rubric], {
+    cwd: site, env: { ...process.env, RUBRIC_REPO: repo }, stdout: "ignore", stderr: "ignore",
+  });
+  const remote = (flag: string, arg: string) => Bun.spawnSync([nvim!, "--server", sock, flag, arg]).stdout.toString().trim();
+  const expr = (lua: string) => remote("--remote-expr", `luaeval("${lua.replace(/"/g, '\\"')}")`);
+  const keys = (k: string) => remote("--remote-send", k);
+  const until = async (f: () => boolean, ms = 10_000) => {
+    for (const end = Date.now() + ms; Date.now() < end; await Bun.sleep(50)) if (f()) return true;
+    return false;
+  };
+  const frameTheme = () => {
+    try {
+      return JSON.stringify(JSON.parse(readFileSync(join(site, "content/rubric-frame/index.md"), "utf8")).theme ?? null);
+    } catch {
+      return "";
+    }
+  };
+  try {
+    expect(await until(() => expr("RubricTest.attached()") === "true")).toBe(true);
+    expect(await until(() => expr("RubricTest.codes()") === "stray-closer,theme-unpicked")).toBe(true);
+    expect(expr("RubricTest.take_first()")).toBe("true");
+    // The stub puts the theme sharing the most words first.
+    keys(":call cursor(1, 1)<CR>A<M-l>");
+    expect(await until(() => expr("RubricTest.line(1)") === "::: theme solarized-light")).toBe(true);
+    expect(expr("RubricTest.line(2)")).toBe("");
+    expect(Number(expr("RubricTest.offered"))).toBeGreaterThan(60);
+    expect(await until(() => frameTheme() === `{"name":"solarized-light"}`)).toBe(true);
+    expect(await until(() => expr("RubricTest.codes()") === "")).toBe(true);
+
+    // On a piece's key=, the accept key in normal mode opens that piece's
+    // list, and the hint on the line names it.
+    keys(`:call setline(1, "::: theme paper palette=dracula")<CR>:call cursor(1, 18)<CR>`);
+    expect(await until(() => expr("RubricTest.theme_hint()").includes("palette"))).toBe(true);
+    keys("<M-l>");
+    const first = (dir: string) => readdirSync(join(repo, "catalogs/universal/themes", dir)).filter((f) => f.endsWith(".yaml")).sort()[0]!.slice(0, -5);
+    expect(await until(() => expr("RubricTest.line(1)") === `::: theme paper palette=${first("palettes")}`)).toBe(true);
+    expect(await until(() => frameTheme() === `{"name":"paper","palette":"${first("palettes")}"}`)).toBe(true);
+    // Off the line, no hint; on its theme name, the hint is the theme list's.
+    keys(":call cursor(4, 1)<CR>");
+    expect(await until(() => expr("RubricTest.theme_hint()") === "")).toBe(true);
+    keys(":call cursor(1, 12)<CR>");
+    expect(await until(() => expr("RubricTest.theme_hint()").includes("theme"))).toBe(true);
+    // A key typed without its "=" yet opens its list too, here by :Rubric theme.
+    keys(`:call setline(1, "::: theme paper scale")<CR>:call cursor(1, 18)<CR>:Rubric theme<CR>`);
+    expect(await until(() => expr("RubricTest.line(1)") === `::: theme paper scale=${first("scales")}`)).toBe(true);
+
+    // Typed by hand: the closer "::: " put below goes once the line is a theme
+    // line, and the block below keeps its own.
+    keys(":1,2d<CR>ggO::: <Esc>");
+    expect(await until(() => expr("RubricTest.line(2)") === ":::")).toBe(true);
+    keys("Atheme paper");
+    expect(await until(() => expr("RubricTest.line(2)") === "::: header")).toBe(true);
+    keys("<Esc>");
+    // A bare "::: theme" could still become a part like theme-switch, so its
+    // closer waits for insert mode to end.
+    keys(":1d<CR>ggO::: <Esc>Atheme");
+    await Bun.sleep(300);
+    expect(expr("RubricTest.line(2)")).toBe(":::");
+    keys("<Esc>");
+    expect(await until(() => expr("RubricTest.line(2)") === "::: header")).toBe(true);
+    // The header's own closer stays.
+    expect(expr("RubricTest.line(4)")).toBe(":::");
+
+    // A closer already there goes with the first edit to the line, and one
+    // undo brings both back, with nothing taking it away again.
+    keys(`:call setline(1, "::: theme paper")<CR>:call append(1, ":::")<CR>`);
+    expect(await until(() => expr("RubricTest.line(2)") === ":::")).toBe(true);
+    keys(":call cursor(1, 11)<CR>cwbear<Esc>");
+    expect(await until(() => expr("RubricTest.line(2)") === "::: header")).toBe(true);
+    keys("u");
+    expect(await until(() => expr("RubricTest.line(1)") === "::: theme paper")).toBe(true);
+    await Bun.sleep(300);
+    expect(expr("RubricTest.line(2)")).toBe(":::");
+    // Among words, a piece's name is a word: the list is the themes'.
+    keys(`:call setline(1, "::: theme large scale editorial")<CR>:call cursor(1, 18)<CR>`);
+    expect(await until(() => expr("RubricTest.theme_hint()").includes("theme list"))).toBe(true);
+  } finally {
+    keys("<Esc>:qa!<CR>");
+    await Promise.race([editor.exited, Bun.sleep(2000)]);
+    editor.kill();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, 60_000);
+
+test.skipIf(!nvim)("Neovim: a part that takes nothing inside loses the closer typing \"::: \" put below it", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "rubric-nvim-alone-"));
+  const sock = join(dir, "nvim.sock");
+  cpSync(join(repo, "sites/blog"), join(dir, "site"), { recursive: true, filter: (src) => !/\/(content|\.rubric|public)(\/|$)/.test(src) });
+  const site = join(dir, "site");
+  writeFileSync(join(site, "hugo.toml"), readFileSync(join(site, "hugo.toml"), "utf8")
+    .replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(repo, "catalogs"))}`)
+    .replace(/^theme = .*$/m, `theme = "universal"`));
+  const page = join(site, "pages/posts/alone.md");
+  writeFileSync(page, ["---", "title: Alone", "---", "Intro.", ""].join("\n"));
+
+  const editor = Bun.spawn([nvim!, "--headless", "--listen", sock, "-u", join(repo, "test/nvim/init.lua"), "-i", "NONE", page], {
+    cwd: site, env: { ...process.env, RUBRIC_REPO: repo }, stdout: "ignore", stderr: "ignore",
+  });
+  const remote = (flag: string, arg: string) => Bun.spawnSync([nvim!, "--server", sock, flag, arg]).stdout.toString().trim();
+  const expr = (lua: string) => remote("--remote-expr", `luaeval("${lua.replace(/"/g, '\\"')}")`);
+  const keys = (k: string) => remote("--remote-send", k);
+  const until = async (f: () => boolean, ms = 10_000) => {
+    for (const end = Date.now() + ms; Date.now() < end; await Bun.sleep(50)) if (f()) return true;
+    return false;
+  };
+  const all = () => expr("table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), '|')");
+  try {
+    expect(await until(() => expr("RubricTest.attached()") === "true")).toBe(true);
+
+    // Typed by hand: the closer goes when insert mode ends.
+    keys("Go::: <Esc>");
+    expect(await until(() => expr("RubricTest.line(6)") === ":::")).toBe(true);
+    keys("Adivider style=ornament<Esc>");
+    expect(await until(() => all() === "---|title: Alone|---|Intro.|::: divider style=ornament")).toBe(true);
+
+    // Or when Enter leaves the line, with the writing going on below it.
+    keys("o::: <Esc>");
+    expect(await until(() => expr("RubricTest.line(7)") === ":::")).toBe(true);
+    // (Sent apart, as typed: Neovim checks the cursor when no keys are waiting.)
+    keys("Acontents<CR>");
+    await Bun.sleep(200);
+    keys("Then more.<Esc>");
+    expect(await until(() => all() === "---|title: Alone|---|Intro.|::: divider style=ornament|::: contents|Then more.")).toBe(true);
+
+    // Words that start with such a part's name are words, and keep theirs.
+    keys("o::: <Esc>Asearch for something<Esc>");
+    await Bun.sleep(300);
+    expect(expr("RubricTest.line(9)")).toBe(":::");
+    keys(":8,9d<CR>");
+
+    // Accepting words that pick one takes the empty block's closer too.
+    keys("Go::: <Esc>");
+    expect(await until(() => expr("RubricTest.line(9)") === ":::")).toBe(true);
+    keys("Aa divider please");
+    await Bun.sleep(600);
+    expect(await until(() => expr("RubricTest.ghost()") === "-> divider")).toBe(true);
+    keys("<M-l>");
+    expect(await until(() => expr("RubricTest.line(8)") === "::: divider")).toBe(true);
+    keys("<Esc>");
+    expect(await until(() => expr("RubricTest.line(9)") === "")).toBe(true);
+    // One undo brings the words and the closer back.
+    keys("u");
+    expect(await until(() => expr("RubricTest.line(9)") === ":::")).toBe(true);
+    expect(expr("RubricTest.codes()")).not.toContain("stray-closer");
+
+    // Inside a block: the closer the plugin put there goes, and the block's
+    // own stays.
+    keys(":8,$d<CR>Go::: <Esc>");
+    expect(await until(() => expr("RubricTest.line(9)") === ":::")).toBe(true);
+    keys("Asection<Esc>oInside.<Esc>o::: <Esc>");
+    expect(await until(() => all().endsWith("|::: section|Inside.|::: |:::|:::"))).toBe(true);
+    keys("Adivider<Esc>");
+    expect(await until(() => all().endsWith("|Then more.|::: section|Inside.|::: divider|:::"))).toBe(true);
+    expect(await until(() => !expr("RubricTest.codes()").includes("stray-closer"))).toBe(true);
+  } finally {
+    keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);
     editor.kill();
     rmSync(dir, { recursive: true, force: true });
@@ -366,13 +540,15 @@ test.skipIf(!nvim)("Neovim: spell checking skips part names and settings, and ke
   const page = join(site, "pages/posts/spell.md");
   writeFileSync(page, [
     "The wrods stay checked.",
-    "::: a big qoute -> callout icon=lightbulb : make it biggr",
+    "::: a big qoute",
+    ":::",
+    "::: callout icon=lightbulb : make it biggr",
     ":::",
     "::: callout icon=lightbulb cite=\"Ch. 2: Hme\"",
     ":::",
     "::: callout icon=",
     ":::",
-    "::: first -> secnd thing -> callout icon=lightbulb",
+    "::: the first and secnd thing",
     ":::",
     "",
   ].join("\n"));
@@ -394,10 +570,13 @@ test.skipIf(!nvim)("Neovim: spell checking skips part names and settings, and ke
 
     // A line typed now is marked as it changes, and words stay words.
     keys("Go::: callout icon=lightbulbb<Esc>");
-    expect(await until(() => expr("RubricTest.line(10)") === "::: callout icon=lightbulbb")).toBe(true);
+    expect(await until(() => expr("RubricTest.line(12)") === "::: callout icon=lightbulbb")).toBe(true);
     expect(expr("RubricTest.misspelled()")).toBe("wrods,qoute,biggr,secnd");
     keys("cc::: a wooden lightbulbb<Esc>");
     expect(await until(() => expr("RubricTest.misspelled()") === "wrods,qoute,biggr,secnd,lightbulbb")).toBe(true);
+    // A theme line is all names: the theme's and its pieces'.
+    keys("cc::: theme hyde-red palette=dracula pairing=pt-abril-hyde<Esc>");
+    expect(await until(() => expr("RubricTest.misspelled()") === "wrods,qoute,biggr,secnd")).toBe(true);
   } finally {
     keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);

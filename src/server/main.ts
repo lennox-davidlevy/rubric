@@ -11,16 +11,18 @@ import {
   CompletionItemKind, createConnection, DiagnosticSeverity, MarkupKind, ProposedFeatures, TextDocuments, TextDocumentSyncKind,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { atPlace, Cache, type PageKind } from "../core/index.ts";
-import { ask, refine, warm } from "../jev.ts";
+import { atPlace, Cache, type Catalog, type PageKind, type ThemeChoice } from "../core/index.ts";
+import { ask, rankThemes, refine, warm } from "../jev.ts";
 import { findSiteRoot, openSite } from "../site.ts";
-import { stubRefiner, stubResolver } from "./stub.ts";
+import { stubRefiner, stubResolver, stubThemeRanker } from "./stub.ts";
+import type { ThemeRanker } from "./themes.ts";
 import { Workspace, type Refiner, type Resolver, type Severity } from "./workspace.ts";
 
 export function serve(opts: { stub: boolean }): void {
   const connection = createConnection(ProposedFeatures.all, process.stdin, process.stdout);
   const documents = new TextDocuments(TextDocument);
   let workspace: Workspace | undefined;
+  let ranker: ThemeRanker | undefined;
 
   const severity: Record<Severity, DiagnosticSeverity> = {
     warning: DiagnosticSeverity.Warning,
@@ -64,6 +66,19 @@ export function serve(opts: { stub: boolean }): void {
             }
             return { ...(asked.refined ? { refined: asked.refined } : {}), ...(asked.error ? { error: asked.error } : {}), model: asked.model ?? "unknown" };
           };
+      // The theme list's order for the words on the theme line. Kept for the
+      // session: the same words, the same order, and no second call.
+      const ranked = new Map<string, Record<string, number>>();
+      ranker = opts.stub ? stubThemeRanker : async (words, themes) => {
+        const key = `${themes.map((t) => t.name).join(",")}\n${words}`;
+        const hit = ranked.get(key);
+        if (hit) return hit;
+        const asked = await rankThemes(themes, words);
+        const log = join(root, ".rubric/jev.jsonl");
+        if (existsSync(log)) void appendFile(log, JSON.stringify({ t: Date.now(), pass: "theme", ...asked }) + "\n").catch(() => {});
+        ranked.set(key, asked.order);
+        return asked.order;
+      };
       workspace = new Workspace(first, cache, resolver, (f, notes) => {
         void connection.sendDiagnostics({
           uri: pathToFileURL(f).href,
@@ -77,6 +92,7 @@ export function serve(opts: { stub: boolean }): void {
         });
       }, {
         refiner,
+        onReload: (site) => void connection.sendNotification("rubric/alone", { parts: alone(site.catalog) }),
         onEdit: (edit) => {
           // A words line being typed will be asked soon: have the
           // connection open by then.
@@ -94,6 +110,9 @@ export function serve(opts: { stub: boolean }): void {
         completionProvider: { triggerCharacters: [" ", "=", "/", "(", '"'] },
         hoverProvider: true,
         inlineCompletionProvider: true,
+        // The parts that take nothing inside, so have no closing ":::": the
+        // editor takes away the one it put below such a line.
+        experimental: { rubric: { alone: workspace ? alone(workspace.site.catalog) : [] } },
       },
       serverInfo: { name: "rubric" },
     };
@@ -153,6 +172,20 @@ export function serve(opts: { stub: boolean }): void {
     if (f && workspace) workspace.choose(f, params.line, params.index);
   });
 
+  // The editor's theme list: every theme and piece, in order for the words
+  // on the theme line at `line`.
+  connection.onRequest("rubric/themes", async (params: { uri: string; line?: number }) => {
+    const f = file(params.uri);
+    if (!f || !workspace) return null;
+    return (await workspace.themes(f, params.line, ranker)) ?? null;
+  });
+
+  // The writer is looking at a theme in that list (or closed it: no theme):
+  // every page is drawn in it.
+  connection.onNotification("rubric/previewTheme", (params: { theme?: ThemeChoice }) => {
+    void workspace?.previewTheme(params.theme);
+  });
+
   connection.languages.inlineCompletion.on(async (params) => {
     const f = file(params.textDocument.uri);
     if (!f || !workspace) return [];
@@ -165,7 +198,7 @@ export function serve(opts: { stub: boolean }): void {
     return ghosts.map((g) => ({
       insertText: g.text,
       range: { start: { line: g.line, character: g.character }, end: { line: g.line, character: g.character } },
-      ...(g.replace === undefined ? {} : { command: { title: "Pin", command: "rubric.pin", arguments: [{ line: g.line, text: g.replace }] } }),
+      ...(g.replace === undefined ? {} : { command: { title: "Pin", command: "rubric.pin", arguments: [{ line: g.line, text: g.replace, ...(g.drop === undefined ? {} : { drop: g.drop }) }] } }),
     }));
   });
 
@@ -217,7 +250,7 @@ function watchConfig(workspace: Workspace, say: (message: string) => void): void
       if (text === was) return;
       was = text;
       try {
-        const site = await openSite(root);
+        const site = await openSite(root, workspace.lineTheme);
         await workspace.reload(site);
         say(`rubric: hugo.toml changed; theme ${String(site.params.theme ?? "paper")}${site.skin ? `, skin ${site.skin}` : ""}`);
       } catch (err) {
@@ -225,4 +258,9 @@ function watchConfig(workspace: Workspace, say: (message: string) => void): void
       }
     }, 150);
   });
+}
+
+// The parts that take nothing inside, for the editor.
+function alone(catalog: Catalog): string[] {
+  return Object.entries(catalog.parts).filter(([, p]) => p.empty).map(([name]) => name).sort();
 }

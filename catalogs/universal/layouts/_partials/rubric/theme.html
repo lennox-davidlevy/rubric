@@ -1,0 +1,34 @@
+{{- /*
+  The theme a page is drawn in: a dict of name, palette, pairing, scale and
+  skin. In order:
+
+  - a page that names its own theme, as the catalog and stress pages do, in
+    that theme as it is;
+  - the theme from rubric.md's `::: theme` line, which the server writes
+    into the frame page (content/rubric-frame/), or the one the writer is
+    looking at in the editor's list;
+  - hugo.toml's params.rubric.theme, with its palette, pairing or scale
+    swapped in;
+  - Paper.
+
+  A swap on the theme line applies to whichever theme comes from below it;
+  hugo.toml's swaps apply only to hugo.toml's theme.
+
+  Usage: {{ $t := partial "rubric/theme.html" .page }}
+*/ -}}
+{{- $page := . | default site.Home -}}
+{{- $line := dict -}}
+{{- with site.GetPage "/rubric-frame" }}{{ with .Params.theme }}{{ $line = . }}{{ end }}{{ end -}}
+{{- $own := not $page.Params.rubric.theme -}}
+{{- $name := $page.Params.rubric.theme | default (cond $own $line.name "") | default site.Params.rubric.theme | default "paper" -}}
+{{- $t := index hugo.Data.themes $name -}}
+{{- if not $t }}{{ errorf "rubric: %q is not a theme in this catalog" $name }}{{ end -}}
+{{- $fromSite := and $own (not $line.name) site.Params.rubric -}}
+{{- $out := dict "name" $name "skin" ($t.skin | default "") -}}
+{{- range slice "palette" "pairing" "scale" -}}
+  {{- $v := index $t . -}}
+  {{- if $fromSite }}{{ with index site.Params.rubric . }}{{ $v = . }}{{ end }}{{ end -}}
+  {{- if $own }}{{ with index $line . }}{{ $v = . }}{{ end }}{{ end -}}
+  {{- $out = merge $out (dict . $v) -}}
+{{- end -}}
+{{- return $out -}}

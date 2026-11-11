@@ -34,6 +34,7 @@ Keys, in insert mode on a `:::` line:
 
 - `<M-l>` accepts the ghost text: puts the part in place of your words, or writes a second pass's settings into the part and drops those words. `u` brings the words back. Before any ghost text shows, it asks Jev about the line at once instead of waiting for you to pause; Esc does too
 - `<M-n>` / `<M-p>` switch between the pick and the runner-up, in the ghost text and on the page
+- On `::: theme` in `rubric.md`, `<M-l>` in insert or normal mode (or `:Rubric theme`) opens the theme list, and a hint at the end of the line says so: names on the left, a picture, colors and type on the right, and the page in the browser takes on the theme under the cursor. Enter chooses it; Esc puts the old one back. Words after `theme` put the list in order. On `palette=`, `pairing=` or `scale=`, it opens that piece's list
 - `K` in normal mode shows what a line became and why
 - `<leader>e` shows the line's note
 

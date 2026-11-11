@@ -33,6 +33,9 @@ export interface Part {
   // so the writer sees what the part expects. Never over anything written.
   body?: string;
   children: boolean;
+  // The part takes nothing inside (a divider, a search box), so its line has
+  // no closing `:::`.
+  empty?: true;
   // The part brings a script, loaded only on pages that use it. The part
   // still works without it.
   script: boolean;
@@ -56,6 +59,16 @@ export interface Catalog {
   // What other skins add, so a pin made in one skin reads as such in another
   // instead of as a mistake: part name to skin, and part to setting to skin.
   elsewhere: { parts: Record<string, string>; settings: Record<string, Record<string, string>> };
+  // The themes a site can name with `::: theme` in rubric.md, and the pieces
+  // it can swap: from themes.yaml and themes/, when the catalog has them.
+  themes?: ThemeNames;
+}
+
+export interface ThemeNames {
+  themes: string[];
+  palette: string[];
+  pairing: string[];
+  scale: string[];
 }
 
 // What a skin adds to the catalog: settings on the catalog's own parts, and
@@ -186,6 +199,9 @@ function parsePart(rawPart: unknown, at: string): Part {
   if (typeof children !== "boolean") throw new CatalogError(`${at}.children must be true or false`);
   const script = part.script ?? false;
   if (typeof script !== "boolean") throw new CatalogError(`${at}.script must be true or false`);
+  const empty = part.empty ?? false;
+  if (typeof empty !== "boolean") throw new CatalogError(`${at}.empty must be true or false`);
+  if (empty && (children || part.body !== undefined)) throw new CatalogError(`${at} takes nothing inside, so it has no children and no body`);
   const settings: Record<string, Setting> = {};
   for (const [settingName, rawSetting] of Object.entries(record(part.settings ?? {}, `${at}.settings`))) {
     named(settingName, `${at}.settings.${settingName}`);
@@ -197,7 +213,7 @@ function parsePart(rawPart: unknown, at: string): Part {
   const already = part.already === undefined ? {} : {
     already: Object.fromEntries(Object.entries(record(part.already, `${at}.already`)).map(([k, v]) => [k, string(v, `${at}.already.${k}`)])),
   };
-  return { description: string(part.description, `${at}.description`), place, ...body, children, script, settings, ...already };
+  return { description: string(part.description, `${at}.description`), place, ...body, children, ...(empty ? { empty: true as const } : {}), script, settings, ...already };
 }
 
 function setting(raw: unknown, at: string): Setting {

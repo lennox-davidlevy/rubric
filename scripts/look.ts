@@ -112,6 +112,46 @@ function serve(dir: string) {
   });
 }
 
+// The picture of each theme in the editor's theme list: the first screen of
+// its sample post at a laptop's width, made smaller. Saved to
+// catalogs/<catalog>/previews/<theme>.png, which is committed, so a writer
+// never needs a browser to see them.
+export const PREVIEW = { width: 1280, height: 800, out: "800x500" };
+
+export async function previews(catalog: string, themes: string[]): Promise<string[]> {
+  const site = join(catalog, "page");
+  const built = mkdtempSync(join(tmpdir(), "rubric-previews-"));
+  const build = Bun.spawnSync(["hugo", "-s", site, "-d", built, "--quiet"], { stdout: "pipe", stderr: "pipe" });
+  if (build.exitCode !== 0) {
+    rmSync(built, { recursive: true, force: true });
+    throw new Error(`hugo failed: ${build.stderr.toString() || build.stdout.toString()}`);
+  }
+  const server = serve(built);
+  const browser = await chromium.launch();
+  const dir = join(catalog, "previews");
+  mkdirSync(dir, { recursive: true });
+  const made: string[] = [];
+  try {
+    const page = await browser.newPage({ viewport: { width: PREVIEW.width, height: PREVIEW.height } });
+    for (const theme of themes) {
+      await page.goto(`http://localhost:${server.port}/sample/${theme}/`, { waitUntil: "networkidle" });
+      await page.evaluate(() => document.fonts.ready);
+      const raw = join(built, `${theme}.png`);
+      await page.screenshot({ path: raw });
+      const out = join(dir, `${theme}.png`);
+      // Fewer colors keep each picture small enough to commit 71 of them.
+      const shrink = Bun.spawnSync(["magick", raw, "-resize", PREVIEW.out, "-strip", "-colors", "192", `PNG8:${out}`], { stderr: "pipe" });
+      if (shrink.exitCode !== 0) throw new Error(`magick failed for ${theme}: ${shrink.stderr.toString()}`);
+      made.push(out);
+    }
+  } finally {
+    await browser.close();
+    server.stop(true);
+    rmSync(built, { recursive: true, force: true });
+  }
+  return made;
+}
+
 export async function look(catalog: string, themes: string[]): Promise<Problem[]> {
   const out: Problem[] = [];
   const site = join(catalog, "page");

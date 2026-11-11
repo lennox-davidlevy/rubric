@@ -19,31 +19,40 @@ export interface Site {
   catalog: Catalog;
   // The skin the site's theme brings, whose additions are in the catalog.
   skin?: string;
+  // The theme the site is drawn in: rubric.md's `::: theme` line when it has
+  // one, else hugo.toml's, else Paper. Its skin decides the catalog's parts.
+  theme: string;
+  // The catalog's folder: themes.yaml, themes/ and previews/ are in it.
+  themeDir: string;
   // [params.rubric] in hugo.toml, read once when the site is opened.
   params: Record<string, unknown>;
 }
 
-export async function openSite(root: string): Promise<Site> {
+// `theme` is the one rubric.md names, which comes before hugo.toml's.
+export async function openSite(root: string, theme?: string): Promise<Site> {
   // The slice has one catalog, read from the theme the site's hugo.toml names.
   const config = await readFile(join(root, "hugo.toml"), "utf8");
-  const theme = /^theme\s*=\s*"([^"]+)"/m.exec(config)?.[1];
+  // Hugo's theme is the catalog; Rubric's theme is a look inside it.
+  const catalogName = /^theme\s*=\s*"([^"]+)"/m.exec(config)?.[1];
   const themesDir = /^themesDir\s*=\s*"([^"]+)"/m.exec(config)?.[1] ?? "themes";
-  if (!theme) throw new Error(`${root}/hugo.toml names no theme`);
-  const themeDir = resolve(root, themesDir, theme);
+  if (!catalogName) throw new Error(`${root}/hugo.toml names no theme`);
+  const themeDir = resolve(root, themesDir, catalogName);
+  const params = rubricParams(config);
   return {
     root,
     pages: join(root, "pages"),
     content: join(root, "content"),
     cache: join(root, ".rubric/cache.json"),
     static: [join(root, "static"), join(themeDir, "static")],
-    ...(await skinned(themeDir, rubricParams(config))),
-    params: rubricParams(config),
+    ...(await skinned(themeDir, theme ?? (typeof params.theme === "string" ? params.theme : "paper"))),
+    themeDir,
+    params,
   };
 }
 
 // The catalog with the site's skin merged in: the skin of the theme the site
 // names under [params.rubric] (themes.yaml), and every other skin known.
-async function skinned(themeDir: string, params: Record<string, unknown>): Promise<{ catalog: Catalog; skin?: string }> {
+async function skinned(themeDir: string, theme: string): Promise<{ catalog: Catalog; skin?: string; theme: string }> {
   const base = await loadCatalog(join(themeDir, "catalog.yaml"));
   const skins: Record<string, Skin> = {};
   const dir = join(themeDir, "skins");
@@ -53,10 +62,16 @@ async function skinned(themeDir: string, params: Record<string, unknown>): Promi
     skins[skin.name] = skin;
   }
   const themes = existsSync(join(themeDir, "themes.yaml")) ? (parse(await readFile(join(themeDir, "themes.yaml"), "utf8")) ?? {}) as Record<string, { skin?: string }> : {};
-  const theme = typeof params.theme === "string" ? params.theme : "paper";
   const skin = themes[theme]?.skin;
   const active = skin && skins[skin] ? skin : undefined;
-  return { catalog: withSkin(base, skins, active), ...(active ? { skin: active } : {}) };
+  const pieces = async (kind: string) => {
+    const dir = join(themeDir, "themes", kind);
+    return existsSync(dir) ? (await readdir(dir)).filter((f) => f.endsWith(".yaml")).map((f) => f.slice(0, -5)).sort() : [];
+  };
+  const names = Object.keys(themes).length
+    ? { themes: Object.keys(themes), palette: await pieces("palettes"), pairing: await pieces("pairings"), scale: await pieces("scales") }
+    : undefined;
+  return { catalog: { ...withSkin(base, skins, active), ...(names ? { themes: names } : {}) }, ...(active ? { skin: active } : {}), theme };
 }
 
 function rubricParams(config: string): Record<string, unknown> {

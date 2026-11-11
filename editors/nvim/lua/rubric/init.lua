@@ -7,10 +7,12 @@
 -- only to Markdown. Ghost text is Neovim's own inline completion.
 
 local M = {}
+local themes = require("rubric.themes")
 
 local defaults = {
   -- Accept the ghost text: pins the line. Before any ghost text shows, it
-  -- asks Jev about the line at once instead of waiting for a pause.
+  -- asks Jev about the line at once instead of waiting for a pause. On
+  -- rubric.md's `::: theme` line, it opens the theme list.
   accept = "<M-l>",
   -- Switch between the pick and the runner-up. Not <M-[>: a terminal sends it
   -- as ESC [, the start of an escape sequence, and the next key is lost.
@@ -23,6 +25,30 @@ local defaults = {
   -- Typing "::: " on an empty line adds the closing ":::" below it.
   close = true,
 }
+
+-- The parts that take nothing inside (`::: divider`), from the server: their
+-- lines have no closing ":::", as the theme line has none.
+local alone_parts = {}
+
+local function set_alone(names)
+  alone_parts = {}
+  for _, n in ipairs(names or {}) do
+    alone_parts[n] = true
+  end
+end
+
+local plain_end
+
+-- Is this a line with no block: the theme line, or a part that takes
+-- nothing inside, in plain form (`::: search : a big one` too). Words that
+-- start with such a part's name (`::: search for something`) open a block.
+local function is_alone_line(line)
+  if themes.is_theme_line(line) then
+    return true
+  end
+  local from, name = line:match("^%s*:::+%s*()([%l%d-]+)")
+  return name ~= nil and alone_parts[name] == true and plain_end(line, from) ~= nil
+end
 
 -- How many blocks are open above `row` (1-based, exclusive): each ":::"
 -- opener adds one and each bare ":::" closes the innermost. Code fences are
@@ -39,7 +65,7 @@ local function open_blocks(bufnr, row)
       fence = f
     elseif l:match("^%s*:::+%s*$") then
       depth = math.max(depth - 1, 0)
-    elseif l:match("^%s*:::+%s*%S") then
+    elseif l:match("^%s*:::+%s*%S") and not is_alone_line(l) then
       depth = depth + 1
     end
   end
@@ -67,6 +93,9 @@ local function close_directive(bufnr)
       table.insert(lines, indent .. ":::")
     end
     vim.api.nvim_buf_set_lines(bufnr, row - 1, row, false, lines)
+    if #lines == 2 then
+      themes.mark_closer(bufnr, row)
+    end
     vim.api.nvim_win_set_cursor(0, { row, col + 1 })
   end, { buffer = bufnr, desc = "Rubric: close a directive" })
 end
@@ -170,7 +199,7 @@ local spell_ns = vim.api.nvim_create_namespace("rubric.spell")
 
 -- Where the plain form starting at `pos` ends: past its last token, before any
 -- ":" and the words after it. Nil when the text isn't shaped like a plain form.
-local function plain_end(line, pos)
+function plain_end(line, pos)
   local stop = line:match("^%l[%l%d-]*()", pos)
   if not stop or not line:find("^%s", stop) and stop <= #line then
     return nil
@@ -189,27 +218,12 @@ local function plain_end(line, pos)
   end
 end
 
--- The columns of a directive line's plain form, as the scanner reads it: after
--- the first " -> " with a plain form on its right, or the last when none has.
+-- The columns of a directive line's plain form, as the scanner reads it: from
+-- the colons to a lone ":", when the line starts with a part.
 local function plain_span(line)
   local from = line:match("^%s*:::+%s*()%S")
   if not from then
     return nil
-  end
-  local arrow, at = nil, from
-  while true do
-    local s, e = line:find(" -> ", at, true)
-    if not s then
-      break
-    end
-    local stop = plain_end(line, e + 1)
-    if stop then
-      return e + 1, stop
-    end
-    arrow, at = e + 1, s + 1
-  end
-  if arrow then
-    return arrow, #line + 1
   end
   local stop = plain_end(line, from)
   if stop then
@@ -220,7 +234,13 @@ end
 local function mark_plain(bufnr)
   vim.api.nvim_buf_clear_namespace(bufnr, spell_ns, 0, -1)
   for row, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)) do
-    local start, stop = plain_span(line)
+    local start, stop
+    if themes.is_theme_line(line) then
+      -- Theme and piece names, all of it: `::: theme hyde-red palette=nord`.
+      start, stop = line:match("^%s*:::+%s*()"), #line + 1
+    else
+      start, stop = plain_span(line)
+    end
     if start then
       -- Above treesitter, which marks a Markdown line's text as spellable.
       vim.api.nvim_buf_set_extmark(bufnr, spell_ns, row - 1, start - 1, { end_col = stop - 1, spell = false, priority = 200 })
@@ -237,6 +257,124 @@ local function watch_spell(bufnr)
       mark_plain(bufnr)
     end,
   })
+end
+
+-- Lines with no block, and rubric.md's theme line.
+--
+-- The ":::" that typing "::: " put below goes once the line plainly has no
+-- block: the theme line, or a part that takes nothing inside. "::: theme "
+-- with its space can't become a part like theme-switch any more, so it goes
+-- then; anything else waits for the writer to leave the line or insert
+-- mode, since `::: search` may still become `::: search for something`,
+-- words, which do get a block. Leaving by Enter puts an empty line between
+-- the two, so the closer is looked for past it.
+--
+-- In rubric.md, with the cursor on the theme line, a hint at the end says
+-- the accept key opens the list (the palette's, on `palette=`).
+local theme_ns = vim.api.nvim_create_namespace("rubric.theme-hint")
+
+local function watch_alone_lines(bufnr, accept, on_rubric_md)
+  local function hint()
+    vim.api.nvim_buf_clear_namespace(bufnr, theme_ns, 0, -1)
+    if not on_rubric_md or vim.api.nvim_get_current_buf() ~= bufnr then
+      return
+    end
+    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+    local line = vim.api.nvim_get_current_line()
+    if not themes.is_theme_line(line) then
+      return
+    end
+    local key = themes.piece_at(line, col) or themes.piece_at(line, col - 1)
+    vim.api.nvim_buf_set_extmark(bufnr, theme_ns, row - 1, 0, {
+      virt_text = { { ("  %s opens the %s list"):format(accept, key or "theme"), "ComplHintMore" } },
+      virt_text_pos = "eol",
+      hl_mode = "combine",
+    })
+  end
+  -- The line at `row` (0-based) is done: its closer goes if it has no block.
+  -- `cursor` is the row the writer is on now, maybe a new empty one below.
+  local function drop_done(row, cursor)
+    local line = vim.api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1]
+    if not line or not is_alone_line(line) then
+      return
+    end
+    local below = vim.api.nvim_buf_get_lines(bufnr, row + 1, row + 2, false)[1]
+    if cursor == row + 1 and below and below:match("^%s*$") then
+      themes.drop_closer(bufnr, row + 1, open_blocks)
+    else
+      themes.drop_closer(bufnr, row, open_blocks)
+    end
+  end
+  -- In insert mode: the row the cursor is on, and the buffer's change count
+  -- when it got there. Only a line typed on is looked at: passing over one
+  -- changes nothing. Counted rather than caught as it happens, since Neovim
+  -- skips its events while keys are still waiting.
+  local last, tick
+  local function changed()
+    return tick ~= vim.api.nvim_buf_get_changedtick(bufnr)
+  end
+  local function at(row)
+    if last and last ~= row and changed() then
+      drop_done(last, row)
+    end
+    if last ~= row then
+      last, tick = row, vim.api.nvim_buf_get_changedtick(bufnr)
+    end
+  end
+  local group = vim.api.nvim_create_augroup("RubricAlone" .. bufnr, { clear = true })
+  vim.api.nvim_create_autocmd({ "CursorMoved", "BufEnter" }, { group = group, buffer = bufnr, callback = hint })
+  vim.api.nvim_create_autocmd("InsertEnter", {
+    group = group,
+    buffer = bufnr,
+    callback = function()
+      last, tick = vim.api.nvim_win_get_cursor(0)[1] - 1, vim.api.nvim_buf_get_changedtick(bufnr)
+    end,
+  })
+  vim.api.nvim_create_autocmd("CursorMovedI", {
+    group = group,
+    buffer = bufnr,
+    callback = function()
+      at(vim.api.nvim_win_get_cursor(0)[1] - 1)
+      hint()
+    end,
+  })
+  -- Only while typing: the closer only ever comes from typing "::: ". In
+  -- normal mode a change may be an undo, and taking the closer away again
+  -- there would make a new change, so undo could never get past it.
+  vim.api.nvim_create_autocmd({ "TextChangedI", "TextChangedP" }, {
+    group = group,
+    buffer = bufnr,
+    callback = function()
+      local row = vim.api.nvim_win_get_cursor(0)[1] - 1
+      at(row)
+      if vim.api.nvim_get_current_line():match("^%s*:::+%s*theme%s") then
+        themes.drop_closer(bufnr, row, open_blocks)
+      end
+      hint()
+    end,
+  })
+  vim.api.nvim_create_autocmd("TextChanged", { group = group, buffer = bufnr, callback = hint })
+  vim.api.nvim_create_autocmd("InsertLeave", {
+    group = group,
+    buffer = bufnr,
+    callback = function()
+      local row = vim.api.nvim_win_get_cursor(0)[1] - 1
+      at(row)
+      if changed() then
+        drop_done(row, row)
+      end
+      last, tick = nil, nil
+      hint()
+    end,
+  })
+  vim.api.nvim_create_autocmd("BufLeave", {
+    group = group,
+    buffer = bufnr,
+    callback = function()
+      vim.api.nvim_buf_clear_namespace(bufnr, theme_ns, 0, -1)
+    end,
+  })
+  hint()
 end
 
 -- Where the cursor is, for the live preview to follow: sent when it moves to
@@ -303,7 +441,13 @@ function M.setup(opts)
     filetypes = { "markdown" },
     root_markers = { "rubric.md" },
     capabilities = opts.capabilities,
-    handlers = { ["rubric/picks"] = picks_handler(opts.next) },
+    handlers = {
+      ["rubric/picks"] = picks_handler(opts.next),
+      -- hugo.toml named another theme, and its skin may bring other parts.
+      ["rubric/alone"] = function(_, params)
+        set_alone(params.parts)
+      end,
+    },
   })
   vim.lsp.enable("rubric")
 
@@ -318,11 +462,41 @@ function M.setup(opts)
     end
     pcall(vim.cmd.undojoin)
     vim.api.nvim_buf_set_lines(ctx.bufnr, arg.line, arg.line + 1, false, { arg.text })
+    -- The part picked takes nothing inside: the block's closer goes, with the
+    -- empty lines in it; anything written there stays, as writing after it.
+    local below = arg.drop and vim.api.nvim_buf_get_lines(ctx.bufnr, arg.drop, arg.drop + 1, false)[1]
+    if below and below:match("^%s*:::+%s*$") then
+      local inside = vim.api.nvim_buf_get_lines(ctx.bufnr, arg.line + 1, arg.drop, false)
+      local from = table.concat(inside):match("^%s*$") and arg.line + 1 or arg.drop
+      pcall(vim.cmd.undojoin)
+      vim.api.nvim_buf_set_lines(ctx.bufnr, from, arg.drop + 1, false, {})
+    end
     local win = vim.fn.bufwinid(ctx.bufnr)
     if win ~= -1 and vim.api.nvim_win_get_cursor(win)[1] == arg.line + 1 then
       vim.api.nvim_win_set_cursor(win, { arg.line + 1, #arg.text })
     end
   end
+
+  -- :Rubric theme opens the theme list for rubric.md's theme line.
+  vim.api.nvim_create_user_command("Rubric", function(cmd)
+    if cmd.args ~= "theme" then
+      vim.notify("rubric: :Rubric theme is the only command so far", vim.log.levels.INFO)
+      return
+    end
+    local bufnr = vim.api.nvim_get_current_buf()
+    local client = vim.lsp.get_clients({ bufnr = bufnr, name = "rubric" })[1]
+    if not client then
+      vim.notify("rubric: the server is not running in this buffer", vim.log.levels.WARN)
+      return
+    end
+    themes.command(bufnr, client, open_blocks)
+  end, {
+    nargs = 1,
+    complete = function()
+      return { "theme" }
+    end,
+    desc = "Rubric: open the theme list",
+  })
 
   vim.api.nvim_create_autocmd("LspAttach", {
     group = vim.api.nvim_create_augroup("Rubric", { clear = true }),
@@ -339,6 +513,30 @@ function M.setup(opts)
       watch_picks(event.buf)
       watch_spell(event.buf)
       send_cursor(event.buf, client.id)
+      local experimental = client.server_capabilities.experimental
+      set_alone(experimental and experimental.rubric and experimental.rubric.alone)
+      local on_rubric_md = themes.is_rubric_md(event.buf)
+      watch_alone_lines(event.buf, opts.accept, on_rubric_md)
+      -- The list for the theme line the cursor is on, from either mode.
+      local function open_theme()
+        local c = vim.lsp.get_client_by_id(client.id)
+        local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+        if c then
+          vim.schedule(function()
+            themes.open(event.buf, c, row - 1, col, open_blocks)
+          end)
+        end
+      end
+      local function on_theme_line()
+        return on_rubric_md and themes.is_theme_line(vim.api.nvim_get_current_line())
+      end
+      if on_rubric_md then
+        vim.keymap.set("n", opts.accept, function()
+          if on_theme_line() then
+            open_theme()
+          end
+        end, { buffer = event.buf, desc = "Rubric: open the theme list" })
+      end
       -- The line is done: ask now rather than after the pause.
       local function ask_now()
         local c = vim.lsp.get_client_by_id(client.id)
@@ -398,10 +596,15 @@ function M.setup(opts)
         vim.keymap.set("i", lhs, rhs, { buffer = event.buf, desc = desc })
       end
       map(opts.accept, function()
+        if on_theme_line() then
+          vim.cmd.stopinsert()
+          open_theme()
+          return
+        end
         if not vim.lsp.inline_completion.get() then
           ask_now()
         end
-      end, "Rubric: accept and pin, or ask now")
+      end, "Rubric: accept and pin, ask now, or open the theme list")
       map(opts.next, function()
         move(1)
       end, "Rubric: next pick")

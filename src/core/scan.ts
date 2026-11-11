@@ -1,30 +1,38 @@
 // Splits a page into directive blocks. Detection is free: a line starting with
 // `:::` is a directive unless it is inside a code fence or the front matter.
-// Each opening line is classified as pinned, plain or words.
+// Each opening line is classified as plain or words.
 
 import type { Catalog } from "./catalog.ts";
 import type { Diagnostic } from "./diagnostic.ts";
 import { isPlain, parsePlain, validatePlain, type PlainForm } from "./plain.ts";
+import { isThemeLine, parseThemeLine, type ThemeLine } from "./theme-line.ts";
 
-export type Kind = "pinned" | "plain" | "words";
+// A theme line (`::: theme paper`, rubric.md only) chooses the site's theme;
+// it has no body and no closing fence.
+export type Kind = "plain" | "words" | "theme";
 
 export interface Directive {
   line: number;
   kind: Kind;
-  // The words, for pinned and words lines.
+  // The words, for words lines.
   words?: string;
-  // The plain form, for plain lines and pins whose right side parses.
+  // The plain form, for plain lines.
   plain?: PlainForm;
   // Words after a lone ":" that follows a plain form: what to change about
   // the part, asked of Jev only about that part's settings. The part is
   // never asked again. `colon` is the column of the ":", `start` of the words.
   refine?: Refine;
+  // The theme chosen, for a theme line.
+  theme?: ThemeLine;
+  // A line with no block: a theme line, or a part that takes nothing inside
+  // (`::: divider`). It never has a closing fence.
+  alone?: true;
   // The closing fence's line, or undefined when the block is never closed.
   close?: number;
   // Index into Scan.directives of the enclosing block.
   parent?: number;
-  // Problems with the line itself: a bad pin or a plain form that fails
-  // validation. A directive with problems is never placed.
+  // Problems with the line itself: a plain form that fails validation, or
+  // one still being typed. A directive with problems is never placed.
   problems: Diagnostic[];
 }
 
@@ -44,7 +52,6 @@ export interface Scan {
 const OPEN = /^(:{3,})\s*(\S.*?)\s*$/;
 const CLOSE = /^:{3,}\s*$/;
 const CODE_FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
-const PIN = " -> ";
 
 export function lines(text: string): string[] {
   return text.split("\n").map((l) => (l.endsWith("\r") ? l.slice(0, -1) : l));
@@ -86,33 +93,27 @@ export function scan(text: string, catalog: Catalog): Scan {
     if (!m) continue;
     const parent = open.at(-1);
     const col = line.indexOf(m[2]!, m[1]!.length);
-    directives.push({ ...classify(m[2]!, col, i, catalog), ...(parent === undefined ? {} : { parent }) });
-    open.push(directives.length - 1);
+    if (isThemeLine(m[2]!, catalog.themes)) {
+      const { theme, problems } = parseThemeLine(m[2]!, col, i, catalog.themes!);
+      directives.push({ line: i, kind: "theme", theme, problems, alone: true, ...(parent === undefined ? {} : { parent }) });
+      continue;
+    }
+    const d = classify(m[2]!, col, i, catalog);
+    // A part that takes nothing inside opens no block. Words open one until
+    // they are a part: what they'll be isn't known yet.
+    // So does one with a setting still being typed (`::: divider style=`).
+    const named = d.plain?.part ?? (d.problems[0]?.code === "unfinished-setting" ? m[2]!.split(/\s+/)[0] : undefined);
+    if (named !== undefined && Object.hasOwn(catalog.parts, named) && catalog.parts[named]!.empty) d.alone = true;
+    directives.push({ ...d, ...(parent === undefined ? {} : { parent }) });
+    if (!d.alone) open.push(directives.length - 1);
   }
 
   return { directives, strayClosers, code };
 }
 
+// A line is plain form when it starts with a part; anything else is words,
+// for Jev. Accepting Jev's pick puts the plain form in place of the words.
 function classify(text: string, col: number, line: number, catalog: Catalog): Directive {
-  // The pin is the first " -> " whose right side reads as a plain form, so
-  // words may hold an arrow of their own; with none, the last one is the pin.
-  const pins = [...text.matchAll(/ -> /g)].map((m) => m.index);
-  const pin = pins.find((p) => parsePlain(splitRefine(text.slice(p + PIN.length), 0).plain) !== undefined) ?? pins.at(-1);
-  if (pin !== undefined) {
-    const words = text.slice(0, pin).trim();
-    const rightCol = col + pin + PIN.length;
-    const { plain: right, refine } = splitRefine(text.slice(pin + PIN.length), rightCol);
-    const plain = parsePlain(right, rightCol);
-    if (!plain) {
-      const problem: Diagnostic = {
-        line, start: rightCol, end: col + text.length, code: "bad-pin",
-        message: "the text after -> is not a plain form: a part name, then key=value settings",
-      };
-      return { line, kind: "pinned", words, problems: [problem] };
-    }
-    return { line, kind: "pinned", words, plain, ...(refine ? { refine } : {}), problems: validatePlain(plain, catalog, line) };
-  }
-
   const split = splitRefine(text, col);
   const plain = parsePlain(split.plain, col);
   if (isPlain(plain, catalog)) {
