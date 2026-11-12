@@ -10,7 +10,7 @@ Last updated: 2026-11-12.
 
 1. Quit every Neovim, stop `bun run play`, start it again from the repo root.
 2. Open http://localhost:1415/posts/walk/ and `nvim testing/pages/posts/walk.md`.
-3. `:Rubric model`, choose **opus**, then **low**.
+3. `:Rubric harness`, choose **Claude Code**, **opus**, **low**, then **No tools**. The notice ends "no tools".
 
 `<M-l>` is the accept key. "Drafter" below is what `:Rubric model` is set to unless the row says otherwise. Every draft is a paid call on your plan.
 
@@ -30,7 +30,8 @@ Last updated: 2026-11-12.
 | # | Do this | Setting | Expect |
 |---|---|---|---|
 | B1 | Draft `::: a heading with trees surrounding it` | sonnet, low | Ready in 11 to 15 s. `:Rubric log` shows three files written, 1 turn, no "read brief.md". |
-| B2 | Cancel it, `:Rubric drafting`, draft the same words | tools mode | Much slower. The last two lines of `testing/.rubric/logs/drafts.jsonl` have `"mode"` fast and tools. Switch back after. |
+| B2 | Cancel it, `:Rubric tooluse`, **Tools**, draft the same words | tools | The menu says "Draft (sonnet, low, tools)". Much slower. The last two lines of `testing/.rubric/logs/drafts.jsonl` have `"mode"` fast and tools. |
+| B2a | `:Rubric tooluse` again | | The list marks **Tools** "(now)". Choose **No tools**: the notice says "tool use: no tools" and the menu's "Draft (…)" loses ", tools". It stays that way after a restart. |
 | B3 | `:Rubric model`, opus, **its default effort**, draft anything | fast mode | The record says `"effort":"low"`. |
 | B4 | Reroll a ready draft with a change, such as "taller trees" | any | 10 to 20 s. Only the files it changed are written. |
 | B5 | Reroll with no change | any | Another take, drawn differently. |

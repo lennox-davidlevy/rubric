@@ -669,6 +669,7 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
     // Yes: notes on what to change, and another drafter for this one alone,
     // which joins the ones used lately; the default stays as it was.
     const saved = join(dir, "data/nvim/rubric/draft.json");
+    const mode = () => expr("vim.lsp.get_clients({ name = 'rubric' })[1]:request_sync('rubric/drafting', {}, 2000).result.mode");
     // Esc in the drafter's lists goes back to the changes, and remembers
     // nothing. The changes start nothing: Back, then the reroll.
     expr("RubricTest.answer('reroll', 'change', 'drafter', 'nothing-here', 'notes', 'smaller moons', 'back', 'just')");
@@ -814,22 +815,35 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
     // :Rubric harness: the tool (it has to be installed), its model and
     // effort; or back to the setup's choice, forgetting this one.
     if (Bun.which("claude")) {
-      expr("RubricTest.answer('claude', 'opus', 'high')");
+      // Last, whether it drafts with tools, which the server takes too.
+      expr("RubricTest.answer('claude', 'opus', 'high', 'tools')");
       keys(":Rubric harness<CR>");
       expect(await until(() => expr("RubricTest.drafter()") === "claude opus high")).toBe(true);
+      expect(await until(() => mode() === "tools")).toBe(true);
+      expect(JSON.parse(readFileSync(saved, "utf8")).drafting).toBe("tools");
+      expr("RubricTest.answer('fast')");
+      keys(":Rubric tooluse<CR>");
+      expect(await until(() => mode() === "fast")).toBe(true);
     }
     expr("RubricTest.answer('setup')");
     keys(":Rubric harness<CR>");
     expect(await until(() => expr("RubricTest.drafter()") === "claude sonnet low")).toBe(true);
     expect(await until(() => existsSync(saved) ? JSON.parse(readFileSync(saved, "utf8")).default === undefined : true)).toBe(true);
-    // :Rubric drafting switches fast drafts for drafts with tools, and
-    // back; the server takes it, and the choice is kept for the next start.
+    // :Rubric tooluse chooses drafts with tools or without; the server
+    // takes it, and the choice is kept for the next start.
     expect(expr("require('rubric.drafts').drafting(nil)")).toBe("fast");
-    keys(":Rubric drafting<CR>");
+    expr("RubricTest.answer('tools')");
+    keys(":Rubric tooluse<CR>");
     expect(await until(() => existsSync(saved) && JSON.parse(readFileSync(saved, "utf8")).drafting === "tools")).toBe(true);
     expect(expr("require('rubric.drafts').drafting('fast')")).toBe("tools");
-    keys(":Rubric drafting<CR>");
+    expect(await until(() => mode() === "tools")).toBe(true);
+    // The drafter is named with it for as long as tools are on.
+    const named = () => expr("vim.lsp.get_clients({ name = 'rubric' })[1]:request_sync('rubric/drafter', {}, 2000).result.short");
+    expect(named().endsWith(", tools")).toBe(true);
+    expr("RubricTest.answer('fast')");
+    keys(":Rubric tooluse<CR>");
     expect(await until(() => JSON.parse(readFileSync(saved, "utf8")).drafting === "fast")).toBe(true);
+    expect(await until(() => !named().includes("tools"))).toBe(true);
     // A setup that leaves the tool out means Claude Code, and the server
     // starts with it named.
     expect(atStart("{ model = 'haiku' }")).toBe("claude haiku default");

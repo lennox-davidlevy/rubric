@@ -31,6 +31,8 @@ export function serve(opts: { stub: boolean; drafter?: Drafter; mode?: Mode }): 
   // How drafts are asked for: fast, one turn with the files in the reply,
   // unless the writer chose the tools, to compare the two.
   let mode: Mode = opts.mode ?? "fast";
+  // Said beside the drafter wherever a menu names it: tools make a draft slower.
+  const withTools = () => (mode === "tools" ? ", tools" : "");
   // The drafter as a draft started now would run it.
   const running = (d: Drafter) => (mode === "fast" ? fastDrafter(d) : d);
 
@@ -118,8 +120,8 @@ export function serve(opts: { stub: boolean; drafter?: Drafter; mode?: Mode }): 
         // The stub says which drafter it stands in for, so a test can see a
         // drafter chosen for one draft reach it.
         drafter: (use) => (opts.stub
-          ? { full: use ? `the stub, as ${describe(use)}` : "the stub", short: "the stub" }
-          : { full: describe(running(use ?? drafter)), short: shortName(use ?? drafter) }),
+          ? { full: use ? `the stub, as ${describe(use)}` : "the stub", short: `the stub${withTools()}` }
+          : { full: describe(running(use ?? drafter)), short: `${shortName(use ?? drafter)}${withTools()}` }),
         onDraft: (state) => void connection.sendNotification("rubric/drafted", state),
         onStarters: (f, starters, own) => void connection.sendNotification("rubric/starters", { uri: pathToFileURL(f).href, starters, own }),
         onReload: (site) => void connection.sendNotification("rubric/alone", { parts: alone(site.catalog) }),
@@ -274,7 +276,7 @@ export function serve(opts: { stub: boolean; drafter?: Drafter; mode?: Mode }): 
       error = (err as Error).message;
     }
     return {
-      harness: drafter.harness, model: drafter.model ?? null, effort: drafter.effort ?? null, short: shortName(drafter),
+      harness: drafter.harness, model: drafter.model ?? null, effort: drafter.effort ?? null, short: `${shortName(drafter)}${withTools()}`,
       harnesses: [...HARNESSES], models: offered,
       // With a harness named, the model asked about is the request's, none
       // being the tool's default; with neither, the drafter's own.

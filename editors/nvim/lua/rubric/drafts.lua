@@ -559,9 +559,13 @@ local function same(a, b)
   return a and b and a.harness == b.harness and a.model == b.model and a.effort == b.effort
 end
 
--- A drafter in a few words: "sonnet, low".
+-- Whether drafts are made with tools, the slower way. Every label that
+-- names a drafter says so, since it changes how long each draft takes.
+local tools_now = false
+
+-- A drafter in a few words: "sonnet, low", or "sonnet, low, tools".
 local function short(d)
-  return ("%s%s"):format(d.model or (d.harness .. "'s default"), d.effort and (", " .. d.effort) or "")
+  return ("%s%s%s"):format(d.model or (d.harness .. "'s default"), d.effort and (", " .. d.effort) or "", tools_now and ", tools" or "")
 end
 
 -- The saved default and recent drafters. Older files are read too: one
@@ -632,36 +636,60 @@ function M.drafter(defaults, setup)
   return M.load_saved().default or M.from_setup(setup) or defaults
 end
 
--- How drafts are asked for when the server starts: what :Rubric drafting
--- chose, else the setup's, "fast" (one turn, the files in the reply) or
--- "tools" (the tool writes them, a turn a step).
+-- How drafts are asked for when the server starts: what :Rubric tooluse
+-- chose, else the setup's, "fast" (one call with no tools, the files in the
+-- reply) or "tools" (the tool writes them, a turn a step).
 function M.drafting(setup)
-  return M.load_saved().drafting or ((setup == "fast" or setup == "tools") and setup or "fast")
+  local mode = M.load_saved().drafting or ((setup == "fast" or setup == "tools") and setup or "fast")
+  tools_now = mode == "tools"
+  return mode
 end
 
--- :Rubric drafting: the other way, from now on and in every session, so
--- the two can be compared on the same words.
-function M.choose_drafting(client, bufnr)
-  client:request("rubric/drafting", {}, function(err, now)
-    if err or not now or not now.mode then
-      vim.notify("rubric: " .. ((err and err.message) or "could not ask how drafts are made"), vim.log.levels.WARN)
+-- A server starts with the mode the setup had when Neovim opened, so each
+-- one is told the kept mode as it attaches: after a restart, or in another
+-- site, the labels and the drafts agree.
+function M.sync(client, bufnr, setup)
+  client:request("rubric/drafting", { mode = M.drafting(setup) }, function() end, bufnr)
+end
+
+-- With tools or without: a list like the model's, with the one in use marked.
+local function pick_tools(done, back)
+  choose({
+    { label = "No tools: one call, files in the reply" .. (tools_now and "" or "  (now)"), value = "fast" },
+    { label = "Tools: the tool writes the files, slower" .. (tools_now and "  (now)" or ""), value = "tools" },
+  }, "Tool use", done, back)
+end
+
+-- The server takes the mode for drafts from now on, and it is kept for
+-- every session.
+local function set_tools(client, bufnr, mode, done)
+  client:request("rubric/drafting", { mode = mode }, function(e, r)
+    if e or not r or r.error then
+      vim.notify("rubric: " .. ((r and r.error) or (e and e.message) or "could not change it"), vim.log.levels.WARN)
       return
     end
-    local next = now.mode == "fast" and "tools" or "fast"
-    client:request("rubric/drafting", { mode = next }, function(e, r)
-      if e or not r or r.error then
-        vim.notify("rubric: " .. ((r and r.error) or (e and e.message) or "could not change it"), vim.log.levels.WARN)
-        return
-      end
-      local saved = M.load_saved()
-      saved.drafting = r.mode
-      write_saved(saved)
-      vim.notify(
-        r.mode == "fast" and "rubric: drafting: fast (one call, no tools)"
-          or "rubric: drafting: tools (the tool writes the files)",
-        vim.log.levels.INFO
-      )
-    end, bufnr)
+    local saved = M.load_saved()
+    saved.drafting = r.mode
+    write_saved(saved)
+    tools_now = r.mode == "tools"
+    done()
+  end, bufnr)
+end
+
+-- :Rubric tooluse: whether a draft is one call with no tools or the tool
+-- writing the files.
+function M.choose_tooluse(client, bufnr)
+  client:request("rubric/drafting", {}, function(err, now)
+    if err or not now or not now.mode then
+      vim.notify("rubric: " .. ((err and err.message) or "no answer from the server"), vim.log.levels.WARN)
+      return
+    end
+    tools_now = now.mode == "tools"
+    pick_tools(function(mode)
+      set_tools(client, bufnr, mode, function()
+        vim.notify("rubric: tool use: " .. (tools_now and "tools" or "no tools"), vim.log.levels.INFO)
+      end)
+    end)
   end, bufnr)
 end
 
@@ -683,7 +711,9 @@ function M.remember_setup(defaults, setup)
   setup_choice = M.from_setup(setup) or defaults
 end
 
-local function set_default(client, bufnr, d, back)
+-- `mode`, when given, is set once the server has taken the drafter, so a
+-- refused drafter changes nothing.
+local function set_default(client, bufnr, d, back, mode)
   client:request("rubric/setDrafter", { harness = d.harness, model = d.model, effort = d.effort }, function(e, r)
     if e or (r and r.error) then
       vim.notify("rubric: " .. ((r and r.error) or (e and e.message) or "could not change it"), vim.log.levels.WARN)
@@ -695,7 +725,14 @@ local function set_default(client, bufnr, d, back)
     if not back then
       remember(d)
     end
-    vim.notify("rubric: drafter: " .. r.drafter, vim.log.levels.INFO)
+    local function say()
+      vim.notify(("rubric: drafter: %s, %s"):format(r.drafter, tools_now and "with tools" or "no tools"), vim.log.levels.INFO)
+    end
+    if mode then
+      set_tools(client, bufnr, mode, say)
+    else
+      say()
+    end
   end, bufnr)
 end
 
@@ -773,14 +810,16 @@ local function pick_tool(client, bufnr, prompt, extra, done, other, back)
   end, bufnr)
 end
 
--- :Rubric harness: the default's tool, model and effort; or the setup's
--- choice again.
+-- :Rubric harness: the default's tool, model and effort, then whether it
+-- drafts with tools; or the setup's choice again.
 function M.choose_harness(client, bufnr)
   local extra = setup_choice and {
     { value = "setup", label = ("From setup (%s)"):format(short(setup_choice)) },
   } or {}
   pick_tool(client, bufnr, "Default drafter", extra, function(d)
-    set_default(client, bufnr, d)
+    pick_tools(function(mode)
+      set_default(client, bufnr, d, false, mode)
+    end)
   end, function()
     set_default(client, bufnr, setup_choice, true)
   end)

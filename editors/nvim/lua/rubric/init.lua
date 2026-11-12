@@ -35,8 +35,8 @@ local defaults = {
   -- until :Rubric harness goes back to this one.
   draft = { harness = "claude", model = "sonnet", effort = "low" },
   -- How a draft is asked for: "fast", one turn with the files in the reply,
-  -- or "tools", the tool writing them a turn a step. :Rubric drafting
-  -- changes it, and that choice is kept.
+  -- or "tools", the tool writing them a turn a step. :Rubric tooluse
+  -- (and :Rubric harness) changes it, and that choice is kept.
   drafting = "fast",
 }
 
@@ -512,11 +512,11 @@ function M.setup(opts)
   end
 
   -- :Rubric theme opens the theme list for rubric.md's theme line. :Rubric
-  -- harness chooses the tool that drafts new parts and its model, and
-  -- :Rubric model another model for that tool; both last across sessions.
+  -- harness chooses the tool that drafts new parts, its model, how hard it
+  -- thinks and whether it uses tools; :Rubric model another model for that
+  -- tool, and :Rubric tooluse tools or none; all last across sessions.
   -- :Rubric log follows what the draft on the cursor's line is doing.
-  -- :Rubric drafting switches between fast drafts and drafts with tools.
-  local commands = { "theme", "harness", "model", "drafting", "log" }
+  local commands = { "theme", "harness", "model", "tooluse", "log" }
   vim.api.nvim_create_user_command("Rubric", function(cmd)
     if not vim.tbl_contains(commands, cmd.args) then
       vim.notify("rubric: :Rubric " .. table.concat(commands, ", :Rubric "), vim.log.levels.INFO)
@@ -532,8 +532,8 @@ function M.setup(opts)
       drafts.choose_model(client, bufnr)
     elseif cmd.args == "harness" then
       drafts.choose_harness(client, bufnr)
-    elseif cmd.args == "drafting" then
-      drafts.choose_drafting(client, bufnr)
+    elseif cmd.args == "tooluse" then
+      drafts.choose_tooluse(client, bufnr)
     elseif cmd.args == "log" then
       drafts.log(client, bufnr, vim.api.nvim_win_get_cursor(0)[1] - 1)
     else
@@ -566,6 +566,7 @@ function M.setup(opts)
       watch_picks(event.buf)
       watch_spell(event.buf)
       send_cursor(event.buf, client.id)
+      drafts.sync(client, event.buf, opts.drafting)
       local experimental = client.server_capabilities.experimental
       set_alone(experimental and experimental.rubric and experimental.rubric.alone)
       local on_rubric_md = themes.is_rubric_md(event.buf)
