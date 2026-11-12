@@ -25,6 +25,7 @@ beforeAll(() => {
     const file = join(bin, name);
     writeFileSync(file, `#!/bin/sh
 if [ "$1" = "models" ]; then printf 'openai/gpt-6.1-sol\\nanthropic/claude-opus-5-5\\n'; exit 0; fi
+if [ "$1" = "api" ]; then printf '%s' '{"data":[{"providerID":"openai","id":"gpt-6.1-sol","variants":[{"id":"none"},{"id":"low"},{"id":"high"},{"id":"xhigh"}]}]}'; exit 0; fi
 if [ "$1" = "session" ]; then if [ -f "${tmp}/no-session" ]; then exit 1; fi; exit 0; fi
 printf '%s\\n' "$@" > "${tmp}/${name}.args"
 case " $* " in *" --resume "*|*" --session "*)
@@ -330,7 +331,10 @@ test("an effort the model doesn't take fails at once; each provider offers its o
   expect(await modelProblem({ harness: "claude", model: "opus", effort: "turbo" })).toBeDefined();
   expect(await modelProblem({ harness: "opencode", model: "anthropic/claude-opus-5-5", effort: "max" })).toBeUndefined();
   expect(await modelProblem({ harness: "opencode", model: "anthropic/claude-opus-5-5", effort: "minimal" })).toBeDefined();
-  expect(efforts({ harness: "opencode", model: "openai/gpt-6.1-sol" })).toContain("xhigh");
+  // What the tool lists for the model, once asked; a provider's common
+  // ones for a model it didn't describe.
+  expect(efforts({ harness: "opencode", model: "openai/gpt-6.1-sol" })).toEqual(["none", "low", "high", "xhigh"]);
+  expect(await modelProblem({ harness: "opencode", model: "openai/gpt-6.1-sol", effort: "medium" })).toBeDefined();
   expect(efforts({ harness: "opencode", model: "someone/else" })).toEqual([]);
 });
 
@@ -377,4 +381,18 @@ test("a tool's suggested model is the first of the measured ones it lists, or no
   expect(suggested("opencode", ["openai/gpt-6.1-sol", "openai/gpt-6.1-terra", "anthropic/claude"])).toBe("openai/gpt-6.1-terra");
   expect(suggested("opencode", ["anthropic/claude"])).toBeUndefined();
   expect(suggested("claude", ["sonnet", "opus"])).toBeUndefined();
+});
+
+test("OpenCode's efforts are read from its own list of models, each with its variants", async () => {
+  const { readEfforts } = await import("../src/server/harness.ts");
+  const read = readEfforts(JSON.stringify({ data: [
+    { providerID: "openai", id: "gpt-6.1-terra", variants: [{ id: "none" }, { id: "low" }] },
+    { providerID: "ollama", id: "small", variants: [] },
+    { providerID: "broken" },
+  ] }));
+  expect(read.get("openai/gpt-6.1-terra")).toEqual(["none", "low"]);
+  expect(read.get("ollama/small")).toEqual([]);
+  expect(read.size).toBe(2);
+  // Not the tool's answer at all: nothing, and the provider's common ones stand.
+  expect(readEfforts("<!doctype html>").size).toBe(0);
 });

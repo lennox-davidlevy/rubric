@@ -56,11 +56,37 @@ export const DEFAULT_DRAFTER: Drafter = { harness: "claude", model: "sonnet", ef
 // (opencode.ai/docs/models). An unlisted provider offers none.
 export function efforts(d: Pick<Drafter, "harness" | "model">): string[] {
   if (d.harness === "claude") return ["low", "medium", "high", "xhigh", "max"];
+  // What OpenCode itself says the model takes, once its list has been read.
+  const told = d.model ? openCodeEfforts.get(d.model) : undefined;
+  if (told) return told;
+  // Before then, or when it couldn't be asked: what every model of the
+  // provider takes, so nothing is offered that the tool would refuse.
   const provider = d.model?.split("/")[0];
-  if (provider === "openai") return ["minimal", "low", "medium", "high", "xhigh"];
+  if (provider === "openai") return ["low", "medium", "high", "xhigh"];
   if (provider === "anthropic") return ["high", "max"];
   if (provider === "google") return ["low", "high"];
   return [];
+}
+
+// Each OpenCode model's efforts, its variants, by provider/model: read from
+// the tool with its model list, since they differ from model to model
+// (`minimal` is offered by a few and refused by the rest).
+const openCodeEfforts = new Map<string, string[]>();
+
+// From `opencode api GET /api/model`: a list, or one under `data`, of models
+// with `providerID`, `id` and `variants: [{ id }]`. Anything else is nothing.
+export function readEfforts(json: string): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    const list = Array.isArray(parsed) ? parsed : (parsed as { data?: unknown })?.data;
+    if (!Array.isArray(list)) return out;
+    for (const m of list as { providerID?: unknown; id?: unknown; variants?: unknown }[]) {
+      if (typeof m?.providerID !== "string" || typeof m.id !== "string" || !Array.isArray(m.variants)) continue;
+      out.set(`${m.providerID}/${m.id}`, (m.variants as { id?: unknown }[]).map((v) => v?.id).filter((v): v is string => typeof v === "string"));
+    }
+  } catch {}
+  return out;
 }
 
 // The model to offer first for a tool that has no settled default of its
@@ -95,7 +121,7 @@ export function fastDrafter(d: Drafter): Drafter {
 }
 
 function fastSystem(d: Drafter): string {
-  return FAST_SYSTEM + (!d.effort || ["minimal", "low"].includes(d.effort) ? FAST_QUICK : "");
+  return FAST_SYSTEM + (!d.effort || ["none", "minimal", "low"].includes(d.effort) ? FAST_QUICK : "");
 }
 
 // The files a draft is made of, copied back from the tool's folder.
@@ -198,6 +224,14 @@ export function models(harness: HarnessName): Promise<string[]> {
         return Promise.all([new Response(proc.stdout).text(), proc.exited]);
       });
       if (code !== 0) throw new Error("opencode models failed");
+      // Its efforts too, from the tool's own server, private to this call.
+      // A tool too old to answer leaves the provider's common ones.
+      await withOpenCodeAlone(async (env) => {
+        // In its own empty folder, so nothing it does lands in the site.
+        const proc = Bun.spawn(["opencode", "api", "--standalone", "GET", "/api/model"], { env, cwd: env.XDG_CONFIG_HOME!, stdout: "pipe", stderr: "ignore", stdin: "ignore", signal: AbortSignal.timeout(20_000) });
+        const [json] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+        for (const [model, list] of readEfforts(json)) openCodeEfforts.set(model, list);
+      }).catch(() => {});
       return out.split("\n").map((l) => l.trim()).filter((l) => /^[\w.-]+\/\S+$/.test(l));
     })();
     list.catch(() => listed.delete(harness));
@@ -220,6 +254,8 @@ export async function installed(harness: HarnessName): Promise<string | undefine
 
 // Why the tool can't draft with this model, before a minute is spent on it.
 export async function modelProblem(d: Drafter): Promise<string | undefined> {
+  // OpenCode's list first: it says which efforts each model takes.
+  const known = d.harness === "opencode" ? await models("opencode").catch(() => undefined) : undefined;
   if (d.effort && !efforts(d).includes(d.effort)) {
     const offered = efforts(d);
     return `${d.model ?? d.harness} has no effort "${d.effort}"${offered.length ? `; it takes ${offered.join(", ")}` : ""}`;
@@ -228,11 +264,7 @@ export async function modelProblem(d: Drafter): Promise<string | undefined> {
   if (d.harness === "claude") {
     return CLAUDE_ALIASES.includes(d.model) || /^claude-[\w.-]+$/.test(d.model) ? undefined : `Claude Code has no model "${d.model}"`;
   }
-  try {
-    return (await models("opencode")).includes(d.model) ? undefined : `opencode has no model "${d.model}"; opencode models lists them`;
-  } catch {
-    return undefined;
-  }
+  return !known || known.includes(d.model) ? undefined : `opencode has no model "${d.model}"; opencode models lists them`;
 }
 
 // The harness for whichever tool and model `drafter` says when a draft starts.
