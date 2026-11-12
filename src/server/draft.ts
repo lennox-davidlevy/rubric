@@ -196,9 +196,10 @@ export function brief(site: Site, req: DraftRequest, mode: Mode = "tools"): stri
       ? `The writer looked at the last take and asked for this change: "${prev.change}". ${fast ? "Its files are below. Make the change" : "Its files are already in this folder, as they are below. Make the change with edits to them"}, and leave everything the change doesn't need as it is.`
       : `The writer looked at the last take and wants a different one: another way to draw the same thing. ${fast ? "Its files are below; write your own take in place of them." : "Its files are in this folder, as they are below; write your own take over them."}`}\n\n${previousFiles}\n`
     : "";
-  const catalogSection = prev ? "" : req.fresh
-    ? "## The catalog's parts\n\nThe writer has seen the catalog's nearest part and wants one of their own anyway, so draft it. Make it plainly different from these:"
-    : "## Is it already in the catalog?\n\nThese are the parts the catalog has. If one of them already does what the writer asked, write only `exists.txt` in this folder: the part's name on the first line, then one sentence saying why it fits. Write nothing else. Only do this when the part really does what they asked, not something near it.";
+  // `new:` means new: the writer saw the parts near their words in the menu
+  // before the draft started, so a draft is never asked whether the catalog
+  // has the part, and nothing but the writer stops one.
+  const catalogSection = prev ? "" : "## The catalog's parts\n\nThe writer asked for a new part, so draft one. These are the parts the catalog has; make it plainly different from them:";
   const naming = req.of
     ? `\`name\`: \`${req.of}\`, as it is now. Pages already use it by that name.`
     : prev
@@ -283,7 +284,7 @@ ${catalogSection}
 
 ${parts.map(([n, p]) => `- ${n}: ${p.description}`).join("\n")}
 ` : ""}
-## ${prev ? "The part's files" : "Otherwise, write the part"}
+## ${prev ? "The part's files" : "Write the part"}
 
 Write these files in this folder, and nothing else:
 

@@ -285,13 +285,12 @@ describe("a draft", () => {
     expect(content()).not.toMatch(/\{\{< (?!rubric-line)/);
   });
 
-  test("words the catalog already has a part for say which, and can use it", async () => {
-    await write(`${front}::: new: a quote from my aunt\n:::\n`);
+  test("words the catalog already has a part for are drafted all the same", async () => {
+    await write(`${front}::: new: a quote said by my aunt\n:::\n`);
     await ws.build(page(), 4);
     await ws.drafted();
-    expect(ws.draft(page(), 4)).toMatchObject({ status: "exists", name: "quote" });
-    expect(codes(4)).toEqual(["draft-exists"]);
-    expect((await ws.use(page(), 4)).replace).toBe("::: quote");
+    expect(ws.draft(page(), 4)?.status).toBe("ready");
+    expect(codes(4)).toEqual(["draft-ready"]);
   });
 
   test("cancel takes every draft for the line away and gives the words back", async () => {
@@ -601,9 +600,9 @@ test("a draft's name on any other line is not a part until it is kept", async ()
 
 test("using a catalog part that takes nothing inside takes the block's closer away", async () => {
   await write(`${front}::: new: a divider here\n:::\n`);
-  await ws.build(page(), 4);
-  await ws.drafted();
-  expect(await ws.use(page(), 4)).toEqual({ replace: "::: divider", drop: 5 });
+  await ws.settle();
+  await ws.look(page(), 4);
+  expect(await ws.use(page(), 4, "divider")).toEqual({ replace: "::: divider", drop: 5 });
 });
 
 test("the folders Hugo mounts are there before any part is, so a Hugo started first sees parts added later", async () => {
@@ -783,8 +782,9 @@ describe("a take", () => {
     writeFileSync(join(prev, "part.css"), ".part-kite-tails { color: var(--ink); }\n");
     const first = brief(ws.site, { words: "kite tails", inside: "" });
     const take = brief(ws.site, { words: "kite tails", inside: "", previous: { dir: prev, change: "longer tails" } });
-    // A first draft is asked whether the catalog has it, with examples; a take is not.
-    expect(first).toContain("exists.txt");
+    // No draft is asked whether the catalog has the part; a first draft
+    // gets the examples, a take does not.
+    expect(first).not.toContain("exists.txt");
     expect(take).not.toContain("exists.txt");
     for (const [name] of (await import("../src/server/draft.ts")).EXAMPLES) {
       expect(first).toContain(`### ${name}`);

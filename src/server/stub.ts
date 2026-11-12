@@ -90,11 +90,6 @@ export function stubHarness(catalog: Catalog, delayMs = 50): Harness {
     if (signal.aborted) return { error: "stopped" };
     if (words.includes("failing")) return { error: "the harness could not run (stub)" };
     const of = /The writer has a part of their own, \*\*([a-z0-9-]+)\*\*/.exec(brief)?.[1];
-    const existing = !fast && !of && words.find((w) => Object.hasOwn(catalog.parts, w) && catalog.parts[w]!.origin === undefined);
-    if (existing) {
-      await Bun.write(join(dir, "exists.txt"), `${existing}\nThe words name it (stub).\n`);
-      return {};
-    }
     const named = words.filter((w) => w.length > 2 && !["the", "and", "with", "for", "that", "slow", "broken"].includes(w)).slice(0, 2).join("-") || "made";
     // A reroll with words says them in the part, so a test can see it changed.
     const change = /asked for this change: "([^"]*)"/.exec(brief)?.[1];

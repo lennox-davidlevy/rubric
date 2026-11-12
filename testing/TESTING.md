@@ -32,6 +32,7 @@ Last updated: 2026-11-12.
 | B1 | Draft `::: a heading with trees surrounding it` | sonnet, low | Ready in 11 to 15 s. `:Rubric log` shows three files written, 1 turn, no "read brief.md". |
 | B2 | Cancel it, `:Rubric tooluse`, **Tools**, draft the same words | tools | The menu says "Draft (sonnet, low, tools)". Much slower. The last two lines of `testing/.rubric/logs/drafts.jsonl` have `"mode"` fast and tools. |
 | B2a | `:Rubric tooluse` again | | The list marks **Tools** "(now)". Choose **No tools**: the notice says "tool use: no tools" and the menu's "Draft (…)" loses ", tools". It stays that way after a restart. |
+| B2b | With **Tools** on and `polaroids` kept: `::: new: a row of polaroid photos pinned at slight angles, each with a caption`, Draft | tools | It drafts a new part. It never stops to say the site has `polaroids`; only "Similar: polaroids" in the menu says so. Choose **No tools** after. |
 | B3 | `:Rubric model`, opus, **its default effort**, draft anything | fast mode | The record says `"effort":"low"`. |
 | B4 | Reroll a ready draft with a change, such as "taller trees" | any | 10 to 20 s. Only the files it changed are written. |
 | B5 | Reroll with no change | any | Another take, drawn differently. |
