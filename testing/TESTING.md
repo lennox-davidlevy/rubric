@@ -23,7 +23,7 @@ Last updated: 2026-11-12.
 | A3 | `::: new: a window with snow falling behind a heading` | opus, low | Its own window, not the rain window with white drops. |
 | A4 | Three requests of your own, unlike the examples | opus, low | No paperclips, window frames or waves unless asked for. |
 | A5 | Any one of the above again | sonnet, low | 12 to 15 s. Note whether you would keep it. |
-| A6 | A draft that falls short: Reroll…, Reroll with changes…, Drafter | opus, medium | 40 to 80 s. Note whether it was worth the wait. |
+| A6 | A draft that falls short: Reroll…, Make changes…, Drafter, then Reroll | opus, medium | 40 to 80 s. Note whether it was worth the wait. |
 
 ## B. Fast drafts
 
@@ -53,7 +53,8 @@ Last updated: 2026-11-12.
 | C5 | `::: new: a tide chart of items` | No "Similar" entry. |
 | C11 | `::: new: a window with snow falling behind a heading`, with `rain-window` kept. Restart the editor's server first. | "Similar: rain-window" is offered, marked "yours". It was missing before: similar parts were hidden whenever nothing fit. Note lines where the similar part is nowhere near. |
 | C12 | On a draft with two or more takes: `<M-l>`, **Takes (N)** | A list like Similar parts, oldest first: "take 1  14:32  opus, low", with a reroll's notes after it and "(now)" on the one on screen, where the cursor starts; the page does not flash take 1 as the list opens. Moving through it draws each take on the page. Enter stays on that take, Esc goes back to the one that was on screen; both return to the menu. A take from another day shows the date too. `<M-n>` and `<M-p>` still cycle. Same on a kept part's line, where the first reads "as kept". |
-| C6 | On a ready draft: Reroll…, Reroll with changes… | Only "Notes: …", "Drafter: …" and "Back". Nothing starts. |
+| C6 | On a ready draft: Reroll… | "Reroll" and "Make changes…". Make changes… shows only "Notes: none…", "Drafter: …" and "Back". Nothing starts. |
+| C6a | Set notes, or a drafter | The list gains "Reroll" at the top, with the notes shown on the Notes line. Choosing it starts the reroll with them. Clearing the notes with no drafter chosen takes "Reroll" away again. |
 | C7 | Set notes and a drafter, then Back | The first entry reads like "Reroll with opus: “bigger”" and starts it. |
 | C8 | On a new `new:` line: Draft with… | The drafter list opens; choosing one returns to the menu with "Draft (opus…)". |
 | C9 | Look at a ready draft's line | `◆ name drafted · takes size, pace · <M-l> keep, reroll, cancel`. Hovering the note lists the values. |

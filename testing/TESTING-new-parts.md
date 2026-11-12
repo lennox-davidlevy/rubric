@@ -51,7 +51,7 @@ Look at it in dark mode too, with the theme switch in the header.
 
 ## 3. Reroll, with a change
 
-With the cursor on the line, press `<M-l>` and choose **Reroll…**. **Should happen:** it asks **Reroll** or **Reroll with changes…**. Choose **Reroll with changes…**: a short list with **Reroll** at the top, **Notes: none…** and **Drafter: sonnet, low, the default…**. Choose **Notes** and type something like `smaller, and only three moons`. Optionally choose **Drafter** and pick Opus for this one. Then **Reroll …** at the top.
+With the cursor on the line, press `<M-l>` and choose **Reroll…**. **Should happen:** it asks **Reroll** or **Make changes…**. Choose **Make changes…**: a short list with **Reroll** at the top, **Notes: none…** and **Drafter: sonnet, low, the default…**. Choose **Notes** and type something like `smaller, and only three moons`. Optionally choose **Drafter** and pick Opus for this one. Then **Reroll …** at the top.
 
 **Should happen:**
 
@@ -150,7 +150,7 @@ Press `<M-l>`. **Should happen:** a menu with **Reroll…**, **Add … to every 
 - `<M-p>` goes back to take 1, which is the part as you kept it. `<M-n>` comes forward again.
 - `testing/parts/<name>/` hasn't changed yet (`git status`).
 
-**Reroll with words on the line.** Type ` : with a softer glow` after the name, so the line reads `::: <name> : with a softer glow`. Leave insert mode, then `<M-l>`. **Should happen:** **Reroll…** then offers **Reroll with “with a softer glow”** in place of **Reroll**, and **Reroll with changes…** starts with those words as the notes. Either takes the words off the line and drafts take 3 with that change. On your own part's line, those words are never sent to Jev: no ghost text and no note about settings appear for them.
+**Reroll with words on the line.** Type ` : with a softer glow` after the name, so the line reads `::: <name> : with a softer glow`. Leave insert mode, then `<M-l>`. **Should happen:** **Reroll…** then offers **Reroll with “with a softer glow”** in place of **Reroll**, and **Make changes…** starts with those words as the notes. Either takes the words off the line and drafts take 3 with that change. On your own part's line, those words are never sent to Jev: no ghost text and no note about settings appear for them.
 
 **Keep stays offered.** On take 2 or 3, start another reroll and open the menu while it drafts. **Should happen:** **Keep this take of <name>** is still offered, and keeps the take on screen. The same holds after a reroll fails.
 
@@ -170,7 +170,7 @@ This is for comparing speed against quality as you go. Each draft's line in `tes
 
 **A take the tool didn't change** fails with "the tool changed nothing", instead of adding a copy of the take before it.
 
-**Going on with the conversation.** A reroll by the same tool and model as the take on screen continues that take's conversation (a copy of it), so the model has its own earlier work. **Should happen:** its log says "going on with the last take's conversation", and its line in `drafts.jsonl` has `"resumed":true`. Reroll the same take with another drafter (**Reroll with changes…**, then **Drafter**): the log says the last take was drafted by the other model, so this one starts fresh, and `"resumed":false`. If the tool can't find the conversation, the log says so and it starts fresh, without failing. Compare `seconds` and `thinking` between resumed and fresh rerolls of similar changes.
+**Going on with the conversation.** A reroll by the same tool and model as the take on screen continues that take's conversation (a copy of it), so the model has its own earlier work. **Should happen:** its log says "going on with the last take's conversation", and its line in `drafts.jsonl` has `"resumed":true`. Reroll the same take with another drafter (**Make changes…**, then **Drafter**): the log says the last take was drafted by the other model, so this one starts fresh, and `"resumed":false`. If the tool can't find the conversation, the log says so and it starts fresh, without failing. Compare `seconds` and `thinking` between resumed and fresh rerolls of similar changes.
 
 **None of your own setup reaches a draft.** Claude Code runs with only Read, Write, Edit, Glob and Grep, no skills or commands, no `CLAUDE.md` and no memory. OpenCode runs with an empty config folder of its own, so your `~/.config/opencode` (its `AGENTS.md`, agents, skills and MCP servers) stays out. To check after a draft: in its `harness.log`, Claude Code's first line lists `"tools":["Edit","Glob","Grep","Read","Write"]` and `"skills":[]`. An OpenCode draft's reasoning no longer mentions reviewers or delegation, and no `.cache` folder appears among the files it reads.
 

@@ -26,7 +26,7 @@ An empty site for showing Rubric to someone: `rubric.md` is empty and there is o
 | 7 | "A small, fast model does all of that: it only chooses among parts a designer made. It answers in a fifth of a second and costs almost nothing." | Point at the terminal running `bun run play`. | Each call with its milliseconds and probabilities. |
 | 8 | "Here is the part I like. What if no designer made the thing I want?" | `::: a paper airplane that flies across the top of a heading and leaves a dashed trail`, pause. | Ghost text `-> draft a new part`. |
 | 9 | "Now a large model writes one, in my theme's colors and type. I keep writing." | `<M-l>`, **Draft**. Write a paragraph below while the spinner runs. | About 20 s later the airplane flies across the page. The line lists its settings. |
-| 10 | "I can direct it." | `<M-l>`, **Reroll…**, **Reroll with changes…**, **Notes**: `make the plane bigger and loop once`, Back, then the first entry. | A second take. `<M-p>` and `<M-n>` flip between takes on the page. |
+| 10 | "I can direct it." | `<M-l>`, **Reroll…**, **Make changes…**, **Notes**: `make the plane bigger and loop once`, then **Reroll**. | A second take. `<M-p>` and `<M-n>` flip between takes on the page. |
 | 11 | "When I like it, it is mine." | `<M-l>`, **Keep**, **This site**. Then `ls sites/demo/parts/` in a shell. | The line becomes `::: paper-plane` (or its name). Three small files: plain HTML and CSS. |
 | 12 | "And now the small model knows it. Next time is instant and free." | On a new line: `::: that airplane heading again`, pause. | Jev offers your new part in a fifth of a second, with no draft. |
 | 13 | "It follows the theme, because it was drawn with the theme's slots, not its own colors." | Back in `rubric.md`, `<M-l>` on the theme line, move through a few themes. | The airplane, the quote and the header all change together. |
@@ -45,7 +45,7 @@ An empty site for showing Rubric to someone: `rubric.md` is empty and there is o
 |---|---|
 | Jev picks a different part than the table says | `<M-n>` shows the runner-up. Say that it is a judgment, and show the probabilities in the terminal. |
 | A draft fails its checks | It is sent back once by itself. If it still fails, `<M-l>`, **Retry**. |
-| A draft is poor | **Reroll**, or reroll with Opus at medium through **Reroll with changes…**, **Drafter**. |
+| A draft is poor | **Reroll**, or reroll with Opus at medium through **Make changes…**, **Drafter**. |
 | Step 15 shows no Similar entry | The words were too far from the part. Use `::: new: a paper airplane over a heading`. |
 
 ## Reset to empty

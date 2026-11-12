@@ -932,16 +932,23 @@ local function pick_once(client, bufnr, chosen, done, back)
 end
 
 -- What a reroll changes, before it starts: notes on what to change and the
--- drafter, for this one alone, kept in `state`. Nothing starts from here:
--- Back (or Esc) goes `back` to the menu that does.
-local function changes(client, bufnr, prompt, default, state, back)
+-- drafter, for this one alone, kept in `state`. Once either is set, the
+-- list gains Reroll, which `start`s it from here. Back (or Esc) goes `back`
+-- to the menu before, which starts it too.
+local function changes(client, bufnr, prompt, default, state, start, back)
   local function show()
-    choose({
+    local items = {
       { label = ("Notes: %s…"):format(state.notes and ("“" .. state.notes .. "”") or "none"), value = "notes" },
       { label = ("Drafter: %s…"):format(state.drafter and short(state.drafter) or ((default or "default") .. " (default)")), value = "drafter" },
       { label = "Back", value = "back" },
-    }, prompt, function(v)
-      if v == "notes" then
+    }
+    if state.notes or state.drafter then
+      table.insert(items, 1, { label = "Reroll", value = "start" })
+    end
+    choose(items, prompt, function(v)
+      if v == "start" then
+        start()
+      elseif v == "notes" then
         vim.ui.input({ prompt = "Change: ", default = state.notes or "" }, function(text)
           if text then
             state.notes = text ~= "" and text or nil
@@ -961,26 +968,30 @@ local function changes(client, bufnr, prompt, default, state, back)
   show()
 end
 
--- Reroll: as it is, or with notes and a drafter chosen first, which the
--- entry that starts it then names. `notes` are words the line already has
+-- Reroll: as it is, or with notes and a drafter chosen first; the changes'
+-- own list starts it once there is one, and so does this one, whose entry
+-- then names them. `notes` are words the line already has
 -- for the change.
 function reroll_menu(client, bufnr, name, default, notes, go)
   local state = { notes = notes, drafter = nil }
   local prompt = ("Reroll %s"):format(name)
+  local function start()
+    -- Used, so it's among the recent ones from now on.
+    if state.drafter then
+      remember(state.drafter)
+    end
+    go(state.notes or "", state.drafter)
+  end
   local function show()
     local with = (state.drafter and (" with " .. short(state.drafter)) or "") .. (state.notes and (": “" .. state.notes .. "”") or "")
     choose({
       { label = "Reroll" .. with, value = "just" },
-      { label = "Reroll with changes…", value = "change" },
+      { label = "Make changes…", value = "change" },
     }, prompt, function(v)
       if v == "just" then
-        -- Used, so it's among the recent ones from now on.
-        if state.drafter then
-          remember(state.drafter)
-        end
-        go(state.notes or "", state.drafter)
+        start()
       else
-        changes(client, bufnr, prompt, default, state, show)
+        changes(client, bufnr, prompt, default, state, start, show)
       end
     end)
   end

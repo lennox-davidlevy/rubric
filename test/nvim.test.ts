@@ -685,8 +685,8 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
     const saved = join(dir, "data/nvim/rubric/draft.json");
     const mode = () => expr("vim.lsp.get_clients({ name = 'rubric' })[1]:request_sync('rubric/drafting', {}, 2000).result.mode");
     // Esc in the drafter's lists goes back to the changes, and remembers
-    // nothing. The changes start nothing: Back, then the reroll.
-    expr("RubricTest.answer('reroll', 'change', 'drafter', 'nothing-here', 'notes', 'smaller moons', 'back', 'just')");
+    // nothing. With notes set, the changes' own list starts the reroll.
+    expr("RubricTest.answer('reroll', 'change', 'drafter', 'nothing-here', 'notes', 'smaller moons', 'start')");
     keys(":call cursor(4, 1)<CR><M-l>");
     expect(await until(() => data("takes") === "3" && note(4) === "draft-ready")).toBe(true);
     // The notes reached the take the reroll made.
