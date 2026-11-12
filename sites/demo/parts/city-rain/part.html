@@ -1,0 +1,27 @@
+{{- $n := 26 -}}
+{{- if eq .s.rain "drizzle" }}{{ $n = 12 }}{{ end -}}
+{{- if eq .s.rain "downpour" }}{{ $n = 44 }}{{ end -}}
+<div class="part part-city-rain rain-{{ .s.rain }} size-{{ .s.size }}">
+  <div class="city-rain-frame look-surface">
+    <div class="city-rain-glass">
+      <div class="city-rain-skyline" aria-hidden="true">
+        {{- range $i := seq 16 }}
+        <span class="city-rain-tower{{ if eq (mod $i 5) 3 }} spire{{ end }}{{ if eq (mod $i 4) 1 }} stepped{{ end }}" style="--h: {{ add 22 (mod (mul $i 37) 52) }}%; --w: {{ add 4 (mod (mul $i 7) 5) }}; --lit: {{ mod (mul $i 3) 4 }};"></span>
+        {{- end }}
+      </div>
+      <div class="city-rain-rain" aria-hidden="true">
+        {{- range $i := seq $n }}
+        <span class="city-rain-streak" style="--x: {{ add 2 (mod (add (mul $i 41) 7) 96) }}%; --d: -{{ mod (mul $i 29) 50 }}00ms; --t: {{ add 2400 (mul (mod (mul $i 7) 9) 280) }}ms; --len: {{ add 2 (mod (mul $i 5) 4) }};"></span>
+        {{- end }}
+        {{- range $i := seq 12 }}
+        <span class="city-rain-bead" style="--x: {{ add 3 (mod (mul $i 53) 93) }}%; --y: {{ add 5 (mod (mul $i 31) 88) }}%; --r: {{ add 2 (mod (mul $i 3) 3) }};"></span>
+        {{- end }}
+      </div>
+      <div class="city-rain-sash" aria-hidden="true"></div>
+      <div class="city-rain-copy">
+        {{ .inner }}
+      </div>
+    </div>
+  </div>
+  <div class="city-rain-sill" aria-hidden="true"></div>
+</div>

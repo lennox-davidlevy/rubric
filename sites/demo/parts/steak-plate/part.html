@@ -1,0 +1,31 @@
+{{- $n := 3 -}}
+{{- if eq .s.steam "hot" }}{{ $n = 5 }}{{ end -}}
+{{- if eq .s.steam "cold" }}{{ $n = 0 }}{{ end -}}
+<div class="part part-steak-plate steam-{{ .s.steam }} size-{{ .s.size }}">
+  <div class="steak-plate-scene" aria-hidden="true">
+    <div class="steak-plate-steam">
+      {{- range $i := seq $n }}
+      <span class="steak-plate-wisp" style="--x: {{ add 22 (mod (mul $i 23) 56) }}%; --d: -{{ mul $i 900 }}ms; --sway: {{ sub (mod (mul $i 7) 5) 2 }};"></span>
+      {{- end }}
+    </div>
+    <svg class="steak-plate-table" viewBox="0 0 320 130" preserveAspectRatio="xMidYMid meet" focusable="false">
+      <g class="steak-plate-fork">
+        <path d="M30 28 V54 M36 28 V54 M42 28 V54 M24 28 V50 Q24 60 33 62 Q42 60 42 50"/>
+        <path class="steak-plate-handle" d="M33 62 V112"/>
+      </g>
+      <ellipse class="steak-plate-rim" cx="160" cy="68" rx="98" ry="54"/>
+      <ellipse class="steak-plate-well" cx="160" cy="68" rx="72" ry="38"/>
+      <path class="steak-plate-meat" d="M112 64 C108 44 132 34 160 36 C192 38 214 46 210 66 C206 86 186 94 160 92 C138 90 128 82 120 82 C112 82 114 74 112 64 Z"/>
+      <path class="steak-plate-fat" d="M120 82 C128 82 138 90 160 92 C186 94 206 86 210 66"/>
+      <path class="steak-plate-sear" d="M132 50 L150 80 M150 44 L170 84 M170 42 L190 80 M188 46 L202 70"/>
+      <path class="steak-plate-sprig" d="M196 52 q8 -6 14 -2 M200 50 q2 -8 8 -10"/>
+      <g class="steak-plate-knife">
+        <path class="steak-plate-blade" d="M286 24 Q296 40 292 66 L284 66 Z"/>
+        <path class="steak-plate-handle" d="M288 66 V112"/>
+      </g>
+    </svg>
+  </div>
+  <div class="steak-plate-copy">
+    {{ .inner }}
+  </div>
+</div>

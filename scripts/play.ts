@@ -2,7 +2,9 @@
 // prints every call the language server makes to Jev, with what was sent and
 // what came back.
 //
-//   bun run play
+//   bun run play [site]
+//
+// Another site than testing/ is named by its folder: `bun run play sites/demo`.
 //
 // The language server runs inside Neovim, so it cannot print here. It appends
 // each call to testing/.rubric/jev.jsonl when that file exists; this script
@@ -13,15 +15,20 @@
 // each words line was typed; `bun scripts/pause.ts` replays it.
 
 import { closeSync, existsSync, mkdirSync, openSync, readSync, statSync, watch, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { THRESHOLDS } from "../src/core/questions.ts";
 
 const repo = join(import.meta.dir, "..");
-const site = join(repo, "testing");
+const named = process.argv[2] ?? "testing";
+const site = resolve(repo, named);
+if (!existsSync(join(site, "rubric.md"))) {
+  console.error(`${named} is not a Rubric site: it has no rubric.md`);
+  process.exit(1);
+}
 const log = join(site, ".rubric/jev.jsonl");
 const port = process.env.RUBRIC_PORT ?? "1415";
 
-const built = Bun.spawnSync(["bun", "src/cli.ts", "build", "testing"], { cwd: repo, stdout: "inherit", stderr: "inherit" });
+const built = Bun.spawnSync(["bun", "src/cli.ts", "build", site], { cwd: repo, stdout: "inherit", stderr: "inherit" });
 if (built.exitCode !== 0) process.exit(built.exitCode ?? 1);
 
 mkdirSync(join(site, ".rubric"), { recursive: true });
@@ -31,7 +38,7 @@ writeFileSync(log, "");
 const keys = join(site, ".rubric/keys.jsonl");
 if (!existsSync(keys)) writeFileSync(keys, "");
 
-const hugo = Bun.spawn(["hugo", "server", "-s", "testing", "--port", port], { cwd: repo, stdout: "inherit", stderr: "inherit" });
+const hugo = Bun.spawn(["hugo", "server", "-s", site, "--port", port], { cwd: repo, stdout: "inherit", stderr: "inherit" });
 
 // Color only on a terminal.
 const tty = process.stdout.isTTY;

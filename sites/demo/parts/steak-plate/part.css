@@ -1,0 +1,143 @@
+/* steak-plate: a heading under a plated steak, knife and fork never picked up. */
+.part-steak-plate {
+  --k: 1;
+  --u: calc(var(--step-0) * var(--k));
+  --rise: 3600ms;
+  display: grid;
+  justify-items: center;
+  gap: calc(var(--u) * 1);
+  padding-block: calc(var(--u) * 1.5);
+  min-inline-size: 0;
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+.part-steak-plate.size-small { --k: 0.8; }
+.part-steak-plate.size-large { --k: 1.25; }
+.part-steak-plate.steam-hot { --rise: 2400ms; }
+
+/* The table setting, with steam above it. */
+.part-steak-plate .steak-plate-scene {
+  position: relative;
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: calc(var(--u) * 20);
+  padding-block-start: calc(var(--u) * 3);
+}
+.part-steak-plate .steak-plate-table {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  overflow: visible;
+}
+.part-steak-plate .steak-plate-table path,
+.part-steak-plate .steak-plate-table ellipse {
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.part-steak-plate .steak-plate-rim {
+  fill: var(--paper);
+  stroke: var(--rule);
+  stroke-width: calc(var(--border) * 2);
+  filter: drop-shadow(0 calc(var(--u) * 0.25) calc(var(--u) * 0.3) color-mix(in srgb, var(--ink) 18%, transparent));
+}
+.part-steak-plate .steak-plate-well {
+  fill: var(--tint);
+  stroke: var(--rule);
+  stroke-width: var(--border);
+}
+.part-steak-plate .steak-plate-meat {
+  fill: color-mix(in srgb, var(--accent) 70%, var(--ink));
+  stroke: color-mix(in srgb, var(--accent) 45%, var(--ink));
+  stroke-width: calc(var(--border) * 1.5);
+}
+.part-steak-plate .steak-plate-fat {
+  fill: none;
+  stroke: color-mix(in srgb, var(--paper) 75%, var(--accent));
+  stroke-width: calc(var(--border) * 3);
+}
+.part-steak-plate .steak-plate-sear {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ink) 80%, var(--accent));
+  stroke-width: calc(var(--border) * 3);
+  opacity: 0.75;
+}
+.part-steak-plate .steak-plate-sprig {
+  fill: none;
+  stroke: var(--positive);
+  stroke-width: calc(var(--border) * 2);
+}
+.part-steak-plate .steak-plate-fork path,
+.part-steak-plate .steak-plate-handle {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: calc(var(--border) * 2);
+}
+.part-steak-plate .steak-plate-handle { stroke-width: calc(var(--border) * 4); }
+.part-steak-plate .steak-plate-blade {
+  fill: var(--rule);
+  stroke: var(--muted);
+  stroke-width: calc(var(--border) * 1.5);
+}
+
+/* Steam rising off the meat. */
+.part-steak-plate .steak-plate-steam {
+  position: absolute;
+  inset-inline: 25%;
+  inset-block-start: 0;
+  block-size: calc(var(--u) * 6);
+  pointer-events: none;
+}
+.part-steak-plate .steak-plate-wisp {
+  position: absolute;
+  left: var(--x);
+  bottom: 0;
+  inline-size: calc(var(--u) * 0.9);
+  block-size: calc(var(--u) * 3);
+  border-inline-start: calc(var(--u) * 0.18) solid var(--muted);
+  border-radius: 50%;
+  opacity: 0;
+  filter: blur(calc(var(--u) * 0.08));
+  animation: steak-plate-rise var(--rise) ease-in var(--d) infinite;
+}
+.part-steak-plate.steam-hot .steak-plate-wisp { border-inline-start-width: calc(var(--u) * 0.26); }
+
+/* Gone cold: the meat dulls a little. */
+.part-steak-plate.steam-cold .steak-plate-meat { fill: color-mix(in srgb, var(--accent) 50%, var(--muted)); }
+
+/* The writer's words. */
+.part-steak-plate .steak-plate-copy {
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: calc(var(--u) * 30);
+  min-inline-size: 0;
+  text-align: center;
+  font-size: var(--u);
+  line-height: var(--leading-body);
+  overflow-wrap: anywhere;
+}
+.part-steak-plate .steak-plate-copy > * { margin: 0; }
+.part-steak-plate .steak-plate-copy > * + * { margin-block-start: calc(var(--u) * 0.6); }
+.part-steak-plate .steak-plate-copy :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--heading);
+  font-family: var(--font-display);
+  font-size: calc(var(--step-3) * var(--k));
+  font-weight: var(--weight-display);
+  line-height: var(--leading-display);
+  letter-spacing: var(--tracking-display);
+  text-transform: var(--heading-case);
+  text-wrap: balance;
+}
+.part-steak-plate .steak-plate-copy p { color: var(--muted); }
+.part-steak-plate .steak-plate-copy a { color: var(--link); }
+.part-steak-plate .steak-plate-copy img { max-inline-size: 100%; block-size: auto; }
+
+@keyframes steak-plate-rise {
+  0% { opacity: 0; transform: translate(0, 0) scaleY(0.6); }
+  25% { opacity: 0.55; }
+  100% { opacity: 0; transform: translate(calc(var(--sway) * var(--u) * 0.6), calc(var(--u) * -3)) scaleY(1.2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .part-steak-plate .steak-plate-wisp { animation: none; opacity: 0.35; }
+}
