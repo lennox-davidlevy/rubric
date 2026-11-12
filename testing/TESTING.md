@@ -40,6 +40,7 @@ Last updated: 2026-11-12.
 | B7 | `::: new: a quote from someone`, draft | any | Drafts at once. The line's note ends by naming `quote` as a part the catalog has. |
 | B8 | Start a draft, Stop, then `<M-l>` and Draft straight away | any | The new draft starts once the stopped one is gone. |
 | B9 | A draft whose log says "the checks refused it" | any | "asking for a fix, once", then ready, with `"runs":2` in the record. |
+| B9a | `:Rubric harness`, **OpenCode** | The model list starts with "openai/gpt-6.1-terra-fast  (suggested)". Choose it, **low**, **No tools**, and draft anything: ready in about 8 s. |
 | B10 | Draft once with an OpenCode model (Draft with…) | OpenCode | One step, files from its reply, ready. If "the reply had no files in it", paste `harness.log` in Notes. |
 
 ## C. Menus

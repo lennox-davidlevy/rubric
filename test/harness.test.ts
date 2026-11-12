@@ -371,3 +371,10 @@ test("a folder left by a draft that never finished is cleared once it's older th
   expect(existsSync(recent)).toBe(true);
   rmSync(recent, { recursive: true, force: true });
 });
+
+test("a tool's suggested model is the first of the measured ones it lists, or none", async () => {
+  const { suggested } = await import("../src/server/harness.ts");
+  expect(suggested("opencode", ["openai/gpt-6.1-sol", "openai/gpt-6.1-terra", "anthropic/claude"])).toBe("openai/gpt-6.1-terra");
+  expect(suggested("opencode", ["anthropic/claude"])).toBeUndefined();
+  expect(suggested("claude", ["sonnet", "opus"])).toBeUndefined();
+});

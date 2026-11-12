@@ -63,6 +63,18 @@ export function efforts(d: Pick<Drafter, "harness" | "model">): string[] {
   return [];
 }
 
+// The model to offer first for a tool that has no settled default of its
+// own, best first, from the bench (docs/plan.md, "Faster drafts"): the
+// first of these the tool lists. OpenCode has only the providers the writer
+// signed in to, so there may be none.
+const SUGGESTED: Record<HarnessName, string[]> = {
+  claude: [],
+  opencode: ["openai/gpt-6.1-terra-fast", "openai/gpt-6.1-terra", "openai/gpt-6.1-sol-fast", "openai/gpt-6.1-sol"],
+};
+export function suggested(harness: HarnessName, offered: string[]): string | undefined {
+  return SUGGESTED[harness].find((m) => offered.includes(m));
+}
+
 // How a draft is asked for. "tools": the tool reads the brief in its folder
 // and writes the files there, a turn a step. "fast": one turn with no tools,
 // the brief in the prompt and the files in the reply, which we write.

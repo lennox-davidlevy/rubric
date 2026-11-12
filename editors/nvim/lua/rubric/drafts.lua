@@ -831,8 +831,15 @@ local function pick_model(client, bufnr, harness, now, done, back)
     end
     -- Drafts don't read OpenCode's config, so its default is its own, not the config's.
     local items = { { label = harness == "opencode" and "OpenCode default (config not read)" or "default model", value = "default" } }
+    -- The model measured as the quickest good one for this tool, first.
+    local first = r.suggested ~= vim.NIL and r.suggested or nil
+    if first then
+      table.insert(items, 1, { label = first .. "  (suggested)" .. (first == now.model and "  (now)" or ""), value = first })
+    end
     for _, m in ipairs(r.models or {}) do
-      table.insert(items, { label = m == now.model and (m .. "  (now)") or m, value = m })
+      if m ~= first then
+        table.insert(items, { label = m == now.model and (m .. "  (now)") or m, value = m })
+      end
     end
     choose(items, ("%s with which model? (%d)"):format(harness, #items - 1), function(m)
       local model = m ~= "default" and m or nil

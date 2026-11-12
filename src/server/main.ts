@@ -14,7 +14,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import { atPlace, Cache, type Catalog, type PageKind, type ThemeChoice } from "../core/index.ts";
 import { ask, rankThemes, refine, traits, warm } from "../jev.ts";
 import { findSiteRoot, openSite } from "../site.ts";
-import { brief as shortName, DEFAULT_DRAFTER, describe, efforts, fastDrafter, HARNESSES, installed, modelProblem, models, MODES, toolHarness, type Drafter, type HarnessName, type Mode } from "./harness.ts";
+import { brief as shortName, DEFAULT_DRAFTER, describe, efforts, fastDrafter, HARNESSES, installed, modelProblem, models, MODES, suggested, toolHarness, type Drafter, type HarnessName, type Mode } from "./harness.ts";
 import { stubHarness, stubRefiner, stubResolver, stubThemeRanker } from "./stub.ts";
 import type { ThemeRanker } from "./themes.ts";
 import { Workspace, type Refiner, type Resolver, type Severity } from "./workspace.ts";
@@ -278,6 +278,8 @@ export function serve(opts: { stub: boolean; drafter?: Drafter; mode?: Mode }): 
     return {
       harness: drafter.harness, model: drafter.model ?? null, effort: drafter.effort ?? null, short: `${shortName(drafter)}${withTools()}`,
       harnesses: [...HARNESSES], models: offered,
+      // The model to offer first, when the bench has one for this tool.
+      suggested: suggested(harness, offered) ?? null,
       // With a harness named, the model asked about is the request's, none
       // being the tool's default; with neither, the drafter's own.
       efforts: efforts(params.harness ? { harness, ...(params.model ? { model: params.model } : {}) } : drafter),
