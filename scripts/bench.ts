@@ -5,7 +5,7 @@
 // running it. Bun loads TYPESAFE_API_KEY from .env for Jev's look at each
 // picture, which costs cents.
 //
-//   bun scripts/bench.ts run [--drafters opus:low,opus:medium] [--requests bench/requests.txt]
+//   bun scripts/bench.ts run [--drafters opus:low,openai/gpt-6.1-sol:low] [--requests bench/requests.txt]
 //                            [--budget 1.5] [--label words]
 //   bun scripts/bench.ts draw <run> [--no-jev]   draws a run again, drafting nothing
 //
@@ -66,14 +66,17 @@ if (command === "run") {
     }
     // One request's drafters side by side; requests one after another, so the budget holds.
     const row = await Promise.all(drafters.split(",").map(async (drafter): Promise<Result> => {
+      // "opus:low" is Claude Code's; a model with a provider in its name,
+      // "openai/gpt-6.1-sol:low", is OpenCode's.
       const [model, effort] = drafter.split(":");
-      const rel = join(drafter.replace(":", "-"), String(n + 1));
+      const harness = model!.includes("/") ? "opencode" : "claude";
+      const rel = join(drafter.replace(/[^a-z0-9.]+/gi, "-"), String(n + 1));
       const dir = join(run, rel);
       mkdirSync(dir, { recursive: true });
       const started = Date.now();
       try {
         const end = await runDraft(site, dir, { id: rel.replace("/", "-"), words: request, status: "drafting", started }, { words: request, inside: "", mode: "fast" },
-          toolHarness(() => ({ harness: "claude", model: model!, ...(effort ? { effort } : {}) })), new AbortController().signal, async () => {});
+          toolHarness(() => ({ harness, model: model!, ...(effort ? { effort } : {}) })), new AbortController().signal, async () => {});
         return { request, drafter, dir: rel, seconds: Math.round((Date.now() - started) / 100) / 10, cost: end.stats?.cost, thinking: end.stats?.thinking, status: end.status, name: end.name, message: end.message };
       } catch (err) {
         return { request, drafter, dir: rel, seconds: Math.round((Date.now() - started) / 100) / 10, status: "failed", message: (err as Error).message };
