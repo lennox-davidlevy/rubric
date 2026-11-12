@@ -666,6 +666,20 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
     expect(await until(() => data("take") === "1")).toBe(true);
     keys("<M-n>");
     expect(await until(() => data("take") === "2")).toBe(true);
+    // The menu lists the takes; choosing one puts it on screen and comes
+    // back to the menu, and Esc in the list leaves the take as it was.
+    let opened = Number(expr("RubricTest.menus"));
+    expr("RubricTest.answer('takes', 1)");
+    keys(":call cursor(4, 1)<CR><M-l>");
+    expect(await until(() => data("take") === "1")).toBe(true);
+    expect(await until(() => Number(expr("RubricTest.menus")) === opened + 3)).toBe(true);
+    opened = Number(expr("RubricTest.menus"));
+    expr("RubricTest.answer('takes', 'none of them')");
+    keys(":call cursor(4, 1)<CR><M-l>");
+    expect(await until(() => Number(expr("RubricTest.menus")) === opened + 3)).toBe(true);
+    expect(data("take")).toBe("1");
+    keys("<M-n>");
+    expect(await until(() => data("take") === "2")).toBe(true);
     // Yes: notes on what to change, and another drafter for this one alone,
     // which joins the ones used lately; the default stays as it was.
     const saved = join(dir, "data/nvim/rubric/draft.json");

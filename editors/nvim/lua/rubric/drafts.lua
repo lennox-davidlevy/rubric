@@ -115,39 +115,20 @@ end
 -- Defined with the drafters, below.
 local reroll_menu, first_menu
 
--- The parts the writer already has that are near a `new:` line's words,
--- their own first. With snacks.nvim the page in the browser draws the one
--- under the cursor where the line is, with the block's writing in it, as
--- the theme list does; without it, a plain list. `use(name)` puts the
--- chosen one on the line; Esc goes `back` to the menu it came from.
-local function near_list(client, bufnr, row, near, use, back)
-  local uri = vim.uri_from_bufnr(bufnr)
-  local function show(item)
-    client:notify("rubric/peek", { uri = uri, line = row, part = item and item.name or vim.NIL })
-  end
-  local function done(item)
-    if item then
-      use(item.name)
-    else
-      show(nil)
-      back()
-    end
-  end
-  local function label(item)
-    return item.name .. (item.own and "  yours" or "")
-  end
-  local title = "Similar parts"
+-- A list whose entry under the cursor the page in the browser draws, as the
+-- theme list does: snacks.nvim's picker when it is there, else a plain list,
+-- which draws nothing until one is chosen. Each item has `value`, `label`
+-- (the plain list's line), `text` (what the picker searches) and `chunks`
+-- (the picker's line). `show(item)` draws one; `done(item)` gets the one
+-- chosen, or nil on Esc. `at` is the entry the cursor starts on.
+local function preview_list(title, items, show, done, at)
   vim.schedule(function()
     if vim.api.nvim_get_mode().mode:sub(1, 1) == "i" then
       vim.cmd.stopinsert()
     end
     local ok, snacks = pcall(require, "snacks")
     if not ok or not snacks.picker then
-      local plain = {}
-      for _, item in ipairs(near) do
-        table.insert(plain, { name = item.name, value = item.name, label = label(item) .. "  " .. item.description })
-      end
-      vim.ui.select(plain, {
+      vim.ui.select(items, {
         prompt = title,
         format_item = function(item)
           return item.label
@@ -155,25 +136,24 @@ local function near_list(client, bufnr, row, near, use, back)
       }, done)
       return
     end
-    local items = {}
-    for i, item in ipairs(near) do
-      local it = vim.deepcopy(item)
-      it.idx = i
-      it.text = item.name .. " " .. item.description
-      table.insert(items, it)
+    for i, item in ipairs(items) do
+      item.idx = i
     end
     local chosen
     snacks.picker.pick({
       title = title,
       items = items,
       format = function(item)
-        return {
-          { item.name, "SnacksPickerLabel" },
-          { item.own and "  yours" or "", "DiagnosticOk" },
-          { "  " .. item.description, "Comment" },
-        }
+        return item.chunks
       end,
       layout = { preset = "select" },
+      on_show = function(picker)
+        if at and at > 1 then
+          pcall(function()
+            picker.list:set_target(at)
+          end)
+        end
+      end,
       on_change = function(_, item)
         if item then
           show(item)
@@ -193,6 +173,77 @@ local function near_list(client, bufnr, row, near, use, back)
       vim.cmd.redraw()
     end)
   end)
+end
+
+-- The parts the writer already has that are near a `new:` line's words,
+-- their own first, each drawn where the line is, with the block's writing
+-- in it, while the cursor is on it. `use(name)` puts the chosen one on the
+-- line; Esc goes `back` to the menu it came from.
+local function near_list(client, bufnr, row, near, use, back)
+  local uri = vim.uri_from_bufnr(bufnr)
+  local function show(item)
+    client:notify("rubric/peek", { uri = uri, line = row, part = item and item.name or vim.NIL })
+  end
+  local items = {}
+  for _, n in ipairs(near) do
+    table.insert(items, {
+      name = n.name,
+      value = n.name,
+      label = n.name .. (n.own and "  yours" or "") .. "  " .. n.description,
+      text = n.name .. " " .. n.description,
+      chunks = {
+        { n.name, "SnacksPickerLabel" },
+        { n.own and "  yours" or "", "DiagnosticOk" },
+        { "  " .. n.description, "Comment" },
+      },
+    })
+  end
+  preview_list("Similar parts", items, show, function(item)
+    if item then
+      use(item.name)
+    else
+      show(nil)
+      back()
+    end
+  end)
+end
+
+-- When a take was made: the time today, the day too before that.
+local function made(at)
+  local t = math.floor(at / 1000)
+  return os.date(os.date("%Y%m%d", t) == os.date("%Y%m%d") and "%H:%M" or "%b %d %H:%M", t)
+end
+
+-- The takes of one line, oldest first, each with when it was made, what
+-- drafted it and what it was asked to change; the page draws the one under
+-- the cursor. Enter stays on it, Esc goes back to the take that was on
+-- screen; either way `back` reopens the menu it came from.
+local function takes_list(client, bufnr, row, view, back)
+  local function show(item)
+    request(client, bufnr, row, { action = "take", to = item.value })
+  end
+  local items = {}
+  for i, t in ipairs(view.list or {}) do
+    local what = t.original and "as kept" or ("take %d"):format(i)
+    local rest = (t.by and ("  " .. t.by) or "") .. (t.change and ("  “" .. t.change .. "”") or "")
+    local now = i == view.take and "  (now)" or ""
+    table.insert(items, {
+      value = i,
+      label = ("%s  %s%s%s"):format(what, made(t.at), rest, now),
+      text = what .. " " .. rest,
+      chunks = {
+        { what, "SnacksPickerLabel" },
+        { "  " .. made(t.at), "Number" },
+        { now, "DiagnosticOk" },
+        { rest, "Comment" },
+      },
+    })
+  end
+  preview_list(("Takes (%d)"):format(#items), items, show, function(item)
+    request(client, bufnr, row, { action = "take", to = item and item.value or view.take }, function()
+      back()
+    end)
+  end, view.take)
 end
 
 -- The accept key on a `new:` line.
@@ -260,7 +311,7 @@ function M.act(client, bufnr, row)
     if status == "ready" then
       add(("Keep %s"):format(view.name), "keep")
       if (view.takes or 0) > 1 then
-        add(("Next take (%d of %d)"):format(view.take, view.takes), "next")
+        add(("Takes (%d)"):format(view.takes), "takes")
       end
       add("Reroll…", "reroll")
     elseif status == "exists" then
@@ -308,8 +359,10 @@ function M.act(client, bufnr, row)
         reroll_menu(client, bufnr, view.name, view.drafter, nil, function(change, d)
           M.build(client, bufnr, row, { action = "reroll", change = change, drafter = d })
         end)
-      elseif v == "next" then
-        M.cycle(client, bufnr, row, 1)
+      elseif v == "takes" then
+        takes_list(client, bufnr, row, view, function()
+          M.act(client, bufnr, row)
+        end)
       elseif v == "log" then
         M.show_log(view.log)
       elseif v == "fresh" then
@@ -400,7 +453,7 @@ function M.act_own(client, bufnr, row, fill)
       add("Keep this take", "keep")
     end
     if (view.takes or 0) > 1 then
-      add(("Next take (%d of %d)"):format(view.take, view.takes), "next")
+      add(("Takes (%d)"):format(view.takes), "takes")
     end
     if status ~= "drafting" then
       add(status == "failed" and "Retry…" or "Reroll…", "reroll")
@@ -448,8 +501,10 @@ function M.act_own(client, bufnr, row, fill)
       elseif v == "reroll" then
         -- The words after ":" are the notes it starts with.
         reroll_menu(client, bufnr, name, view.drafter, refine, reroll)
-      elseif v == "next" then
-        M.cycle(client, bufnr, row, 1)
+      elseif v == "takes" then
+        takes_list(client, bufnr, row, view, function()
+          M.act_own(client, bufnr, row, fill)
+        end)
       elseif v == "log" then
         M.show_log(view.log)
       elseif v == "stop" or v == "cancel" then

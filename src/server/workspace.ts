@@ -15,7 +15,7 @@ import {
 import { DRAFT_INDEX, DRAFT_LOGS, draftKey, DRAFTS, keepLocal, keepTake, makeGlobal, ownKey, putAway, readDrafts, shownTake, takesFor, writeHugoTree, type DraftState } from "../parts.ts";
 import { openSite, pageKind, pagePath, type Site } from "../site.ts";
 import { LOG, newDraft, NOT_MOUNTED, runDraft, saveState, type Harness } from "./draft.ts";
-import type { Drafter, Mode } from "./harness.ts";
+import { brief as shortDrafter, type Drafter, type HarnessName, type Mode } from "./harness.ts";
 import { themeList, type ThemeList, type ThemeRanker } from "./themes.ts";
 import { fileExists, isSiteAddress, pictures } from "./files.ts";
 
@@ -68,6 +68,10 @@ export interface DraftView {
   // Which take is on screen, from 1, of how many finished ones.
   take?: number;
   takes?: number;
+  // When there are several: each take, oldest first, so take 1 is the
+  // first; when it was finished, what drafted it, and what a reroll asked
+  // it to change. `original` is the site's part as it was kept.
+  list?: { at: number; by?: string; change?: string; original?: true }[];
   // Finished takes for these words the writer cancelled before, which can
   // be brought back instead of drafting again.
   earlier?: number;
@@ -592,6 +596,20 @@ export class Workspace {
     return shown ? { take: takes.indexOf(shown) + 1, takes: takes.length } : {};
   }
 
+  // The takes to choose between, for the editor's list.
+  #takeList(key: string): Pick<DraftView, "list"> {
+    const takes = takesFor(this.#drafts.values(), key);
+    if (takes.length < 2) return {};
+    return {
+      list: takes.map((d) => ({
+        at: d.finished ?? d.started,
+        ...(d.drafter ? { by: `${shortDrafter({ ...d.drafter, harness: d.drafter.harness as HarnessName })}${d.mode === "tools" ? ", tools" : ""}` } : {}),
+        ...(d.change ? { change: d.change } : {}),
+        ...(d.original ? { original: true as const } : {}),
+      })),
+    };
+  }
+
   // Finished takes for these words whose last word in the record is that
   // they were cancelled, and whose folder is still there.
   #earlier(words: string): string[] {
@@ -700,6 +718,7 @@ export class Workspace {
       ...(shown?.name && shown !== latest && latest?.status !== "ready" ? { shown: shown.name } : {}),
       ...(latest ? { log: join(this.site.root, DRAFTS, latest.id, LOG) } : {}),
       ...this.#takes(key),
+      ...this.#takeList(key),
       ...(latest || at.of !== undefined ? {} : (() => {
         const earlier = this.#earlier(words).length;
         return earlier ? { earlier } : {};
@@ -759,14 +778,17 @@ export class Workspace {
     return view?.of !== undefined ? { ...view, uses: await this.#uses(view.of, file, line) } : view;
   }
 
-  // Moves the preview to the next take (step 1) or the one before (-1), round.
-  async take(file: string, line: number, step: number): Promise<DraftView | undefined> {
+  // Moves the preview to the next take (step 1) or the one before (-1),
+  // round; or to take `to`, counted from 1, oldest first.
+  async take(file: string, line: number, step: number, to?: number): Promise<DraftView | undefined> {
     const at = this.#draftLine(file, line);
     if (!at) return undefined;
     const takes = takesFor(this.#drafts.values(), at.key);
     const shown = this.#shown(at.key);
     if (takes.length < 2 || !shown) return this.draft(file, line);
-    const next = takes[(takes.indexOf(shown) + step + takes.length * 10) % takes.length]!;
+    const next = to !== undefined ? takes[to - 1] : takes[(takes.indexOf(shown) + step + takes.length * 10) % takes.length]!;
+    if (!next) return this.draft(file, line);
+    if (next === shown) return this.draft(file, line);
     const chosen: DraftState = { ...next, chosen: Date.now() };
     this.#drafts.set(chosen.id, chosen);
     await saveState(this.site.root)(chosen);

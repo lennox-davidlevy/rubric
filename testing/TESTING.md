@@ -52,6 +52,7 @@ Last updated: 2026-11-12.
 | C4 | `::: new: a row of candles for each thing I learned`, with `candle-row` kept | `candle-row` is at the top of the list. |
 | C5 | `::: new: a tide chart of items` | No "Similar" entry. |
 | C11 | `::: new: a window with snow falling behind a heading`, with `rain-window` kept. Restart the editor's server first. | "Similar: rain-window" is offered, marked "yours". It was missing before: similar parts were hidden whenever nothing fit. Note lines where the similar part is nowhere near. |
+| C12 | On a draft with two or more takes: `<M-l>`, **Takes (N)** | A list like Similar parts, oldest first: "take 1  14:32  opus, low", with a reroll's notes after it and "(now)" on the one on screen, where the cursor starts. Moving through it draws each take on the page. Enter stays on that take, Esc goes back to the one that was on screen; both return to the menu. A take from another day shows the date too. `<M-n>` and `<M-p>` still cycle. Same on a kept part's line, where the first reads "as kept". |
 | C6 | On a ready draft: Reroll…, Reroll with changes… | Only "Notes: …", "Drafter: …" and "Back". Nothing starts. |
 | C7 | Set notes and a drafter, then Back | The first entry reads like "Reroll with opus: “bigger”" and starts it. |
 | C8 | On a new `new:` line: Draft with… | The drafter list opens; choosing one returns to the menu with "Draft (opus…)". |

@@ -246,6 +246,16 @@ describe("a draft", () => {
     const third = draftsOnDisk().find((d) => !after.includes(d))!;
     expect(readFileSync(join(dir, DRAFTS, third, "brief.md"), "utf8")).not.toContain("make the moons bigger");
     expect(ws.draft(page(), 6)).toMatchObject({ take: 3, takes: 3 });
+    // The takes are listed oldest first, each with when it was made and
+    // what it was asked to change, and one is gone to by its number.
+    const list = ws.draft(page(), 6)!.list!;
+    expect(list).toHaveLength(3);
+    expect(list.map((t) => t.at)).toEqual([...list.map((t) => t.at)].sort((a, b) => a - b));
+    expect(list.filter((t) => t.change !== undefined)).not.toHaveLength(0);
+    expect(await ws.take(page(), 6, 1, 1)).toMatchObject({ take: 1, takes: 3 });
+    // A number past the last changes nothing.
+    expect(await ws.take(page(), 6, 1, 9)).toMatchObject({ take: 1 });
+    expect(await ws.take(page(), 6, 1, 3)).toMatchObject({ take: 3 });
   });
 
   test("what the words ask for is asked once, beside the first draft, and kept with its takes and the record", async () => {

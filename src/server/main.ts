@@ -232,7 +232,7 @@ export function serve(opts: { stub: boolean; drafter?: Drafter; mode?: Mode }): 
   // checked before anything starts.
   type DraftParams = {
     uri: string; line: number; action?: "build" | "reroll" | "fresh" | "keep" | "cancel" | "stop" | "use" | "take" | "restore" | "remove";
-    change?: string; global?: boolean; step?: number; part?: string; drafter?: { harness: HarnessName; model?: string | null; effort?: string | null };
+    change?: string; global?: boolean; step?: number; to?: number; part?: string; drafter?: { harness: HarnessName; model?: string | null; effort?: string | null };
   };
   connection.onRequest("rubric/draft", async (params: DraftParams): Promise<object | null> => {
     const f = file(params.uri);
@@ -253,7 +253,7 @@ export function serve(opts: { stub: boolean; drafter?: Drafter; mode?: Mode }): 
       case "keep": return workspace.keep(f, params.line, params.global === true);
       case "cancel": return workspace.cancel(f, params.line);
       case "stop": return workspace.stop(f, params.line);
-      case "take": return (await workspace.take(f, params.line, params.step === -1 ? -1 : 1)) ?? null;
+      case "take": return (await workspace.take(f, params.line, params.step === -1 ? -1 : 1, Number.isInteger(params.to) ? params.to : undefined)) ?? null;
       case "restore": return (await workspace.restore(f, params.line)) ?? null;
       case "use": return workspace.use(f, params.line, typeof params.part === "string" ? params.part : undefined);
       case "remove": return workspace.remove(f, params.line);
