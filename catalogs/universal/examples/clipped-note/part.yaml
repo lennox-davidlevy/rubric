@@ -1,0 +1,20 @@
+name: clipped-note
+description: A single short note set off to one side of the page, held on with a paperclip.
+children: true
+body: |
+  **A short note**
+
+  A few lines set aside from the main writing.
+settings:
+  side:
+    type: choice
+    default: right
+    values:
+      right: note sits at the right side
+      left: note sits at the left side
+  tilt:
+    type: choice
+    default: slight
+    values:
+      slight: note hangs a little crooked
+      straight: note hangs square

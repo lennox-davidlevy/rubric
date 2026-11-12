@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // The rubric command.
 //
-//   bun src/cli.ts lsp [--stub] [--harness claude|opencode] [--model <model>] [--effort <level>]
+//   bun src/cli.ts lsp [--stub] [--harness claude|opencode] [--model <model>] [--effort <level>] [--drafting fast|tools]
 //                                   the language server, over stdio; what drafts
 //                                   new parts unless one is chosen for a draft
 //   bun src/cli.ts build <site>     write pages/ into content/ once
@@ -14,7 +14,7 @@ import { watch } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { Cache, frame, FRAME_PAGE, framePage, preprocess } from "./core/index.ts";
-import { HARNESSES, type Drafter, type HarnessName } from "./server/harness.ts";
+import { HARNESSES, MODES, type Drafter, type HarnessName, type Mode } from "./server/harness.ts";
 import { serve } from "./server/main.ts";
 import { writeHugoTree } from "./parts.ts";
 import { openSite, pageKind, type Site } from "./site.ts";
@@ -32,9 +32,14 @@ if (command === "lsp") {
     console.error(`--harness is one of ${HARNESSES.join(", ")}`);
     process.exit(2);
   }
+  const drafting = flag("--drafting");
+  if (drafting !== undefined && !MODES.includes(drafting as Mode)) {
+    console.error(`--drafting is one of ${MODES.join(", ")}`);
+    process.exit(2);
+  }
   const named = harness !== undefined || model !== undefined || effort !== undefined;
   const drafter: Drafter = { harness: (harness as HarnessName | undefined) ?? "claude", ...(model ? { model } : {}), ...(effort ? { effort } : {}) };
-  serve({ stub: args.includes("--stub"), ...(named ? { drafter } : {}) });
+  serve({ stub: args.includes("--stub"), ...(named ? { drafter } : {}), ...(drafting ? { mode: drafting as Mode } : {}) });
 } else if ((command === "build" || command === "watch") && args[0]) {
   const site = await openSite(args[0]);
   const cache = await Cache.load(site.cache);
@@ -62,7 +67,7 @@ if (command === "lsp") {
     });
   }
 } else {
-  console.error("usage: rubric lsp [--stub] [--harness claude|opencode] [--model <model>] [--effort <level>] | rubric build|watch <site>");
+  console.error("usage: rubric lsp [--stub] [--harness claude|opencode] [--model <model>] [--effort <level>] [--drafting fast|tools] | rubric build|watch <site>");
   process.exit(2);
 }
 

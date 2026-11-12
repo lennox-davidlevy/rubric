@@ -12,3 +12,14 @@ probe/runs/
 .rubric/
 catalogs/*/shots/
 .cache
+bench/runs/
+# Pictures of your own in the test site. The samples are tracked.
+testing/static/images/*
+!testing/static/images/gallery/
+!testing/static/images/logos/
+!testing/static/images/path.png
+!testing/static/images/sample.jpg
+# Your own writing and drafted parts in the test site. What is tracked there
+# is the fixture the tests copy; anything new stays local.
+testing/parts/*
+testing/pages/posts/moms-blog.md

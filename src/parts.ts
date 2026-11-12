@@ -47,6 +47,14 @@ export interface DraftState {
   // the runs it took (2 when the checks sent it back), what they cost, and
   // whether it went on with the last take's conversation.
   kind?: "first" | "fresh" | "another" | "change";
+  // What a reroll was asked to change, in the writer's words: the notes are
+  // the record of what a draft got wrong.
+  change?: string;
+  // What the words ask for, as Jev judged each kind (`TRAITS` in
+  // questions.ts); a take carries its first draft's.
+  traits?: Record<string, number>;
+  // How it was asked for: one turn with the files in the reply, or with tools.
+  mode?: "fast" | "tools";
   drafter?: { harness: string; model?: string; effort?: string };
   brief?: string;
   runs?: number;
@@ -241,6 +249,8 @@ export async function makeGlobal(themeDir: string, dir: string, name: string): P
   if (partsAt < 0 || lines.slice(partsAt + 1).some((l) => /^[a-z]/.test(l))) throw new Error("catalog.yaml does not end with its parts, so the new one has nowhere to go");
   const version = Number(/^version:\s*(\d+)/m.exec(was.catalog)?.[1]);
   if (!Number.isInteger(version)) throw new Error("catalog.yaml has no version");
+  // Where it came from stays with it, in the catalog.
+  entry.drafted = true;
   const indented = stringify(entry).trimEnd().split("\n").map((l) => `    ${l}`).join("\n");
   const catalog = `${was.catalog.trimEnd().replace(/^version:\s*\d+/m, `version: ${version + 1}`)}\n\n  ${name}:\n${indented}\n`;
 

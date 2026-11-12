@@ -34,6 +34,10 @@ local defaults = {
   -- harness or :Rubric model is kept and used instead, in every session,
   -- until :Rubric harness goes back to this one.
   draft = { harness = "claude", model = "sonnet", effort = "low" },
+  -- How a draft is asked for: "fast", one turn with the files in the reply,
+  -- or "tools", the tool writing them a turn a step. :Rubric drafting
+  -- changes it, and that choice is kept.
+  drafting = "fast",
 }
 
 -- The parts that take nothing inside (`::: divider`), from the server: their
@@ -454,7 +458,7 @@ function M.setup(opts)
   drafts.remember_setup(defaults.draft, opts.draft)
   drafts.set_keys({ accept = opts.accept, next = opts.next, prev = opts.prev })
   starters.set_accept(opts.accept)
-  local draft_args = drafts.args(chosen)
+  local draft_args = vim.list_extend(drafts.args(chosen), { "--drafting", drafts.drafting(opts.drafting) })
   vim.lsp.config("rubric", {
     cmd = vim.list_extend(vim.list_extend({ "bun", root .. "/src/cli.ts", "lsp" }, draft_args), opts.args),
     -- Bun loads .env from the working directory; the repo's holds TYPESAFE_API_KEY.
@@ -511,7 +515,8 @@ function M.setup(opts)
   -- harness chooses the tool that drafts new parts and its model, and
   -- :Rubric model another model for that tool; both last across sessions.
   -- :Rubric log follows what the draft on the cursor's line is doing.
-  local commands = { "theme", "harness", "model", "log" }
+  -- :Rubric drafting switches between fast drafts and drafts with tools.
+  local commands = { "theme", "harness", "model", "drafting", "log" }
   vim.api.nvim_create_user_command("Rubric", function(cmd)
     if not vim.tbl_contains(commands, cmd.args) then
       vim.notify("rubric: :Rubric " .. table.concat(commands, ", :Rubric "), vim.log.levels.INFO)
@@ -527,6 +532,8 @@ function M.setup(opts)
       drafts.choose_model(client, bufnr)
     elseif cmd.args == "harness" then
       drafts.choose_harness(client, bufnr)
+    elseif cmd.args == "drafting" then
+      drafts.choose_drafting(client, bufnr)
     elseif cmd.args == "log" then
       drafts.log(client, bufnr, vim.api.nvim_win_get_cursor(0)[1] - 1)
     else

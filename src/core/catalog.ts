@@ -47,6 +47,10 @@ export interface Part {
   // a draft the writer is looking at, which only its `::: new:` line draws
   // and Jev is never asked about.
   origin?: "site" | "draft";
+  // Drafted from a writer's words and then kept for every theme: a catalog
+  // part like any other, but offered with the writer's own when they look
+  // for parts they already have.
+  drafted?: true;
 }
 
 export interface Catalog {
@@ -255,7 +259,7 @@ function parsePart(rawPart: unknown, at: string): Part {
   const already = part.already === undefined ? {} : {
     already: Object.fromEntries(Object.entries(record(part.already, `${at}.already`)).map(([k, v]) => [k, string(v, `${at}.already.${k}`)])),
   };
-  return { description: string(part.description, `${at}.description`), place, ...body, children, ...(empty ? { empty: true as const } : {}), script, settings, ...already };
+  return { description: string(part.description, `${at}.description`), place, ...body, children, ...(empty ? { empty: true as const } : {}), script, settings, ...(part.drafted === true ? { drafted: true as const } : {}), ...already };
 }
 
 function setting(raw: unknown, at: string): Setting {

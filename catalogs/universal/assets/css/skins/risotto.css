@@ -1,12 +1,14 @@
 /* Risotto's layer (github.com/joeroe/risotto, MIT), read from
    assets/css/typography.css, logo.css and header.css: a page that looks like a
-   text file. # marks on headings, a shell prompt for the site's name, ./ on
+   text file. # marks on the page's headings, a shell prompt for the site's name, ./ on
    each link, > beside each quote. */
 
-h1::before { content: "# "; opacity: 0.6; }
-h2::before { content: "## "; opacity: 0.6; }
-h3::before { content: "### "; opacity: 0.6; }
-h4::before { content: "#### "; opacity: 0.6; }
+/* On the page's own headings, not a part's: a part draws its headings its
+   own way. :where keeps these as easy to override as they were. */
+h1:where(:not(.part *))::before { content: "# "; opacity: 0.6; }
+h2:where(:not(.part *))::before { content: "## "; opacity: 0.6; }
+h3:where(:not(.part *))::before { content: "### "; opacity: 0.6; }
+h4:where(:not(.part *))::before { content: "#### "; opacity: 0.6; }
 .catalog-part::before { content: none; }
 
 /* The name as a prompt: [site] $, on a block of the notice green. */

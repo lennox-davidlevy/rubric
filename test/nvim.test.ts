@@ -601,7 +601,7 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
   const site = join(dir, "site");
   writeFileSync(join(site, "hugo.toml"), readFileSync(join(site, "hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(repo, "catalogs"))}`));
   const page = join(site, "pages/posts/new.md");
-  writeFileSync(page, ["---", "title: New", "---", "::: a wobbly orbit of moons", ":::", "", "::: new: slow comet tails", ":::", ""].join("\n"));
+  writeFileSync(page, ["---", "title: New", "---", "::: a wobbly orbit of moons", ":::", "", "::: new: slow comet tails", ":::", "", "::: new: a quote or a callout", "Words.", ":::", ""].join("\n"));
 
   const editor = Bun.spawn([nvim!, "--headless", "--listen", sock, "-u", join(repo, "test/nvim/init.lua"), "-i", "NONE", page], {
     // A data folder of its own, where :Rubric harness keeps its choice.
@@ -618,6 +618,16 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
   const note = (line: number) => expr(`(function() for _, d in ipairs(vim.diagnostic.get(0, { lnum = ${line - 1} })) do return d.code end return '' end)()`);
   try {
     expect(await until(() => expr("RubricTest.attached()") === "true")).toBe(true);
+
+    // Parts near a `new:` line's words are offered before drafting: looked
+    // at in a list, the one chosen takes the line, and nothing is drafted.
+    expect(await until(() => note(10) === "new-part")).toBe(true);
+    // Jev is asked as the menu opens, which waits for the answer.
+    expr("RubricTest.answer('look', 'callout')");
+    keys(":call cursor(10, 1)<CR><M-l>");
+    expect(await until(() => expr("RubricTest.line(10)") === "::: callout")).toBe(true);
+    expect(expr("RubricTest.line(11)")).toBe("Words.");
+    expect(existsSync(join(site, ".rubric/drafts")) ? readdirSync(join(site, ".rubric/drafts")) : []).toEqual([]);
 
     // Nothing fits: the ghost text offers a new part, and accepting it turns
     // the line into a `new:` line and asks how to draft it: as set up.
@@ -659,14 +669,17 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
     // Yes: notes on what to change, and another drafter for this one alone,
     // which joins the ones used lately; the default stays as it was.
     const saved = join(dir, "data/nvim/rubric/draft.json");
-    // Esc in the drafter's lists goes back to the setup, and remembers nothing.
-    expr("RubricTest.answer('reroll', 'change', 'drafter', 'nothing-here', 'notes', 'smaller moons', 'go')");
+    // Esc in the drafter's lists goes back to the changes, and remembers
+    // nothing. The changes start nothing: Back, then the reroll.
+    expr("RubricTest.answer('reroll', 'change', 'drafter', 'nothing-here', 'notes', 'smaller moons', 'back', 'just')");
     keys(":call cursor(4, 1)<CR><M-l>");
     expect(await until(() => data("takes") === "3" && note(4) === "draft-ready")).toBe(true);
+    // The notes reached the take the reroll made.
+    expect(readdirSync(join(site, ".rubric/drafts")).some((d) => { try { return readFileSync(join(site, ".rubric/drafts", d, "part.html"), "utf8").includes("smaller moons"); } catch { return false; } })).toBe(true);
     expect(existsSync(saved)).toBe(false);
     const takeBy = () => readdirSync(join(site, ".rubric/drafts")).map((d) => { try { return JSON.parse(readFileSync(join(site, ".rubric/drafts", d, "state.json"), "utf8")) as { by?: string; started: number }; } catch { return undefined; } }).filter((x) => x !== undefined).sort((a, b) => b.started - a.started)[0]?.by;
     if (Bun.which("claude")) {
-      expr("RubricTest.answer('reroll', 'change', 'drafter', 'other', 'claude', 'opus', 'high', 'go')");
+      expr("RubricTest.answer('reroll', 'change', 'drafter', 'other', 'claude', 'opus', 'high', 'back', 'just')");
       keys(":call cursor(4, 1)<CR><M-l>");
       expect(await until(() => data("takes") === "4" && note(4) === "draft-ready")).toBe(true);
       // It reached the server for this take alone, and is among the recent ones.
@@ -809,6 +822,14 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
     keys(":Rubric harness<CR>");
     expect(await until(() => expr("RubricTest.drafter()") === "claude sonnet low")).toBe(true);
     expect(await until(() => existsSync(saved) ? JSON.parse(readFileSync(saved, "utf8")).default === undefined : true)).toBe(true);
+    // :Rubric drafting switches fast drafts for drafts with tools, and
+    // back; the server takes it, and the choice is kept for the next start.
+    expect(expr("require('rubric.drafts').drafting(nil)")).toBe("fast");
+    keys(":Rubric drafting<CR>");
+    expect(await until(() => existsSync(saved) && JSON.parse(readFileSync(saved, "utf8")).drafting === "tools")).toBe(true);
+    expect(expr("require('rubric.drafts').drafting('fast')")).toBe("tools");
+    keys(":Rubric drafting<CR>");
+    expect(await until(() => JSON.parse(readFileSync(saved, "utf8")).drafting === "fast")).toBe(true);
     // A setup that leaves the tool out means Claude Code, and the server
     // starts with it named.
     expect(atStart("{ model = 'haiku' }")).toBe("claude haiku default");

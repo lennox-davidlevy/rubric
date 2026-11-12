@@ -12,14 +12,14 @@ import {
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { atPlace, Cache, type Catalog, type PageKind, type ThemeChoice } from "../core/index.ts";
-import { ask, rankThemes, refine, warm } from "../jev.ts";
+import { ask, rankThemes, refine, traits, warm } from "../jev.ts";
 import { findSiteRoot, openSite } from "../site.ts";
-import { brief as shortName, DEFAULT_DRAFTER, describe, efforts, HARNESSES, installed, modelProblem, models, toolHarness, type Drafter, type HarnessName } from "./harness.ts";
+import { brief as shortName, DEFAULT_DRAFTER, describe, efforts, fastDrafter, HARNESSES, installed, modelProblem, models, MODES, toolHarness, type Drafter, type HarnessName, type Mode } from "./harness.ts";
 import { stubHarness, stubRefiner, stubResolver, stubThemeRanker } from "./stub.ts";
 import type { ThemeRanker } from "./themes.ts";
 import { Workspace, type Refiner, type Resolver, type Severity } from "./workspace.ts";
 
-export function serve(opts: { stub: boolean; drafter?: Drafter }): void {
+export function serve(opts: { stub: boolean; drafter?: Drafter; mode?: Mode }): void {
   const connection = createConnection(ProposedFeatures.all, process.stdin, process.stdout);
   const documents = new TextDocuments(TextDocument);
   let workspace: Workspace | undefined;
@@ -28,6 +28,11 @@ export function serve(opts: { stub: boolean; drafter?: Drafter }): void {
   // editor's setup, and changed for the session from the editor's lists.
   // A draft may be made by another, chosen for it alone.
   let drafter: Drafter = opts.drafter ?? DEFAULT_DRAFTER;
+  // How drafts are asked for: fast, one turn with the files in the reply,
+  // unless the writer chose the tools, to compare the two.
+  let mode: Mode = opts.mode ?? "fast";
+  // The drafter as a draft started now would run it.
+  const running = (d: Drafter) => (mode === "fast" ? fastDrafter(d) : d);
 
   const severity: Record<Severity, DiagnosticSeverity> = {
     warning: DiagnosticSeverity.Warning,
@@ -99,12 +104,22 @@ export function serve(opts: { stub: boolean; drafter?: Drafter }): void {
       }, {
         refiner,
         // New parts are drafted by Claude Code, or by the stub with --stub.
-        harness: opts.stub ? (dir, prompt, signal, log) => stubHarness(current().catalog)(dir, prompt, signal, log) : toolHarness(() => drafter),
+        harness: opts.stub ? (dir, prompt, signal, log, use, resume, how) => stubHarness(current().catalog)(dir, prompt, signal, log, use, resume, how) : toolHarness(() => drafter),
+        mode: () => mode,
+        // The stub has no Jev to ask, so its drafts' records go without.
+        ...(opts.stub ? {} : {
+          traits: async (words: string) => {
+            const asked = await traits(words);
+            const log = join(root, ".rubric/jev.jsonl");
+            if (existsSync(log)) void appendFile(log, JSON.stringify({ t: Date.now(), pass: "traits", ...asked }) + "\n").catch(() => {});
+            return asked.traits;
+          },
+        }),
         // The stub says which drafter it stands in for, so a test can see a
         // drafter chosen for one draft reach it.
         drafter: (use) => (opts.stub
           ? { full: use ? `the stub, as ${describe(use)}` : "the stub", short: "the stub" }
-          : { full: describe(use ?? drafter), short: shortName(use ?? drafter) }),
+          : { full: describe(running(use ?? drafter)), short: shortName(use ?? drafter) }),
         onDraft: (state) => void connection.sendNotification("rubric/drafted", state),
         onStarters: (f, starters, own) => void connection.sendNotification("rubric/starters", { uri: pathToFileURL(f).href, starters, own }),
         onReload: (site) => void connection.sendNotification("rubric/alone", { parts: alone(site.catalog) }),
@@ -201,6 +216,13 @@ export function serve(opts: { stub: boolean; drafter?: Drafter }): void {
     void workspace?.previewTheme(params.theme);
   });
 
+  // The writer is looking at a part near a `new:` line's words, in the list
+  // of them (or closed it: no part): the preview draws it on the line.
+  connection.onNotification("rubric/peek", (params: { uri: string; line: number; part?: string | null }) => {
+    const f = file(params.uri);
+    if (f) workspace?.peek(f, params.line, params.part ?? undefined);
+  });
+
   // A `::: new:` line, or a line of the site's own part: what its drafts
   // are, and what the writer chose to do with them. Keep, cancel and use
   // answer a `new:` line with the line to put in its place.
@@ -208,7 +230,7 @@ export function serve(opts: { stub: boolean; drafter?: Drafter }): void {
   // checked before anything starts.
   type DraftParams = {
     uri: string; line: number; action?: "build" | "reroll" | "fresh" | "keep" | "cancel" | "stop" | "use" | "take" | "restore" | "remove";
-    change?: string; global?: boolean; step?: number; drafter?: { harness: HarnessName; model?: string | null; effort?: string | null };
+    change?: string; global?: boolean; step?: number; part?: string; drafter?: { harness: HarnessName; model?: string | null; effort?: string | null };
   };
   connection.onRequest("rubric/draft", async (params: DraftParams): Promise<object | null> => {
     const f = file(params.uri);
@@ -231,7 +253,7 @@ export function serve(opts: { stub: boolean; drafter?: Drafter }): void {
       case "stop": return workspace.stop(f, params.line);
       case "take": return (await workspace.take(f, params.line, params.step === -1 ? -1 : 1)) ?? null;
       case "restore": return (await workspace.restore(f, params.line)) ?? null;
-      case "use": return workspace.use(f, params.line);
+      case "use": return workspace.use(f, params.line, typeof params.part === "string" ? params.part : undefined);
       case "remove": return workspace.remove(f, params.line);
       default: return (await workspace.look(f, params.line)) ?? null;
     }
@@ -271,6 +293,15 @@ export function serve(opts: { stub: boolean; drafter?: Drafter }): void {
     if (problem) return { error: problem };
     drafter = next;
     return { drafter: describe(next), short: shortName(next) };
+  });
+
+  // Fast or with tools, for the drafts that start from now on.
+  connection.onRequest("rubric/drafting", async (params: { mode?: string }): Promise<object> => {
+    if (params.mode !== undefined) {
+      if (!MODES.includes(params.mode as Mode)) return { error: `drafting is one of ${MODES.join(", ")}` };
+      mode = params.mode as Mode;
+    }
+    return { mode, modes: [...MODES] };
   });
 
   connection.languages.inlineCompletion.on(async (params) => {

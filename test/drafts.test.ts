@@ -10,7 +10,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { atPlace, Cache, scan, type PageKind } from "../src/core/index.ts";
 import { DRAFT_INDEX, DRAFT_LOGS, DRAFTS, HUGO_TREE, readDrafts, shownTake } from "../src/parts.ts";
-import { checkDraft } from "../src/server/draft.ts";
+import { checkDraft, type Harness } from "../src/server/draft.ts";
+import type { Mode } from "../src/server/harness.ts";
 import { stubHarness, stubResolver } from "../src/server/stub.ts";
 import { Workspace, type Note } from "../src/server/workspace.ts";
 import { openSite } from "../src/site.ts";
@@ -24,9 +25,13 @@ let ws: Workspace;
 let asked: string[];
 // The model chosen for each draft alone, or "default", in order.
 let uses: string[] = [];
+const traitsAsked: string[] = [];
 // The conversation each run was asked to go on with, in order.
 let resumes: (string | undefined)[] = [];
 let sessions = 0;
+// How the workspace's drafts are asked for, and how each run was.
+let mode: Mode = "tools";
+let modes: (Mode | undefined)[] = [];
 const notes = new Map<string, Note[]>();
 const page = () => join(dir, "pages/posts/new.md");
 const front = "---\ntitle: New\n---\n\n";
@@ -51,10 +56,16 @@ async function workspace(): Promise<Workspace> {
   };
   return new Workspace(site, await Cache.load(site.cache), resolver, (f, n) => notes.set(f, n), {
     idleMs: 5, waitMs: 1000, drawMs: 5,
-    harness: async (d, prompt, signal, log, use, resume) => {
+    mode: () => mode,
+    traits: async (words) => {
+      traitsAsked.push(words);
+      return { moves: 0.9 };
+    },
+    harness: async (d, prompt, signal, log, use, resume, how) => {
       uses.push(use?.model ?? "default");
       resumes.push(resume?.id);
-      const r = await stubHarness(current().catalog, 5)(d, prompt, signal, log);
+      modes.push(how);
+      const r = await stubHarness(current().catalog, 5)(d, prompt, signal, log, use, resume, how);
       // What a tool reports: its cost and a conversation to go on with.
       return { ...r, resumed: resume !== undefined, stats: { turns: 2, cost: 0.1, thinking: 50 }, session: { id: `s-${++sessions}`, harness: "claude" as const, model: "sonnet", cwd: "/nowhere" }, drafter: { harness: "claude" as const, model: "sonnet", effort: "low" } };
     },
@@ -79,10 +90,11 @@ const content = () => readFileSync(join(dir, "content/posts/new.md"), "utf8");
 const draftsOnDisk = () => (existsSync(join(dir, DRAFTS)) ? readdirSync(join(dir, DRAFTS)) : []);
 
 describe("the line", () => {
-  test("`new:` asks for a part, opens a block, and is never sent to Jev", async () => {
+  test("`new:` asks for a part, opens a block, and is not sent to Jev as it is typed", async () => {
     const s = scan(`${front}::: new: a timeline of posts by year\n:::\n`, ws.site.catalog);
     expect(s.directives.map((d) => [d.kind, d.words, d.close])).toEqual([["new", "a timeline of posts by year", 5]]);
     await write(`${front}::: new: a timeline of posts by year\n:::\n`);
+    await ws.settle();
     expect(asked).not.toContain("a timeline of posts by year");
     expect(asked).not.toContain("new: a timeline of posts by year");
     expect(codes(4)).toEqual(["new-part"]);
@@ -108,6 +120,59 @@ describe("the line", () => {
   });
 });
 
+describe("parts the writer already has, near a new: line's words", () => {
+  test("are listed before anything is drafted, drawn in the preview while looked at, and one can take the line", async () => {
+    await write(`${front}::: new: a quote or a callout\nSome words.\n:::\n`);
+    await ws.settle();
+    // Asked when the menu opens, not before, and nothing is placed from it.
+    expect(asked).not.toContain("a quote or a callout");
+    expect((await ws.look(page(), 4))?.near?.map((n) => n.name)).toEqual(["quote", "callout"]);
+    expect(asked).toContain("a quote or a callout");
+    expect(content()).not.toContain("{{< quote");
+
+    // Looked at: the page draws it where the line is, with the block's writing.
+    ws.peek(page(), 4, "callout");
+    await ws.settle();
+    expect(content()).toContain("{{< callout >}}\nSome words.");
+    ws.peek(page(), 4, "quote");
+    await ws.settle();
+    expect(content()).toContain("{{< quote >}}");
+    expect(content()).not.toContain("{{< callout");
+    // The list closed: the line is as it was.
+    ws.peek(page(), 4);
+    await ws.settle();
+    expect(content()).not.toContain("{{< quote");
+
+    // Only a part from the list can take the line.
+    // Refused, the list is closed all the same: nothing stays drawn.
+    ws.peek(page(), 4, "quote");
+    expect(await ws.use(page(), 4, "steps")).toHaveProperty("error");
+    await ws.settle();
+    expect(content()).not.toContain("{{< quote");
+    ws.peek(page(), 4, "callout");
+    expect(await ws.use(page(), 4, "callout")).toEqual({ replace: "::: callout" });
+    await ws.settle();
+    expect(content()).not.toContain("{{< callout");
+  });
+
+  test("are listed when nothing fits but one is close", async () => {
+    await write(`${front}::: new: nearly a quote\nWords.\n:::\n`);
+    await ws.settle();
+    expect((await ws.look(page(), 4))?.near?.map((n) => n.name)).toEqual(["quote"]);
+  });
+
+  test("are not offered when nothing is near, or once a draft is there", async () => {
+    await write(`${front}::: new: moon orbit\nThree moons.\n:::\n\n::: new: a quote from the keeper\nWords.\n:::\n`);
+    await ws.settle();
+    expect((await ws.look(page(), 4))?.near).toBeUndefined();
+    expect((await ws.look(page(), 8))?.near?.map((n) => n.name)).toEqual(["quote"]);
+    await ws.build(page(), 8);
+    await ws.drafted();
+    expect(ws.draft(page(), 8)?.near).toBeUndefined();
+    await ws.cancel(page(), 8);
+  });
+});
+
 describe("a draft", () => {
   test("is drafted when asked, then drawn where its line is, in the preview only", async () => {
     await write(`${front}Before.\n\n::: new: moon orbit\nThree moons.\n:::\n\nAfter.\n`);
@@ -118,6 +183,10 @@ describe("a draft", () => {
     await ws.drafted();
     expect(ws.draft(page(), 6)).toMatchObject({ status: "ready", name: "moon-orbit" });
     expect(codes(6)).toEqual(["draft-ready"]);
+    // What it can be set to is with the line, to judge it by before keeping.
+    const ready = (notes.get(page()) ?? []).find((n) => n.line === 6)!;
+    expect((ready.data as { settings?: unknown }).settings).toEqual([{ name: "pace", values: ["slow", "fast"] }]);
+    expect(ready.message).toContain("pace=slow|fast");
     expect(content()).toContain("{{< moon-orbit >}}");
     // Hugo sees it beside the catalog; Jev never does.
     expect(existsSync(join(dir, HUGO_TREE, "layouts/_partials/parts/moon-orbit.html"))).toBe(true);
@@ -154,6 +223,8 @@ describe("a draft", () => {
     expect(after).toHaveLength(2);
     const added = after.find((d) => !before.includes(d))!;
     expect(readFileSync(join(dir, DRAFTS, added, "part.html"), "utf8")).toContain("make the moons bigger");
+    // The notes stay with the take, for the record of what drafts get wrong.
+    expect(JSON.parse(readFileSync(join(dir, DRAFTS, added, "state.json"), "utf8")).change).toBe("make the moons bigger");
     // It was asked of the take before, whose files its brief shows.
     const first = readFileSync(join(dir, DRAFTS, before[0]!, "part.html"), "utf8").trim();
     expect(readFileSync(join(dir, DRAFTS, added, "brief.md"), "utf8")).toContain(first);
@@ -175,6 +246,25 @@ describe("a draft", () => {
     const third = draftsOnDisk().find((d) => !after.includes(d))!;
     expect(readFileSync(join(dir, DRAFTS, third, "brief.md"), "utf8")).not.toContain("make the moons bigger");
     expect(ws.draft(page(), 6)).toMatchObject({ take: 3, takes: 3 });
+  });
+
+  test("what the words ask for is asked once, beside the first draft, and kept with its takes and the record", async () => {
+    await write(`${front}::: new: paper kite\n:::\n`);
+    await ws.build(page(), 4);
+    await ws.drafted();
+    const saved = (id: string) => JSON.parse(readFileSync(join(dir, DRAFTS, id, "state.json"), "utf8"));
+    const first = draftsOnDisk().find((d) => d.startsWith("paper-kite"))!;
+    expect(saved(first).traits).toEqual({ moves: 0.9 });
+    // A reroll with notes carries them; Jev is not asked the same words twice.
+    await ws.build(page(), 4, { change: "a longer tail" });
+    await ws.drafted();
+    const second = draftsOnDisk().find((d) => d.startsWith("paper-kite") && d !== first)!;
+    expect(saved(second).traits).toEqual({ moves: 0.9 });
+    expect(traitsAsked.filter((w) => w === "paper kite")).toHaveLength(1);
+    await ws.cancel(page(), 4);
+    const lines = readFileSync(join(dir, DRAFT_INDEX), "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((l) => l.words === "paper kite");
+    expect(lines.length).toBeGreaterThan(0);
+    for (const l of lines) expect(l.traits).toEqual({ moves: 0.9 });
   });
 
   test("one the checks refuse goes back with the reasons, and is fixed", async () => {
@@ -345,6 +435,11 @@ describe("keeping it", () => {
       expect(existsSync(join(catalogDir, f))).toBe(true);
     }
     expect(existsSync(join(dir, "parts/tide-clock"))).toBe(false);
+    // It stays known as one drafted from words: among the parts near a new
+    // line, it comes before the catalog's own, though Jev put it second.
+    expect(ws.site.catalog.parts["tide-clock"]?.drafted).toBe(true);
+    await write(`${front}::: new: a quote or a tide-clock\nWords.\n:::\n`);
+    expect((await ws.look(page(), 4))?.near).toMatchObject([{ name: "tide-clock", own: true }, { name: "quote", own: false }]);
   });
 
   test("one Hugo can't build goes nowhere, and the catalog is as it was", async () => {
@@ -373,6 +468,17 @@ describe("the checks", () => {
     expect(problems.some((p) => p.includes("literal color"))).toBe(true);
     expect(problems.some((p) => p.includes("no scripts"))).toBe(true);
     expect(problems.some((p) => p.includes("outer element"))).toBe(true);
+  });
+
+  test("refuse an auto margin on the outer element, and allow one inside it", async () => {
+    const d = join(tmp, "check-margin");
+    mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, "part.yaml"), "name: lone-frame\ndescription: A frame on its own.\nchildren: true\n");
+    writeFileSync(join(d, "part.html"), `<div class="part part-lone-frame"><div class="lone-frame-stage">{{ .inner }}</div></div>\n`);
+    writeFileSync(join(d, "part.css"), ".part-lone-frame { color: var(--ink); margin-inline: auto; }\n.part-lone-frame .lone-frame-stage { margin-inline: auto; }\n");
+    expect((await checkDraft(ws.site, d)).problems.filter((p) => p.includes("auto margin"))).toHaveLength(1);
+    writeFileSync(join(d, "part.css"), ".part-lone-frame { color: var(--ink); }\n.part-lone-frame .lone-frame-stage { margin-inline: auto; }\n");
+    expect((await checkDraft(ws.site, d)).problems).toEqual([]);
   });
 
   test("take a custom property the HTML sets inline as the part's own, and refuse one set nowhere", async () => {
@@ -514,8 +620,12 @@ test("the brief shows each curated example's own files, and what it is there to 
   const text = brief(ws.site, { words: "trail markers", inside: "" });
   for (const [name, why] of EXAMPLES) {
     expect(text).toContain(`### ${name}\n${why}`);
-    const html = readFileSync(join(ws.site.themeDir, "layouts/_partials/parts", `${name}.html`), "utf8").trim();
+    // A kept part's files are in the catalog's examples/; the rest are its own parts.
+    const kept = join(ws.site.themeDir, "examples", name, "part.html");
+    const html = readFileSync(existsSync(kept) ? kept : join(ws.site.themeDir, "layouts/_partials/parts", `${name}.html`), "utf8").trim();
     expect(text).toContain(html);
+    // An example obeys the brief's own rules, or drafts learn to break them.
+    if (existsSync(kept)) expect((await checkDraft(ws.site, join(ws.site.themeDir, "examples", name), undefined, name)).problems).toEqual([]);
   }
 });
 
@@ -731,6 +841,152 @@ describe("a take", () => {
     expect(ws.draft(page(), 4)).toMatchObject({ status: "ready", takes: 3 });
     await ws.cancel(page(), 4);
   });
+});
+
+describe("a fast draft", () => {
+  const signal = () => new AbortController().signal;
+  const fresh = (name: string) => {
+    const out = join(tmp, name);
+    rmSync(out, { recursive: true, force: true });
+    mkdirSync(out, { recursive: true });
+    return { out, state: { id: name, words: "", status: "drafting" as const, started: Date.now() } };
+  };
+  const kite = () => {
+    const prev = join(tmp, "prev-fast");
+    mkdirSync(prev, { recursive: true });
+    writeFileSync(join(prev, "part.yaml"), "name: kite-tails\ndescription: Kite tails.\nchildren: true\n");
+    writeFileSync(join(prev, "part.html"), `<div class="part part-kite-tails">{{ .inner }}</div>\n`);
+    writeFileSync(join(prev, "part.css"), ".part-kite-tails { color: var(--ink); }\n");
+    return prev;
+  };
+
+  test("the reply's files are read whatever is around them", async () => {
+    const { parseReply } = await import("../src/server/draft.ts");
+    const files = parseReply("Here you go:\n=== part.yaml\nname: a\n\n=== part.html\n```html\n<div>\n  x\n</div>\n```\n=== part.css\r\n.part-a { color: var(--ink); }\n\n");
+    expect(files).toEqual({ "part.yaml": "name: a\n", "part.html": "<div>\n  x\n</div>\n", "part.css": ".part-a { color: var(--ink); }\n" });
+    // One fence around the whole reply leaves none in the files.
+    expect(parseReply("```\n=== part.yaml\nname: a\n=== part.css\n.part-a { margin: 0; }\n```\n")).toEqual({ "part.yaml": "name: a\n", "part.css": ".part-a { margin: 0; }\n" });
+    expect(parseReply("I could not do that.")).toEqual({});
+  });
+
+  test("is one call: the brief is the prompt, without the catalog to look through, and the reply's files are the draft", async () => {
+    const { runDraft } = await import("../src/server/draft.ts");
+    const { out, state } = fresh("fast-first");
+    const calls: { prompt: string; how?: Mode; resume?: unknown }[] = [];
+    const harness: Harness = async (d, prompt, s, l, u, resume, how) => {
+      calls.push({ prompt, ...(how ? { how } : {}), resume });
+      return { ...(await stubHarness(ws.site.catalog, 1)(d, prompt, s, l, u, resume, how)), stats: { turns: 1 } };
+    };
+    const end = await runDraft(ws.site, out, { ...state, words: "amber fireflies" }, { words: "amber fireflies", inside: "", mode: "fast", resume: { id: "s-old", harness: "claude", cwd: "/x" } }, harness, signal(), async () => {});
+    expect(end).toMatchObject({ status: "ready", name: "amber-fireflies", mode: "fast", runs: 1, refused: 0, stats: { turns: 1 } });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ how: "fast", resume: undefined });
+    // The brief itself, with the words, and no question about the catalog:
+    // none of its parts is described, and no file is asked for in a folder.
+    expect(calls[0]!.prompt).toContain("amber fireflies");
+    expect(calls[0]!.prompt).not.toContain("exists.txt");
+    expect(calls[0]!.prompt).not.toContain(ws.site.catalog.parts.timeline!.description);
+    expect(readFileSync(join(out, "part.html"), "utf8")).toContain("part-amber-fireflies");
+    expect(readFileSync(join(out, "brief.md"), "utf8")).toBe(calls[0]!.prompt);
+  });
+
+  test("a refused draft gets one more call, which carries the brief, the draft and the reasons", async () => {
+    const { runDraft } = await import("../src/server/draft.ts");
+    const { out, state } = fresh("fast-refused");
+    const prompts: string[] = [];
+    const harness: Harness = async (d, prompt, s, l, u, r, how) => {
+      prompts.push(prompt);
+      return stubHarness(ws.site.catalog, 1)(d, prompt, s, l, u, r, how);
+    };
+    const end = await runDraft(ws.site, out, { ...state, words: "broken kite" }, { words: "broken kite", inside: "", mode: "fast" }, harness, signal(), async () => {});
+    expect(end).toMatchObject({ status: "ready", runs: 2, refused: 1 });
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]!.startsWith(prompts[0]!)).toBe(true);
+    expect(prompts[1]).toContain("#ff0000");
+    expect(prompts[1]).toContain("literal color");
+    expect(readFileSync(join(out, "part.css"), "utf8")).not.toContain("#ff0000");
+  });
+
+  test("a change sends back only the files it changes; a reply with no files is asked for again, once", async () => {
+    const { runDraft } = await import("../src/server/draft.ts");
+    const prev = kite();
+    const { out, state } = fresh("fast-change");
+    const prompts: string[] = [];
+    const harness = async (_d: string, prompt: string) => {
+      prompts.push(prompt);
+      return { reply: prompts.length === 1 ? "Sure, I made the tails longer." : "=== part.css\n.part-kite-tails { color: var(--accent); }\n" };
+    };
+    const end = await runDraft(ws.site, out, { ...state, words: "kite tails" }, { words: "kite tails", inside: "", mode: "fast", previous: { dir: prev, change: "longer tails" } }, harness, signal(), async () => {});
+    expect(end).toMatchObject({ status: "ready", name: "kite-tails", kind: "change", runs: 2 });
+    expect(prompts[0]).toContain("longer tails");
+    expect(prompts[0]).toContain(".part-kite-tails { color: var(--ink); }");
+    expect(readFileSync(join(out, "part.css"), "utf8")).toContain("var(--accent)");
+    expect(readFileSync(join(out, "part.html"), "utf8")).toBe(readFileSync(join(prev, "part.html"), "utf8"));
+
+    // The same files back is no take at all.
+    const same = fresh("fast-same");
+    const idle = async () => ({ reply: `=== part.css\n${readFileSync(join(prev, "part.css"), "utf8")}` });
+    const none = await runDraft(ws.site, same.out, { ...same.state, words: "kite tails" }, { words: "kite tails", inside: "", mode: "fast", previous: { dir: prev, change: "longer tails" } }, idle, signal(), async () => {});
+    expect(none.status).toBe("failed");
+  });
+
+  test("on a line: new: drafts at once though the catalog has a part for the words, rerolls fast, and the record says how", async () => {
+    mode = "fast";
+    try {
+      await write(`${front}::: new: a quote from the lighthouse keeper\n:::\n\n::: new: tide pools\n:::\n`);
+      modes = [];
+      await ws.build(page(), 4);
+      await ws.drafted();
+      // The writer saw what the catalog has and wrote new: anyway.
+      expect(ws.draft(page(), 4)).toMatchObject({ status: "ready" });
+      expect(modes).toEqual(["fast"]);
+      // The small model was asked beside the draft, and the line's note
+      // names the catalog's part without standing in the way.
+      await ws.settle();
+      expect(asked).toContain("a quote from the lighthouse keeper");
+      const said = (notes.get(page()) ?? []).find((n) => n.line === 4)!;
+      expect(said.code).toBe("draft-ready");
+      expect(said.message).toContain("quote");
+      expect((notes.get(page()) ?? []).find((n) => n.line === 7)!.message).not.toContain("catalog");
+      modes = [];
+
+      await ws.build(page(), 7);
+      await ws.drafted();
+      await ws.build(page(), 7, { change: "brighter" });
+      await ws.drafted();
+      expect(ws.draft(page(), 7)).toMatchObject({ status: "ready", name: "tide-pools", takes: 2 });
+      expect(modes).toEqual(["fast", "fast"]);
+      const shown = shownTake(readDrafts(dir), "tide pools")!;
+      expect(readFileSync(join(dir, DRAFTS, shown.id, "part.html"), "utf8")).toContain("brighter");
+      // Kept, the part gets takes the same way, under its own name.
+      await ws.keep(page(), 7, false);
+      await ws.cancel(page(), 4);
+      await write(`${front}::: tide-pools\nThe shore.\n:::\n`);
+      modes = [];
+      await ws.build(page(), 4, { change: "deeper" });
+      await ws.drafted();
+      expect(ws.draft(page(), 4)).toMatchObject({ status: "ready", name: "tide-pools", of: "tide-pools", takes: 2 });
+      expect(modes).toEqual(["fast"]);
+      await ws.cancel(page(), 4);
+      const lines = readFileSync(join(dir, DRAFT_INDEX), "utf8").trim().split("\n").map((l) => JSON.parse(l) as { words: string; of?: string; mode?: string; kind?: string });
+      expect(lines.filter((l) => l.words === "tide pools").map((l) => [l.kind, l.mode])).toEqual(expect.arrayContaining([["first", "fast"], ["change", "fast"]]));
+      expect(lines.filter((l) => l.of === "tide-pools").map((l) => l.mode)).toContain("fast");
+    } finally {
+      mode = "tools";
+    }
+  });
+});
+
+test("a draft asked for again while the last one is still being stopped starts once it has gone", async () => {
+  await write(`${front}::: new: slow river reeds\n:::\n`);
+  await ws.build(page(), 4);
+  // Not awaited: the tool takes a while to stop.
+  const stopping = ws.stop(page(), 4);
+  await ws.build(page(), 4);
+  await stopping;
+  await ws.drafted();
+  expect(ws.draft(page(), 4)).toMatchObject({ status: "ready", takes: 1 });
+  await ws.cancel(page(), 4);
 });
 
 describe("the record, to study the tools by", () => {

@@ -15,7 +15,7 @@ import { NAME, parseOwnPart, writeWhole } from "../core/index.ts";
 import { draftKey, DRAFTS, hugoFiles, readDrafts, type DraftState } from "../parts.ts";
 import type { Site } from "../site.ts";
 import { lint } from "../theme.ts";
-import type { Drafter, RunStats, Session } from "./harness.ts";
+import { FILE_LINE, type Drafter, type Mode, type RunStats, type Session } from "./harness.ts";
 
 // Runs the harness in `dir` with `prompt`; resolves when it is done. The
 // files it wrote are the answer; an error is why there are none. What it
@@ -23,10 +23,12 @@ import type { Drafter, RunStats, Session } from "./harness.ts";
 // `use` is a drafter for this draft alone, in place of the writer's default.
 // `resume` is an earlier conversation to go on with, when the same tool and
 // model draft. It answers with what the run cost, the drafter it ran with,
-// and its own session, to go on with later.
+// and its own session, to go on with later. A "fast" draft is one turn with
+// no tools: the prompt is the whole brief, and `reply` what the model said,
+// with the files in it.
 export type Harness = (
-  dir: string, prompt: string, signal: AbortSignal, log?: (line: string) => void, use?: Drafter, resume?: Session,
-) => Promise<{ error?: string; stats?: RunStats; session?: Session; drafter?: Drafter; resumed?: boolean; runs?: number }>;
+  dir: string, prompt: string, signal: AbortSignal, log?: (line: string) => void, use?: Drafter, resume?: Session, mode?: Mode,
+) => Promise<{ error?: string; stats?: RunStats; session?: Session; drafter?: Drafter; resumed?: boolean; runs?: number; reply?: string }>;
 
 // What a draft did, as it happens, for the writer to read: in the draft's
 // folder, a line a step, each with the time since it started.
@@ -64,15 +66,33 @@ export function briefVersion(site: Pick<Site, "theme"> & { catalog: { version: n
 // A part's files, in a draft's folder or the site's parts/.
 export const PART_FILES = ["part.yaml", "part.html", "part.css"];
 
-// Parts whose files the brief shows as examples, each for what it teaches.
-// Chosen from what drafts got wrong or left out (docs/plan.md, step 7):
-// a starter that matches the drawing, settings for a quantity and a manner,
-// and decoration in CSS alone, with no controls.
+// Parts whose files the brief shows as examples, each for one kind of craft
+// rather than for being like what was asked: one of the catalog's own for
+// how a part is put together, and three drafted parts David kept. A model
+// that doesn't stop to plan draws at the level of what it is shown: with a
+// sheet of paper among them, Opus at low effort drew polaroids as real
+// cards, which it had not before (docs/plan.md, step 7). The kept ones are
+// in the catalog's examples/ folder, not among its parts: nothing places
+// them. The folder holds others that have been examples, to choose from.
 export const EXAMPLES: [string, string][] = [
   ["steps", "Children drawn as a structure: each `###` in the block becomes a numbered item, through the catalog's `rubric/sections.html` helper, and the `body` starter has the `###`s, so the writer sees what to write."],
-  ["cards", "Settings for a quantity (`columns`) and a manner (`edge`), each a `choice` turned into a class on the outer element, with CSS for each value."],
-  ["divider", "Decoration in CSS alone: no controls, no script, a `style` setting for the look, and `empty: true` since it holds nothing."],
+  ["clipped-note", "An object that holds the writing: a sheet of paper drawn with the slots so it stands off the page in any theme, marked `look-surface` so the look settings land on the sheet, with a small inline SVG paperclip and a `tilt` setting."],
+  ["rain-window", "A scene that moves behind a heading, in CSS alone: streaks placed by the template's arithmetic, every measure a multiple of one unit so `size` scales the whole drawing, the writing kept readable, and the motion stopped for `prefers-reduced-motion`."],
+  ["tide-chart", "A list where the drawing carries meaning: each `###` becomes an item through `rubric/sections.html`, and its place in the list sets how high its water stands, through a custom property on the item."],
 ];
+
+// An example's files: the catalog's own part, or one in its examples/.
+function example(site: Site, raw: Record<string, unknown>, name: string): { yaml: string; html: string; css: string } | undefined {
+  const dir = join(site.themeDir, "examples", name);
+  const kept = PART_FILES.map((f) => readText(join(dir, f))?.trim());
+  if (kept.every((t) => t !== undefined)) return { yaml: kept[0]!, html: kept[1]!, css: kept[2]! };
+  if (!raw[name]) return undefined;
+  return {
+    yaml: stringify({ name, ...(raw[name] as object) }).trim(),
+    html: readText(join(site.themeDir, "layouts/_partials/parts", `${name}.html`))?.trim() ?? "",
+    css: readText(join(site.themeDir, "assets/css/parts", `${name}.css`))?.trim() ?? "",
+  };
+}
 
 export interface DraftRequest {
   words: string;
@@ -91,25 +111,75 @@ export interface DraftRequest {
   use?: Drafter;
   // The take it starts from's conversation, to go on with.
   resume?: Session;
+  // How it is asked for: with tools, a turn a step, unless "fast". A fast
+  // draft never asks whether the catalog has the part: a `new:` line says
+  // the writer wants a new one, whatever the catalog offered for the words.
+  mode?: Mode;
+}
+
+// The files in a fast draft's reply, each after a line naming it. Words
+// before the first are dropped, as is a code fence around a file or all.
+export function parseReply(reply: string): Record<string, string> {
+  const files: Record<string, string[]> = {};
+  let now: string[] | undefined;
+  for (const line of reply.replace(/\r\n/g, "\n").split("\n")) {
+    const file = FILE_LINE.exec(line)?.[1];
+    if (file) now = files[file] = [];
+    else now?.push(line);
+  }
+  return Object.fromEntries(Object.entries(files).map(([f, lines]) => {
+    // A fence's line at either end, around this file or the whole reply.
+    const text = lines.join("\n").trim().replace(/^```[\w-]*\n/, "").replace(/(^|\n)```$/, "").trim();
+    return [f, text];
+  }).filter(([, text]) => text !== "").map(([f, text]) => [f, `${text}\n`]));
+}
+
+// The files as a reply has them, to show a draft back to the model.
+function asReply(files: Record<string, string>): string {
+  return PART_FILES.filter((f) => files[f] !== undefined).map((f) => `=== ${f}\n${files[f]!.trim()}`).join("\n");
+}
+
+// What a fast draft is asked when the checks refuse it: the brief again,
+// since no conversation is kept, then the draft and what is wrong with it.
+export function fixPrompt(briefText: string, files: Record<string, string>, problems: string[]): string {
+  return `${briefText}
+## The checks refused your draft
+
+${Object.keys(files).length ? `This is the draft:\n\n${asReply(files)}\n\n` : ""}What is wrong with it:
+
+${problems.map((p) => `- ${p}`).join("\n")}
+
+Fix that and change nothing else. Reply as above, with each file you change, whole; leave out a file that stays as it is.
+`;
 }
 
 // The brief: what to make, what the site looks like, and how a part is put
 // together, with examples from the catalog.
-export function brief(site: Site, req: DraftRequest): string {
+export function brief(site: Site, req: DraftRequest, mode: Mode = "tools"): string {
+  const fast = mode === "fast";
   const catalog = site.catalog;
   const themes = (readYaml(join(site.themeDir, "themes.yaml")) ?? {}) as Record<string, { description?: string; palette?: string; pairing?: string; scale?: string; skin?: string }>;
   const theme = themes[site.theme] ?? {};
   const piece = (kind: string, name?: string) => (name ? readText(join(site.themeDir, "themes", kind, `${name}.yaml`)) : undefined);
   const raw = (readYaml(join(site.themeDir, "catalog.yaml")) as { parts?: Record<string, unknown> } | undefined)?.parts ?? {};
   const parts = Object.entries(catalog.parts).filter(([, p]) => p.place === "writing" && p.origin !== "draft");
-  const examples = EXAMPLES.filter(([n]) => raw[n]).map(([n, why]) => [
-    `### ${n}`,
-    why,
-    "part.yaml:", fence("yaml", stringify({ name: n, ...(raw[n] as object) }).trim()),
-    "part.html:", fence("html", readText(join(site.themeDir, "layouts/_partials/parts", `${n}.html`))?.trim() ?? ""),
-    "part.css:", fence("css", readText(join(site.themeDir, "assets/css/parts", `${n}.css`))?.trim() ?? ""),
-  ].join("\n"));
+  const examples = EXAMPLES.flatMap(([n, why]) => {
+    const files = example(site, raw, n);
+    return files ? [[
+      `### ${n}`,
+      why,
+      "part.yaml:", fence("yaml", files.yaml),
+      "part.html:", fence("html", files.html),
+      "part.css:", fence("css", files.css),
+    ].join("\n")] : [];
+  });
 
+  // Names a new part can't have, as the checks hold it to: the catalog's
+  // parts and the site's, and other lines' drafts.
+  const taken = [...new Set([
+    ...Object.entries(catalog.parts).filter(([, p]) => p.origin !== "draft").map(([n]) => n),
+    ...readDrafts(site.root).filter((d) => d.status === "ready" && d.name !== undefined && draftKey(d) !== req.words).map((d) => d.name!),
+  ])];
   const asked = req.of
     ? `The writer has a part of their own, **${req.of}**, and wants another take of it. What it is:`
     : "The writer asked for a part the catalog does not have:";
@@ -123,8 +193,8 @@ export function brief(site: Site, req: DraftRequest): string {
   }).filter(Boolean).join("\n") : "";
   const again = prev
     ? `## This is another take\n\n${prev.change
-      ? `The writer looked at the last take and asked for this change: "${prev.change}". Its files are already in this folder, as they are below. Make the change with edits to them, and leave everything the change doesn't need as it is.`
-      : "The writer looked at the last take and wants a different one: another way to draw the same thing. Its files are in this folder, as they are below; write your own take over them."}\n\n${previousFiles}\n`
+      ? `The writer looked at the last take and asked for this change: "${prev.change}". ${fast ? "Its files are below. Make the change" : "Its files are already in this folder, as they are below. Make the change with edits to them"}, and leave everything the change doesn't need as it is.`
+      : `The writer looked at the last take and wants a different one: another way to draw the same thing. ${fast ? "Its files are below; write your own take in place of them." : "Its files are in this folder, as they are below; write your own take over them."}`}\n\n${previousFiles}\n`
     : "";
   const catalogSection = prev ? "" : req.fresh
     ? "## The catalog's parts\n\nThe writer has seen the catalog's nearest part and wants one of their own anyway, so draft it. Make it plainly different from these:"
@@ -133,38 +203,29 @@ export function brief(site: Site, req: DraftRequest): string {
     ? `\`name\`: \`${req.of}\`, as it is now. Pages already use it by that name.`
     : prev
       ? "`name`: as it is, unless the change asks for another; lowercase letters, digits and hyphens, and not a name the catalog has."
-      : "`name`: lowercase letters, digits and hyphens, short, naming what it is (`timeline`, not `my-timeline-part`). Not one of the names above.";
-
-  return `# Draft a new part for a Rubric site
-
-Rubric turns writing into a website. A writer puts a line like \`::: quote\` in a Markdown page, and a part from a catalog is drawn there by Hugo. ${asked}
-
-> ${req.words || "(no words yet)"}
-${req.inside.trim() ? `\nWhat they have already written inside its block, which the part should draw well:\n\n${fence("markdown", req.inside.trim())}\n` : ""}${again ? `\n${again}` : ""}${catalogSection ? `
-${catalogSection}
-
-${parts.map(([n, p]) => `- ${n}: ${p.description}`).join("\n")}
-` : ""}
-## ${prev ? "The part's files" : "Otherwise, write the part"}
-
-Write these files in this folder, and nothing else:
-
-1. **part.yaml**: \`name:\` and the part's entry${prev ? "" : ", as in the examples below"}.
+      // A fast draft isn't shown the catalog's parts, only what they are called.
+      : `\`name\`: lowercase letters, digits and hyphens, short, naming what it is (\`timeline\`, not \`my-timeline-part\`). ${fast ? `These names are taken, so it must be none of them: ${taken.join(", ")}.` : "Not one of the names above."}`;
+  const wanted = `> ${req.words || "(no words yet)"}
+${req.inside.trim() ? `\nWhat they have already written inside its block, which the part should draw well:\n\n${fence("markdown", req.inside.trim())}\n` : ""}`;
+  const files = `1. **part.yaml**: \`name:\` and the part's entry${prev ? "" : ", as in the examples below"}.
    - ${naming}
    - \`description\`: one plain sentence saying what the part is, in words a writer would use. A small model reads it to decide when to pick this part, so say what it is and nothing a writer would not say.
    - \`children: true\` if the block holds Markdown the part draws (most do). \`empty: true\` instead for a part that takes nothing inside.
    - \`settings\`: for a real variation the writer might ask for. When the words name a quantity, a speed, a direction, a size or a style ("a ring of moons", "a slow scroll"), offer it as a setting (\`count\`, \`pace\`); one or two, not more. Each \`choice\` has a \`default\` and at least two \`values\`, each a few words saying what it does. Value and setting names are lowercase with hyphens. None named ${Object.keys(catalog.look).join(", ")}: every part already has those.
    - \`body\`: a short starter written into an empty block, so the writer sees what the part expects. It has exactly the structure the drawing reads: if part.html draws each \`###\` as a step, the starter has the \`###\`s. It never commits to content (\`### When: What happened\`, not \`### 2024\`).
 2. **part.html**: the drawing, a Hugo partial. It gets \`.s\` (every setting, defaults filled in), \`.inner\` (the block's Markdown, already rendered to HTML), \`.raw\` (the block's Markdown as written) and \`.page\`. The outer element's class attribute starts with \`part part-<name>\`, so the theme can add classes to it. Turn settings into classes (\`size-{{ .s.size }}\`). To draw the block's \`###\` sections as items, use \`partial "rubric/sections.html" (dict "html" .inner "level" 3)\`: it gives \`.items\`, each with \`.title\` and \`.body\`, and \`.before\`, what comes before the first.
-3. **part.css**: the part's CSS. Every rule starts with \`.part-<name>\`.
-
-## Rules
+3. **part.css**: the part's CSS. Every rule starts with \`.part-<name>\`.`;
+  const rest = `## Rules
 
 - **Slots only.** Colors, fonts, weights, sizes and spaces come from the theme's slots, as \`var(--name)\`: never a literal color (\`#333\`, \`rgb()\`, \`white\`), font family or numeric font weight. Custom properties of your own are fine, set in part.css or inline in part.html (\`style="--angle: 40deg"\`). The slots: ${catalog.slots.join(", ")}.
 - Use \`paper\`, \`ink\`, \`accent\`, \`muted\`, \`rule\`, \`tint\` and \`raised\` for ordinary parts: dark mode swaps their values for you. The \`dark-*\` slots are only for a part that is itself a dark band.
 - It has to work in every theme and at every width from 360px: no fixed widths that can scroll sideways, and writing that stays readable on the grounds you choose.
+- The part sits in the page's column, a grid, and is as wide as the writing unless you narrow it. Never put \`margin-inline: auto\` on the outer element: there it shrinks the part to its contents, and a size set inside it stops working. Center what is inside instead.
+- A setting for size scales the whole drawing, type included, never one measure alone: a shape made shorter around words that stay the same size goes squat. Give the part one unit taken from the type, \`--u: calc(var(--step-0) * var(--k))\`, measure the drawing in it (\`calc(var(--u) * 16)\`), set the words' \`font-size\` from it, and let each size change \`--k\` only (0.8, 1, 1.25). Then the words fit the same way at every size.
+- Every part already takes the look settings, which the theme draws on its outer element: \`shadow\`, \`border\`, \`corners\` and \`text\` (size). So offer no settings of your own for those. When the outer element is only a wrapper around the thing you draw (a note, a frame, a card), give that thing the class \`look-surface\` (each of them, when there are several, such as the slips on a line), at most four levels inside the outer element: the look is then drawn on it, and not around the wrapper.
 - No script, nothing fetched from another site, no images of your own. HTML and CSS only.
 - No controls (buttons, checkboxes, inputs) unless the words ask for something the reader works. Motion respects \`prefers-reduced-motion\` on its own.
+- Draw around the writer's words, never into them: no characters of your own before or after their headings or writing (a \`#\`, a label, a mark in \`content:\`) unless the words ask for them. The theme may add its own; a part doesn't copy them.
 - American English.
 - Make it look good. This is the writer's site.
 
@@ -177,9 +238,58 @@ ${[["palette", "palettes", theme.palette], ["pairing", "pairings", theme.pairing
   }).join("")}
 ${prev ? "" : `## Examples from the catalog
 
+These show how a part is put together and the care to take with one, not what to draw. The writer's part is its own idea, as well made as these: drawn for their words, with shape, detail and motion where they suit, never a plain box with a border.
+
 ${examples.join("\n\n")}
 
-`}## When you are done
+`}`;
+
+  // A fast draft: everything that is the same from one draft to the next
+  // comes first, so the model's provider can keep it ready, and what this
+  // writer asked for comes last. No catalog to look through: the small model
+  // offered what it has before the writer wrote `new:`, and asking again
+  // here costs most of a draft's time in thinking. The files come back in the
+  // reply; a change sends back only the files it changes.
+  if (fast) {
+    return `# Draft a new part for a Rubric site
+
+Rubric turns writing into a website. A writer puts a line like \`::: quote\` in a Markdown page, and a part from a catalog is drawn there by Hugo. A writer has asked for a part; what they asked for is at the end.
+
+## The part's files
+
+A part is three files:
+
+${files}
+
+${rest}## What the writer asked for
+
+${asked}
+
+${wanted}${again ? `\n${again}` : ""}
+## Your reply
+
+${prev?.change
+    ? "Reply with each file you change, whole, after a line naming it: `=== part.yaml`, `=== part.html`, `=== part.css`. Leave out a file that stays as it is."
+    : "Reply with the three files, each whole, after a line naming it: `=== part.yaml`, then `=== part.html`, then `=== part.css`."} No code fences, and no words before, between or after the files: start with the first file's line at once.
+`;
+  }
+
+  return `# Draft a new part for a Rubric site
+
+Rubric turns writing into a website. A writer puts a line like \`::: quote\` in a Markdown page, and a part from a catalog is drawn there by Hugo. ${asked}
+
+${wanted}${again ? `\n${again}` : ""}${catalogSection ? `
+${catalogSection}
+
+${parts.map(([n, p]) => `- ${n}: ${p.description}`).join("\n")}
+` : ""}
+## ${prev ? "The part's files" : "Otherwise, write the part"}
+
+Write these files in this folder, and nothing else:
+
+${files}
+
+${rest}## When you are done
 
 Reply with one sentence: what you made, or what you changed. Nothing else; the files say the rest.
 `;
@@ -233,6 +343,10 @@ export async function checkDraft(site: Site, dir: string, words?: string, of?: s
       if (p.level === "error") problems.push(`${p.where}: ${p.message.replace(/ is not a slot in catalog\.yaml$/, " is not one of the theme's slots, and neither part.css nor part.html sets it; set it in one of them, or use a slot")}`);
     }
     if (/url\(\s*["']?(https?:)?\/\//i.test(css) || /@import/i.test(css)) problems.push("part.css: nothing fetched from another site");
+    // In the page's grid an auto margin shrinks the part to its contents,
+    // and a size set inside it stops working (spooky-frame, 2026-11-12).
+    const outer = [...css.matchAll(new RegExp(`(?:^|})\\s*\\.part-${name}\\s*\\{([^}]*)\\}`, "g"))].map((m) => m[1]!).join(";");
+    if (/margin(-inline|-left|-right)?\s*:[^;]*\bauto\b/.test(outer)) problems.push(`part.css: .part-${name} has an auto margin, which shrinks the part to its contents in the page's column; take it off and center what is inside instead`);
   }
   if (problems.length > 0) return { name, problems };
 
@@ -291,7 +405,9 @@ export async function runDraft(site: Site, dir: string, state: DraftState, req: 
   // What the runs cost, added up; the drafter, the session and whether it
   // resumed, from the last run.
   const kind: DraftState["kind"] = req.previous ? (req.previous.change ? "change" : "another") : req.fresh ? "fresh" : "first";
-  const measured: Partial<DraftState> = { kind, brief: briefVersion(site), runs: 0 };
+  const mode: Mode = req.mode ?? "tools";
+  const fast = mode === "fast";
+  const measured: Partial<DraftState> = { kind, ...(req.previous?.change ? { change: req.previous.change } : {}), mode, brief: briefVersion(site), runs: 0 };
   const add = (r: Awaited<ReturnType<Harness>>) => {
     const first = (measured.runs ?? 0) === 0;
     measured.runs = (measured.runs ?? 0) + (r.runs ?? 1);
@@ -341,16 +457,27 @@ export async function runDraft(site: Site, dir: string, state: DraftState, req: 
     }
   }
   if (req.fresh) log("drafting one anyway, though the catalog may have one");
-  await writeFile(join(dir, "brief.md"), brief(site, req));
+  const briefText = brief(site, req, mode);
+  await writeFile(join(dir, "brief.md"), briefText);
 
-  let prompt = req.previous ? takePrompt(req.previous.change) : PROMPT;
+  // A fast draft's prompt is the brief itself.
+  let prompt = fast ? briefText : req.previous ? takePrompt(req.previous.change) : PROMPT;
   for (let attempt = 0; attempt < 2; attempt++) {
     // A second try goes on with the first's conversation, which knows the
-    // draft it's fixing; a first try, with the take it starts from's.
-    const ran = await harness(dir, prompt, signal, log, req.use, attempt === 0 ? req.resume : measured.session);
+    // draft it's fixing; a first try, with the take it starts from's. A fast
+    // draft goes on with none: each call says everything.
+    const ran = await harness(dir, prompt, signal, log, req.use, fast ? undefined : attempt === 0 ? req.resume : measured.session, mode);
     add(ran);
     if (signal.aborted) return done({ status: "failed", message: "stopped" });
     if (ran.error) return done({ status: "failed", message: ran.error });
+    // A fast draft's files are in its reply: the ones it sent are written,
+    // and the rest stay as they were, the last take's or the first try's.
+    let sent = true;
+    if (fast) {
+      const files = parseReply(ran.reply ?? "");
+      sent = Object.keys(files).length > 0;
+      for (const [f, text] of Object.entries(files)) await writeFile(join(dir, f), text);
+    }
 
     const exists = await readFile(join(dir, "exists.txt"), "utf8").catch(() => undefined);
     // Only a first draft asks whether the catalog has it; a take doesn't.
@@ -368,7 +495,7 @@ export async function runDraft(site: Site, dir: string, state: DraftState, req: 
     // The last take's files, untouched: the tool did nothing. Going on with
     // an earlier conversation, a model may take the work for done; once more
     // without it, then it's a failure.
-    if (req.previous && attempt === 0 && Object.keys(before).length > 0) {
+    if (sent && req.previous && attempt === 0 && Object.keys(before).length > 0) {
       const unchanged = async () => (await Promise.all(PART_FILES.map(async (f) => (await readFile(join(dir, f), "utf8").catch(() => undefined)) === before[f]))).every(Boolean);
       if (await unchanged()) {
         if (!ran.resumed) return done({ status: "failed", message: "the tool changed nothing" });
@@ -381,13 +508,22 @@ export async function runDraft(site: Site, dir: string, state: DraftState, req: 
       }
     }
     log("checking the draft, and building it with Hugo");
-    const { name, problems } = await checkDraft(site, dir, req.words, req.of);
+    const { name, problems } = sent
+      ? await checkDraft(site, dir, req.words, req.of)
+      : { name: undefined, problems: ["the reply had no files in it: each file comes after a line naming it, `=== part.yaml`, `=== part.html` or `=== part.css`"] };
     measured.refused = (measured.refused ?? 0) + (problems.length > 0 ? 1 : 0);
     if (problems.length === 0) return done({ status: "ready", name: name! });
     log(`the checks refused it:\n${problems.map((p) => `- ${p}`).join("\n")}`);
     if (attempt === 1) return done({ status: "failed", message: problems.join("; ") });
     log("asking for a fix, once");
-    prompt = `The checks refused the draft in this folder. Fix it, and change nothing else:\n\n${problems.map((p) => `- ${p}`).join("\n")}\n\nThe brief is still in brief.md.`;
+    if (fast) {
+      const now: Record<string, string> = {};
+      for (const f of PART_FILES) {
+        const text = await readFile(join(dir, f), "utf8").catch(() => undefined);
+        if (text !== undefined) now[f] = text;
+      }
+      prompt = fixPrompt(briefText, now, problems);
+    } else prompt = `The checks refused the draft in this folder. Fix it, and change nothing else:\n\n${problems.map((p) => `- ${p}`).join("\n")}\n\nThe brief is still in brief.md.`;
   }
   return done({ status: "failed", message: "no draft" });
   }

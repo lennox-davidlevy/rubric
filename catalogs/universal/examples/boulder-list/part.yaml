@@ -1,0 +1,27 @@
+name: boulder-list
+description: A list of items, each with a different type of boulder in front of it instead of a number.
+children: true
+body: |
+  ### First item
+
+  A line about it.
+
+  ### Second item
+
+  A line about it.
+
+  ### Third item
+
+  A line about it.
+
+  ### Fourth item
+
+  A line about it.
+settings:
+  size:
+    type: choice
+    default: medium
+    values:
+      small: small boulders beside each item
+      medium: boulders about two lines tall
+      large: large boulders beside each item

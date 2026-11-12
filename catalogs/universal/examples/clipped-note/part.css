@@ -1,0 +1,97 @@
+/* clipped-note: one short note at the side of the page, held by a paperclip. */
+.part-clipped-note {
+  --tilt: 0deg;
+  display: flex;
+  justify-content: flex-end;
+  padding-block: var(--space-3) var(--space-2);
+  min-inline-size: 0;
+}
+.part-clipped-note.side-left { justify-content: flex-start; }
+.part-clipped-note.side-right.tilt-slight { --tilt: 1.2deg; }
+.part-clipped-note.side-left.tilt-slight { --tilt: -1.2deg; }
+
+/* The sheet of paper. */
+.part-clipped-note .clipped-note-sheet {
+  position: relative;
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: calc(var(--space-5) * 7);
+  min-inline-size: 0;
+  padding: calc(var(--space-4) + var(--space-1)) var(--space-3) var(--space-3);
+  background: var(--tint);
+  color: var(--ink);
+  border: var(--border) solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: var(--leading-body);
+  transform: rotate(var(--tilt));
+  transform-origin: 50% 0;
+  transition: transform 0.4s ease;
+}
+.part-clipped-note .clipped-note-sheet:hover { transform: rotate(0deg); }
+
+/* A folded-up lower corner, on the side away from the clip. */
+.part-clipped-note .clipped-note-sheet::after {
+  content: "";
+  position: absolute;
+  inset-block-end: calc(var(--border) * -1);
+  inline-size: var(--space-3);
+  block-size: var(--space-3);
+  pointer-events: none;
+}
+.part-clipped-note.side-right .clipped-note-sheet::after {
+  inset-inline-start: calc(var(--border) * -1);
+  background: linear-gradient(to bottom left, var(--rule) 50%, var(--paper) 50%);
+}
+.part-clipped-note.side-left .clipped-note-sheet::after {
+  inset-inline-end: calc(var(--border) * -1);
+  background: linear-gradient(to bottom right, var(--rule) 50%, var(--paper) 50%);
+}
+
+/* The paperclip over the top edge, toward the outer side. */
+.part-clipped-note .clipped-note-clip {
+  position: absolute;
+  inset-block-start: calc(var(--space-2) * -1.25);
+  inline-size: calc(var(--space-5) * 0.4);
+  block-size: var(--space-5);
+  overflow: visible;
+  pointer-events: none;
+}
+.part-clipped-note.side-right .clipped-note-clip { inset-inline-end: 16%; }
+.part-clipped-note.side-left .clipped-note-clip { inset-inline-start: 16%; }
+.part-clipped-note .clipped-note-clip path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.part-clipped-note .clipped-note-clip .clip-under {
+  stroke: var(--paper);
+  stroke-width: calc(var(--border) * 5);
+}
+.part-clipped-note .clipped-note-clip .clip-wire {
+  stroke: var(--muted);
+  stroke-width: calc(var(--border) * 2);
+}
+
+/* The writer's words. */
+.part-clipped-note .clipped-note-copy { min-inline-size: 0; overflow-wrap: anywhere; }
+.part-clipped-note .clipped-note-copy > * { margin: 0; }
+.part-clipped-note .clipped-note-copy > * + * { margin-block-start: var(--space-2); }
+.part-clipped-note .clipped-note-copy :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--heading);
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: var(--weight-heading);
+  line-height: var(--leading-heading);
+  text-transform: var(--heading-case);
+}
+.part-clipped-note .clipped-note-copy strong { color: var(--heading); font-weight: var(--weight-strong); }
+.part-clipped-note .clipped-note-copy a { color: var(--link); }
+.part-clipped-note .clipped-note-copy img { max-inline-size: 100%; block-size: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .part-clipped-note .clipped-note-sheet { transition: none; }
+}

@@ -15,7 +15,7 @@ import {
 import { DRAFT_INDEX, DRAFT_LOGS, draftKey, DRAFTS, keepLocal, keepTake, makeGlobal, ownKey, putAway, readDrafts, shownTake, takesFor, writeHugoTree, type DraftState } from "../parts.ts";
 import { openSite, pageKind, pagePath, type Site } from "../site.ts";
 import { LOG, newDraft, NOT_MOUNTED, runDraft, saveState, type Harness } from "./draft.ts";
-import type { Drafter } from "./harness.ts";
+import type { Drafter, Mode } from "./harness.ts";
 import { themeList, type ThemeList, type ThemeRanker } from "./themes.ts";
 import { fileExists, isSiteAddress, pictures } from "./files.ts";
 
@@ -50,6 +50,11 @@ export interface Ghost {
 }
 
 // What the editor shows and does for a `::: new:` line.
+// How long a `new:` line's menu waits for Jev to say what is near its words.
+const NEAR_WAIT_MS = 700;
+// How long a finished draft's record waits for what Jev says its words ask for.
+const TRAITS_WAIT_MS = 1000;
+
 export interface DraftView {
   words: string;
   // The newest draft for these words, if there is one.
@@ -66,6 +71,9 @@ export interface DraftView {
   // Finished takes for these words the writer cancelled before, which can
   // be brought back instead of drafting again.
   earlier?: number;
+  // Before anything is drafted: parts the writer already has that are near
+  // the words, their own first, to look at in the preview and use instead.
+  near?: { name: string; description: string; own: boolean }[];
   // On a line of the site's own part: its name, whose takes these are, and
   // how many other blocks on the site's pages use it.
   of?: string;
@@ -178,6 +186,12 @@ export interface Options {
   // The drafter, the writer's default or the one chosen for a draft, in
   // full, for the record, and in a few words, for the menu ("sonnet, low").
   drafter?: (use?: Drafter) => { full: string; short: string };
+  // How drafts are asked for, when each starts: with tools unless "fast",
+  // one turn with the files in the reply.
+  mode?: () => Mode;
+  // What a request for a new part needs, asked of Jev beside its first
+  // draft, for the record only.
+  traits?: (words: string) => Promise<Record<string, number>>;
 }
 
 // Only shown, before the pick in the ghost text: accepting replaces the words.
@@ -210,6 +224,8 @@ export class Workspace {
   #onStarters: Options["onStarters"];
   #starters = new Map<string, string>();
   #drafter: Options["drafter"];
+  #mode: Options["mode"];
+  #traits: Options["traits"];
   // Every draft on disk, by id, and the runs in flight, by words.
   #drafts = new Map<string, DraftState>();
   #running = new Map<string, { id: string; stop: AbortController; started: Promise<void>; done: Promise<void> }>();
@@ -232,6 +248,8 @@ export class Workspace {
     this.#onDraft = opts.onDraft;
     this.#onStarters = opts.onStarters;
     this.#drafter = opts.drafter;
+    this.#mode = opts.mode;
+    this.#traits = opts.traits;
     // A draft left half made by a server that stopped will never finish.
     for (const d of readDrafts(site.root)) {
       this.#drafts.set(d.id, d.status === "drafting" ? { ...d, status: "failed", message: "the editor closed while it was being drafted" } : d);
@@ -492,7 +510,7 @@ export class Workspace {
     // in a page, and only with a harness to draft it.
     if (hit.outcome === "nothing-fits") {
       if (doc.page === "site" || !this.#harness || !this.site.ownMounted) return [];
-      return [{ text: `${sep}a new part, drafted for these words`, line, character: end, replace: `${lead} new: ${asked}`, build: true }];
+      return [{ text: `${sep}draft a new part`, line, character: end, replace: `${lead} new: ${asked}`, build: true }];
     }
     // An empty block gets the part's starter body with the pin, so the writer
     // sees what the part expects; a block with anything in it gets nothing.
@@ -686,12 +704,57 @@ export class Workspace {
         const earlier = this.#earlier(words).length;
         return earlier ? { earlier } : {};
       })()),
+      ...(latest || at.of !== undefined ? {} : (() => {
+        const near = this.#near(at.doc.page, words);
+        return near.length ? { near } : {};
+      })()),
     };
+  }
+
+  // Parts the writer already has that Jev's answer for the words puts near
+  // them: the ones drafted from words first (the site's own, and those kept
+  // for every theme), then the catalog's, each in Jev's order.
+  // From the answer already cached for the line; nothing is asked here.
+  // Read from the Choice alone, whatever the outcome: "nothing fits" is
+  // when a draft is offered, and it is often a part that is close but not
+  // it (snow behind a heading, with a rain window kept: the Choice gave it
+  // 0.99 and its fit 0.18).
+  #near(page: PageKind, words: string): NonNullable<DraftView["near"]> {
+    const hit = words ? this.#cache.get(this.site.catalog, page, words) : undefined;
+    if (!hit) return [];
+    const parts = this.site.catalog.parts;
+    const near = Object.entries(hit.parts)
+      .filter(([name, p]) => p >= THRESHOLDS.near && Object.hasOwn(parts, name) && parts[name]!.origin !== "draft")
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, THRESHOLDS.nearMost)
+      .map(([name]) => ({ name, description: parts[name]!.description, own: parts[name]!.origin === "site" || parts[name]!.drafted === true }));
+    return [...near.filter((n) => n.own), ...near.filter((n) => !n.own)];
+  }
+
+  // The part the writer is looking at for a `new:` line, from the list of
+  // near ones: the preview draws it where the line is. No part: back to the
+  // line as it was.
+  #peek: { words: string; part: string } | undefined;
+  peek(file: string, line: number, part?: string): void {
+    const at = this.#newLine(file, line);
+    const next = at && part && Object.hasOwn(this.site.catalog.parts, part) ? { words: at.d.words!, part } : undefined;
+    if (this.#peek?.words === next?.words && this.#peek?.part === next?.part) return;
+    this.#peek = next;
+    for (const f of this.#docs.keys()) this.#drawSoon(f);
   }
 
   // draft(), and for a line of the site's own part, how many other blocks
   // on the site use it, which removing it would leave unknown.
+  // A `new:` line with nothing drafted is asked of Jev here, when the writer
+  // opens its menu, and not as it is typed: the answer is only the parts
+  // near its words, to look at before drafting. Words typed before `new:`
+  // were asked already, and cost nothing. The menu waits for the answer only
+  // so long; without it, it opens with no such parts.
   async look(file: string, line: number): Promise<DraftView | undefined> {
+    const at = this.#newLine(file, line);
+    if (at && at.doc.page !== "site" && at.d.words && !this.#draftsFor(at.d.words)[0] && !this.#cache.get(this.site.catalog, at.doc.page, at.d.words)) {
+      await Promise.race([this.#ask(at.doc.page, at.d.words), new Promise((r) => setTimeout(r, NEAR_WAIT_MS))]);
+    }
     const view = this.draft(file, line);
     return view?.of !== undefined ? { ...view, uses: await this.#uses(view.of, file, line) } : view;
   }
@@ -746,10 +809,13 @@ export class Workspace {
     const runKey = key;
     if (words.trim() === "") return this.draft(file, line);
     // One already starting or running: say where it is, once it has started.
-    const already = this.#running.get(runKey);
-    if (already) {
+    // One being stopped is waited out, and then this one starts: asked for
+    // again before the tool has gone, the draft would otherwise never start.
+    for (let already = this.#running.get(runKey); already; already = this.#running.get(runKey)) {
       await already.started;
-      return this.draft(file, line);
+      if (!already.stop.signal.aborted) return this.draft(file, line);
+      await already.done.catch(() => {});
+      if (this.#running.get(runKey) === already) this.#running.delete(runKey);
     }
     // Taken at once, before anything is awaited, so a second request for the
     // same words while this one starts finds it.
@@ -780,6 +846,16 @@ export class Workspace {
     this.#drafts.set(state.id, state);
     this.#onDraft?.(state);
     const site = this.site;
+    const mode = this.#mode?.() ?? "tools";
+    // A fast draft never stops to ask whether the catalog has the part; the
+    // small model is asked beside it, for the line's note to say so if it
+    // does. Words typed before `new:` were asked already.
+    if (mode === "fast" && of === undefined && !this.#cache.get(site.catalog, at.doc.page, words)) void this.#ask(at.doc.page, words);
+    // What the words ask for, for the record: asked once, beside the first
+    // draft, and carried by its takes. The draft never waits on it.
+    const carried = (previous ?? this.#shown(key))?.traits;
+    const traits: Promise<Record<string, number> | undefined> = carried ? Promise.resolve(carried)
+      : of === undefined && this.#traits ? this.#traits(words).catch(() => undefined) : Promise.resolve(undefined);
     run.done = (async () => {
       let end: DraftState;
       try {
@@ -790,6 +866,7 @@ export class Workspace {
           ...(of !== undefined ? { of } : {}),
           ...(previous?.session ? { resume: previous.session } : {}),
           ...(opts.drafter ? { use: opts.drafter } : {}),
+          mode,
         }, this.#harness!, stop.signal, save);
       } catch (err) {
         end = { ...state, status: "failed", message: (err as Error).message, finished: Date.now() };
@@ -806,6 +883,14 @@ export class Workspace {
       }
       await this.#reopen();
       this.#onDraft?.(end);
+      // After the draft is on screen, and only while it is still this
+      // take: an answer that is late by then is left out.
+      const asked = await Promise.race([traits, new Promise<undefined>((r) => setTimeout(() => r(undefined), TRAITS_WAIT_MS))]);
+      if (asked && this.#drafts.get(state.id) === end) {
+        const kept = { ...end, traits: asked };
+        this.#drafts.set(state.id, kept);
+        await save(kept).catch(() => {});
+      }
     })();
     started();
     for (const f of this.#docs.keys()) this.#drawSoon(f);
@@ -926,8 +1011,15 @@ export class Workspace {
   }
 
   // The catalog's part that does this already, in place of the line.
-  async use(file: string, line: number): Promise<DraftDone> {
+  // `part` is one the writer chose from the near ones, before any draft.
+  async use(file: string, line: number, part?: string): Promise<DraftDone> {
     const at = this.#newLine(file, line);
+    if (at && part !== undefined) {
+      // The list is closed either way: the preview stops drawing its part.
+      this.peek(file, line);
+      if (!this.#near(at.doc.page, at.d.words!).some((n) => n.name === part)) return { error: `${part} is not one of the parts near this line` };
+      return { replace: `${opener(splitLines(at.doc.text)[line] ?? "")} ${part}`, ...this.#drop(at.d, part) };
+    }
     const latest = at && this.#draftsFor(at.d.words!)[0];
     if (!at || latest?.status !== "exists" || !latest.name) return { error: "no part of the catalog was found for this line" };
     for (const d of this.#draftsFor(at.d.words!)) await this.#forget(d.id, `used ${latest.name}`);
@@ -981,7 +1073,7 @@ export class Workspace {
       started: new Date(state.started).toISOString(),
       seconds: state.finished ? Math.round((state.finished - state.started) / 1000) : undefined,
       // What it took, to study the tools and the brief by.
-      kind: state.kind, drafter: state.drafter, brief: state.brief, runs: state.runs,
+      kind: state.kind, change: state.change, traits: state.traits, mode: state.mode, drafter: state.drafter, brief: state.brief, runs: state.runs,
       // Passed the checks the first time they ran; nothing when they never did.
       firstTry: state.refused === undefined ? undefined : state.refused === 0,
       resumed: state.resumed, ...state.stats,
@@ -1009,24 +1101,33 @@ export class Workspace {
       const shown = this.#shown(words);
       // A ready line is about the take on screen, which is the one Keep keeps.
       const latest = newest?.status === "ready" && shown ? shown : newest;
-      const showing = shown?.name ? `; ${shown.name} is drawn in the preview meanwhile` : "";
+      const showing = shown?.name ? `; ${shown.name} in the preview meanwhile` : "";
       // The block's last line, for the editor to mark the whole block.
       const close = d.close === undefined ? {} : { close: d.close };
+      // What a ready draft can be set to, to judge it by before keeping it.
+      const settings = latest?.status === "ready" && latest.name ? this.#kept(latest.name).settings : [];
+      const sets = settings.length ? `. Settings: ${settings.map((t) => (t.values.length ? `${t.name}=${t.values.join("|")}` : `${t.name}=`)).join(" ")}` : "";
       const data = latest
-        ? { data: { status: latest.status, ...(latest.name ? { name: latest.name } : {}), ...(latest.by ? { by: latest.by } : {}), started: latest.started, ...(shown?.name && shown !== latest ? { shown: shown.name } : {}), ...this.#takes(words), ...close } }
+        ? { data: { status: latest.status, ...(latest.name ? { name: latest.name } : {}), ...(latest.by ? { by: latest.by } : {}), started: latest.started, ...(shown?.name && shown !== latest ? { shown: shown.name } : {}), ...this.#takes(words), ...close, ...(settings.length ? { settings } : {}) } }
         : { data: { status: "none", ...close, ...(() => {
           const earlier = words ? this.#earlier(words).length : 0;
           return earlier ? { earlier } : {};
         })() } };
       const here = { ...at, ...data };
-      if (words === "") notes.push({ ...here, code: "new-part", severity: "information", message: "say after new: what the part should be" });
-      else if (!this.#harness) notes.push({ ...here, code: "new-part", severity: "information", message: "a new part, but this editor has no harness to draft it" });
+      // The catalog's part the small model would place for the words, said
+      // beside the draft and never in its way: it is sometimes too eager.
+      const hit = words ? this.#cache.get(this.site.catalog, doc.page, words) : undefined;
+      const part = hit?.outcome === "placed" ? hit.candidates[0]?.part : undefined;
+      const near = part && this.site.catalog.parts[part] && this.site.catalog.parts[part]!.origin !== "draft" && part !== latest?.name
+        ? `. Similar in the catalog: ${part}` : "";
+      if (words === "") notes.push({ ...here, code: "new-part", severity: "information", message: "new: needs words after it" });
+      else if (!this.#harness) notes.push({ ...here, code: "new-part", severity: "information", message: "new part: no harness to draft it" });
       else if (!this.site.ownMounted) notes.push({ ...here, code: "new-part", severity: "warning", message: NOT_MOUNTED });
-      else if (!latest) notes.push({ ...here, code: "new-part", severity: "information", message: "a new part for these words: the accept key drafts one, in a minute or two" });
-      else if (latest.status === "drafting") notes.push({ ...here, code: "drafting", severity: "information", message: `drafting a part for these words${showing}` });
-      else if (latest.status === "ready") notes.push({ ...here, code: "draft-ready", severity: "information", message: `drafted ${latest.name}, drawn in the preview: the accept key keeps it, rerolls it or cancels` });
-      else if (latest.status === "exists") notes.push({ ...here, code: "draft-exists", severity: "information", message: `the catalog has this already: ${latest.name}${latest.message ? `. ${latest.message}` : ""} The accept key uses it or drafts one anyway` });
-      else notes.push({ ...here, code: "draft-failed", severity: "warning", message: `the draft failed: ${latest.message ?? "no reason given"}. The accept key tries again${showing}` });
+      else if (!latest) notes.push({ ...here, code: "new-part", severity: "information", message: `new part: the accept key drafts it${near}` });
+      else if (latest.status === "drafting") notes.push({ ...here, code: "drafting", severity: "information", message: `drafting${showing}${near}` });
+      else if (latest.status === "ready") notes.push({ ...here, code: "draft-ready", severity: "information", message: `${latest.name} drafted, in the preview: the accept key keeps, rerolls or cancels${sets}${near}` });
+      else if (latest.status === "exists") notes.push({ ...here, code: "draft-exists", severity: "information", message: `catalog has ${latest.name}${latest.message ? `. ${latest.message}` : "."} The accept key uses it or drafts new` });
+      else notes.push({ ...here, code: "draft-failed", severity: "warning", message: `draft failed: ${latest.message ?? "no reason given"}. The accept key retries${showing}` });
     }
     // A site's own part being redrafted: where its takes are.
     for (const d of scan(doc.text, this.site.catalog).directives) {
@@ -1045,9 +1146,9 @@ export class Workspace {
           ...this.#takes(key), ...(d.close === undefined ? {} : { close: d.close }),
         },
       };
-      if (latest.status === "drafting") notes.push({ ...here, code: "drafting", severity: "information", message: `drafting another take of ${of}` });
-      else if (latest.status === "ready") notes.push({ ...here, code: "draft-ready", severity: "information", message: `${shown?.original ? `${of} as it was kept` : `another take of ${of}`}, drawn in the preview: the accept key keeps it, rerolls or goes back` });
-      else notes.push({ ...here, code: "draft-failed", severity: "warning", message: `another take of ${of} failed: ${latest.message ?? "no reason given"}. The accept key tries again or goes back` });
+      if (latest.status === "drafting") notes.push({ ...here, code: "drafting", severity: "information", message: `drafting a take of ${of}` });
+      else if (latest.status === "ready") notes.push({ ...here, code: "draft-ready", severity: "information", message: `${shown?.original ? `${of} as kept` : `a take of ${of}`}, in the preview: the accept key keeps, rerolls or goes back` });
+      else notes.push({ ...here, code: "draft-failed", severity: "warning", message: `take of ${of} failed: ${latest.message ?? "no reason given"}. The accept key retries or goes back` });
     }
     return notes;
   }
@@ -1409,7 +1510,7 @@ export class Workspace {
     return (words, kind) => {
       // A `new:` line draws its finished draft, while the writer looks at it.
       if (kind === "new") {
-        const name = this.#shown(words)?.name;
+        const name = this.#peek?.words === words ? this.#peek.part : this.#shown(words)?.name;
         return name && Object.hasOwn(this.site.catalog.parts, name) ? parsePlain(name) : undefined;
       }
       return chosen?.words === words ? parsePlain(chosen.plain) : cached(words);

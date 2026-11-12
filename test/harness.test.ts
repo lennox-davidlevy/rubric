@@ -8,7 +8,8 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { command, efforts, modelProblem, toolHarness, type Drafter } from "../src/server/harness.ts";
+import { parseReply } from "../src/server/draft.ts";
+import { command, efforts, fastDrafter, modelProblem, toolHarness, type Drafter } from "../src/server/harness.ts";
 
 let tmp: string;
 let bin: string;
@@ -34,6 +35,13 @@ printf '%s\\n' "$@" > "${tmp}/${name}.args"
 env > "${tmp}/${name}.env"
 pwd > "${tmp}/${name}.cwd"
 test -f brief.md && cp brief.md "${tmp}/${name}.brief"
+if [ -f "${tmp}/reply" ]; then
+  ls -A > "${tmp}/${name}.ls"
+  ${name === "opencode"
+    ? `printf '%s\\n' '{"type":"text","sessionID":"ses_9","part":{"text":"=== part.yaml\\nname: lanterns\\ndescription: Lanterns.\\nchildren: true\\n=== part.html\\n<div class=\\"part part-lanterns\\">{{ .inner }}</div>\\n=== part.css\\n.part-lanterns { color: var(--ink); }"}}' '{"type":"step_finish","sessionID":"ses_9","part":{"cost":0.01,"tokens":{"input":10,"output":5,"reasoning":0,"cache":{"read":0,"write":0}}}}'`
+    : `printf '%s\\n' '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"=== part.yaml\\nname: lanterns\\n=== part.css\\n.part"}}}' '{"type":"result","is_error":false,"session_id":"sess-9","num_turns":1,"total_cost_usd":0.03,"duration_api_ms":800,"usage":{"output_tokens":40},"result":"=== part.yaml\\nname: lanterns\\ndescription: Lanterns.\\nchildren: true\\n=== part.html\\n<div class=\\"part part-lanterns\\">{{ .inner }}</div>\\n=== part.css\\n.part-lanterns { color: var(--ink); }"}'`}
+  exit 0
+fi
 printf 'name: lanterns\\ndescription: Lanterns.\\nchildren: true\\n' > part.yaml
 printf '<div class="part part-lanterns">{{ .inner }}</div>\\n' > part.html
 printf '.part-lanterns { color: var(--ink); }\\n' > part.css
@@ -109,6 +117,51 @@ test("Claude Code drafts with the chosen model, with tools held to its folder", 
   expect(args.slice(args.indexOf("--disallowedTools") + 1)).toContain("Bash");
   expect(readFileSync(join(tmp, "claude.env"), "utf8")).not.toContain("secret-for-the-test");
   expect(existsSync(join(dir, "part.css"))).toBe(true);
+});
+
+test("a fast draft is one call with no tools and nothing in its folder: the files come back in the reply, and no conversation is kept or gone on with", async () => {
+  writeFileSync(join(tmp, "reply"), "");
+  try {
+    for (const name of ["claude", "opencode"] as const) {
+      const dir = draftDir(`fast-${name}`);
+      const logged: string[] = [];
+      const model = name === "claude" ? "opus" : "openai/gpt-6.1-sol";
+      const earlier = { id: "earlier", harness: name, model, cwd: join(tmpdir(), "rubric-draft-earlier") };
+      const result = await toolHarness(() => ({ harness: name, model }))(dir, "the whole brief", new AbortController().signal, (l) => logged.push(l), undefined, earlier, "fast");
+      expect(result.error).toBeUndefined();
+      const files = parseReply(result.reply ?? "");
+      expect(Object.keys(files)).toEqual(["part.yaml", "part.html", "part.css"]);
+      expect(files["part.yaml"]).toContain("name: lanterns");
+      // Nothing was there to read, and nothing was copied back.
+      expect(readFileSync(join(tmp, `${name}.ls`), "utf8").trim()).toBe("");
+      expect(existsSync(join(dir, "part.yaml"))).toBe(false);
+      expect(result.session).toBeUndefined();
+      expect(result.resumed).toBe(false);
+      // Low effort, the writer having chosen none.
+      expect(result.drafter).toMatchObject({ model, effort: "low" });
+      expect(result.stats?.turns).toBe(1);
+      expect(logged.some((l) => l.includes("part.css"))).toBe(true);
+      expect(readFileSync(join(tmp, `${name}.env`), "utf8")).not.toContain("secret-for-the-test");
+      const args = readFileSync(join(tmp, `${name}.args`), "utf8").split("\n");
+      expect(args).not.toContain("earlier");
+      expect(args.some((a) => a.endsWith("the whole brief"))).toBe(true);
+    }
+    const args = readFileSync(join(tmp, "claude.args"), "utf8").split("\n");
+    expect(args[args.indexOf("--tools") + 1]).toBe("");
+    expect(args[args.indexOf("--effort") + 1]).toBe("low");
+    for (const flag of ["--restricted", "--strict-mcp-config", "--disable-slash-commands", "--system-prompt", "--no-session-persistence"]) expect(args).toContain(flag);
+    expect(args[args.indexOf("--setting-sources") + 1]).toBe("local");
+    const env = readFileSync(join(tmp, "claude.env"), "utf8");
+    for (const v of ["CLAUDE_CODE_DISABLE_CLAUDE_MDS", "CLAUDE_CODE_DISABLE_AUTO_MEMORY", "CLAUDE_CODE_DISABLE_BUNDLED_SKILLS"]) expect(env).toMatch(new RegExp(`^${v}=1$`, "m"));
+    expect(args).not.toContain("--allowedTools");
+    const config = /^OPENCODE_CONFIG_CONTENT=(.*)$/m.exec(readFileSync(join(tmp, "opencode.env"), "utf8"))![1]!;
+    expect(JSON.parse(config).permission).toEqual({ "*": "deny" });
+  } finally {
+    rmSync(join(tmp, "reply"), { force: true });
+  }
+  // An effort the writer chose is theirs; a model that takes no low effort gets none.
+  expect(fastDrafter({ harness: "claude", model: "opus", effort: "high" }).effort).toBe("high");
+  expect(fastDrafter({ harness: "opencode", model: "anthropic/claude-opus-5-5" }).effort).toBeUndefined();
 });
 
 test("a model the tool doesn't have fails at once, before anything runs", async () => {

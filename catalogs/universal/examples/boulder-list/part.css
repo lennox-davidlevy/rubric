@@ -1,0 +1,91 @@
+/* boulder-list: items marked with a different boulder instead of a number.
+
+   One unit, --u, is the size of the writing, and the boulders are measured
+   in it. A size changes --k alone, so the writing and the boulders grow and
+   shrink together. */
+.part-boulder-list {
+  --k: 1;
+  --u: calc(var(--step-0) * var(--k));
+  --boulder-w: calc(var(--u) * 3.6);
+  --boulder-h: calc(var(--u) * 3);
+  font-size: var(--u);
+}
+.part-boulder-list.size-small { --k: 0.8; }
+.part-boulder-list.size-large { --k: 1.25; }
+
+.part-boulder-list ul {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.part-boulder-list li {
+  display: grid;
+  grid-template-columns: var(--boulder-w) minmax(0, 1fr);
+  gap: var(--space-2);
+  margin: 0;
+  align-items: start;
+}
+.part-boulder-list .boulder-text {
+  min-width: 0;
+}
+.part-boulder-list h3 {
+  margin: 0;
+  font-size: calc(var(--step-1) * var(--k));
+}
+.part-boulder-list .stack {
+  margin-top: var(--space-1);
+}
+.part-boulder-list-intro {
+  margin-bottom: var(--space-3);
+}
+
+/* The marker is a small pen sketch of a boulder, standing on the ground line. */
+.part-boulder-list .boulder {
+  display: block;
+  box-sizing: border-box;
+  width: var(--boulder-w);
+  height: var(--boulder-h);
+  margin-top: 0.1em;
+  border-bottom: var(--border) var(--rule-style) var(--rule);
+}
+.part-boulder-list .boulder svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.part-boulder-list .boulder path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The outline of each stone. */
+.part-boulder-list .boulder .b-shape {
+  fill: var(--tint);
+  stroke: var(--ink);
+  stroke-width: calc(var(--border) * 1.4);
+}
+/* Ridges, facets and layers. */
+.part-boulder-list .boulder .b-line {
+  stroke: var(--muted);
+  stroke-width: var(--border);
+}
+/* Shading on the side away from the light. */
+.part-boulder-list .boulder .b-hatch {
+  stroke: var(--muted);
+  stroke-width: var(--border);
+  opacity: 0.7;
+}
+/* A crack running through the stone. */
+.part-boulder-list .boulder .b-crack {
+  stroke: var(--ink);
+  stroke-width: calc(var(--border) * 1.2);
+}
+/* Grain and pits on the surface. */
+.part-boulder-list .boulder .b-dot {
+  fill: var(--muted);
+}

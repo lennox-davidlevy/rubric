@@ -12,7 +12,7 @@
 
 /* Headings are the writing's size, with their own color; a small mark ahead. */
 h2, h3 { color: var(--heading); }
-.flow > :is(h2, h3)::before { content: "# "; color: var(--accent); }
+.flow > :is(h2, h3):where(:not(.part, .part *))::before { content: "# "; color: var(--accent); }
 .flow > .catalog-part::before { content: none; }
 .flow a:not([class]) { color: var(--link); }
 .flow a:not([class]):hover { color: var(--accent); }
