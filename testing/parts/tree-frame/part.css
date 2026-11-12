@@ -1,0 +1,50 @@
+/* tree-frame: a heading with a row of trees above and below and one on each side. */
+.part-tree-frame { --tree-w: 1.25rem; --tree-h: 2.5rem; display: grid; gap: var(--space-2); padding: var(--space-2) 0; }
+.part-tree-frame-row { display: flex; justify-content: space-between; align-items: flex-end; overflow: hidden; }
+.part-tree-frame-row .tree { --scale: 1; }
+.part-tree-frame-row .tree:nth-child(3n + 2) { --scale: 0.75; }
+.part-tree-frame-row .tree:nth-child(3n) { --scale: 0.9; }
+.part-tree-frame-row .tree:nth-child(5n) { --scale: 1.15; }
+.part-tree-frame-middle { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); }
+.part-tree-frame-text { min-width: 0; text-align: center; overflow-wrap: anywhere; }
+.part-tree-frame-text > * { margin-block: 0; }
+.part-tree-frame .tree {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--tree-w);
+  height: calc(var(--tree-h) * var(--scale, 1));
+}
+.part-tree-frame .tree::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 18% 0;
+  background: linear-gradient(to right, var(--positive) 50%, color-mix(in srgb, var(--positive) 65%, var(--paper)) 50%);
+}
+.part-tree-frame .tree::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 42%;
+  width: 16%;
+  height: 22%;
+  background: var(--muted);
+}
+.part-tree-frame.kind-pine .tree::before {
+  clip-path: polygon(50% 0, 66% 30%, 58% 30%, 80% 62%, 70% 62%, 100% 100%, 0 100%, 30% 62%, 20% 62%, 42% 30%, 34% 30%);
+}
+.part-tree-frame.kind-round .tree::before {
+  border-radius: 50%;
+  inset: 0 0 20% 0;
+  background:
+    radial-gradient(circle at 34% 32%, color-mix(in srgb, var(--positive) 60%, var(--ink)) 0 14%, transparent 15%),
+    radial-gradient(circle at 66% 58%, color-mix(in srgb, var(--positive) 65%, var(--paper)) 0 18%, transparent 19%),
+    var(--positive);
+}
+.part-tree-frame.kind-round .tree { --tree-h: 2.25rem; }
+.part-tree-frame .tree-side { --scale: 1.4; }
+.part-tree-frame.kind-round .tree-side { --scale: 1.3; }
+@media (min-width: 40rem) {
+  .part-tree-frame { --tree-w: 1.5rem; --tree-h: 3rem; }
+  .part-tree-frame-middle { gap: var(--space-4); }
+}

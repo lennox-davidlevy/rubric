@@ -5,7 +5,7 @@
 
   Usage: {{ $p := partial "rubric/part.html" (dict "part" "callout" "skin" $skin) }}
 */ -}}
-{{- $base := index hugo.Data.catalog.parts .part -}}
+{{- $base := index hugo.Data.catalog.parts .part | default (index (hugo.Data.siteparts | default dict) .part) -}}
 {{- $skin := cond (ne .skin "") (index (hugo.Data.skins | default dict) .skin | default dict) dict -}}
 {{- $added := index ($skin.parts | default dict) .part -}}
 {{- $def := $base | default $added -}}

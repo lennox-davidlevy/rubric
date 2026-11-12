@@ -1,0 +1,79 @@
+.part-satellite-orbits { color: var(--ink); }
+.part-satellite-orbits-intro { margin-bottom: var(--space-3); }
+.part-satellite-orbits-layout { display: grid; gap: var(--space-3); }
+.part-satellite-orbits-scene {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(100%, 18rem);
+  aspect-ratio: 1;
+  margin-inline: auto;
+}
+.part-satellite-orbits-earth {
+  position: relative;
+  width: 42%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: var(--border) solid var(--accent);
+  border-radius: 50%;
+  background: var(--tint);
+}
+.part-satellite-orbits-earth::before,
+.part-satellite-orbits-earth::after {
+  content: "";
+  position: absolute;
+  inset: 12% 28%;
+  border: var(--border) solid var(--muted);
+  border-radius: 50%;
+}
+.part-satellite-orbits-earth::after { inset: 35% 0; }
+.part-satellite-orbits-path {
+  position: absolute;
+  inset: 12%;
+  border: var(--border) dashed var(--muted);
+  border-radius: 50%;
+  animation: satellite-orbits-turn 24s linear infinite;
+}
+.part-satellite-orbits-position {
+  position: absolute;
+  inset: 0;
+}
+.part-satellite-orbits-marker {
+  position: absolute;
+  top: 50%;
+  right: 0;
+}
+.part-satellite-orbits-marker > span,
+.part-satellite-orbits-number {
+  display: grid;
+  place-items: center;
+  min-width: var(--space-3);
+  height: var(--space-3);
+  padding-inline: var(--space-1);
+  background: var(--accent);
+  color: var(--paper);
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  font-weight: var(--weight-strong);
+  line-height: 1;
+}
+.part-satellite-orbits-marker > span { animation: satellite-orbits-counterturn 24s linear infinite; }
+.part-satellite-orbits-list { list-style: none; margin: 0; padding: 0; border-top: var(--border) var(--rule-style) var(--rule); }
+.part-satellite-orbits-item { display: flex; align-items: flex-start; gap: var(--space-2); padding: var(--space-2) 0; border-bottom: var(--border) var(--rule-style) var(--rule); }
+.part-satellite-orbits-number { flex: none; }
+.part-satellite-orbits-copy { min-width: 0; overflow-wrap: anywhere; }
+.part-satellite-orbits-copy h3 { margin: 0; color: var(--heading); font-size: var(--step-1); line-height: var(--leading-heading); }
+.part-satellite-orbits-body { margin-top: var(--space-1); }
+.part-satellite-orbits-body > :first-child { margin-top: 0; }
+.part-satellite-orbits-body > :last-child { margin-bottom: 0; }
+.part-satellite-orbits.pace-still .part-satellite-orbits-path,
+.part-satellite-orbits.pace-still .part-satellite-orbits-marker > span { animation: none; }
+@keyframes satellite-orbits-turn { to { transform: rotate(1turn); } }
+@keyframes satellite-orbits-counterturn { to { transform: rotate(-1turn); } }
+@media (min-width: 40rem) {
+  .part-satellite-orbits-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .part-satellite-orbits .part-satellite-orbits-path,
+  .part-satellite-orbits .part-satellite-orbits-marker > span { animation: none; }
+}

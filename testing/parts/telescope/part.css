@@ -1,0 +1,17 @@
+.part-telescope { padding: var(--space-3); overflow: hidden; color: var(--ink); background: var(--tint); }
+.part-telescope .part-telescope-scene { position: relative; width: min(100%, calc(var(--space-5) * 8)); aspect-ratio: 3 / 2; margin: auto; }
+.part-telescope .part-telescope-star { position: absolute; color: var(--accent); line-height: 1; }
+.part-telescope .part-telescope-star-one { top: 12%; left: 18%; font-size: var(--step-1); }
+.part-telescope .part-telescope-star-two { top: 7%; right: 22%; font-size: var(--step-2); }
+.part-telescope .part-telescope-star-three { top: 37%; right: 8%; font-size: var(--step--1); }
+.part-telescope .part-telescope-instrument { position: absolute; inset: 0; }
+.part-telescope .part-telescope-tube { position: absolute; z-index: 2; left: 22%; top: 29%; width: 56%; height: 14%; box-sizing: border-box; border: var(--border) solid var(--ink); background: var(--raised); transform: rotate(-25deg); }
+.part-telescope .part-telescope-tube::before { content: ""; position: absolute; left: -8%; top: 25%; width: 8%; height: 50%; box-sizing: border-box; border: var(--border) solid var(--ink); background: var(--tint); }
+.part-telescope .part-telescope-tube::after { content: ""; position: absolute; right: -4%; top: -14%; width: 9%; height: 128%; box-sizing: border-box; border: var(--border) solid var(--accent); background: var(--tint); }
+.part-telescope .part-telescope-tube span { position: absolute; left: 14%; top: 0; height: 100%; border-left: var(--border) solid var(--rule); }
+.part-telescope .part-telescope-mount { position: absolute; z-index: 3; left: 48%; top: 38%; width: 6%; aspect-ratio: 1; border: var(--border) solid var(--accent); border-radius: 50%; background: var(--paper); }
+.part-telescope .part-telescope-leg { position: absolute; z-index: 1; top: 41%; left: 51%; width: var(--border); height: 46%; background: var(--ink); transform-origin: top center; }
+.part-telescope .part-telescope-leg-left { transform: rotate(30deg); }
+.part-telescope .part-telescope-leg-right { transform: rotate(-30deg); }
+.part-telescope .part-telescope-leg-center { height: 40%; background: var(--muted); }
+.part-telescope .part-telescope-ground { position: absolute; bottom: 15%; left: 20%; right: 20%; border-top: var(--border) var(--rule-style) var(--rule); }

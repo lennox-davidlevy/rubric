@@ -6,7 +6,8 @@ import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { parse } from "yaml";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { loadCatalog, parseSkin, withSkin, type Catalog, type PageKind, type Skin } from "./core/index.ts";
+import { loadCatalog, parseSkin, withOwn, withSkin, type Catalog, type PageKind, type Skin } from "./core/index.ts";
+import { readOwn, type Own } from "./parts.ts";
 
 export interface Site {
   root: string;
@@ -26,6 +27,12 @@ export interface Site {
   themeDir: string;
   // [params.rubric] in hugo.toml, read once when the site is opened.
   params: Record<string, unknown>;
+  // The site's own parts (parts/) and the finished drafts, which are in the
+  // catalog too, and what was wrong with any that are not.
+  own: Record<string, Own>;
+  ownProblems: string[];
+  // Whether hugo.toml mounts .rubric/hugo/, so Hugo can draw them.
+  ownMounted: boolean;
 }
 
 // `theme` is the one rubric.md names, which comes before hugo.toml's.
@@ -38,15 +45,21 @@ export async function openSite(root: string, theme?: string): Promise<Site> {
   if (!catalogName) throw new Error(`${root}/hugo.toml names no theme`);
   const themeDir = resolve(root, themesDir, catalogName);
   const params = rubricParams(config);
+  const skin = await skinned(themeDir, theme ?? (typeof params.theme === "string" ? params.theme : "paper"));
+  const { own, problems } = readOwn(root, skin.catalog);
   return {
     root,
     pages: join(root, "pages"),
     content: join(root, "content"),
     cache: join(root, ".rubric/cache.json"),
     static: [join(root, "static"), join(themeDir, "static")],
-    ...(await skinned(themeDir, theme ?? (typeof params.theme === "string" ? params.theme : "paper"))),
+    ...skin,
+    catalog: withOwn(skin.catalog, Object.fromEntries(Object.entries(own).map(([n, o]) => [n, o.part]))),
     themeDir,
     params,
+    own,
+    ownProblems: problems,
+    ownMounted: /^\s*source\s*=\s*"\.rubric\/hugo\/layouts"/m.test(config),
   };
 }
 

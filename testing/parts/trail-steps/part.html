@@ -1,0 +1,10 @@
+{{- $sections := partial "rubric/sections.html" (dict "html" .inner "level" 3) -}}
+<ol class="part part-trail-steps" role="list">
+{{- range $index, $item := $sections.items }}
+  <li>
+    <span class="trail-marker" aria-hidden="true">{{ add $index 1 }}</span>
+    <h3>{{ $item.title }}</h3>
+    <div class="trail-story">{{ $item.body }}</div>
+  </li>
+{{- end }}
+</ol>

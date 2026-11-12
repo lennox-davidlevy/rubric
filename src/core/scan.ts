@@ -8,13 +8,16 @@ import { isPlain, parsePlain, validatePlain, type PlainForm } from "./plain.ts";
 import { isThemeLine, parseThemeLine, type ThemeLine } from "./theme-line.ts";
 
 // A theme line (`::: theme paper`, rubric.md only) chooses the site's theme;
-// it has no body and no closing fence.
-export type Kind = "plain" | "words" | "theme";
+// it has no body and no closing fence. A `new` line (`::: new: a timeline of
+// posts by year`) asks for a part the catalog doesn't have: never sent to
+// Jev, drafted only when the writer asks, and drawn as the draft once there
+// is one.
+export type Kind = "plain" | "words" | "theme" | "new";
 
 export interface Directive {
   line: number;
   kind: Kind;
-  // The words, for words lines.
+  // The words, for words lines, and what a `new` line asks for.
   words?: string;
   // The plain form, for plain lines.
   plain?: PlainForm;
@@ -50,6 +53,8 @@ export interface Scan {
 }
 
 const OPEN = /^(:{3,})\s*(\S.*?)\s*$/;
+// `new:` and what the new part should be; the words may still be empty.
+const NEW = /^new:(?:\s+(.*))?$/;
 const CLOSE = /^:{3,}\s*$/;
 const CODE_FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 
@@ -114,6 +119,8 @@ export function scan(text: string, catalog: Catalog): Scan {
 // A line is plain form when it starts with a part; anything else is words,
 // for Jev. Accepting Jev's pick puts the plain form in place of the words.
 function classify(text: string, col: number, line: number, catalog: Catalog): Directive {
+  const asked = NEW.exec(text);
+  if (asked) return { line, kind: "new", words: asked[1]?.trim() ?? "", problems: [] };
   const split = splitRefine(text, col);
   const plain = parsePlain(split.plain, col);
   if (isPlain(plain, catalog)) {

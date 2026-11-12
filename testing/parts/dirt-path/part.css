@@ -1,0 +1,74 @@
+/* dirt-path: a heading with a sketched dirt path winding around it. The path is
+   a wide band of packed earth, two loose dashed edge lines a little out of
+   register, like a quick pen sketch, and a scatter of small stones. The writing
+   is padded in from the edges so the path goes around it, never under it. */
+.part-dirt-path {
+  --dp-w: max(var(--border), 1px);
+  --dp-dirt: color-mix(in srgb, var(--muted) 20%, var(--paper));
+  position: relative;
+  isolation: isolate;
+  padding-block: calc(var(--space-5) + var(--space-1));
+  padding-inline: calc(var(--space-3) + 9%);
+  color: var(--ink);
+}
+
+.part-dirt-path .dirt-path-trail {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+.part-dirt-path .dirt-path-trail path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.part-dirt-path .dirt-path-ground {
+  stroke: var(--dp-dirt);
+  stroke-width: calc(var(--dp-w) * 14);
+}
+.part-dirt-path .dirt-path-edge {
+  stroke: var(--muted);
+  stroke-width: var(--dp-w);
+  stroke-dasharray: calc(var(--dp-w) * 9) calc(var(--dp-w) * 5) calc(var(--dp-w) * 3) calc(var(--dp-w) * 6);
+  opacity: 0.75;
+}
+.part-dirt-path .dirt-path-sketch {
+  stroke-dasharray: calc(var(--dp-w) * 4) calc(var(--dp-w) * 8) calc(var(--dp-w) * 12) calc(var(--dp-w) * 5);
+  stroke-dashoffset: calc(var(--dp-w) * 7);
+  opacity: 0.45;
+}
+.part-dirt-path .dirt-path-stones {
+  stroke: var(--accent);
+  stroke-width: calc(var(--dp-w) * 2.5);
+  stroke-dasharray: 0 calc(var(--dp-w) * 23) 0 calc(var(--dp-w) * 37);
+  opacity: 0.7;
+}
+
+.part-dirt-path .dirt-path-inner { position: relative; }
+.part-dirt-path .dirt-path-inner > * { margin: 0; }
+.part-dirt-path .dirt-path-inner > * + * { margin-top: var(--space-2); }
+.part-dirt-path :is(h1, h2, h3, h4) {
+  font-family: var(--font-display);
+  font-weight: var(--weight-heading);
+  line-height: var(--leading-heading);
+  letter-spacing: var(--tracking-display);
+  text-transform: var(--heading-case);
+  color: var(--heading, var(--ink));
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.part-dirt-path :is(h1, h2) { font-size: var(--step-3); }
+.part-dirt-path :is(h3, h4) { font-size: var(--step-2); }
+.part-dirt-path .dirt-path-inner > :not(h1, h2, h3, h4) { color: var(--muted); }
+
+.part-dirt-path.align-center { text-align: center; }
+.part-dirt-path.align-center .dirt-path-inner > * { margin-inline: auto; }
+.part-dirt-path.align-left { text-align: left; }
+
+@media (max-width: 30rem) {
+  .part-dirt-path { padding-inline: calc(var(--space-2) + 10%); }
+}

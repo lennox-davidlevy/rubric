@@ -3,9 +3,17 @@
 // Skipped when nvim is not on the path.
 
 import { expect, test } from "bun:test";
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+// The editor's language server can still be writing as it exits, and put
+// back a folder just removed: remove it, wait, and remove it again.
+async function gone(dir: string): Promise<void> {
+  rmSync(dir, { recursive: true, force: true });
+  await Bun.sleep(500);
+  rmSync(dir, { recursive: true, force: true });
+}
 
 const repo = join(import.meta.dir, "..");
 const nvim = Bun.which("nvim");
@@ -87,7 +95,7 @@ test.skipIf(!nvim)("Neovim: attach, diagnostics, completion, ghost text, accept,
     keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);
     editor.kill();
-    rmSync(dir, { recursive: true, force: true });
+    await gone(dir);
   }
 }, 60_000);
 
@@ -131,7 +139,7 @@ test.skipIf(!nvim)("Neovim: accepting a pick on an empty block writes the part's
     keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);
     editor.kill();
-    rmSync(dir, { recursive: true, force: true });
+    await gone(dir);
   }
 }, 60_000);
 
@@ -169,7 +177,7 @@ test.skipIf(!nvim)("Neovim: accepting words after a pin's colon rewrites the pin
     keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);
     editor.kill();
-    rmSync(dir, { recursive: true, force: true });
+    await gone(dir);
   }
 }, 60_000);
 
@@ -226,7 +234,7 @@ test.skipIf(!nvim)("Neovim: when Jev offers two picks, a hint beside the ghost t
     keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);
     editor.kill();
-    rmSync(dir, { recursive: true, force: true });
+    await gone(dir);
   }
 }, 60_000);
 
@@ -265,7 +273,7 @@ test.skipIf(!nvim)("Neovim: switching the theme in hugo.toml reaches the server 
     remote("--remote-send", "<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);
     editor.kill();
-    rmSync(dir, { recursive: true, force: true });
+    await gone(dir);
   }
 }, 60_000);
 
@@ -361,7 +369,7 @@ test.skipIf(!nvim)("Neovim: the accept key on rubric.md's theme line opens the t
     keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);
     editor.kill();
-    rmSync(dir, { recursive: true, force: true });
+    await gone(dir);
   }
 }, 60_000);
 
@@ -439,7 +447,7 @@ test.skipIf(!nvim)("Neovim: a part that takes nothing inside loses the closer ty
     keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);
     editor.kill();
-    rmSync(dir, { recursive: true, force: true });
+    await gone(dir);
   }
 }, 60_000);
 
@@ -479,7 +487,7 @@ test.skipIf(!nvim)("Neovim: the accept key before any ghost text asks at once, w
     keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);
     editor.kill();
-    rmSync(dir, { recursive: true, force: true });
+    await gone(dir);
   }
 }, 60_000);
 
@@ -527,7 +535,7 @@ test.skipIf(!nvim)("Neovim: typing on after the ghost text shows takes it away, 
     keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);
     editor.kill();
-    rmSync(dir, { recursive: true, force: true });
+    await gone(dir);
   }
 }, 60_000);
 
@@ -581,6 +589,241 @@ test.skipIf(!nvim)("Neovim: spell checking skips part names and settings, and ke
     keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);
     editor.kill();
-    rmSync(dir, { recursive: true, force: true });
+    await gone(dir);
+  }
+}, 60_000);
+
+test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then kept or cancelled", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "rubric-nvim-new-"));
+  const sock = join(dir, "nvim.sock");
+  // The testing site, whose hugo.toml mounts .rubric/hugo/ for drafts.
+  cpSync(join(repo, "testing"), join(dir, "site"), { recursive: true, filter: (src) => !/\/(content|\.rubric|public|resources)(\/|$)/.test(src) });
+  const site = join(dir, "site");
+  writeFileSync(join(site, "hugo.toml"), readFileSync(join(site, "hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(repo, "catalogs"))}`));
+  const page = join(site, "pages/posts/new.md");
+  writeFileSync(page, ["---", "title: New", "---", "::: a wobbly orbit of moons", ":::", "", "::: new: slow comet tails", ":::", ""].join("\n"));
+
+  const editor = Bun.spawn([nvim!, "--headless", "--listen", sock, "-u", join(repo, "test/nvim/init.lua"), "-i", "NONE", page], {
+    // A data folder of its own, where :Rubric harness keeps its choice.
+    cwd: site, env: { ...process.env, RUBRIC_REPO: repo, XDG_DATA_HOME: join(dir, "data") }, stdout: "ignore", stderr: "ignore",
+  });
+  const remote = (flag: string, arg: string) => Bun.spawnSync([nvim!, "--server", sock, flag, arg]).stdout.toString().trim();
+  const expr = (lua: string) => remote("--remote-expr", `luaeval("${lua.replace(/"/g, '\\"')}")`);
+  const keys = (k: string) => remote("--remote-send", k);
+  const until = async (f: () => boolean, ms = 10_000) => {
+    for (const end = Date.now() + ms; Date.now() < end; await Bun.sleep(50)) if (f()) return true;
+    return false;
+  };
+  // The note on a line, by code.
+  const note = (line: number) => expr(`(function() for _, d in ipairs(vim.diagnostic.get(0, { lnum = ${line - 1} })) do return d.code end return '' end)()`);
+  try {
+    expect(await until(() => expr("RubricTest.attached()") === "true")).toBe(true);
+
+    // Nothing fits: the ghost text offers a new part, and accepting it turns
+    // the line into a `new:` line and asks how to draft it: as set up.
+    keys(":call cursor(4, 1)<CR>A");
+    await Bun.sleep(600);
+    expect(await until(() => expr("RubricTest.ghost()").startsWith("->"))).toBe(true);
+    expr("RubricTest.answer('draft')");
+    keys("<M-l>");
+    expect(await until(() => expr("RubricTest.line(4)") === "::: new: a wobbly orbit of moons")).toBe(true);
+    keys("<Esc>");
+    expect(await until(() => note(4) === "draft-ready")).toBe(true);
+    // The line under it shows it's ready.
+    expect(await until(() => expr("RubricTest.draft_sign(4)") === "◆")).toBe(true);
+    // From insert mode, at the end of the line, the accept key leaves insert
+    // mode and opens the menu at once.
+    const menus = Number(expr("RubricTest.menus"));
+    keys(":call cursor(4, 1)<CR>A<M-l>");
+    expect(await until(() => Number(expr("RubricTest.menus")) === menus + 1)).toBe(true);
+    expect(expr("vim.api.nvim_get_mode().mode")).toBe("n");
+    // The block reads apart from the page: a bracket from its line to its
+    // closer, in the color of where the draft is.
+    expect(expr("RubricTest.block(4)")).toBe("╭ RubricNewBlockOk");
+    expect(expr("RubricTest.block(5)")).toBe("╰ RubricNewBlockOk");
+    expect(expr("RubricTest.block(6)")).toBe("");
+    // No squiggle under the request: nothing on the line is underlined.
+    const underlined = expr(`(function() local n = 0 for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, -1, { 3, 0 }, { 3, -1 }, { details = true })) do local g = m[4].hl_group if type(g) == 'string' and g:find('Underline') then n = n + 1 end end return n end)()`);
+    expect(underlined).toBe("0");
+    // A reroll adds a take; the keys that move between picks move between them.
+    const data = (key: string) => expr(`(function() for _, d in ipairs(vim.diagnostic.get(0, { lnum = 3 })) do local v = d.user_data and d.user_data.lsp and d.user_data.lsp.data; return v and tostring(v.${key}) or '' end return '' end)()`);
+    // One Reroll, which asks whether to change anything first: no.
+    expr("RubricTest.answer('reroll', 'just')");
+    keys(":call cursor(4, 1)<CR><M-l>");
+    expect(await until(() => data("takes") === "2" && note(4) === "draft-ready")).toBe(true);
+    expect(data("take")).toBe("2");
+    keys("<M-p>");
+    expect(await until(() => data("take") === "1")).toBe(true);
+    keys("<M-n>");
+    expect(await until(() => data("take") === "2")).toBe(true);
+    // Yes: notes on what to change, and another drafter for this one alone,
+    // which joins the ones used lately; the default stays as it was.
+    const saved = join(dir, "data/nvim/rubric/draft.json");
+    // Esc in the drafter's lists goes back to the setup, and remembers nothing.
+    expr("RubricTest.answer('reroll', 'change', 'drafter', 'nothing-here', 'notes', 'smaller moons', 'go')");
+    keys(":call cursor(4, 1)<CR><M-l>");
+    expect(await until(() => data("takes") === "3" && note(4) === "draft-ready")).toBe(true);
+    expect(existsSync(saved)).toBe(false);
+    const takeBy = () => readdirSync(join(site, ".rubric/drafts")).map((d) => { try { return JSON.parse(readFileSync(join(site, ".rubric/drafts", d, "state.json"), "utf8")) as { by?: string; started: number }; } catch { return undefined; } }).filter((x) => x !== undefined).sort((a, b) => b.started - a.started)[0]?.by;
+    if (Bun.which("claude")) {
+      expr("RubricTest.answer('reroll', 'change', 'drafter', 'other', 'claude', 'opus', 'high', 'go')");
+      keys(":call cursor(4, 1)<CR><M-l>");
+      expect(await until(() => data("takes") === "4" && note(4) === "draft-ready")).toBe(true);
+      // It reached the server for this take alone, and is among the recent ones.
+      expect(takeBy()).toContain("claude with opus at high effort");
+      expect(JSON.parse(readFileSync(saved, "utf8")).recent?.[0]).toEqual({ harness: "claude", model: "opus", effort: "high" });
+      expect(JSON.parse(readFileSync(saved, "utf8")).default).toBeUndefined();
+    }
+    expect(expr("RubricTest.drafter()")).toBe("claude sonnet low");
+    // A drafter the tool doesn't have is refused before anything starts.
+    const refused = expr(`(function() local c = vim.lsp.get_clients({ name = 'rubric' })[1] local r = c:request_sync('rubric/draft', { uri = vim.uri_from_bufnr(0), line = 3, action = 'reroll', change = '', drafter = { harness = 'claude', model = 'no-such-model' } }, 5000, 0) return r and r.result and r.result.error or '' end)()`);
+    expect(refused).toContain("no-such-model");
+    // The status sits under the line and wraps to the window, so none of it
+    // is cut off, even in a narrow one.
+    keys(":vsplit<CR>:vertical resize 40<CR>");
+    expect(await until(() => {
+      const [lines, widest, width] = expr("RubricTest.drafting_fit(4)").split(" ").map(Number);
+      return lines! > 1 && widest! <= width!;
+    })).toBe(true);
+    expect(expr("RubricTest.drafting(4)")).toContain("<M-l>");
+    keys(":only<CR>");
+
+    // :Rubric log opens the draft's log below, read only, and the cursor stays in the page.
+    const before = Number(expr("vim.fn.winnr('$')"));
+    keys(":call cursor(4, 1)<CR>:Rubric log<CR>");
+    expect(await until(() => Number(expr("vim.fn.winnr('$')")) === before + 1)).toBe(true);
+    expect(expr("vim.fn.bufname(vim.fn.winbufnr(vim.fn.winnr('$')))")).toMatch(/\.rubric\/drafts\/.+\/draft\.log$/);
+    expect(expr("vim.bo[vim.fn.winbufnr(vim.fn.winnr('$'))].modifiable")).toBe("false");
+    expect(Number(expr("vim.api.nvim_buf_line_count(vim.fn.winbufnr(vim.fn.winnr('$')))"))).toBeGreaterThan(1);
+    expect(expr("RubricTest.line(4)")).toBe("::: new: a wobbly orbit of moons");
+    keys(":only<CR>");
+
+    // The accept key asks what to do with it: keep, for this site only.
+    expr("RubricTest.answer('keep', false)");
+    keys(":call cursor(4, 1)<CR><M-l>");
+    expect(await until(() => expr("RubricTest.line(4)") === "::: wobbly-orbit")).toBe(true);
+    expect(await until(() => readdirSync(join(site, "parts")).includes("wobbly-orbit"))).toBe(true);
+    expect(await until(() => note(4) === "")).toBe(true);
+    // Kept: a check for a while, saying what settings the part takes.
+    expect(expr("RubricTest.draft_sign(4)")).toBe("✓");
+    // The kept part's block is empty: its starter shows inside it, dimmed,
+    // and the accept key on the closer fills it in.
+    const starter = () => expr(`(function() local ns = vim.api.nvim_get_namespaces()['rubric.starters'] if not ns then return '' end for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })) do local vl = m[4].virt_lines if vl then return m[2] .. ':' .. vim.trim(vl[1][1][1]) end end return '' end)()`);
+    expect(await until(() => /^4:\S/.test(starter()))).toBe(true);
+    const first = starter().slice(2);
+    keys(":call cursor(5, 1)<CR><M-l>");
+    expect(await until(() => expr("RubricTest.line(5)") === first)).toBe(true);
+    expect(await until(() => starter() === "")).toBe(true);
+    expect(expr("RubricTest.line(4)")).toBe("::: wobbly-orbit");
+    // Undone, the block is empty again, and the page as the rest expects it.
+    keys(":undo<CR>");
+    expect(await until(() => expr("RubricTest.line(5)") === ":::")).toBe(true);
+    expect(await until(() => /^4:\S/.test(starter()))).toBe(true);
+    // On the part's own line, a part of the site's own, the accept key opens
+    // its menu, which fills in the starter too; a quiet hint says so.
+    const hint = () => expr(`(function() local ns = vim.api.nvim_get_namespaces()['rubric.own'] if not ns then return '' end for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })) do local vt = m[4].virt_text if vt then return m[2] .. ':' .. vt[1][1] end end return '' end)()`);
+    keys(":call cursor(4, 1)<CR>");
+    expect(await until(() => hint().startsWith("3:") && hint().includes("<M-l>"))).toBe(true);
+    keys(":call cursor(6, 1)<CR>");
+    expect(await until(() => hint() === "")).toBe(true);
+    expr("RubricTest.answer('fill')");
+    keys(":call cursor(4, 1)<CR>$<M-l>");
+    expect(await until(() => expr("RubricTest.line(5)") === first)).toBe(true);
+    keys(":undo<CR>");
+    expect(await until(() => expr("RubricTest.line(5)") === ":::")).toBe(true);
+
+    // Another take of it keeps its name, so the line stays; the keys that
+    // move between picks move between its takes, the first the kept one.
+    expr("RubricTest.answer('reroll', 'just')");
+    keys(":call cursor(4, 1)<CR><M-l>");
+    expect(await until(() => note(4) === "draft-ready" && data("takes") === "2")).toBe(true);
+    expect(expr("RubricTest.line(4)")).toBe("::: wobbly-orbit");
+    expect(await until(() => expr("RubricTest.draft_sign(4)") === "◆")).toBe(true);
+    keys("<M-p>");
+    expect(await until(() => data("take") === "1")).toBe(true);
+    keys("<M-n>");
+    expect(await until(() => data("take") === "2")).toBe(true);
+    // Words after ":" are the change asked for: they leave the line as it starts.
+    keys(":call setline(4, '::: wobbly-orbit : brighter')<CR>");
+    expr("RubricTest.answer('reroll', 'just')");
+    keys(":call cursor(4, 1)<CR><M-l>");
+    expect(await until(() => expr("RubricTest.line(4)") === "::: wobbly-orbit")).toBe(true);
+    expect(await until(() => note(4) === "draft-ready" && data("takes") === "3")).toBe(true);
+    // Back to it as it was: its takes go, the line stays.
+    expr("RubricTest.answer('cancel')");
+    keys(":call cursor(4, 1)<CR><M-l>");
+    expect(await until(() => note(4) === "")).toBe(true);
+    expect(await until(() => readdirSync(join(site, ".rubric/drafts")).every((d) => !d.startsWith("wobbly-orbit")))).toBe(true);
+    expect(expr("RubricTest.line(4)")).toBe("::: wobbly-orbit");
+
+    // A `new:` typed by hand is drafted only on the accept key; cancel puts
+    // the words back.
+    expect(note(7)).toBe("new-part");
+    expr("RubricTest.answer('draft')");
+    keys(":call cursor(7, 1)<CR><M-l>");
+    // While it's drafted, a spinner turns and the line counts the time.
+    expect(await until(() => /\d:\d\d/.test(expr("RubricTest.drafting(7)")) && !["", "◆", "+", "✓"].includes(expr("RubricTest.draft_sign(7)")))).toBe(true);
+    // Taking too long: stop it. The line stays a `new:` line, with nothing drafted.
+    expr("RubricTest.answer('stop')");
+    keys("<M-l>");
+    expect(await until(() => expr("RubricTest.draft_sign(7)") === "+")).toBe(true);
+    expect(expr("RubricTest.line(7)")).toBe("::: new: slow comet tails");
+    expr("RubricTest.answer('draft')");
+    keys("<M-l>");
+    expect(await until(() => note(7) === "draft-ready")).toBe(true);
+    expect(await until(() => expr("RubricTest.draft_sign(7)") === "◆")).toBe(true);
+    expr("RubricTest.answer('cancel')");
+    keys("<M-l>");
+    expect(await until(() => expr("RubricTest.line(7)") === "::: slow comet tails")).toBe(true);
+    expect(readdirSync(join(site, ".rubric/drafts"))).toEqual([]);
+
+    // Cancel, from the first menu, puts the words back too.
+    keys(":call setline(7, '::: new: quiet comet trails')<CR>");
+    expect(await until(() => note(7) === "new-part")).toBe(true);
+    expr("RubricTest.answer('cancel')");
+    keys(":call cursor(7, 1)<CR><M-l>");
+    expect(await until(() => expr("RubricTest.line(7)") === "::: quiet comet trails")).toBe(true);
+
+    // The default drafter: :Rubric model chooses its model, then how hard
+    // it thinks; kept, whole, for the next session.
+    const atStart = (setup: string) => expr(`(function() local d = require('rubric.drafts').drafter({ harness = 'claude' }, ${setup}) return d.harness .. ' ' .. (d.model or 'default') .. ' ' .. (d.effort or 'default') end)()`);
+    expr("RubricTest.answer('haiku', 'medium')");
+    keys(":Rubric model<CR>");
+    expect(await until(() => expr("RubricTest.drafter()") === "claude haiku medium")).toBe(true);
+    expect(JSON.parse(readFileSync(saved, "utf8")).default).toEqual({ harness: "claude", model: "haiku", effort: "medium" });
+    // The tool's own defaults: no model or effort, and the setup's don't
+    // come back at the next start.
+    expr("RubricTest.answer('default', 'default')");
+    keys(":Rubric model<CR>");
+    expect(await until(() => expr("RubricTest.drafter()") === "claude default default")).toBe(true);
+    expect(await until(() => JSON.parse(readFileSync(saved, "utf8")).default?.model === undefined)).toBe(true);
+    expect(atStart("{ harness = 'claude', model = 'opus' }")).toBe("claude default default");
+    // :Rubric harness: the tool (it has to be installed), its model and
+    // effort; or back to the setup's choice, forgetting this one.
+    if (Bun.which("claude")) {
+      expr("RubricTest.answer('claude', 'opus', 'high')");
+      keys(":Rubric harness<CR>");
+      expect(await until(() => expr("RubricTest.drafter()") === "claude opus high")).toBe(true);
+    }
+    expr("RubricTest.answer('setup')");
+    keys(":Rubric harness<CR>");
+    expect(await until(() => expr("RubricTest.drafter()") === "claude sonnet low")).toBe(true);
+    expect(await until(() => existsSync(saved) ? JSON.parse(readFileSync(saved, "utf8")).default === undefined : true)).toBe(true);
+    // A setup that leaves the tool out means Claude Code, and the server
+    // starts with it named.
+    expect(atStart("{ model = 'haiku' }")).toBe("claude haiku default");
+    expect(expr(`table.concat(require('rubric.drafts').args(require('rubric.drafts').from_setup({ model = 'haiku' })), ' ')`)).toBe("--harness claude --model haiku");
+    // Older saved choices: one for everything is a recent drafter now, and
+    // the setup's is the default; a fast one is the default.
+    writeFileSync(saved, JSON.stringify({ harness: "opencode", model: "openai/gpt-6.1-sol" }));
+    expect(atStart("nil")).toBe("claude default default");
+    expect(expr(`require('rubric.drafts').load_saved().recent[1].model`)).toBe("openai/gpt-6.1-sol");
+    writeFileSync(saved, JSON.stringify({ fast: { harness: "claude", model: "haiku" }, careful: { harness: "claude", model: "opus" } }));
+    expect(atStart("nil")).toBe("claude haiku default");
+  } finally {
+    keys("<Esc>:qa!<CR>");
+    await Promise.race([editor.exited, Bun.sleep(2000)]);
+    editor.kill();
+    await gone(dir);
   }
 }, 60_000);

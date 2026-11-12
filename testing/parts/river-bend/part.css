@@ -1,0 +1,101 @@
+/* river-bend: a heading with a river winding above and below it.
+   Each stretch of river is a chain of half-rings in CSS gradients: lower halves in
+   one row of tiles, upper halves in the row above, so the band of water bends down
+   and up as it goes. Each half-ring is a bank, water, a narrow gap, water and the
+   far bank. Under the gap a conic gradient of dashes turns, so a current runs along
+   the middle of the stream and follows every bend. A mask of the same half-rings
+   keeps it all inside the river.
+   --r is the radius of one bend, --w how wide the water runs between its banks. */
+@property --part-river-bend-flow {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.part-river-bend {
+  --r: 1.25rem;
+  --w: 1.125rem;
+  --dash: 18deg;
+  --period: 30deg;
+  --pace: 1;
+  --time: 16s;
+  display: grid;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+}
+.part-river-bend.bends-many { --r: 0.6rem; --w: 0.6rem; --dash: 25deg; --period: 45deg; --pace: 0.5; }
+.part-river-bend.flow-brisk { --time: 6s; }
+
+.part-river-bend::before,
+.part-river-bend::after {
+  --in: calc(var(--r) - var(--w) / 2);
+  --out: calc(var(--r) + var(--w) / 2);
+  --t: calc(var(--border) * 2);
+  --c: var(--border);
+  --x: 0px;
+  --flow: var(--part-river-bend-flow, 0deg);
+  --bank: var(--muted);
+  --water: color-mix(in srgb, var(--accent) 14%, var(--paper));
+  --ring:
+    var(--bank) calc(var(--in) + var(--t)),
+    var(--water) 0 calc(var(--r) - var(--c)),
+    transparent 0 calc(var(--r) + var(--c)),
+    var(--water) 0 calc(var(--out) - var(--t)),
+    var(--bank) 0;
+  --edge: transparent calc(var(--in) - 0.5px), currentColor var(--in) calc(var(--out) - 0.5px), transparent var(--out);
+  content: "";
+  display: block;
+  height: calc(var(--out) * 2);
+  color: var(--ink);
+  background-image:
+    radial-gradient(circle var(--out) at 50% 0, var(--ring)),
+    radial-gradient(circle var(--out) at 50% 100%, var(--ring)),
+    repeating-conic-gradient(from calc(var(--flow) * -1) at 50% 0, var(--accent) 0 var(--dash), var(--water) 0 var(--period)),
+    repeating-conic-gradient(from calc(var(--flow) - var(--dash)) at 50% 100%, var(--accent) 0 var(--dash), var(--water) 0 var(--period));
+  background-size: calc(var(--r) * 4) var(--out);
+  background-repeat: repeat-x;
+  background-position:
+    calc(var(--x) - var(--r) * 2) var(--out),
+    var(--x) 0,
+    calc(var(--x) - var(--r) * 2) var(--out),
+    var(--x) 0;
+  -webkit-mask-image:
+    radial-gradient(circle var(--out) at 50% 0, var(--edge)),
+    radial-gradient(circle var(--out) at 50% 100%, var(--edge));
+  mask-image:
+    radial-gradient(circle var(--out) at 50% 0, var(--edge)),
+    radial-gradient(circle var(--out) at 50% 100%, var(--edge));
+  -webkit-mask-size: calc(var(--r) * 4) var(--out);
+  mask-size: calc(var(--r) * 4) var(--out);
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
+  -webkit-mask-position:
+    calc(var(--x) - var(--r) * 2) var(--out),
+    var(--x) 0;
+  mask-position:
+    calc(var(--x) - var(--r) * 2) var(--out),
+    var(--x) 0;
+}
+/* the lower stretch bends the other way, so the river seems to wind around the heading */
+.part-river-bend::after { --x: calc(var(--r) * 2); }
+
+.part-river-bend-text { min-width: 0; }
+.part-river-bend-text :is(h1, h2, h3, h4, h5, h6) {
+  margin: 0;
+  font-size: var(--step-3);
+  line-height: var(--leading-heading);
+  overflow-wrap: anywhere;
+}
+.part-river-bend-text > :not(:is(h1, h2, h3, h4, h5, h6)) { color: var(--muted); }
+
+/* the current runs right along the upper stretch and back left along the lower one */
+@keyframes part-river-bend-run {
+  from { --part-river-bend-flow: 0deg; }
+  to { --part-river-bend-flow: 360deg; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .part-river-bend:is(.flow-slow, .flow-brisk)::before,
+  .part-river-bend:is(.flow-slow, .flow-brisk)::after {
+    animation: part-river-bend-run calc(var(--time) * var(--pace)) linear infinite;
+  }
+  .part-river-bend:is(.flow-slow, .flow-brisk)::after { animation-direction: reverse; }
+}

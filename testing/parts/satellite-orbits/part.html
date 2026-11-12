@@ -1,0 +1,29 @@
+{{- $x := partial "rubric/sections.html" (dict "html" .inner "level" 3) -}}
+{{- $count := len $x.items -}}
+<div class="part part-satellite-orbits pace-{{ .s.pace }}">
+{{- with trim (string $x.before) " \n" }}<div class="part-satellite-orbits-intro">{{ . | safeHTML }}</div>{{ end }}
+<div class="part-satellite-orbits-layout">
+  <div class="part-satellite-orbits-scene" aria-hidden="true">
+    <span class="part-satellite-orbits-earth"></span>
+    {{- if $count }}
+    <span class="part-satellite-orbits-path">
+      {{- range $i, $_ := $x.items }}
+      {{- $angle := div (mul (float $i) 360.0) (float $count) }}
+      <span class="part-satellite-orbits-position" style="transform: rotate({{ $angle }}deg)"><span class="part-satellite-orbits-marker" style="transform: translate(50%, -50%) rotate({{ mul -1.0 $angle }}deg)"><span>{{ add $i 1 }}</span></span></span>
+      {{- end }}
+    </span>
+    {{- end }}
+  </div>
+  <ol class="part-satellite-orbits-list">
+    {{- range $i, $item := $x.items }}
+    <li class="part-satellite-orbits-item">
+      <span class="part-satellite-orbits-number" aria-hidden="true">{{ add $i 1 }}</span>
+      <div class="part-satellite-orbits-copy">
+        <h3>{{ $item.title }}</h3>
+        <div class="part-satellite-orbits-body">{{ $item.body }}</div>
+      </div>
+    </li>
+    {{- end }}
+  </ol>
+</div>
+</div>

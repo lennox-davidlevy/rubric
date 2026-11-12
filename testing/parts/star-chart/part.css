@@ -1,0 +1,116 @@
+.part-star-chart {
+  --pulse-duration: 7s;
+  color: var(--ink);
+  font-family: var(--font-body);
+  min-width: 0;
+}
+.part-star-chart.pace-lively { --pulse-duration: 3.5s; }
+.part-star-chart .part-star-chart-intro { margin-bottom: var(--space-3); }
+.part-star-chart .part-star-chart-sky {
+  position: relative;
+  isolation: isolate;
+  padding: var(--space-5) var(--space-3);
+  background: var(--paper);
+  border-block: var(--border) var(--rule-style) var(--rule);
+}
+.part-star-chart .part-star-chart-field {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: -1;
+}
+.part-star-chart .part-star-chart-field span {
+  --x: 0;
+  --y: 0;
+  position: absolute;
+  left: calc(var(--x) * 0.1%);
+  top: calc(var(--y) * 0.1%);
+  width: var(--border);
+  height: var(--border);
+  border-radius: 50%;
+  background: var(--muted);
+  opacity: 0.4;
+}
+.part-star-chart .part-star-chart-field span:nth-child(5n) {
+  width: calc(var(--border) * 2);
+  height: calc(var(--border) * 2);
+  opacity: 0.25;
+}
+.part-star-chart .part-star-chart-stars {
+  display: grid;
+  gap: var(--space-5) var(--space-4);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.part-star-chart .part-star-chart-star {
+  --phase: 0;
+  position: relative;
+  min-width: 0;
+  margin: 0;
+  padding: 0 0 0 var(--space-4);
+}
+.part-star-chart .part-star-chart-beacon {
+  position: absolute;
+  left: 0;
+  top: var(--space-2);
+  width: var(--space-1);
+  height: var(--space-1);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 var(--space-2) var(--accent), 0 0 var(--space-3) var(--accent-tint);
+  animation: star-chart-pulse var(--pulse-duration) ease-in-out infinite;
+  animation-delay: calc(var(--phase) * -1s);
+}
+.part-star-chart .part-star-chart-beacon::before,
+.part-star-chart .part-star-chart-beacon::after {
+  content: "";
+  position: absolute;
+  background: var(--accent);
+  opacity: 0.65;
+}
+.part-star-chart .part-star-chart-beacon::before {
+  width: var(--border);
+  height: var(--space-3);
+  left: calc(50% - var(--border) / 2);
+  top: calc((var(--space-1) - var(--space-3)) / 2);
+}
+.part-star-chart .part-star-chart-beacon::after {
+  height: var(--border);
+  width: var(--space-3);
+  top: calc(50% - var(--border) / 2);
+  left: calc((var(--space-1) - var(--space-3)) / 2);
+}
+.part-star-chart .part-star-chart-label {
+  position: relative;
+  background: var(--paper);
+  padding: var(--space-1);
+  overflow-wrap: anywhere;
+  font-size: var(--step-0);
+  line-height: var(--leading-body);
+}
+.part-star-chart .part-star-chart-label > h3 {
+  margin: 0;
+  color: var(--heading);
+  font-family: var(--font-display);
+  font-weight: var(--weight-heading);
+  font-size: var(--step-1);
+  line-height: var(--leading-heading);
+}
+.part-star-chart .part-star-chart-label > :not(:first-child) { margin-block: var(--space-1) 0; }
+.part-star-chart .part-star-chart-label img { max-width: 100%; height: auto; }
+.part-star-chart .part-star-chart-label pre { max-width: 100%; overflow-x: auto; }
+@media (min-width: 48rem) {
+  .part-star-chart .part-star-chart-sky { padding: var(--space-5); }
+  .part-star-chart .part-star-chart-stars { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .part-star-chart .part-star-chart-star:nth-child(even) { margin-top: var(--space-5); }
+  .part-star-chart .part-star-chart-star:nth-child(4n + 3) { margin-left: var(--space-3); }
+}
+@keyframes star-chart-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .part-star-chart .part-star-chart-beacon { animation: none; }
+}

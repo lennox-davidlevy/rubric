@@ -1,0 +1,17 @@
+{{- $n := 8 -}}
+{{- if eq .s.density "few" }}{{ $n = 5 }}{{ else if eq .s.density "many" }}{{ $n = 12 }}{{ end -}}
+<div class="part part-tree-frame density-{{ .s.density }} kind-{{ .s.kind }}">
+<div class="part-tree-frame-row" aria-hidden="true">
+{{- range seq $n }}<span class="tree"></span>{{ end }}
+</div>
+<div class="part-tree-frame-middle">
+<span class="tree tree-side" aria-hidden="true"></span>
+<div class="part-tree-frame-text stack">
+{{ .inner }}
+</div>
+<span class="tree tree-side" aria-hidden="true"></span>
+</div>
+<div class="part-tree-frame-row" aria-hidden="true">
+{{- range seq $n }}<span class="tree"></span>{{ end }}
+</div>
+</div>

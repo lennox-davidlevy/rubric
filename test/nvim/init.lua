@@ -114,3 +114,94 @@ function RubricTest.take_first()
   end
   return true
 end
+
+-- Answers for vim.ui.select and vim.ui.input, in order, so a test can choose
+-- in the plugin's menus: an item is chosen by its value.
+RubricTest.answers = {}
+function RubricTest.answer(...)
+  RubricTest.answers = { ... }
+  return true
+end
+-- How many menus have opened.
+RubricTest.menus = 0
+vim.ui.select = function(items, _, on_choice)
+  RubricTest.menus = RubricTest.menus + 1
+  local want = table.remove(RubricTest.answers, 1)
+  for _, item in ipairs(items) do
+    if item.value == want then
+      return on_choice(item)
+    end
+  end
+  on_choice(nil)
+end
+vim.ui.input = function(_, on_confirm)
+  on_confirm(table.remove(RubricTest.answers, 1))
+end
+
+-- The status under line n (1-based), its lines joined, or "".
+function RubricTest.drafting(n)
+  local ns = vim.api.nvim_get_namespaces()["rubric.drafting"]
+  if not ns then
+    return ""
+  end
+  for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, ns, { n - 1, 0 }, { n - 1, -1 }, { details = true })) do
+    local vl = m[4].virt_lines
+    if vl and vl[1] then
+      local parts = {}
+      for _, l in ipairs(vl) do
+        table.insert(parts, vim.trim(l[1][1]))
+      end
+      return table.concat(parts, " ")
+    end
+  end
+  return ""
+end
+
+-- How many screen lines the status under line n takes, the widest, and
+-- the room virtual lines have (the window less its number and sign columns).
+function RubricTest.drafting_fit(n)
+  local ns = vim.api.nvim_get_namespaces()["rubric.drafting"]
+  for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, ns, { n - 1, 0 }, { n - 1, -1 }, { details = true })) do
+    local vl = m[4].virt_lines
+    if vl then
+      local widest = 0
+      for _, l in ipairs(vl) do
+        widest = math.max(widest, vim.fn.strdisplaywidth(l[1][1]))
+      end
+      local info = vim.fn.getwininfo(vim.api.nvim_get_current_win())[1]
+      return ("%d %d %d"):format(#vl, widest, info.width - info.textoff)
+    end
+  end
+  return ""
+end
+
+-- The mark that starts the status under line n (1-based): a spinner, ◆,
+-- ✗, ↪, + or ✓; or "".
+function RubricTest.draft_sign(n)
+  return (RubricTest.drafting(n):match("^(%S+)")) or ""
+end
+
+-- The gutter beside line n (1-based): the `new:` block's bracket, or "".
+function RubricTest.block(n)
+  local ns = vim.api.nvim_get_namespaces()["rubric.drafting"]
+  if not ns then
+    return ""
+  end
+  for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, ns, { n - 1, 0 }, { n - 1, -1 }, { details = true })) do
+    if m[4].sign_text then
+      return vim.trim(m[4].sign_text) .. " " .. (m[4].line_hl_group or "")
+    end
+  end
+  return ""
+end
+
+-- The server's default drafter: its harness, model and effort, as a request
+-- answers them.
+function RubricTest.drafter()
+  local res = client():request_sync("rubric/drafter", {}, 5000, 0)
+  local r = res and res.result or {}
+  local function v(x)
+    return (x ~= nil and x ~= vim.NIL) and x or "default"
+  end
+  return (r.harness or "") .. " " .. v(r.model) .. " " .. v(r.effort)
+end

@@ -1,0 +1,21 @@
+name: river-bend
+description: A heading with a winding river of running water drawn above and below it, like a walk along a river bank.
+children: true
+body: |
+  ## The heading
+
+  A line beneath it, if you want one.
+settings:
+  bends:
+    type: choice
+    default: few
+    values:
+      few: wide, lazy bends in the river
+      many: tight, frequent bends in the river
+  flow:
+    type: choice
+    default: slow
+    values:
+      still: the water stands still
+      slow: the water drifts slowly along
+      brisk: the water runs faster

@@ -568,11 +568,13 @@ export function checkScale(s: Scale): Problem[] {
 // The CSS a catalog's parts and page are written in may read slots and its
 // own local variables, and never a literal color, font or weight: those
 // belong to themes.
-export function lint(cat: Catalog, files: Record<string, string>): Problem[] {
+// `also`: custom properties set elsewhere, such as in a part's HTML
+// (style="--angle: 40deg"), which are the part's own, not slots.
+export function lint(cat: Catalog, files: Record<string, string>, also: Iterable<string> = []): Problem[] {
   const out: Problem[] = [];
   const slots = new Set(cat.slots);
   for (const [path, css] of Object.entries(files)) {
-    const local = new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]!.slice(2)));
+    const local = new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]!.slice(2)).concat([...also]));
     const lines = css.split("\n");
     lines.forEach((line, i) => {
       const where = `${path}:${i + 1}`;

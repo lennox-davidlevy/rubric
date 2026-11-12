@@ -5,6 +5,8 @@
 // that setting, and "sparkles" asks for more than any setting does.
 
 import { settingsOf, type Catalog, type Resolution } from "../core/index.ts";
+import { join } from "node:path";
+import type { Harness } from "./draft.ts";
 import type { Refiner, Resolver } from "./workspace.ts";
 
 export function stubResolver(catalog: Catalog, delayMs = 50): Resolver {
@@ -59,4 +61,44 @@ export async function stubThemeRanker(words: string, themes: { name: string; des
   const scores = themes.map((t) => [t.name, `${t.name} ${t.description}`.toLowerCase().split(/\W+/).filter((w) => said.has(w)).length] as const);
   const total = scores.reduce((n, [, s]) => n + s, 0) || 1;
   return Object.fromEntries(scores.map(([n, s]) => [n, s / total]));
+}
+
+// The harness, without Claude Code: writes a small part named for the words
+// at once. A line naming a catalog part gets that part back as one that
+// already exists; "broken" writes a literal color the first time, which the
+// checks refuse, and fixes it when told; "failing" fails like a harness that
+// could not run; "slow" takes a while first. Another take of the site's own
+// part keeps its name.
+export function stubHarness(catalog: Catalog, delayMs = 50): Harness {
+  return async (dir, prompt, signal, log = () => {}) => {
+    log("read brief.md");
+    const brief = await Bun.file(join(dir, "brief.md")).text();
+    const words = (/^> (.*)$/m.exec(brief)?.[1] ?? "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    await new Promise((r) => setTimeout(r, words.includes("slow") ? delayMs * 20 : delayMs));
+    if (signal.aborted) return { error: "stopped" };
+    if (words.includes("failing")) return { error: "the harness could not run (stub)" };
+    const of = /The writer has a part of their own, \*\*([a-z0-9-]+)\*\*/.exec(brief)?.[1];
+    const existing = !of && words.find((w) => Object.hasOwn(catalog.parts, w) && catalog.parts[w]!.origin === undefined);
+    if (existing) {
+      await Bun.write(join(dir, "exists.txt"), `${existing}\nThe words name it (stub).\n`);
+      return {};
+    }
+    const named = words.filter((w) => w.length > 2 && !["the", "and", "with", "for", "that", "slow", "broken"].includes(w)).slice(0, 2).join("-") || "made";
+    // A reroll with words says them in the part, so a test can see it changed.
+    const change = /asked for this change: "([^"]*)"/.exec(brief)?.[1];
+    // "name it x" in a change names the take x, so takes can differ in name.
+    const renamed = change && /name it ([a-z][a-z0-9-]*)/.exec(change)?.[1];
+    const name = renamed || of || named;
+    const fixing = prompt.includes("checks refused");
+    const color = words.includes("broken") && !fixing ? "#ff0000" : "var(--accent)";
+    // "no settings" in a change drops the part's setting, as a real reroll may.
+    const settings = change?.includes("no settings") ? "" : "settings:\n  pace:\n    type: choice\n    default: slow\n    values:\n      slow: it moves slowly\n      fast: it moves quickly\n";
+    await Bun.write(join(dir, "part.yaml"), `name: ${name}\ndescription: A part made for "${words.join(" ")}" by the stub harness.\nchildren: true\n${settings}body: |\n  Something to put in it.\n`);
+    // Another take with no change is drawn differently, as a real one would be.
+    const another = /wants a different one/.test(brief) ? ` data-take="${Math.random().toString(36).slice(2, 8)}"` : "";
+    await Bun.write(join(dir, "part.html"), `<div class="part part-${name} pace-{{ .s.pace }}"${change ? ` data-change="${change.replace(/"/g, "")}"` : ""}${another}>\n{{ .inner }}\n</div>\n`);
+    await Bun.write(join(dir, "part.css"), `.part-${name} { border-left: 3px solid ${color}; padding-left: var(--space-3); }\n`);
+    log("write part.yaml\nwrite part.html\nwrite part.css");
+    return {};
+  };
 }

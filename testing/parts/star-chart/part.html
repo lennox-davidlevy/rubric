@@ -1,0 +1,26 @@
+{{- $x := partial "rubric/sections.html" (dict "html" .inner "level" 3) -}}
+{{- $count := 144 -}}
+{{- if eq .s.density "scattered" }}{{ $count = 64 }}{{ end -}}
+<div class="part part-star-chart density-{{ .s.density }} pace-{{ .s.pace }}">
+  {{- with trim (string $x.before) " \n" }}
+  <div class="part-star-chart-intro stack">{{ . | safeHTML }}</div>
+  {{- end }}
+  <div class="part-star-chart-sky">
+    <div class="part-star-chart-field" aria-hidden="true">
+      {{- range seq $count }}
+      <span style="--x: {{ mod (add (mul . 73) (mul . .)) 997 }}; --y: {{ mod (add (mul . 137) (mul . .)) 991 }};"></span>
+      {{- end }}
+    </div>
+    <ul class="part-star-chart-stars">
+      {{- range $i, $item := $x.items }}
+      <li class="part-star-chart-star" style="--phase: {{ mod $i 7 }};">
+        <span class="part-star-chart-beacon" aria-hidden="true"></span>
+        <div class="part-star-chart-label stack">
+          <h3>{{ $item.title }}</h3>
+          {{ $item.body }}
+        </div>
+      </li>
+      {{- end }}
+    </ul>
+  </div>
+</div>

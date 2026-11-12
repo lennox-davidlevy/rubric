@@ -4,15 +4,18 @@
 // only ever writes content/, .rubric/ and nothing the writer edits.
 
 import { randomUUID } from "node:crypto";
-import { unlinkSync } from "node:fs";
-import { readFile, readdir, unlink } from "node:fs/promises";
+import { existsSync, readFileSync, statSync, unlinkSync } from "node:fs";
+import { appendFile, copyFile, mkdir, readFile, readdir, rename, rm, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import {
   applyRefine, atPlace, Cache, frontMatterProblem, liveContent, settingsOf, formatPlain, frame, FRAME_PAGE, framePage, parsePlain, preprocess, refineWords, scan, lines as splitLines,
   formatThemeLine, PIECES, THEME, THRESHOLDS, writeWhole, type Piece,
   type Catalog, type Diagnostic, type Directive, type Entry, type PageKind, type Place, type Refined, type Resolution, type Resolve, type ThemeChoice,
 } from "../core/index.ts";
+import { DRAFT_INDEX, DRAFT_LOGS, draftKey, DRAFTS, keepLocal, keepTake, makeGlobal, ownKey, putAway, readDrafts, shownTake, takesFor, writeHugoTree, type DraftState } from "../parts.ts";
 import { openSite, pageKind, pagePath, type Site } from "../site.ts";
+import { LOG, newDraft, NOT_MOUNTED, runDraft, saveState, type Harness } from "./draft.ts";
+import type { Drafter } from "./harness.ts";
 import { themeList, type ThemeList, type ThemeRanker } from "./themes.ts";
 import { fileExists, isSiteAddress, pictures } from "./files.ts";
 
@@ -25,6 +28,8 @@ export type Severity = "warning" | "information" | "hint";
 export interface Note extends Omit<Diagnostic, "code"> {
   code: string;
   severity: Severity;
+  // For the editor to draw: a `new:` line's draft, where it is.
+  data?: { status: string; name?: string; by?: string; started?: number; shown?: string; take?: number; takes?: number; earlier?: number; close?: number; of?: string };
 }
 
 export interface Ghost {
@@ -39,6 +44,51 @@ export interface Ghost {
   // A closing ":::" the editor takes away on accepting: the block's, when the
   // part picked takes nothing inside.
   drop?: number;
+  // Accepting asks for a new part to be drafted: the line becomes a `new:`
+  // line, and the editor then asks the server to start.
+  build?: true;
+}
+
+// What the editor shows and does for a `::: new:` line.
+export interface DraftView {
+  words: string;
+  // The newest draft for these words, if there is one.
+  status?: DraftState["status"];
+  name?: string;
+  message?: string;
+  // A finished draft drawn in the preview while another is being made.
+  shown?: string;
+  // The newest draft's log, a path, to follow what it does.
+  log?: string;
+  // Which take is on screen, from 1, of how many finished ones.
+  take?: number;
+  takes?: number;
+  // Finished takes for these words the writer cancelled before, which can
+  // be brought back instead of drafting again.
+  earlier?: number;
+  // On a line of the site's own part: its name, whose takes these are, and
+  // how many other blocks on the site's pages use it.
+  of?: string;
+  uses?: { blocks: number; pages: number };
+  // Words after ":" on that line, the change a reroll asks for, and the
+  // column of the ":", where the line is cut once the reroll starts.
+  change?: { words: string; colon: number };
+  // The writer's default drafter, in a few words, for the menu.
+  drafter?: string;
+}
+
+// What the editor puts in place of the `new:` line once the writer chose.
+export interface DraftDone {
+  replace?: string;
+  // The block's closer, which goes when the part takes nothing inside.
+  drop?: number;
+  // A kept part's name and its settings with their values, for the editor
+  // to say what the part can do now that it is one.
+  part?: { name: string; settings: { name: string; values: string[] }[] };
+  error?: string;
+  version?: number;
+  // A site's part removed: where its files went.
+  removed?: string;
 }
 
 export interface Completion {
@@ -59,6 +109,27 @@ const PICTURES = /!\[[^\]]*\]\(\s*<?([^)\s>]+)/g;
 // A file's address alone on a line in a block, as a PDF, video or audio part
 // takes it: /files/route.pdf. One with no extension is a page's.
 const BARE_FILE = /^\s*(\/[^\s/][^\s]*\.[A-Za-z0-9]+)\s*$/;
+
+// A block with nothing in it yet, and what its part starts with: the
+// opening line, the closer, and the starter's lines.
+export interface Starter {
+  line: number;
+  close: number;
+  // The opening line as it was, so the editor never fills another block
+  // that has moved into its place.
+  opener: string;
+  part: string;
+  body: string[];
+}
+
+// A line placing one of the site's own parts, which the accept key can
+// redraft, keep or remove; and how many takes it has on screen.
+export interface OwnLine {
+  line: number;
+  opener: string;
+  part: string;
+  takes?: number;
+}
 
 interface Doc {
   text: string;
@@ -96,6 +167,17 @@ export interface Options {
   // The site was opened again, from hugo.toml or rubric.md's theme line: its
   // skin may bring other parts, which the editor needs to know about.
   onReload?: (site: Site) => void;
+  // Drafts a new part: Claude Code in the server, the stub in tests.
+  harness?: Harness;
+  // A draft started or finished, for the editor to say so.
+  onDraft?: (state: DraftState) => void;
+  // A page's empty blocks and their parts' starters, whenever they change,
+  // so the editor can show what the preview shows faded, and fill it in.
+  onStarters?: (file: string, starters: Starter[], own: OwnLine[]) => void;
+  // Which tool and model draft, recorded with each draft.
+  // The drafter, the writer's default or the one chosen for a draft, in
+  // full, for the record, and in a few words, for the menu ("sonnet, low").
+  drafter?: (use?: Drafter) => { full: string; short: string };
 }
 
 // Only shown, before the pick in the ghost text: accepting replaces the words.
@@ -123,6 +205,14 @@ export class Workspace {
   #drawMs: number;
   #refiner: Refiner | undefined;
   #onReload: Options["onReload"];
+  #harness: Harness | undefined;
+  #onDraft: Options["onDraft"];
+  #onStarters: Options["onStarters"];
+  #starters = new Map<string, string>();
+  #drafter: Options["drafter"];
+  // Every draft on disk, by id, and the runs in flight, by words.
+  #drafts = new Map<string, DraftState>();
+  #running = new Map<string, { id: string; stop: AbortController; started: Promise<void>; done: Promise<void> }>();
   // This server's list of open pages in .rubric/open/, for the others.
   #claim = `${process.pid}-${randomUUID().slice(0, 8)}.json`;
 
@@ -138,12 +228,22 @@ export class Workspace {
     this.#drawMs = opts.drawMs ?? 100;
     this.#refiner = opts.refiner;
     this.#onReload = opts.onReload;
+    this.#harness = opts.harness;
+    this.#onDraft = opts.onDraft;
+    this.#onStarters = opts.onStarters;
+    this.#drafter = opts.drafter;
+    // A draft left half made by a server that stopped will never finish.
+    for (const d of readDrafts(site.root)) {
+      this.#drafts.set(d.id, d.status === "drafting" ? { ...d, status: "failed", message: "the editor closed while it was being drafted" } : d);
+    }
   }
 
   // Writes content/ for every page on disk, from the cache only. Run once at
   // start, so the preview is whole before any page is opened.
   // A page open in another editor is that editor's server's to draw.
   async buildAll(): Promise<void> {
+    // What's going is taken away once the pages are drawn without it.
+    await writeHugoTree(this.site.root, this.site.own, false).catch(() => {});
     const elsewhere = await this.#openElsewhere();
     const mine = (file: string) => !this.#docs.has(file) && !elsewhere.has(file);
     const files = (await readdir(this.site.pages, { recursive: true })).filter((f) => f.endsWith(".md"));
@@ -185,8 +285,10 @@ export class Workspace {
     return open;
   }
 
-  // The server is stopping: its pages are no longer open anywhere.
+  // The server is stopping: its pages are no longer open anywhere, and its
+  // drafts stop.
   dispose(): void {
+    for (const r of this.#running.values()) r.stop.abort();
     try {
       unlinkSync(join(this.#claims, this.#claim));
     } catch {}
@@ -206,6 +308,7 @@ export class Workspace {
       await this.#render(file);
       this.#askAll(file);
     }
+    await writeHugoTree(this.site.root, this.site.own).catch(() => {});
   }
 
   // Where the writer's cursor is, for the live preview to follow: the page's
@@ -316,6 +419,8 @@ export class Workspace {
     const doc = this.#docs.get(file);
     if (!doc) return;
     this.#docs.delete(file);
+    // Opened again, its starters are sent again.
+    this.#starters.delete(file);
     await this.#claimOpen();
     clearTimeout(this.#timers.get(file));
     this.#timers.delete(file);
@@ -361,7 +466,8 @@ export class Workspace {
   async #ghost(file: string, line: number): Promise<Ghost[]> {
     const doc = this.#docs.get(file);
     const at = doc && this.#directiveAt(doc, line);
-    if (doc && at?.plain && at.refine) return this.#refineGhost(file, line);
+    // On a site's own part, words after ":" are a reroll's change, from its menu.
+    if (doc && at?.plain && at.refine) return this.#isOwn(at.plain.part) ? [] : this.#refineGhost(file, line);
     const words = () => {
       const d = this.#docs.get(file) && this.#directiveAt(this.#docs.get(file)!, line);
       return d?.kind === "words" ? d.words : undefined;
@@ -376,12 +482,18 @@ export class Workspace {
       if (words() !== asked || (this.#errors.has(key) && !this.#inflight.has(key))) return [];
       await new Promise((r) => setTimeout(r, 25));
     }
-    if (!hit || words() !== asked || hit.outcome === "nothing-fits") return [];
+    if (!hit || words() !== asked) return [];
 
     const lineText = splitLines(doc.text)[line] ?? "";
     const end = lineText.length;
     const sep = lineText.endsWith(" ") ? ARROW.trimStart() : ARROW;
     const lead = opener(lineText);
+    // Nothing in the catalog fits: offer to draft a part for the words. Only
+    // in a page, and only with a harness to draft it.
+    if (hit.outcome === "nothing-fits") {
+      if (doc.page === "site" || !this.#harness || !this.site.ownMounted) return [];
+      return [{ text: `${sep}a new part, drafted for these words`, line, character: end, replace: `${lead} new: ${asked}`, build: true }];
+    }
     // An empty block gets the part's starter body with the pin, so the writer
     // sees what the part expects; a block with anything in it gets nothing.
     const d = this.#directiveAt(doc, line);
@@ -441,6 +553,503 @@ export class Workspace {
       character: lineText.length,
       replace: `${opener(lineText)} ${after}`,
     }];
+  }
+
+  // ── New parts (docs/plan.md, step 7) ─────────────────────────────────
+
+  // The drafts for a line, newest first, by its key: a `new:` line's words,
+  // or ownKey() of the site's part a line redrafts.
+  #draftsFor(key: string): DraftState[] {
+    return [...this.#drafts.values()].filter((d) => draftKey(d) === key).sort((a, b) => b.started - a.started);
+  }
+
+  // The finished draft the preview draws for a line: the take on screen.
+  #shown(key: string): DraftState | undefined {
+    return shownTake(this.#drafts.values(), key);
+  }
+
+  #takes(key: string): { take?: number; takes?: number } {
+    const takes = takesFor(this.#drafts.values(), key);
+    const shown = this.#shown(key);
+    return shown ? { take: takes.indexOf(shown) + 1, takes: takes.length } : {};
+  }
+
+  // Finished takes for these words whose last word in the record is that
+  // they were cancelled, and whose folder is still there.
+  #earlier(words: string): string[] {
+    const index = this.#index();
+    return [...index.entries()].filter(([id, e]) =>
+      e.of === undefined && e.words === words && e.status === "ready" && e.outcome === "cancelled" && !this.#drafts.has(id) && existsSync(join(this.site.root, DRAFT_LOGS, id, "part.yaml")),
+    ).map(([id]) => id);
+  }
+
+  // Each draft's last line in the record, read again only when it changed.
+  #indexCache: { mtime: number; entries: Map<string, { words?: string; status?: string; outcome?: string; of?: string }> } | undefined;
+  #index(): Map<string, { words?: string; status?: string; outcome?: string; of?: string }> {
+    const file = join(this.site.root, DRAFT_INDEX);
+    let mtime: number;
+    try {
+      mtime = statSync(file).mtimeMs;
+    } catch {
+      return new Map();
+    }
+    if (this.#indexCache?.mtime === mtime) return this.#indexCache.entries;
+    const entries = new Map<string, { words?: string; status?: string; outcome?: string; of?: string }>();
+    for (const line of readFileSync(file, "utf8").split("\n")) {
+      try {
+        const e = JSON.parse(line) as { id?: string; words?: string; status?: string; outcome?: string; of?: string };
+        if (e.id) entries.set(e.id, e);
+      } catch {}
+    }
+    this.#indexCache = { mtime, entries };
+    return entries;
+  }
+
+  #newLine(file: string, line: number): { doc: Doc; d: Directive } | undefined {
+    const doc = this.#docs.get(file);
+    const d = doc && this.#directiveAt(doc, line);
+    return doc && d?.kind === "new" && d.words !== undefined ? { doc, d } : undefined;
+  }
+
+  // A line drafts are for: a `new:` line, by its words, or a line placing
+  // one of the site's own parts, whose takes keep its name.
+  #draftLine(file: string, line: number): { doc: Doc; d: Directive; key: string; words: string; of?: string } | undefined {
+    const at = this.#newLine(file, line);
+    if (at) return { ...at, key: at.d.words!, words: at.d.words! };
+    const doc = this.#docs.get(file);
+    const d = doc && this.#directiveAt(doc, line);
+    const of = doc && d && this.#ownPart(doc, d);
+    return of ? { doc: doc!, d: d!, key: ownKey(of), words: this.site.catalog.parts[of]!.description, of } : undefined;
+  }
+
+  // The site's own part a line places in its plain form, if it is one. By
+  // its name alone: a take on screen may lack a setting the line sets, and
+  // the line must stay the part's, to keep, cycle or go back.
+  #ownPart(doc: Doc, d: Directive): string | undefined {
+    const name = d.plain?.part;
+    return doc.page !== "site" && name && this.#isOwn(name) ? name : undefined;
+  }
+
+  #isOwn(name: string): boolean {
+    return Object.hasOwn(this.site.catalog.parts, name) && this.site.catalog.parts[name]!.origin === "site";
+  }
+
+  // How many blocks on the site's pages place `name`, besides the one at
+  // `line` of `file`: open pages as the editor holds them, the rest from disk.
+  async #uses(name: string, file: string, line: number): Promise<{ blocks: number; pages: number }> {
+    let blocks = 0;
+    let pages = 0;
+    const files = (await readdir(this.site.pages, { recursive: true }).catch(() => [] as string[])).filter((f) => f.endsWith(".md")).map((f) => join(this.site.pages, f));
+    for (const f of files) {
+      const text = this.#docs.get(f)?.text ?? (await readFile(f, "utf8").catch(() => ""));
+      const n = scan(text, this.site.catalog).directives.filter((d) => d.plain?.part === name && !(f === file && d.line === line)).length;
+      blocks += n;
+      if (n > 0) pages++;
+    }
+    return { blocks, pages };
+  }
+
+  // The site's part as it is kept, as the first of its takes, so the writer
+  // can go back to it from the others.
+  async #original(name: string, words: string): Promise<void> {
+    if (takesFor(this.#drafts.values(), ownKey(name)).length > 0) return;
+    const { dir, state } = await newDraft(this.site.root, words, undefined, name);
+    for (const f of ["part.yaml", "part.html", "part.css"]) {
+      const from = join(this.site.root, "parts", name, f);
+      if (existsSync(from)) await copyFile(from, join(dir, f));
+    }
+    const at = state.started - 1;
+    const kept: DraftState = { ...state, status: "ready", name, original: true, started: at, finished: at };
+    await saveState(this.site.root)(kept);
+    this.#drafts.set(kept.id, kept);
+  }
+
+  // What the `new:` line at `line` has: no draft yet, one being made, one to
+  // look at, one that failed, or a part the catalog has already.
+  draft(file: string, line: number): DraftView | undefined {
+    const at = this.#draftLine(file, line);
+    if (!at) return undefined;
+    const { words, key } = at;
+    const latest = this.#draftsFor(key)[0];
+    const shown = this.#shown(key);
+    return {
+      words,
+      ...(at.of !== undefined ? { of: at.of } : {}),
+      ...(this.#drafter ? { drafter: this.#drafter().short } : {}),
+      ...(at.of !== undefined && at.d.refine && refineWords(at.d.refine.words) !== "" ? { change: { words: refineWords(at.d.refine.words), colon: at.d.refine.colon } } : {}),
+      // A ready line names the take on screen, which is the one Keep keeps.
+      ...(latest ? { status: latest.status, ...((latest.status === "ready" ? shown?.name : latest.name) ? { name: latest.status === "ready" ? shown!.name : latest.name } : {}), ...(latest.message ? { message: latest.message } : {}) } : {}),
+      ...(shown?.name && shown !== latest && latest?.status !== "ready" ? { shown: shown.name } : {}),
+      ...(latest ? { log: join(this.site.root, DRAFTS, latest.id, LOG) } : {}),
+      ...this.#takes(key),
+      ...(latest || at.of !== undefined ? {} : (() => {
+        const earlier = this.#earlier(words).length;
+        return earlier ? { earlier } : {};
+      })()),
+    };
+  }
+
+  // draft(), and for a line of the site's own part, how many other blocks
+  // on the site use it, which removing it would leave unknown.
+  async look(file: string, line: number): Promise<DraftView | undefined> {
+    const view = this.draft(file, line);
+    return view?.of !== undefined ? { ...view, uses: await this.#uses(view.of, file, line) } : view;
+  }
+
+  // Moves the preview to the next take (step 1) or the one before (-1), round.
+  async take(file: string, line: number, step: number): Promise<DraftView | undefined> {
+    const at = this.#draftLine(file, line);
+    if (!at) return undefined;
+    const takes = takesFor(this.#drafts.values(), at.key);
+    const shown = this.#shown(at.key);
+    if (takes.length < 2 || !shown) return this.draft(file, line);
+    const next = takes[(takes.indexOf(shown) + step + takes.length * 10) % takes.length]!;
+    const chosen: DraftState = { ...next, chosen: Date.now() };
+    this.#drafts.set(chosen.id, chosen);
+    await saveState(this.site.root)(chosen);
+    await this.#reopen();
+    for (const f of this.#docs.keys()) this.#drawSoon(f);
+    return this.draft(file, line);
+  }
+
+  // The takes cancelled before for these words, back on the line.
+  async restore(file: string, line: number): Promise<DraftView | undefined> {
+    const at = this.#newLine(file, line);
+    if (!at) return undefined;
+    await mkdir(join(this.site.root, DRAFTS), { recursive: true });
+    for (const id of this.#earlier(at.d.words!)) {
+      const from = join(this.site.root, DRAFT_LOGS, id);
+      const to = join(this.site.root, DRAFTS, id);
+      let state: DraftState;
+      try {
+        state = JSON.parse(await readFile(join(from, "state.json"), "utf8")) as DraftState;
+        await rename(from, to);
+      } catch {
+        continue;
+      }
+      this.#drafts.set(id, state);
+      await appendFile(join(this.site.root, DRAFT_INDEX), JSON.stringify({ id, words: state.words, status: state.status, name: state.name, outcome: "brought back" }) + "\n").catch(() => {});
+    }
+    await this.#reopen();
+    for (const f of this.#docs.keys()) this.#drawSoon(f);
+    return this.draft(file, line);
+  }
+
+  // Starts a draft for the `new:` line at `line`. A reroll passes what to
+  // change ("" for another take); the draft shown stays until the new one is
+  // ready. `fresh` drafts even when the catalog has a part for it already.
+  // `drafter` drafts this one alone, in place of the writer's default.
+  async build(file: string, line: number, opts: { change?: string; fresh?: boolean; drafter?: Drafter } = {}): Promise<DraftView | undefined> {
+    const at = this.#draftLine(file, line);
+    if (!at || !this.#harness) return this.draft(file, line);
+    const { words, key, of } = at;
+    const runKey = key;
+    if (words.trim() === "") return this.draft(file, line);
+    // One already starting or running: say where it is, once it has started.
+    const already = this.#running.get(runKey);
+    if (already) {
+      await already.started;
+      return this.draft(file, line);
+    }
+    // Taken at once, before anything is awaited, so a second request for the
+    // same words while this one starts finds it.
+    const stop = new AbortController();
+    let started!: () => void;
+    const ready = new Promise<void>((r) => (started = r));
+    const run = { id: "", stop, started: ready, done: ready as Promise<void> };
+    this.#running.set(runKey, run);
+    const src = splitLines(at.doc.text);
+    const inside = at.d.close === undefined ? "" : src.slice(at.d.line + 1, at.d.close).join("\n");
+    let made: Awaited<ReturnType<typeof newDraft>>;
+    let previous: DraftState | undefined;
+    try {
+      // Another take of a site's part starts from the take on screen, the
+      // part as kept at first.
+      if (of !== undefined) await this.#original(of, words);
+      previous = opts.change !== undefined || of !== undefined ? this.#shown(key) : undefined;
+      made = await newDraft(this.site.root, words, this.#drafter?.(opts.drafter).full, of);
+    } catch (err) {
+      this.#running.delete(runKey);
+      started();
+      throw err;
+    }
+    const { dir, state } = made;
+    run.id = state.id;
+    const save = saveState(this.site.root);
+    await save(state);
+    this.#drafts.set(state.id, state);
+    this.#onDraft?.(state);
+    const site = this.site;
+    run.done = (async () => {
+      let end: DraftState;
+      try {
+        end = await runDraft(site, dir, state, {
+          words, inside,
+          ...(previous ? { previous: { dir: join(this.site.root, DRAFTS, previous.id), change: opts.change ?? "" } } : {}),
+          ...(opts.fresh ? { fresh: true } : {}),
+          ...(of !== undefined ? { of } : {}),
+          ...(previous?.session ? { resume: previous.session } : {}),
+          ...(opts.drafter ? { use: opts.drafter } : {}),
+        }, this.#harness!, stop.signal, save);
+      } catch (err) {
+        end = { ...state, status: "failed", message: (err as Error).message, finished: Date.now() };
+        await save(end).catch(() => {});
+      }
+      if (this.#running.get(runKey) === run) this.#running.delete(runKey);
+      // Stopped: cancel took it away already.
+      if (!this.#drafts.has(state.id)) return;
+      this.#drafts.set(state.id, end);
+      // A new take joins the ones before it and goes on screen; drafts that
+      // failed or found the catalog's part go to the record.
+      if (end.status === "ready") {
+        for (const old of this.#draftsFor(key)) if (old.id !== end.id && (old.status === "failed" || old.status === "exists")) await this.#forget(old.id, "replaced");
+      }
+      await this.#reopen();
+      this.#onDraft?.(end);
+    })();
+    started();
+    for (const f of this.#docs.keys()) this.#drawSoon(f);
+    return this.draft(file, line);
+  }
+
+  // The writer keeps the draft shown for the line: the site's own part, or,
+  // with `global`, the catalog's, for every theme. The line becomes the part.
+  async keep(file: string, line: number, global: boolean): Promise<DraftDone> {
+    const own = this.#draftLine(file, line);
+    if (own?.of !== undefined) return this.#keepOwn(own.key, own.of, global);
+    const at = this.#newLine(file, line);
+    const shown = at && this.#shown(at.d.words!);
+    if (!at || !shown?.name) return { error: "there is no draft to keep on this line" };
+    const dir = join(this.site.root, DRAFTS, shown.id);
+    const lead = opener(splitLines(at.doc.text)[line] ?? "");
+    let version: number | undefined;
+    try {
+      if (global) version = await makeGlobal(this.site.themeDir, dir, shown.name);
+      else await keepLocal(this.site.root, dir, shown.name);
+    } catch (err) {
+      return { error: (err as Error).message };
+    }
+    await this.#stop(at.d.words!, "dropped");
+    for (const d of this.#draftsFor(at.d.words!)) await this.#forget(d.id, d.id === shown.id ? (global ? "kept for every theme" : "kept for the site") : "another take was kept");
+    await this.#reopen();
+    return {
+      replace: `${lead} ${shown.name}`, ...this.#drop(at.d, shown.name), ...(version === undefined ? {} : { version }),
+      part: this.#kept(shown.name),
+    };
+  }
+
+  // A kept part's name and settings, for the editor to say what it can do.
+  #kept(name: string): NonNullable<DraftDone["part"]> {
+    const settings = Object.entries(this.site.catalog.parts[name]?.settings ?? {}).map(([name, def]) => ({
+      name,
+      values: def.type === "choice" ? Object.keys(def.values) : def.type === "level" ? Object.keys(def.levels) : def.type === "flag" ? ["true", "false"] : [],
+    }));
+    return { name, settings };
+  }
+
+  // Keeps the take of a site's part on screen, under the same name, so every
+  // page with it changes; or, with `global`, puts it in the catalog for every
+  // theme, and the site's copy goes to the record. The line stays.
+  async #keepOwn(key: string, of: string, global: boolean): Promise<DraftDone> {
+    const shown = this.#shown(key);
+    const dir = shown ? join(this.site.root, DRAFTS, shown.id) : join(this.site.root, "parts", of);
+    let version: number | undefined;
+    try {
+      if (global) {
+        version = await makeGlobal(this.site.themeDir, dir, of);
+        await putAway(this.site.root, of).catch((err: Error) => {
+          throw new Error(`${of} is in the catalog now, version ${version}, but parts/${of} could not be moved out of the site, so both have it; move it yourself: ${err.message}`);
+        });
+      } else if (shown && !shown.original) await keepTake(this.site.root, dir, of);
+    } catch (err) {
+      return { error: (err as Error).message };
+    }
+    await this.#stop(key, "dropped");
+    for (const d of this.#draftsFor(key)) {
+      await this.#forget(d.id, d.id !== shown?.id ? "another take was kept" : global ? "kept for every theme" : d.original ? "kept as it was" : "kept for the site");
+    }
+    await this.#reopen();
+    return { ...(version === undefined ? {} : { version }), part: this.#kept(of) };
+  }
+
+  // Takes a site's own part away: its takes go, and its files go to the
+  // record (.rubric/logs/removed/), not deleted. The lines using it stay,
+  // and say the part is unknown.
+  async remove(file: string, line: number): Promise<DraftDone> {
+    const at = this.#draftLine(file, line);
+    if (at?.of === undefined) return { error: "this line is not one of the site's own parts" };
+    await this.#stop(at.key, "the part was removed");
+    let removed: string;
+    try {
+      removed = await putAway(this.site.root, at.of);
+    } catch (err) {
+      return { error: (err as Error).message };
+    }
+    for (const d of this.#draftsFor(at.key)) await this.#forget(d.id, "the part was removed");
+    await this.#reopen();
+    return { removed };
+  }
+
+  // The writer doesn't want a new part: every draft for the line goes, and
+  // the line goes back to words.
+  async cancel(file: string, line: number): Promise<DraftDone> {
+    const own = this.#draftLine(file, line);
+    // Another take of a site's part: back to the part as it was kept.
+    if (own?.of !== undefined) {
+      await this.#stop(own.key, "cancelled");
+      for (const d of this.#draftsFor(own.key)) await this.#forget(d.id, d.original ? "kept as it was" : "cancelled");
+      await this.#reopen();
+      for (const f of this.#docs.keys()) this.#drawSoon(f);
+      return {};
+    }
+    const at = this.#newLine(file, line);
+    if (!at) return { error: "this is not a new: line" };
+    const words = at.d.words!;
+    await this.#stop(words, "cancelled");
+    for (const d of this.#draftsFor(words)) await this.#forget(d.id, "cancelled");
+    await this.#reopen();
+    return { replace: `${opener(splitLines(at.doc.text)[line] ?? "")} ${words}` };
+  }
+
+  // Taking too long: only the draft being made stops. A draft already made
+  // for the line stays, to keep or reroll, and the line stays as it is.
+  async stop(file: string, line: number): Promise<DraftDone> {
+    const at = this.#draftLine(file, line);
+    if (!at) return { error: "this line has no draft" };
+    await this.#stop(at.key, "stopped");
+    // A site's part with no other take than itself is just the part again.
+    const left = this.#draftsFor(at.key);
+    if (at.of !== undefined && left.every((d) => d.original)) for (const d of left) await this.#forget(d.id, "kept as it was");
+    await this.#reopen();
+    for (const f of this.#docs.keys()) this.#drawSoon(f);
+    return {};
+  }
+
+  // The catalog's part that does this already, in place of the line.
+  async use(file: string, line: number): Promise<DraftDone> {
+    const at = this.#newLine(file, line);
+    const latest = at && this.#draftsFor(at.d.words!)[0];
+    if (!at || latest?.status !== "exists" || !latest.name) return { error: "no part of the catalog was found for this line" };
+    for (const d of this.#draftsFor(at.d.words!)) await this.#forget(d.id, `used ${latest.name}`);
+    return { replace: `${opener(splitLines(at.doc.text)[line] ?? "")} ${latest.name}`, ...this.#drop(at.d, latest.name) };
+  }
+
+  // A part that takes nothing inside has no block, so the `new:` line's closer goes.
+  #drop(d: Directive, part: string): { drop?: number } {
+    return this.site.catalog.parts[part]?.empty && d.close !== undefined ? { drop: d.close } : {};
+  }
+
+  // Waits for every draft in flight. For tests.
+  async drafted(): Promise<void> {
+    while (this.#running.size > 0) await Promise.all([...this.#running.values()].map((r) => r.done));
+    await this.settle();
+  }
+
+  async #stop(key: string, outcome: string): Promise<void> {
+    const run = this.#running.get(key);
+    if (!run) return;
+    run.stop.abort();
+    // A run still starting has no id yet; its work starts once it has one.
+    for (let waited: Promise<void> | undefined; waited !== run.done; ) {
+      waited = run.done;
+      this.#drafts.delete(run.id);
+      await waited.catch(() => {});
+    }
+    if (this.#running.get(key) === run) this.#running.delete(key);
+    await this.#forget(run.id, outcome);
+  }
+
+  // The writer is done with a draft: it leaves the drafts, and goes, whole,
+  // to the drafts' log with what became of it, and a line in the index.
+  async #forget(id: string, outcome: string): Promise<void> {
+    this.#drafts.delete(id);
+    if (!id) return;
+    const root = this.site.root;
+    const from = join(root, DRAFTS, id);
+    const state = await readFile(join(from, "state.json"), "utf8").then((t) => JSON.parse(t) as DraftState).catch(() => undefined);
+    try {
+      await mkdir(join(root, DRAFT_LOGS), { recursive: true });
+      // Brought back once and cancelled again: the newer copy replaces it.
+      await rm(join(root, DRAFT_LOGS, id), { recursive: true, force: true });
+      await rename(from, join(root, DRAFT_LOGS, id));
+    } catch {
+      await rm(from, { recursive: true, force: true });
+    }
+    if (!state) return;
+    const line = {
+      id, words: state.words, ...(state.of !== undefined ? { of: state.of } : {}), by: state.by, status: state.status, name: state.name, message: state.message, outcome,
+      started: new Date(state.started).toISOString(),
+      seconds: state.finished ? Math.round((state.finished - state.started) / 1000) : undefined,
+      // What it took, to study the tools and the brief by.
+      kind: state.kind, drafter: state.drafter, brief: state.brief, runs: state.runs,
+      // Passed the checks the first time they ran; nothing when they never did.
+      firstTry: state.refused === undefined ? undefined : state.refused === 0,
+      resumed: state.resumed, ...state.stats,
+    };
+    await appendFile(join(root, DRAFT_INDEX), JSON.stringify(line) + "\n").catch(() => {});
+  }
+
+  // The site again, with its own parts and drafts as they are now on disk.
+  async #reopen(): Promise<void> {
+    try {
+      await this.reload(await openSite(this.site.root, this.lineTheme));
+    } catch {}
+  }
+
+  // A note on each `new:` line saying where its draft is.
+  #newNotes(doc: Doc): Note[] {
+    if (doc.page === "site") return [];
+    const src = splitLines(doc.text);
+    const notes: Note[] = [];
+    for (const d of scan(doc.text, this.site.catalog).directives) {
+      if (d.kind !== "new") continue;
+      const at = { line: d.line, start: 0, end: src[d.line]!.length };
+      const words = d.words ?? "";
+      const newest = this.#draftsFor(words)[0];
+      const shown = this.#shown(words);
+      // A ready line is about the take on screen, which is the one Keep keeps.
+      const latest = newest?.status === "ready" && shown ? shown : newest;
+      const showing = shown?.name ? `; ${shown.name} is drawn in the preview meanwhile` : "";
+      // The block's last line, for the editor to mark the whole block.
+      const close = d.close === undefined ? {} : { close: d.close };
+      const data = latest
+        ? { data: { status: latest.status, ...(latest.name ? { name: latest.name } : {}), ...(latest.by ? { by: latest.by } : {}), started: latest.started, ...(shown?.name && shown !== latest ? { shown: shown.name } : {}), ...this.#takes(words), ...close } }
+        : { data: { status: "none", ...close, ...(() => {
+          const earlier = words ? this.#earlier(words).length : 0;
+          return earlier ? { earlier } : {};
+        })() } };
+      const here = { ...at, ...data };
+      if (words === "") notes.push({ ...here, code: "new-part", severity: "information", message: "say after new: what the part should be" });
+      else if (!this.#harness) notes.push({ ...here, code: "new-part", severity: "information", message: "a new part, but this editor has no harness to draft it" });
+      else if (!this.site.ownMounted) notes.push({ ...here, code: "new-part", severity: "warning", message: NOT_MOUNTED });
+      else if (!latest) notes.push({ ...here, code: "new-part", severity: "information", message: "a new part for these words: the accept key drafts one, in a minute or two" });
+      else if (latest.status === "drafting") notes.push({ ...here, code: "drafting", severity: "information", message: `drafting a part for these words${showing}` });
+      else if (latest.status === "ready") notes.push({ ...here, code: "draft-ready", severity: "information", message: `drafted ${latest.name}, drawn in the preview: the accept key keeps it, rerolls it or cancels` });
+      else if (latest.status === "exists") notes.push({ ...here, code: "draft-exists", severity: "information", message: `the catalog has this already: ${latest.name}${latest.message ? `. ${latest.message}` : ""} The accept key uses it or drafts one anyway` });
+      else notes.push({ ...here, code: "draft-failed", severity: "warning", message: `the draft failed: ${latest.message ?? "no reason given"}. The accept key tries again${showing}` });
+    }
+    // A site's own part being redrafted: where its takes are.
+    for (const d of scan(doc.text, this.site.catalog).directives) {
+      const of = this.#ownPart(doc, d);
+      if (of === undefined) continue;
+      const key = ownKey(of);
+      const newest = this.#draftsFor(key)[0];
+      if (!newest) continue;
+      const shown = this.#shown(key);
+      const latest = newest.status === "ready" && shown ? shown : newest;
+      const here = {
+        line: d.line, start: 0, end: src[d.line]!.length,
+        data: {
+          status: latest.status, name: of, of, ...(latest.by ? { by: latest.by } : {}), started: latest.started,
+          ...(shown && shown !== latest ? { shown: shown.original ? "the kept one" : `take ${this.#takes(key).take}` } : {}),
+          ...this.#takes(key), ...(d.close === undefined ? {} : { close: d.close }),
+        },
+      };
+      if (latest.status === "drafting") notes.push({ ...here, code: "drafting", severity: "information", message: `drafting another take of ${of}` });
+      else if (latest.status === "ready") notes.push({ ...here, code: "draft-ready", severity: "information", message: `${shown?.original ? `${of} as it was kept` : `another take of ${of}`}, drawn in the preview: the accept key keeps it, rerolls or goes back` });
+      else notes.push({ ...here, code: "draft-failed", severity: "warning", message: `another take of ${of} failed: ${latest.message ?? "no reason given"}. The accept key tries again or goes back` });
+    }
+    return notes;
   }
 
   // Completion of the plain form, on a line starting with ::: : the parts, then a part's settings, then a setting's values. Words
@@ -658,7 +1267,7 @@ export class Workspace {
       // opening a page, and only for a pin with nothing wrong in it.
       if (
         this.#refiner && d.plain && d.refine && d.line !== except && d.problems.length === 0 &&
-        refineWords(d.refine.words) !== "" && Object.hasOwn(this.site.catalog.parts, d.plain.part) &&
+        refineWords(d.refine.words) !== "" && Object.hasOwn(this.site.catalog.parts, d.plain.part) && !this.#isOwn(d.plain.part) &&
         !this.#cache.getRefine(this.site.catalog, d.plain.part, d.refine.words)
       ) {
         void this.#askRefine(doc.page, d.plain.part, d.refine.words);
@@ -732,20 +1341,79 @@ export class Workspace {
   async #render(file: string): Promise<void> {
     const doc = this.#docs.get(file);
     if (!doc) return;
-    const { entries, diagnostics } = await this.#write(doc.rel, doc.page, doc.text, doc.chosen);
+    // The text drawn, which the starters are read against: the writer may
+    // type on while it's written.
+    const text = doc.text;
+    const { entries, diagnostics } = await this.#write(doc.rel, doc.page, text, doc.chosen);
+    this.#sendStarters(file, { ...doc, text }, entries);
     this.#publish(file, [
       ...diagnostics.map((d): Note => ({ ...d, severity: d.code === "other-skin" || d.code === "theme-unpicked" ? "information" : "warning" })),
       ...this.#wordsNotes(doc, entries),
       ...this.#neededNotes(doc, entries),
       ...this.#refineNotes(doc),
       ...this.#fileNotes(doc),
+      ...this.#newNotes(doc),
     ].sort((a, b) => a.line - b.line || a.start - b.start));
+  }
+
+  // The empty blocks of a page whose parts have a starter.
+  starters(file: string): Starter[] {
+    const doc = this.#docs.get(file);
+    return doc ? this.#startersOf(doc, preprocess(doc.text, this.site.catalog, this.#resolve(doc.page, doc.chosen)).entries) : [];
+  }
+
+  #startersOf(doc: Doc, entries: Entry[]): Starter[] {
+    if (doc.page === "site") return [];
+    const src = splitLines(doc.text);
+    const out: Starter[] = [];
+    for (const e of entries) {
+      if (!e.placed || !e.plain || e.close === undefined) continue;
+      const name = e.plain.split(/\s/)[0]!;
+      const body = this.site.catalog.parts[name]?.body;
+      if (!body) continue;
+      if (!src.slice(e.line + 1, e.close).every((l) => l.trim() === "")) continue;
+      out.push({ line: e.line, close: e.close, opener: src[e.line]!, part: name, body: body.replace(/\n+$/, "").split("\n") });
+    }
+    return out;
+  }
+
+  #sendStarters(file: string, doc: Doc, entries: Entry[]): void {
+    if (!this.#onStarters) return;
+    const starters = this.#startersOf(doc, entries);
+    const own = this.#ownLines(doc);
+    const key = JSON.stringify([starters, own]);
+    if (this.#starters.get(file) === key) return;
+    this.#starters.set(file, key);
+    this.#onStarters(file, starters, own);
+  }
+
+  // The lines of a page placing the site's own parts.
+  ownLines(file: string): OwnLine[] {
+    const doc = this.#docs.get(file);
+    return doc ? this.#ownLines(doc) : [];
+  }
+
+  #ownLines(doc: Doc): OwnLine[] {
+    const src = splitLines(doc.text);
+    return scan(doc.text, this.site.catalog).directives.flatMap((d) => {
+      const part = this.#ownPart(doc, d);
+      if (part === undefined) return [];
+      const { takes } = this.#takes(ownKey(part));
+      return [{ line: d.line, opener: src[d.line]!, part, ...(takes ? { takes } : {}) }];
+    });
   }
 
   // The cache's lookup, with the pick the writer has moved to in its place.
   #resolve(page: PageKind, chosen: Doc["chosen"]): Resolve {
     const cached = this.#cache.resolver(this.site.catalog, page);
-    return (words) => (chosen?.words === words ? parsePlain(chosen.plain) : cached(words));
+    return (words, kind) => {
+      // A `new:` line draws its finished draft, while the writer looks at it.
+      if (kind === "new") {
+        const name = this.#shown(words)?.name;
+        return name && Object.hasOwn(this.site.catalog.parts, name) ? parsePlain(name) : undefined;
+      }
+      return chosen?.words === words ? parsePlain(chosen.plain) : cached(words);
+    };
   }
 
   async #write(rel: string, page: PageKind, text: string, chosen?: Doc["chosen"]) {
@@ -919,7 +1587,7 @@ export class Workspace {
     const src = splitLines(doc.text);
     const notes: Note[] = [];
     for (const d of scan(doc.text, this.site.catalog).directives) {
-      if (!d.plain || !d.refine || refineWords(d.refine.words) === "") continue;
+      if (!d.plain || !d.refine || refineWords(d.refine.words) === "" || this.#isOwn(d.plain.part)) continue;
       const at = { line: d.line, start: d.refine.start, end: src[d.line]!.length };
       const part = d.plain.part;
       const hit = this.#cache.getRefine(this.site.catalog, part, d.refine.words);

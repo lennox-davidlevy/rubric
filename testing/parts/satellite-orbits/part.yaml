@@ -1,0 +1,18 @@
+name: satellite-orbits
+description: Satellites orbiting one Earth, each with its own attached text.
+children: true
+settings:
+  pace:
+    type: choice
+    default: slow
+    values:
+      slow: satellites move slowly around Earth
+      still: satellites stay in place
+body: |
+  ### Satellite name
+
+  Write about this satellite.
+
+  ### Another satellite
+
+  Write about this satellite.

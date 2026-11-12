@@ -35,7 +35,8 @@ export interface Output {
 }
 
 // Looks up the plain form a words line resolved to: the cache, in the server.
-export type Resolve = (words: string) => PlainForm | undefined;
+// For a `new` line, the draft made for it, if there is one yet.
+export type Resolve = (words: string, kind?: "words" | "new") => PlainForm | undefined;
 
 // `place` is where the text is: a page ("writing") or rubric.md ("site"). A
 // part chosen in the other place is left as text, with a diagnostic.
@@ -77,13 +78,13 @@ export function preprocess(text: string, catalog: Catalog, resolve: Resolve = ()
     }
     let form = d.plain;
     let problems = d.problems;
-    if (!form && d.kind === "words" && d.words !== undefined) {
-      form = resolve(d.words);
+    if (!form && (d.kind === "words" || d.kind === "new") && d.words !== undefined) {
+      form = resolve(d.words, d.kind);
       // A cached pick the catalog no longer allows. Its spans point into the
       // cached text, not the line, so the whole line is marked instead.
       if (form) {
         const picked = formatPlain(form);
-        problems = validatePlain(form, catalog, d.line).map((p) => ({
+        problems = validatePlain(form, catalog, d.line, d.kind === "new").map((p) => ({
           ...p, ...whole(d.line), message: `the pick for these words, ${picked}, no longer fits the catalog: ${p.message}`,
         }));
       }

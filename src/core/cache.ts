@@ -19,7 +19,11 @@ export function refineWords(words: string): string {
   return words.toLowerCase().replace(/\s+/g, " ").replace(/[\s.,;:!?]+$/, "").trim();
 }
 
-const skinKey = (catalog: Catalog) => (catalog.skin ? [`skin:${catalog.skin.name}@${catalog.skin.version}`] : []);
+// The site's own parts are read by Jev too.
+const skinKey = (catalog: Catalog) => [
+  ...(catalog.skin ? [`skin:${catalog.skin.name}@${catalog.skin.version}`] : []),
+  ...(catalog.own ? [`own:${catalog.own}`] : []),
+];
 
 export class Cache {
   // Words lines and refinements share one file; their keys never collide.
@@ -71,8 +75,9 @@ export class Cache {
   }
 
   // The preprocessor's lookup: the plain form a words line was placed as.
-  resolver(catalog: Catalog, page: PageKind): (words: string) => PlainForm | undefined {
-    return (words) => {
+  resolver(catalog: Catalog, page: PageKind): (words: string, kind?: "words" | "new") => PlainForm | undefined {
+    return (words, kind) => {
+      if (kind === "new") return undefined;
       const hit = this.get(catalog, page, words);
       return hit?.outcome === "placed" && hit.candidates[0] ? parsePlain(hit.candidates[0].plain) : undefined;
     };
