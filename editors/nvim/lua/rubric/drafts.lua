@@ -140,6 +140,10 @@ local function preview_list(title, items, show, done, at)
       item.idx = i
     end
     local chosen
+    -- The picker reports its first entry as it opens, before the cursor is
+    -- put where it starts: nothing is drawn until then, or the page would
+    -- flash the first entry every time.
+    local shown = false
     snacks.picker.pick({
       title = title,
       items = items,
@@ -148,14 +152,17 @@ local function preview_list(title, items, show, done, at)
       end,
       layout = { preset = "select" },
       on_show = function(picker)
+        shown = true
         if at and at > 1 then
           pcall(function()
             picker.list:set_target(at)
           end)
+        elseif items[1] then
+          show(items[1])
         end
       end,
       on_change = function(_, item)
-        if item then
+        if item and shown then
           show(item)
         end
       end,
@@ -234,8 +241,8 @@ local function takes_list(client, bufnr, row, view, back)
       chunks = {
         { what, "SnacksPickerLabel" },
         { "  " .. made(t.at), "Number" },
-        { now, "DiagnosticOk" },
         { rest, "Comment" },
+        { now, "DiagnosticOk" },
       },
     })
   end

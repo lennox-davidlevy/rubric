@@ -602,7 +602,8 @@ export class Workspace {
     if (takes.length < 2) return {};
     return {
       list: takes.map((d) => ({
-        at: d.finished ?? d.started,
+        // When it was started, which is what they are ordered by.
+        at: d.started,
         ...(d.drafter ? { by: `${shortDrafter({ ...d.drafter, harness: d.drafter.harness as HarnessName })}${d.mode === "tools" ? ", tools" : ""}` } : {}),
         ...(d.change ? { change: d.change } : {}),
         ...(d.original ? { original: true as const } : {}),
@@ -789,7 +790,9 @@ export class Workspace {
     const next = to !== undefined ? takes[to - 1] : takes[(takes.indexOf(shown) + step + takes.length * 10) % takes.length]!;
     if (!next) return this.draft(file, line);
     if (next === shown) return this.draft(file, line);
-    const chosen: DraftState = { ...next, chosen: Date.now() };
+    // Later than the take on screen, even within one millisecond, so two
+    // moves in a row always end on the second.
+    const chosen: DraftState = { ...next, chosen: Math.max(Date.now(), Math.max(shown.chosen ?? 0, shown.finished ?? shown.started) + 1) };
     this.#drafts.set(chosen.id, chosen);
     await saveState(this.site.root)(chosen);
     await this.#reopen();
