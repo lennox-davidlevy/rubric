@@ -1,0 +1,22 @@
+name: steak-plate
+description: A heading over a plate with a steak on it, knife and fork laid beside it, untouched, with steam rising or gone cold.
+children: true
+body: |
+  ## Your heading
+
+  A line or two beneath it.
+settings:
+  steam:
+    type: choice
+    default: cooling
+    values:
+      hot: thick steam rising fast, just off the pan
+      cooling: a few slow wisps of steam
+      cold: no steam, the steak gone cold
+  size:
+    type: choice
+    default: medium
+    values:
+      small: a small plate
+      medium: a plate of ordinary size
+      large: a big plate

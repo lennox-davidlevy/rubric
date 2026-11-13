@@ -1,0 +1,18 @@
+{{- $x := partial "rubric/sections.html" (dict "html" .inner "level" 3) -}}
+<div class="part part-tide-chart rise-{{ .s.rise }} pace-{{ .s.pace }}">
+{{- with trim (string $x.before) " \n" }}<div class="stack tide-chart-intro">{{ . | safeHTML }}</div>{{ end }}
+<ul>
+{{- range $i, $it := $x.items }}
+<li style="--level: {{ $i }}">
+<div class="tide-chart-text">
+{{ with $it.title }}<h3>{{ . }}</h3>{{ end }}
+<div class="stack">{{ $it.body }}</div>
+</div>
+<div class="tide-chart-sea" aria-hidden="true">
+<div class="tide-chart-swell"><svg viewBox="0 0 240 16" preserveAspectRatio="none" focusable="false"><path class="tide-chart-fill" d="M0 8 Q15 2 30 8 T60 8 T90 8 T120 8 T150 8 T180 8 T210 8 T240 8 V16 H0 Z"/><path class="tide-chart-crest" d="M0 8 Q15 2 30 8 T60 8 T90 8 T120 8 T150 8 T180 8 T210 8 T240 8"/></svg></div>
+<div class="tide-chart-water"></div>
+</div>
+</li>
+{{- end }}
+</ul>
+</div>

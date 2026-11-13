@@ -9,7 +9,7 @@
 .part-header-nav a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); }
 .part-header.sticky-stays { border-bottom: 0; }
 
-.flow > :is(h1, h2, h3, h4)::before, .page-header h1::before { content: "# "; color: var(--accent); }
+.flow > :is(h1, h2, h3, h4):where(:not(.part, .part *))::before, .page-header h1::before { content: "# "; color: var(--accent); }
 .flow > .catalog-part::before { content: none; }
 
 /* A link is underlined in the accent, and fills with it on hover. */

@@ -1,5 +1,5 @@
 name: universal
-version: 9
+version: 10
 
 # Every component a website needs, as contracts only: what each part is,
 # its settings and what it expects inside. Nothing here is drawn yet. Drawn
@@ -458,7 +458,7 @@ parts:
           raised: each box lifted off the page with a shadow
 
   steps:
-    description: Numbered steps to follow in order, each with a short title.
+    description: Numbered points in order, each with a short title, such as steps to follow or lessons learned.
     children: true
     body: |
       ### The first step

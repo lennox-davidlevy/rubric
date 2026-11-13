@@ -47,6 +47,13 @@ export interface Part {
   // a draft the writer is looking at, which only its `::: new:` line draws
   // and Jev is never asked about.
   origin?: "site" | "draft";
+  // Drafted from a writer's words and then kept for every theme: a catalog
+  // part like any other, but offered with the writer's own when they look
+  // for parts they already have.
+  drafted?: true;
+  // The site's own drawing of a catalog part, under the catalog's name: it
+  // takes the catalog's place on this site.
+  changed?: true;
 }
 
 export interface Catalog {
@@ -164,9 +171,10 @@ export function parseSkin(text: string, catalog: Catalog): Skin {
 }
 
 // The catalog with the site's own parts and the drafts being looked at added.
-// A name the catalog already has stays the catalog's.
+// A name the catalog already has stays the catalog's, unless the site's part
+// is its own drawing of it.
 export function withOwn(catalog: Catalog, own: Record<string, Part>): Catalog {
-  const added = Object.entries(own).filter(([name]) => !Object.hasOwn(catalog.parts, name));
+  const added = Object.entries(own).filter(([name, p]) => !Object.hasOwn(catalog.parts, name) || p.changed);
   if (added.length === 0) return catalog;
   const kept = added.filter(([, p]) => p.origin === "site").sort(([a], [b]) => a.localeCompare(b));
   return {
@@ -174,6 +182,24 @@ export function withOwn(catalog: Catalog, own: Record<string, Part>): Catalog {
     parts: { ...catalog.parts, ...Object.fromEntries(added) },
     ...(kept.length ? { own: fingerprint(JSON.stringify(kept)) } : {}),
   };
+}
+
+// What `part` lacks of `was`: each setting it dropped or made another kind,
+// and each value of a choice or level it dropped, as `setting` or
+// `setting=value`. A change may add settings, never take one away, since
+// lines already use them.
+export function missingSettings(was: Part, part: Part): string[] {
+  const missing: string[] = [];
+  for (const [key, def] of Object.entries(was.settings)) {
+    const now = part.settings[key];
+    if (!now || now.type !== def.type) {
+      missing.push(key);
+      continue;
+    }
+    const values = (s: Setting) => (s.type === "choice" ? Object.keys(s.values) : s.type === "level" ? Object.keys(s.levels) : []);
+    for (const v of values(def)) if (!values(now).includes(v)) missing.push(`${key}=${v}`);
+  }
+  return missing;
 }
 
 // One part's entry on its own, as a draft or a site's part is written:
@@ -255,7 +281,7 @@ function parsePart(rawPart: unknown, at: string): Part {
   const already = part.already === undefined ? {} : {
     already: Object.fromEntries(Object.entries(record(part.already, `${at}.already`)).map(([k, v]) => [k, string(v, `${at}.already.${k}`)])),
   };
-  return { description: string(part.description, `${at}.description`), place, ...body, children, ...(empty ? { empty: true as const } : {}), script, settings, ...already };
+  return { description: string(part.description, `${at}.description`), place, ...body, children, ...(empty ? { empty: true as const } : {}), script, settings, ...(part.drafted === true ? { drafted: true as const } : {}), ...already };
 }
 
 function setting(raw: unknown, at: string): Setting {

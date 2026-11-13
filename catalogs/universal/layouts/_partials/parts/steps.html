@@ -2,7 +2,7 @@
 <ol class="part part-steps">
 {{- range $x.items }}
 <li>
-<h3>{{ .title }}</h3>
+{{ with .title }}<h3>{{ . }}</h3>{{ end }}
 <div class="stack">
 {{ .body }}
 </div>

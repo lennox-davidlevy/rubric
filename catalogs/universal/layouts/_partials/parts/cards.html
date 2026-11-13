@@ -4,7 +4,7 @@
 <ul>
 {{- range $x.items }}
 <li class="stack">
-<h3>{{ .title }}</h3>
+{{ with .title }}<h3>{{ . }}</h3>{{ end }}
 {{ .body }}
 </li>
 {{- end }}

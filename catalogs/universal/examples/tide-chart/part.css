@@ -1,0 +1,95 @@
+/* tide-chart: each item rides on water a little higher than the last. */
+.part-tide-chart {
+  --rise: var(--space-2);
+  --swell: var(--space-2);
+  --pace: 18s;
+  color: var(--ink);
+}
+.part-tide-chart.rise-gentle { --rise: calc(var(--space-1) * 0.75); }
+.part-tide-chart.rise-steep { --rise: var(--space-3); }
+.part-tide-chart.pace-lively { --pace: 8s; }
+
+.part-tide-chart-intro,
+.part-tide-chart .tide-chart-intro {
+  margin-bottom: var(--space-3);
+}
+
+.part-tide-chart ul {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.part-tide-chart li {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  min-width: 0;
+}
+
+.part-tide-chart .tide-chart-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding-inline-start: var(--space-2);
+}
+.part-tide-chart h3 {
+  margin: 0;
+  font-size: var(--step-1);
+  color: var(--heading);
+}
+.part-tide-chart .stack {
+  margin-top: var(--space-1);
+}
+
+/* The sea under each item: a rolling crest over a body of water that deepens item by item. */
+.part-tide-chart .tide-chart-sea {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+}
+.part-tide-chart .tide-chart-swell {
+  height: var(--swell);
+  width: 200%;
+  animation: tide-chart-roll var(--pace) linear infinite;
+  animation-delay: calc(var(--level) * -1.7s);
+}
+.part-tide-chart.pace-still .tide-chart-swell { animation: none; }
+.part-tide-chart .tide-chart-swell svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.part-tide-chart .tide-chart-fill {
+  fill: var(--tint);
+}
+.part-tide-chart .tide-chart-crest {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: calc(var(--border) * 1.5);
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The water itself, with gauge marks along its left edge like a tide staff. */
+.part-tide-chart .tide-chart-water {
+  height: calc(var(--space-1) + min(var(--level), 8) * var(--rise));
+  margin-top: calc(var(--border) * -1);
+  background:
+    repeating-linear-gradient(to top, var(--rule) 0 var(--border), transparent var(--border) var(--space-1))
+      left bottom / var(--space-2) 100% no-repeat,
+    var(--tint);
+  border-inline-start: var(--border) var(--rule-style) var(--muted);
+  transition: height 0.4s ease;
+}
+
+@keyframes tide-chart-roll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .part-tide-chart .tide-chart-swell { animation: none; }
+  .part-tide-chart .tide-chart-water { transition: none; }
+}

@@ -18,6 +18,12 @@ export const THRESHOLDS = {
   settled: 0.6,
   // The runner-up part is offered beside the pick when it has at least this.
   close: 0.3,
+  // Before a new part is drafted, the writer can look at parts they already
+  // have that are near the words: every part the Choice gives at least this
+  // much, at most `nearMost` of them. Loose on purpose: looking costs a
+  // glance, and nothing is placed. Not yet tuned against a probe.
+  near: 0.05,
+  nearMost: 4,
   // How sure the part Choice itself is. A pick is placed on a clear fit only
   // when the Choice gives it at least a majority; a split Choice means the
   // line could be either, so both are offered. When the Choice is this sure,
@@ -121,6 +127,37 @@ export function themeQuestion(themes: { name: string; description: string }[]): 
       criteria: Object.fromEntries(themes.map((t) => [t.name, t.description])),
     },
   };
+}
+
+// What a request for a new part needs, one Noul each over the writer's
+// words, asked beside the draft and saved with its record (`traits` in
+// drafts.jsonl): the kinds of craft a request calls for, to study which
+// examples help which kind, and what a writer keeps. Nothing is decided
+// from them yet. Probed 2026-11-12 on the 39 requests of the first day's
+// record (docs/plan.md, "Faster drafts"); asking whether the request goes
+// with a heading was dropped, since nearly every request does.
+export const TRAITS: Record<string, string> = {
+  moves: "Does `request` ask for something that moves?",
+  surface: "Does `request` ask for an object that holds the writing, such as a card, a sheet of paper, a sign or a frame?",
+  list: "Would the writer fill the thing `request` asks for with a list?",
+  amount: "Does `request` ask to show a number, an amount or progress?",
+  picture: "Does `request` ask for a place to put a photo or picture?",
+  abstract: "Does `request` describe a feeling or an idea without naming what to draw?",
+};
+export function traitQuestions(): Record<string, Question> {
+  return Object.fromEntries(Object.entries(TRAITS).map(([id, instructions]) => [id, { type: "noul", instructions }]));
+}
+
+// Whether the picture of a drafted part shows the thing it is named for: one
+// Noul over an image, for the bench only (scripts/bench.ts), a number to
+// compare drafters and briefs by without a person looking. Probed
+// 2026-11-12: polaroids drawn with no card around them got 0.69 and 0.78,
+// good ones 0.97; a constellation whose lines missed their stars 0.68, the
+// fixed one 0.91. It did not tell flat stitches from better ones, and gave a
+// river heading the writer kept 0.08, so it decides nothing in a draft.
+export const SHOWN = "shown";
+export function shownQuestion(thing: string): Record<string, Question> {
+  return { [SHOWN]: { type: "noul", instructions: `Is there a ${thing} in \`picture\`?` } };
 }
 
 // Which part `directive` asks for: one Choice among the catalog's parts.

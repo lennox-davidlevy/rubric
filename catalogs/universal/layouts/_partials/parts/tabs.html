@@ -1,6 +1,6 @@
 {{- /* Each ## heading is a tab. Without the script the panels are headings
      and sections, one after another; js/parts/tabs.js makes them tabs. */ -}}
-{{- $x := partial "rubric/sections.html" (dict "html" .inner "level" 2) -}}
+{{- $x := partial "rubric/sections.html" (dict "html" .inner "level" 2 "parts" false) -}}
 <div class="part part-tabs">
 {{- range $x.items }}
 <section class="part-tabs-panel">

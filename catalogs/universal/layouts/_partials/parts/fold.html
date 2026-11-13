@@ -1,6 +1,6 @@
 {{- /* One closed section, or, when the block has ## headings, one per
      heading: a list of questions and answers. */ -}}
-{{- $x := partial "rubric/sections.html" (dict "html" .inner "level" 2) -}}
+{{- $x := partial "rubric/sections.html" (dict "html" .inner "level" 2 "parts" false) -}}
 {{- if $x.items }}
 <div class="part part-fold-group">
 {{- range $i, $it := $x.items }}

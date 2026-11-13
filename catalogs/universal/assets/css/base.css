@@ -355,17 +355,56 @@ button:hover { background: var(--accent); border-color: var(--accent); }
    They win over the part's own drawing and the skin's layer (two classes),
    since the writer asked for them; a skin draws them its own way by
    redefining these. A part with no picture or player in it gets room inside
-   its shadow or line. */
-.part:is(.look-shadow-soft, .look-shadow-deep) { border-radius: var(--radius); }
-.part.look-shadow-soft { box-shadow: var(--shadow-soft); }
-.part.look-shadow-deep { box-shadow: var(--shadow-deep); }
-.part.look-border-outlined { border: var(--border) solid color-mix(in srgb, var(--ink) 28%, transparent); border-radius: var(--radius); }
-.part:is(.look-shadow-soft, .look-shadow-deep, .look-border-outlined):not(:has(img, video, iframe, audio, svg)) { padding: var(--space-2) var(--space-3); }
-.part.look-corners-square, .part.look-corners-square :is(img, video, iframe, pre) { border-radius: 0; }
-.part.look-corners-round { border-radius: 1.25rem; }
+   its shadow or line.
+
+   They are drawn on the part's outer element. A part whose outer element
+   is only a wrapper around what it draws (a note, a frame, each slip on a
+   line) marks that `look-surface`, at most four levels inside the outer
+   element and never inside another part, and the look is drawn on it
+   instead; the wrapper stays bare. */
+.part:is(.look-shadow-soft, .look-shadow-deep):where(:not(:has(> .look-surface, > :not(.part) > .look-surface, > :not(.part) > :not(.part) > .look-surface, > :not(.part) > :not(.part) > :not(.part) > .look-surface))),
+.part:is(.look-shadow-soft, .look-shadow-deep) > .look-surface,
+.part:is(.look-shadow-soft, .look-shadow-deep) > :where(:not(.part)) > .look-surface,
+.part:is(.look-shadow-soft, .look-shadow-deep) > :where(:not(.part)) > :where(:not(.part)) > .look-surface,
+.part:is(.look-shadow-soft, .look-shadow-deep) > :where(:not(.part)) > :where(:not(.part)) > :where(:not(.part)) > .look-surface { border-radius: var(--radius); }
+.part.look-shadow-soft:where(:not(:has(> .look-surface, > :not(.part) > .look-surface, > :not(.part) > :not(.part) > .look-surface, > :not(.part) > :not(.part) > :not(.part) > .look-surface))),
+.part.look-shadow-soft > .look-surface,
+.part.look-shadow-soft > :where(:not(.part)) > .look-surface,
+.part.look-shadow-soft > :where(:not(.part)) > :where(:not(.part)) > .look-surface,
+.part.look-shadow-soft > :where(:not(.part)) > :where(:not(.part)) > :where(:not(.part)) > .look-surface { box-shadow: var(--shadow-soft); }
+.part.look-shadow-deep:where(:not(:has(> .look-surface, > :not(.part) > .look-surface, > :not(.part) > :not(.part) > .look-surface, > :not(.part) > :not(.part) > :not(.part) > .look-surface))),
+.part.look-shadow-deep > .look-surface,
+.part.look-shadow-deep > :where(:not(.part)) > .look-surface,
+.part.look-shadow-deep > :where(:not(.part)) > :where(:not(.part)) > .look-surface,
+.part.look-shadow-deep > :where(:not(.part)) > :where(:not(.part)) > :where(:not(.part)) > .look-surface { box-shadow: var(--shadow-deep); }
+.part.look-border-outlined:where(:not(:has(> .look-surface, > :not(.part) > .look-surface, > :not(.part) > :not(.part) > .look-surface, > :not(.part) > :not(.part) > :not(.part) > .look-surface))),
+.part.look-border-outlined > .look-surface,
+.part.look-border-outlined > :where(:not(.part)) > .look-surface,
+.part.look-border-outlined > :where(:not(.part)) > :where(:not(.part)) > .look-surface,
+.part.look-border-outlined > :where(:not(.part)) > :where(:not(.part)) > :where(:not(.part)) > .look-surface { border: var(--border) solid color-mix(in srgb, var(--ink) 28%, transparent); border-radius: var(--radius); }
+.part:is(.look-shadow-soft, .look-shadow-deep, .look-border-outlined):not(:has(img, video, iframe, audio, svg, .look-surface)) { padding: var(--space-2) var(--space-3); }
+.part.look-corners-square:where(:not(:has(> .look-surface, > :not(.part) > .look-surface, > :not(.part) > :not(.part) > .look-surface, > :not(.part) > :not(.part) > :not(.part) > .look-surface))),
+.part.look-corners-square > .look-surface,
+.part.look-corners-square > :where(:not(.part)) > .look-surface,
+.part.look-corners-square > :where(:not(.part)) > :where(:not(.part)) > .look-surface,
+.part.look-corners-square > :where(:not(.part)) > :where(:not(.part)) > :where(:not(.part)) > .look-surface,
+.part.look-corners-square :is(img, video, iframe, pre) { border-radius: 0; }
+.part.look-corners-round:where(:not(:has(> .look-surface, > :not(.part) > .look-surface, > :not(.part) > :not(.part) > .look-surface, > :not(.part) > :not(.part) > :not(.part) > .look-surface))),
+.part.look-corners-round > .look-surface,
+.part.look-corners-round > :where(:not(.part)) > .look-surface,
+.part.look-corners-round > :where(:not(.part)) > :where(:not(.part)) > .look-surface,
+.part.look-corners-round > :where(:not(.part)) > :where(:not(.part)) > :where(:not(.part)) > .look-surface { border-radius: 1.25rem; }
 .part.look-corners-round :is(img, video, iframe, pre) { border-radius: 1rem; }
-.part.look-text-smaller { font-size: var(--step--1); }
-.part.look-text-bigger { font-size: var(--step-1); }
+.part.look-text-smaller,
+.part.look-text-smaller > .look-surface,
+.part.look-text-smaller > :where(:not(.part)) > .look-surface,
+.part.look-text-smaller > :where(:not(.part)) > :where(:not(.part)) > .look-surface,
+.part.look-text-smaller > :where(:not(.part)) > :where(:not(.part)) > :where(:not(.part)) > .look-surface { font-size: var(--step--1); }
+.part.look-text-bigger,
+.part.look-text-bigger > .look-surface,
+.part.look-text-bigger > :where(:not(.part)) > .look-surface,
+.part.look-text-bigger > :where(:not(.part)) > :where(:not(.part)) > .look-surface,
+.part.look-text-bigger > :where(:not(.part)) > :where(:not(.part)) > :where(:not(.part)) > .look-surface { font-size: var(--step-1); }
 
 /* The live preview only: a part Jev placed whose block is still empty shows
    its starter body, faded, so its shape is there before the writing is. The

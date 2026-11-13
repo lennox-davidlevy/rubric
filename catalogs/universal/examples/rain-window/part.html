@@ -1,0 +1,22 @@
+{{- $n := 24 -}}
+{{- if eq .s.rain "drizzle" }}{{ $n = 12 }}{{ end -}}
+{{- if eq .s.rain "downpour" }}{{ $n = 40 }}{{ end -}}
+<div class="part part-rain-window rain-{{ .s.rain }} size-{{ .s.size }} opacity-{{ .s.opacity }}">
+  <div class="rain-window-frame look-surface">
+    <div class="rain-window-glass">
+      <div class="rain-window-rain" aria-hidden="true">
+        {{- range $i := seq $n }}
+        <span class="rain-window-streak" style="--x: {{ add 2 (mod (add (mul $i 41) 7) 96) }}%; --y: {{ mod (mul $i 37) 90 }}%; --d: -{{ mod (mul $i 29) 50 }}00ms; --t: {{ add 2600 (mul (mod (mul $i 7) 9) 300) }}ms; --len: {{ add 2 (mod (mul $i 5) 4) }};"></span>
+        {{- end }}
+        {{- range $i := seq 10 }}
+        <span class="rain-window-bead" style="--x: {{ add 4 (mod (mul $i 53) 92) }}%; --y: {{ add 6 (mod (mul $i 31) 86) }}%; --r: {{ add 2 (mod (mul $i 3) 3) }};"></span>
+        {{- end }}
+      </div>
+      <div class="rain-window-sash" aria-hidden="true"></div>
+      <div class="rain-window-copy">
+        {{ .inner }}
+      </div>
+    </div>
+  </div>
+  <div class="rain-window-sill" aria-hidden="true"></div>
+</div>

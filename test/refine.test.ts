@@ -4,7 +4,7 @@
 // copy of the review site on the universal catalog, with the stub resolvers.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -101,6 +101,30 @@ describe("in the editor", () => {
   });
 
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  // A site's own drawing of a catalog part has the catalog's settings, which
+  // Jev knows, unlike a part of the site's own.
+  test("on a catalog part the site has changed, the words are still asked", async () => {
+    const { catalogFiles } = await import("../src/parts.ts");
+    const files = catalogFiles(join(repo, "catalogs/universal"), "quote")!;
+    mkdirSync(join(dir, "parts/quote"), { recursive: true });
+    writeFileSync(join(dir, "parts/quote/part.yaml"), files.yaml);
+    writeFileSync(join(dir, "parts/quote/part.html"), files.html);
+    const site = await openSite(dir);
+    expect(site.catalog.parts.quote?.changed).toBe(true);
+    const changed = new Workspace(site, await Cache.load(site.cache), stubResolver(atPlace(site.catalog, "writing"), 5), () => {}, {
+      idleMs: 5, waitMs: 1000, drawMs: 5, refiner: stubRefiner(site.catalog, 5),
+    });
+    try {
+      const file = join(dir, "pages/posts/changed.md");
+      await changed.open(file, `${head}::: quote : with a soft shadow\nSaid.\n:::\n`);
+      await changed.settle();
+      expect((await changed.ghost(file, 3))[0]?.replace).toBe("::: quote shadow=soft");
+    } finally {
+      changed.dispose();
+      rmSync(join(dir, "parts"), { recursive: true, force: true });
+    }
+  });
 
   const head = "---\ntitle: T\n---\n";
 

@@ -1,0 +1,16 @@
+# Live test A (2026-11-13), and lines near steps: numbered points in order
+# that are not instructions, and lists that should stay something else.
+- { directive: a big opening for the top of the page, want: hero }
+- { directive: a tip for the reader, want: callout }
+- { directive: a quote from my grandmother, want: quote }
+- { directive: "the three things I learned, in order", want: steps }
+- { directive: the menu as a pdf, want: pdf }
+- { directive: a small quote in smaller text, want: quote }
+- { directive: a big centered quote from the interview, want: quote }
+- { directive: five lessons from my first marathon, want: steps }
+- { directive: "what I did first, then next, then last", want: steps }
+- { directive: my top three reasons to move, want: steps }
+- { directive: the history of the company year by year, want: timeline }
+- { directive: boxes for each service we offer, want: cards }
+- { directive: some big numbers about the project, want: stats }
+- { directive: a shopping cart, want: nothing }

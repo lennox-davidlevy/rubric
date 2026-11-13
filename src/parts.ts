@@ -16,19 +16,18 @@ import { copyFile, mkdir, readdir, readFile, rename, rm, writeFile } from "node:
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { parse, stringify } from "yaml";
-import { CatalogError, parseCatalog, parseOwnPart, writeWhole, type Catalog, type Part } from "./core/index.ts";
+import { CatalogError, missingSettings, parseCatalog, parseOwnPart, writeWhole, type Catalog, type Part } from "./core/index.ts";
 
-export type DraftStatus = "drafting" | "ready" | "failed" | "exists";
+export type DraftStatus = "drafting" | "ready" | "failed";
 
 export interface DraftState {
   id: string;
   // What the `::: new:` line asks for.
   words: string;
   status: DraftStatus;
-  // The part's name once drafted, or the catalog's part that already does
-  // this ("exists").
+  // The part's name once drafted.
   name?: string;
-  // Why it failed, or why the existing part fits.
+  // Why it failed.
   message?: string;
   started: number;
   finished?: number;
@@ -46,7 +45,15 @@ export interface DraftState {
   // step 7): what kind of draft, the drafter in parts, the brief's version,
   // the runs it took (2 when the checks sent it back), what they cost, and
   // whether it went on with the last take's conversation.
-  kind?: "first" | "fresh" | "another" | "change";
+  kind?: "first" | "another" | "change";
+  // What a reroll was asked to change, in the writer's words: the notes are
+  // the record of what a draft got wrong.
+  change?: string;
+  // What the words ask for, as Jev judged each kind (`TRAITS` in
+  // questions.ts); a take carries its first draft's.
+  traits?: Record<string, number>;
+  // How it was asked for: one turn with the files in the reply, or with tools.
+  mode?: "fast" | "tools";
   drafter?: { harness: string; model?: string; effort?: string };
   brief?: string;
   runs?: number;
@@ -95,9 +102,38 @@ export const DRAFT_INDEX = ".rubric/logs/drafts.jsonl";
 export const HUGO_TREE = ".rubric/hugo";
 const HUGO_DIRS = ["layouts/_shortcodes", "layouts/_partials/parts", "assets/css/parts", "assets/js/parts", "data"];
 
+// What a part's drawing may not do, as the checks hold a draft to it.
+export function drawingProblems(html: string): string[] {
+  const problems: string[] = [];
+  if (/<script/i.test(html)) problems.push("part.html: no scripts");
+  if (/\b(src|srcset)=["']?(https?:)?\/\//i.test(html) || /url\(\s*["']?(https?:)?\/\//i.test(html)) problems.push("part.html: nothing fetched from another site");
+  if (/\b(resources\.GetRemote|GetRemote|readFile|readDir|os\.ReadFile|os\.ReadDir|getenv|os\.Getenv)\b/.test(html)) problems.push("part.html: no reading files, the environment or other sites from the template");
+  return problems;
+}
+
+// Whether the site may have its own drawing of the catalog's part `name`: a
+// part in the writing, with no script, since a site's part brings none, and
+// whose drawing a take could keep and still pass the checks (a map or a
+// video fetches from another site, which a draft may not). `shared` is the
+// catalog as catalog.yaml has it, without a skin's additions; `themeDir`,
+// when given, is where its drawing is read from.
+const drawable = new Map<string, boolean>();
+export function changeable(shared: Catalog, name: string, themeDir?: string): boolean {
+  const p = Object.hasOwn(shared.parts, name) ? shared.parts[name]! : undefined;
+  if (p === undefined || p.place !== "writing" || p.script) return false;
+  if (themeDir === undefined) return true;
+  const file = join(themeDir, "layouts/_partials/parts", `${name}.html`);
+  if (!drawable.has(file)) drawable.set(file, drawingProblems(existsSync(file) ? readFileSync(file, "utf8") : "").length === 0);
+  return drawable.get(file)!;
+}
+
 // The site's parts and its finished drafts, checked against the catalog. One
-// that does not parse is left out and said why.
-export function readOwn(root: string, catalog: Catalog): { own: Record<string, Own>; problems: string[] } {
+// that does not parse is left out and said why. A site's part with a name
+// from `shared`, the catalog as catalog.yaml has it, is the site's own
+// drawing of that part, and takes its place while it has every setting the
+// catalog's has; one that has fallen behind is left out, and the catalog's
+// is drawn.
+export function readOwn(root: string, catalog: Catalog, shared: Catalog = catalog, themeDir?: string): { own: Record<string, Own>; problems: string[] } {
   const own: Record<string, Own> = {};
   const problems: string[] = [];
   const add = (dir: string, origin: "site" | "draft") => {
@@ -105,7 +141,14 @@ export function readOwn(root: string, catalog: Catalog): { own: Record<string, O
     if (!existsSync(file)) return;
     try {
       const { name, part } = parseOwnPart(readFileSync(file, "utf8"), catalog);
-      if (Object.hasOwn(catalog.parts, name) || Object.hasOwn(own, name)) throw new CatalogError(`${name} is already a part`);
+      if (Object.hasOwn(own, name)) throw new CatalogError(`${name} is already a part`);
+      if (Object.hasOwn(catalog.parts, name)) {
+        if (origin !== "site" || !changeable(shared, name, themeDir)) throw new CatalogError(`${name} is already a part`);
+        const behind = missingSettings(shared.parts[name]!, part);
+        if (behind.length) throw new CatalogError(`the catalog's ${name} has ${behind.join(", ")}, which this copy lacks, so the catalog's is drawn`);
+        own[name] = { part: { ...part, origin, changed: true }, dir };
+        return;
+      }
       own[name] = { part: { ...part, origin }, dir };
     } catch (err) {
       problems.push(`${relative(root, file)}: ${(err as Error).message}`);
@@ -113,17 +156,18 @@ export function readOwn(root: string, catalog: Catalog): { own: Record<string, O
   };
   for (const name of folders(join(root, "parts"))) add(join(root, "parts", name), "site");
   // Only the take on screen for each line: takes of the same words may share
-  // a name. Another take of a site's part is drawn in its place.
+  // a name. Another take of a site's part, or of a catalog part the site is
+  // changing, is drawn in its place.
   const drafts = readDrafts(root);
   for (const key of new Set(drafts.map(draftKey))) {
     const shown = shownTake(drafts, key);
     if (!shown) continue;
     if (shown.of !== undefined) {
-      if (shown.name !== shown.of || !Object.hasOwn(own, shown.of)) continue;
-      const kept = own[shown.of]!;
+      if (shown.name !== shown.of || !(Object.hasOwn(own, shown.of) || changeable(shared, shown.of, themeDir))) continue;
+      const kept = own[shown.of];
       delete own[shown.of];
       add(join(root, DRAFTS, shown.id), "site");
-      if (!Object.hasOwn(own, shown.of)) own[shown.of] = kept;
+      if (!Object.hasOwn(own, shown.of) && kept) own[shown.of] = kept;
     } else add(join(root, DRAFTS, shown.id), "draft");
   }
   return { own, problems };
@@ -132,7 +176,9 @@ export function readOwn(root: string, catalog: Catalog): { own: Record<string, O
 export function readDrafts(root: string): DraftState[] {
   return folders(join(root, DRAFTS)).flatMap((id) => {
     try {
-      return [JSON.parse(readFileSync(join(root, DRAFTS, id, "state.json"), "utf8")) as DraftState];
+      const state = JSON.parse(readFileSync(join(root, DRAFTS, id, "state.json"), "utf8")) as DraftState;
+      // Left by a version that asked whether the catalog had the part: not a draft.
+      return (state.status as string) === "exists" ? [] : [state];
     } catch {
       return [];
     }
@@ -204,14 +250,32 @@ export async function keepLocal(root: string, dir: string, name: string): Promis
 }
 
 // Another take of the site's part `name` replaces its files in parts/<name>/.
-export async function keepTake(root: string, dir: string, name: string): Promise<void> {
+// `fresh` is for a catalog part the site had no drawing of: its folder is made.
+export async function keepTake(root: string, dir: string, name: string, fresh = false): Promise<void> {
   const target = join(root, "parts", name);
+  if (fresh && !existsSync(target)) return keepLocal(root, dir, name);
   if (!existsSync(target)) throw new Error(`parts/${name} is not there any more`);
   const tmp = join(root, ".rubric/tmp");
   for (const f of PART_FILES) {
     if (existsSync(join(dir, f))) await writeWhole(join(target, f), await readFile(join(dir, f), "utf8"), tmp);
     else await rm(join(target, f), { force: true });
   }
+}
+
+// A catalog part's files as a site's part has them: its entry from
+// catalog.yaml with `name:` first, its drawing and its CSS. With `skin`, the
+// skin's own drawing of it when it has one, which is what the site shows.
+export function catalogFiles(themeDir: string, name: string, skin?: string): { yaml: string; html: string; css: string } | undefined {
+  const raw = (parse(readFileSync(join(themeDir, "catalog.yaml"), "utf8")) as { parts?: Record<string, unknown> } | undefined)?.parts ?? {};
+  if (!Object.hasOwn(raw, name)) return undefined;
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, "utf8").trim() : "");
+  return {
+    yaml: stringify({ name, ...(raw[name] as object) }).trim(),
+    html: read(skin && existsSync(join(themeDir, "layouts/_partials/skins", skin, "parts", `${name}.html`))
+      ? join(themeDir, "layouts/_partials/skins", skin, "parts", `${name}.html`)
+      : join(themeDir, "layouts/_partials/parts", `${name}.html`)),
+    css: read(join(themeDir, "assets/css/parts", `${name}.css`)),
+  };
 }
 
 // Where a site's part goes when the writer removes it, or puts it in the
@@ -241,6 +305,8 @@ export async function makeGlobal(themeDir: string, dir: string, name: string): P
   if (partsAt < 0 || lines.slice(partsAt + 1).some((l) => /^[a-z]/.test(l))) throw new Error("catalog.yaml does not end with its parts, so the new one has nowhere to go");
   const version = Number(/^version:\s*(\d+)/m.exec(was.catalog)?.[1]);
   if (!Number.isInteger(version)) throw new Error("catalog.yaml has no version");
+  // Where it came from stays with it, in the catalog.
+  entry.drafted = true;
   const indented = stringify(entry).trimEnd().split("\n").map((l) => `    ${l}`).join("\n");
   const catalog = `${was.catalog.trimEnd().replace(/^version:\s*\d+/m, `version: ${version + 1}`)}\n\n  ${name}:\n${indented}\n`;
 

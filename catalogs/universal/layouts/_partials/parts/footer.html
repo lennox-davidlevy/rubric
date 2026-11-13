@@ -6,7 +6,7 @@
 {{- $x := partial "rubric/sections.html" (dict "html" .inner "level" 3) }}
 <div class="part-footer-columns">
 {{- range $x.items }}
-<section><h2>{{ .title }}</h2>{{ .body }}</section>
+<section>{{ with .title }}<h2>{{ . }}</h2>{{ end }}{{ .body }}</section>
 {{- end }}
 </div>
 {{- else }}

@@ -7,14 +7,14 @@
 // types are still used for the questions and answers.
 
 import {
-  buildQuestions, buildState, detailQuestions, THEME_CHOICE, themeQuestion, lookQuestions, MODEL, PART, partQuestion, refineQuestions, refineState, resolve, resolveRefine,
+  buildQuestions, buildState, detailQuestions, SHOWN, shownQuestion, THEME_CHOICE, themeQuestion, traitQuestions, TRAITS, lookQuestions, MODEL, PART, partQuestion, refineQuestions, refineState, resolve, resolveRefine,
   type Answers, type Catalog, type PageKind, type Question, type Refined, type Resolution,
 } from "./core/index.ts";
 
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 const TIMEOUT_MS = 10_000;
 
-type Request = { model: string; state: unknown; questions: Record<string, Question> };
+type Request = { model: string; state: unknown; questions: Record<string, Question>; assets?: Record<string, { type: "image"; format: "png"; data_base64: string }> };
 
 export interface Asked {
   resolution: Resolution;
@@ -52,7 +52,8 @@ async function call(request: Request, key: string): Promise<Called> {
   try {
     res = await fetch(ENDPOINT, {
       method: "POST",
-      headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+      // Images are off unless a request says it carries them.
+      headers: { authorization: `Bearer ${key}`, "content-type": "application/json", ...(request.assets ? { "TypeSafe-Danger-Zone-Images": "true" } : {}) },
       body: JSON.stringify(request),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
@@ -160,4 +161,38 @@ export async function rankThemes(
   const order = (res.answers[THEME_CHOICE] as { probabilities?: Record<string, number> } | undefined)?.probabilities;
   if (!order) throw new Error("could not read Jev's answer: no probabilities for the theme");
   return { order, request, response: res.body, model: res.model, ms: res.ms };
+}
+
+// What a request for a new part needs (`TRAITS`), each as how likely, to
+// two places. One small request beside the draft; a failure is thrown, and
+// the draft's record goes without.
+export async function traits(
+  words: string, key = process.env.TYPESAFE_API_KEY,
+): Promise<{ traits: Record<string, number>; request: Request; response?: unknown; model?: string; ms: number }> {
+  const request: Request = { model: MODEL, state: { request: words }, questions: traitQuestions() };
+  if (!key) throw new Error("could not reach Jev: TYPESAFE_API_KEY is not set");
+  const res = await call(request, key);
+  if (!res.ok) throw new Error(res.message);
+  const got: Record<string, number> = {};
+  for (const id of Object.keys(TRAITS)) {
+    const noul = (res.answers[id] as { noul?: number } | undefined)?.noul;
+    if (typeof noul !== "number") throw new Error(`could not read Jev's answer: no noul for ${id}`);
+    got[id] = Math.round(noul * 100) / 100;
+  }
+  return { traits: got, request, response: res.body, model: res.model, ms: res.ms };
+}
+
+// How likely a PNG of a drafted part shows the thing named, for the bench.
+// Jev takes pictures 280 to 1568 pixels a side. A failure is thrown.
+export async function shown(png: Uint8Array, thing: string, key = process.env.TYPESAFE_API_KEY): Promise<number> {
+  const request: Request = {
+    model: MODEL, state: { picture: "part-picture" }, questions: shownQuestion(thing),
+    assets: { "part-picture": { type: "image", format: "png", data_base64: Buffer.from(png).toString("base64") } },
+  };
+  if (!key) throw new Error("could not reach Jev: TYPESAFE_API_KEY is not set");
+  const res = await call(request, key);
+  if (!res.ok) throw new Error(res.message);
+  const noul = (res.answers[SHOWN] as { noul?: number } | undefined)?.noul;
+  if (typeof noul !== "number") throw new Error("could not read Jev's answer: no noul for the picture");
+  return Math.round(noul * 100) / 100;
 }

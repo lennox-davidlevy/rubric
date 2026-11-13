@@ -47,31 +47,121 @@ export interface RunStats {
   apiSeconds?: number;
 }
 
-// What drafts unless the writer chose otherwise: a fast model. Any one
-// draft can be made by another, chosen for it alone.
-export const DEFAULT_DRAFTER: Drafter = { harness: "claude", model: "sonnet", effort: "low" };
+// What drafts unless the writer chose otherwise: the best look for the
+// wait, as measured. Any one draft can be made by another, chosen for it
+// alone.
+export const DEFAULT_DRAFTER: Drafter = { harness: "claude", model: "opus", effort: "low" };
 
 // How hard a model can be asked to think: Claude Code's --effort levels for
 // any model, and OpenCode's built-in variants, which differ by provider
 // (opencode.ai/docs/models). An unlisted provider offers none.
 export function efforts(d: Pick<Drafter, "harness" | "model">): string[] {
   if (d.harness === "claude") return ["low", "medium", "high", "xhigh", "max"];
+  // What OpenCode itself says the model takes, once its list has been read.
+  const told = d.model ? openCodeEfforts.get(d.model) : undefined;
+  if (told) return told;
+  // Before then, or when it couldn't be asked: what every model of the
+  // provider takes, so nothing is offered that the tool would refuse.
   const provider = d.model?.split("/")[0];
-  if (provider === "openai") return ["minimal", "low", "medium", "high", "xhigh"];
+  if (provider === "openai") return ["low", "medium", "high", "xhigh"];
   if (provider === "anthropic") return ["high", "max"];
   if (provider === "google") return ["low", "high"];
   return [];
 }
 
+// Each OpenCode model's efforts, its variants, by provider/model: read from
+// the tool with its model list, since they differ from model to model
+// (`minimal` is offered by a few and refused by the rest).
+const openCodeEfforts = new Map<string, string[]>();
+
+// From `opencode api GET /api/model`: a list, or one under `data`, of models
+// with `providerID`, `id` and `variants: [{ id }]`. Anything else is nothing.
+export function readEfforts(json: string): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    const list = Array.isArray(parsed) ? parsed : (parsed as { data?: unknown })?.data;
+    if (!Array.isArray(list)) return out;
+    for (const m of list as { providerID?: unknown; id?: unknown; variants?: unknown }[]) {
+      if (typeof m?.providerID !== "string" || typeof m.id !== "string" || !Array.isArray(m.variants)) continue;
+      out.set(`${m.providerID}/${m.id}`, (m.variants as { id?: unknown }[]).map((v) => v?.id).filter((v): v is string => typeof v === "string"));
+    }
+  } catch {}
+  return out;
+}
+
+// The model to offer first for a tool that has no settled default of its
+// own, best first, from the bench (docs/plan.md, "Faster drafts"): the
+// first of these the tool lists. OpenCode has only the providers the writer
+// signed in to, so there may be none.
+const SUGGESTED: Record<HarnessName, string[]> = {
+  claude: [],
+  opencode: ["openai/gpt-6.1-terra-fast", "openai/gpt-6.1-terra", "openai/gpt-6.1-sol-fast", "openai/gpt-6.1-sol"],
+};
+export function suggested(harness: HarnessName, offered: string[]): string | undefined {
+  return SUGGESTED[harness].find((m) => offered.includes(m));
+}
+
+// How a draft is asked for. "tools": the tool reads the brief in its folder
+// and writes the files there, a turn a step. "fast": one turn with no tools,
+// the brief in the prompt and the files in the reply, which we write.
+export const MODES = ["fast", "tools"] as const;
+export type Mode = (typeof MODES)[number];
+
+// What the model is told it is, in a fast draft, in place of the tool's own
+// long instructions for working in a codebase.
+export const FAST_SYSTEM = "You draft one part for a Rubric website: a few small files, returned in your reply exactly in the format the brief asks for. You have no tools and no folder to look in; the brief has everything. Reply with the files and nothing else.";
+// Added when the writer chose no effort, or a low one: thinking before
+// writing is where a draft's time goes.
+export const FAST_QUICK = " The writer is waiting and can ask for another take, so do not plan or weigh alternatives first: take the first good design that comes to mind and write the files at once.";
+
+// The drafter a fast draft runs with: the writer's, at low effort when they
+// chose none and the model takes one.
+export function fastDrafter(d: Drafter): Drafter {
+  return d.effort || !efforts(d).includes("low") ? d : { ...d, effort: "low" };
+}
+
+function fastSystem(d: Drafter): string {
+  return FAST_SYSTEM + (!d.effort || ["none", "minimal", "low"].includes(d.effort) ? FAST_QUICK : "");
+}
+
 // The files a draft is made of, copied back from the tool's folder.
-const RESULT = ["part.yaml", "part.html", "part.css", "exists.txt"];
+const RESULT = ["part.yaml", "part.html", "part.css"];
 
 // Claude Code's short names for its latest models; it also takes full names.
 const CLAUDE_ALIASES = ["opus", "sonnet", "haiku", "fable"];
 
 // What the tool is started with: its command line and what is added to its
 // environment.
-export function command(d: Drafter, prompt: string, resume?: string): { args: string[]; env: Record<string, string> } {
+export function command(d: Drafter, prompt: string, resume?: string, mode: Mode = "tools"): { args: string[]; env: Record<string, string> } {
+  const claudeEnv = {
+    CLAUDE_CODE_DISABLE_CLAUDE_MDS: "1",
+    CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
+    CLAUDE_CODE_DISABLE_BUNDLED_SKILLS: "1",
+    CLAUDE_CODE_DISABLE_EXPLORE_PLAN_AGENTS: "1",
+  };
+  if (d.harness === "claude" && mode === "fast") {
+    return {
+      args: [
+        "claude", "-p", prompt,
+        // The reply as it is written, so the log can say which file it is on.
+        "--output-format", "stream-json", "--verbose", "--include-partial-messages",
+        // The same isolation as a draft with tools, and no tools at all: the
+        // reply is the draft. A short system prompt of ours in place of the
+        // tool's, and no conversation kept, since nothing goes on with it.
+        "--setting-sources", "local",
+        "--strict-mcp-config",
+        "--restricted",
+        "--disable-slash-commands",
+        "--tools", "",
+        "--system-prompt", fastSystem(d),
+        "--no-session-persistence",
+        ...(d.model ? ["--model", d.model] : []),
+        ...(d.effort ? ["--effort", d.effort] : []),
+      ],
+      env: claudeEnv,
+    };
+  }
   if (d.harness === "claude") {
     return {
       args: [
@@ -95,17 +185,14 @@ export function command(d: Drafter, prompt: string, resume?: string): { args: st
       ],
       // No CLAUDE.md or AGENTS.md of the writer's, no memory of its own, and
       // none of the bundled skills and agents a draft has no use for.
-      env: {
-        CLAUDE_CODE_DISABLE_CLAUDE_MDS: "1",
-        CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
-        CLAUDE_CODE_DISABLE_BUNDLED_SKILLS: "1",
-        CLAUDE_CODE_DISABLE_EXPLORE_PLAN_AGENTS: "1",
-      },
+      env: claudeEnv,
     };
   }
   // Every tool denied but reading and writing in its folder; a private
   // server, so this environment is the one it runs with.
-  const permission = {
+  // A fast draft is denied those too, and is told what it is in the prompt,
+  // OpenCode having no flag for a system prompt.
+  const permission = mode === "fast" ? { "*": "deny" } : {
     "*": "deny", read: "allow", edit: "allow", glob: "allow", grep: "allow", list: "allow", external_directory: "deny",
   };
   return {
@@ -114,7 +201,7 @@ export function command(d: Drafter, prompt: string, resume?: string): { args: st
       "opencode", "run", "--standalone", "--archived", "--format", "json",
       ...(d.model ? ["--model", d.effort ? `${d.model}#${d.effort}` : d.model] : []),
       ...(resume ? ["--session", resume, "--fork"] : []),
-      prompt,
+      mode === "fast" ? `${fastSystem(d)}\n\n${prompt}` : prompt,
     ],
     env: {
       OPENCODE_CONFIG_CONTENT: JSON.stringify({ permission }),
@@ -138,6 +225,14 @@ export function models(harness: HarnessName): Promise<string[]> {
         return Promise.all([new Response(proc.stdout).text(), proc.exited]);
       });
       if (code !== 0) throw new Error("opencode models failed");
+      // Its efforts too, from the tool's own server, private to this call.
+      // A tool too old to answer leaves the provider's common ones.
+      await withOpenCodeAlone(async (env) => {
+        // In its own empty folder, so nothing it does lands in the site.
+        const proc = Bun.spawn(["opencode", "api", "--standalone", "GET", "/api/model"], { env, cwd: env.XDG_CONFIG_HOME!, stdout: "pipe", stderr: "ignore", stdin: "ignore", signal: AbortSignal.timeout(20_000) });
+        const [json] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+        for (const [model, list] of readEfforts(json)) openCodeEfforts.set(model, list);
+      }).catch(() => {});
       return out.split("\n").map((l) => l.trim()).filter((l) => /^[\w.-]+\/\S+$/.test(l));
     })();
     list.catch(() => listed.delete(harness));
@@ -160,6 +255,8 @@ export async function installed(harness: HarnessName): Promise<string | undefine
 
 // Why the tool can't draft with this model, before a minute is spent on it.
 export async function modelProblem(d: Drafter): Promise<string | undefined> {
+  // OpenCode's list first: it says which efforts each model takes.
+  const known = d.harness === "opencode" ? await models("opencode").catch(() => undefined) : undefined;
   if (d.effort && !efforts(d).includes(d.effort)) {
     const offered = efforts(d);
     return `${d.model ?? d.harness} has no effort "${d.effort}"${offered.length ? `; it takes ${offered.join(", ")}` : ""}`;
@@ -168,11 +265,7 @@ export async function modelProblem(d: Drafter): Promise<string | undefined> {
   if (d.harness === "claude") {
     return CLAUDE_ALIASES.includes(d.model) || /^claude-[\w.-]+$/.test(d.model) ? undefined : `Claude Code has no model "${d.model}"`;
   }
-  try {
-    return (await models("opencode")).includes(d.model) ? undefined : `opencode has no model "${d.model}"; opencode models lists them`;
-  } catch {
-    return undefined;
-  }
+  return !known || known.includes(d.model) ? undefined : `opencode has no model "${d.model}"; opencode models lists them`;
 }
 
 // The harness for whichever tool and model `drafter` says when a draft starts.
@@ -184,15 +277,22 @@ export function toolHarness(drafter: () => Drafter, limitMs = 10 * 60_000): Harn
   // One draft keeps the drafter it started with, through its second try,
   // even if the writer chooses another meanwhile.
   const kept = new Map<string, Drafter>();
-  return async (dir, prompt, signal, log = () => {}, use, resume) => {
-    const d = kept.get(dir) ?? use ?? drafter();
-    kept.set(dir, d);
+  return async (dir, prompt, signal, log = () => {}, use, resume, mode = "tools") => {
+    const chosen = kept.get(dir) ?? use ?? drafter();
+    const d = mode === "fast" ? fastDrafter(chosen) : chosen;
+    kept.set(dir, chosen);
     setTimeout(() => kept.delete(dir), limitMs * 2).unref?.();
     const problem = await modelProblem(d);
     if (problem) return { error: problem };
     if (!Bun.which(d.harness)) return { error: `${d.harness} is not installed, or not on the PATH` };
     await sweep(limitMs);
     const drafted = { drafter: d };
+    // A fast draft is one call that stands alone: the brief has the last
+    // take's files, and no conversation is kept or gone on with.
+    if (mode === "fast") {
+      const only = await run(d, dir, prompt, signal, log, limitMs, undefined, mode);
+      return { ...drafted, ...only.result, resumed: false };
+    }
     if (resume && (resume.harness !== d.harness || (resume.model ?? "") !== (d.model ?? ""))) {
       log(`the last take was drafted by ${resume.harness} with ${resume.model ?? "its default model"}, so this one starts fresh`);
       resume = undefined;
@@ -270,11 +370,12 @@ function sum(a: RunStats | undefined, b: RunStats | undefined): RunStats {
   return out;
 }
 
-type Ran = { error?: string; timedOut?: boolean; started?: boolean; inUse?: boolean; result: { error?: string; stats?: RunStats; session?: Session } };
+type Ran = { error?: string; timedOut?: boolean; started?: boolean; inUse?: boolean; result: { error?: string; stats?: RunStats; session?: Session; reply?: string } };
 
 // One run of the tool, in a folder of its own: a new one, or the session's,
 // claimed whole, so two runs never share one.
-async function run(d: Drafter, dir: string, prompt: string, signal: AbortSignal, log: (line: string) => void, limitMs: number, resume?: Session): Promise<Ran> {
+async function run(d: Drafter, dir: string, prompt: string, signal: AbortSignal, log: (line: string) => void, limitMs: number, resume?: Session, mode: Mode = "tools"): Promise<Ran> {
+  const fast = mode === "fast";
   let work: string;
   if (resume) {
     try {
@@ -286,8 +387,9 @@ async function run(d: Drafter, dir: string, prompt: string, signal: AbortSignal,
   } else work = await mkdtemp(join(tmpdir(), "rubric-draft-"));
   let configDir: string | undefined;
   try {
-    await cp(dir, work, { recursive: true, filter: (src) => !/(state\.json|harness\.log|draft\.log)$/.test(src) });
-    const { args, env: extra } = command(d, prompt, resume?.id);
+    // A fast draft's folder stays empty: there is nothing for it to read.
+    if (!fast) await cp(dir, work, { recursive: true, filter: (src) => !/(state\.json|harness\.log|draft\.log)$/.test(src) });
+    const { args, env: extra } = command(d, prompt, resume?.id, mode);
     // OpenCode reads the writer's global config folder (~/.config/opencode:
     // its AGENTS.md, agents, skills and MCP servers) whatever else is set; an
     // empty one of the draft's own keeps them out. Sign-in and sessions are
@@ -303,12 +405,16 @@ async function run(d: Drafter, dir: string, prompt: string, signal: AbortSignal,
     log(`started ${describe(d)}${resume ? ", going on with the last take's conversation" : ""}`);
     // PWD too: OpenCode takes its folder from it, not from where it starts.
     const proc = Bun.spawn(args, { cwd: work, env: { ...env, ...extra, PWD: work }, stdout: "pipe", stderr: "pipe", stdin: "ignore", signal: stop });
+    const writing = fast ? progress(log) : undefined;
     const [out, err, code] = await Promise.all([
       lines(proc.stdout, (line) => {
         // The log never stops a draft: an event it can't read is left out.
         try {
-          const said = readable(d.harness, line);
-          if (said) log(said);
+          if (writing) writing(d.harness, line);
+          else {
+            const said = readable(d.harness, line);
+            if (said) log(said);
+          }
         } catch {}
       }),
       new Response(proc.stderr).text(),
@@ -316,8 +422,10 @@ async function run(d: Drafter, dir: string, prompt: string, signal: AbortSignal,
     ]);
     // The command without the prompt, which is long and the same every
     // time. Each run of a draft is added, so a second try keeps the first's.
-    const shown = args.map((a) => (a === prompt ? "<prompt>" : a)).join(" ");
-    await appendFile(join(dir, "harness.log"), `${shown}\n\n${out}\n${err}\n`).catch(() => {});
+    // Nor a fast draft's reply a piece at a time: the whole of it follows.
+    const shown = args.map((a) => (a.endsWith(prompt) ? "<prompt>" : a)).join(" ");
+    const kept = fast ? out.split("\n").filter((l) => !l.startsWith('{"type":"stream_event"')).join("\n") : out;
+    await appendFile(join(dir, "harness.log"), `${shown}\n\n${kept}\n${err}\n`).catch(() => {});
     // Measured whatever happened: a run stopped or out of time cost too.
     const measured = measure(d.harness, out);
     const started = (measured.stats.turns ?? 0) > 0 || (measured.stats.output ?? 0) > 0;
@@ -329,6 +437,7 @@ async function run(d: Drafter, dir: string, prompt: string, signal: AbortSignal,
       const last = err.trim() ? err.trim().split("\n").at(-1) : out.trim().split("\n").reverse().map((l) => { try { return readable(d.harness, l); } catch { return undefined; } }).find(Boolean);
       return fail(said ?? `${d.harness} exited with ${code}${last ? `: ${last}` : ""}`);
     }
+    if (fast) return { started, result: { stats: measured.stats, reply: replyText(d.harness, out) } };
     for (const f of RESULT) {
       if (existsSync(join(work, f))) await cp(join(work, f), join(dir, f));
       else await rm(join(dir, f), { force: true });
@@ -339,6 +448,63 @@ async function run(d: Drafter, dir: string, prompt: string, signal: AbortSignal,
     await rm(work, { recursive: true, force: true });
     if (configDir) await rm(configDir, { recursive: true, force: true });
   }
+}
+
+// A line naming a file in a fast draft's reply, as the brief asks for them.
+export const FILE_LINE = /^=== (part\.yaml|part\.html|part\.css)\s*$/;
+
+// What the model replied, whole: Claude Code's result, or OpenCode's text.
+export function replyText(harness: HarnessName, out: string): string {
+  const events = out.split("\n").flatMap((l) => {
+    try {
+      const e = JSON.parse(l) as Record<string, any>;
+      return e && typeof e === "object" ? [e] : [];
+    } catch {
+      return [];
+    }
+  });
+  if (harness === "claude") {
+    const r = events.findLast((e) => e.type === "result");
+    if (typeof r?.result === "string" && r.result.trim()) return r.result;
+    return events.filter((e) => e.type === "assistant").flatMap((e) => (Array.isArray(e.message?.content) ? e.message.content : []))
+      .filter((c: Record<string, any>) => c?.type === "text" && typeof c.text === "string").map((c: Record<string, any>) => c.text).join("");
+  }
+  return events.filter((e) => e.type === "text" && typeof e.part?.text === "string").map((e) => e.part.text).join("\n");
+}
+
+// A fast draft's log: each file as the reply starts on it, then how the run
+// ended. The reply itself is the draft, and isn't said again.
+function progress(log: (line: string) => void): (harness: HarnessName, line: string) => void {
+  let text = "";
+  let said = 0;
+  const files = (more: string) => {
+    text += more;
+    const lines = text.split("\n");
+    // The last line may be half written.
+    text = lines.pop() ?? "";
+    for (const l of lines) {
+      const file = FILE_LINE.exec(l)?.[1];
+      if (file && said++ < 12) log(`writing ${file}`);
+    }
+  };
+  return (harness, line) => {
+    const e = JSON.parse(line) as Event;
+    if (!e || typeof e !== "object") return;
+    if (harness === "claude") {
+      if (e.type === "stream_event") {
+        const ev: Event = e.event ?? {};
+        if (ev.type === "content_block_start" && ev.content_block?.type === "thinking") log("thinking");
+        if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta" && typeof ev.delta.text === "string") files(ev.delta.text);
+        return;
+      }
+      if (e.type === "assistant" || e.type === "user") return;
+    } else if (e.type === "text") {
+      if (typeof e.part?.text === "string") files(`${e.part.text}\n`);
+      return;
+    }
+    const other = readable(harness, line);
+    if (other) log(other);
+  };
 }
 
 // What a run cost and its session, from the tool's own report: Claude Code's

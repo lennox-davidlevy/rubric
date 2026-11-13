@@ -1,0 +1,51 @@
+baseURL = "/"
+title = "A New Site"
+theme = "universal"
+themesDir = "../../catalogs"
+disableKinds = ["sitemap"]
+
+# The site's own parts and the draft being looked at, which the language
+# server writes into .rubric/hugo/ (src/parts.ts), beside the site's own
+# folders. A mount replaces Hugo's default for its folder, so each is named.
+[[module.mounts]]
+source = "layouts"
+target = "layouts"
+[[module.mounts]]
+source = ".rubric/hugo/layouts"
+target = "layouts"
+[[module.mounts]]
+source = "assets"
+target = "assets"
+[[module.mounts]]
+source = ".rubric/hugo/assets"
+target = "assets"
+[[module.mounts]]
+source = "data"
+target = "data"
+[[module.mounts]]
+source = ".rubric/hugo/data"
+target = "data"
+
+[params]
+author = "A. Writer"
+# The comments part offers a reply by email when this is set.
+email = "writer@example.com"
+
+[params.rubric]
+theme = "paper"
+
+# Nested parts hand their HTML to the outer part's RenderString.
+[markup.goldmark.renderer]
+unsafe = true
+
+[markup.highlight]
+noClasses = false
+
+# For `hugo server` only. Its Last-Modified is to the second, so two rebuilds
+# in one second answer the browser's reload with 304 Not Modified and the
+# browser keeps the older page. Rubric rebuilds as the writer types, so this
+# happens often. Hugo reads this from the site only, never from a theme.
+[[server.headers]]
+for = "/**"
+[server.headers.values]
+Cache-Control = "no-store"

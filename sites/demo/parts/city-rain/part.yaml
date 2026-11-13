@@ -1,0 +1,22 @@
+name: city-rain
+description: A heading in front of a window looking out on a city skyline at night, with rain running down the glass.
+children: true
+body: |
+  ## Your heading
+
+  A line or two beneath it.
+settings:
+  rain:
+    type: choice
+    default: steady
+    values:
+      drizzle: a few slow drops
+      steady: an even rain
+      downpour: heavy, fast rain
+  size:
+    type: choice
+    default: medium
+    values:
+      small: a small window
+      medium: a window of ordinary size
+      large: a tall, wide window

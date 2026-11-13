@@ -33,7 +33,11 @@ local defaults = {
   -- No model or effort is the tool's default. A choice made with :Rubric
   -- harness or :Rubric model is kept and used instead, in every session,
   -- until :Rubric harness goes back to this one.
-  draft = { harness = "claude", model = "sonnet", effort = "low" },
+  draft = { harness = "claude", model = "opus", effort = "low" },
+  -- How a draft is asked for: "fast", one turn with the files in the reply,
+  -- or "tools", the tool writing them a turn a step. :Rubric tooluse
+  -- (and :Rubric harness) changes it, and that choice is kept.
+  drafting = "fast",
 }
 
 -- The parts that take nothing inside (`::: divider`), from the server: their
@@ -454,7 +458,7 @@ function M.setup(opts)
   drafts.remember_setup(defaults.draft, opts.draft)
   drafts.set_keys({ accept = opts.accept, next = opts.next, prev = opts.prev })
   starters.set_accept(opts.accept)
-  local draft_args = drafts.args(chosen)
+  local draft_args = vim.list_extend(drafts.args(chosen), { "--drafting", drafts.drafting(opts.drafting) })
   vim.lsp.config("rubric", {
     cmd = vim.list_extend(vim.list_extend({ "bun", root .. "/src/cli.ts", "lsp" }, draft_args), opts.args),
     -- Bun loads .env from the working directory; the repo's holds TYPESAFE_API_KEY.
@@ -501,17 +505,22 @@ function M.setup(opts)
     end
     -- Nothing in the catalog fitted, and the writer took the offer of a new
     -- part: the line is a `new:` line now, and they choose how to draft it.
-    local client = arg.build and vim.lsp.get_client_by_id(ctx.client_id)
-    if client then
+    local client = (arg.build or arg.change) and vim.lsp.get_client_by_id(ctx.client_id)
+    if client and arg.build then
       drafts.act(client, ctx.bufnr, arg.line)
+    elseif client then
+      -- The words set nothing the part has: its menu, with Change… on it.
+      vim.cmd.stopinsert()
+      drafts.act_own(client, ctx.bufnr, arg.line)
     end
   end
 
   -- :Rubric theme opens the theme list for rubric.md's theme line. :Rubric
-  -- harness chooses the tool that drafts new parts and its model, and
-  -- :Rubric model another model for that tool; both last across sessions.
+  -- harness chooses the tool that drafts new parts, its model, how hard it
+  -- thinks and whether it uses tools; :Rubric model another model for that
+  -- tool, and :Rubric tooluse tools or none; all last across sessions.
   -- :Rubric log follows what the draft on the cursor's line is doing.
-  local commands = { "theme", "harness", "model", "log" }
+  local commands = { "theme", "harness", "model", "tooluse", "log" }
   vim.api.nvim_create_user_command("Rubric", function(cmd)
     if not vim.tbl_contains(commands, cmd.args) then
       vim.notify("rubric: :Rubric " .. table.concat(commands, ", :Rubric "), vim.log.levels.INFO)
@@ -527,6 +536,8 @@ function M.setup(opts)
       drafts.choose_model(client, bufnr)
     elseif cmd.args == "harness" then
       drafts.choose_harness(client, bufnr)
+    elseif cmd.args == "tooluse" then
+      drafts.choose_tooluse(client, bufnr)
     elseif cmd.args == "log" then
       drafts.log(client, bufnr, vim.api.nvim_win_get_cursor(0)[1] - 1)
     else
@@ -559,6 +570,7 @@ function M.setup(opts)
       watch_picks(event.buf)
       watch_spell(event.buf)
       send_cursor(event.buf, client.id)
+      drafts.sync(client, event.buf, opts.drafting, chosen, defaults.draft, opts.draft)
       local experimental = client.server_capabilities.experimental
       set_alone(experimental and experimental.rubric and experimental.rubric.alone)
       local on_rubric_md = themes.is_rubric_md(event.buf)
@@ -633,7 +645,12 @@ function M.setup(opts)
         elseif on_new_line() then
           act_new()
           return true
-        elseif own_line() then
+        end
+        -- An empty block of a catalog part the site hasn't changed: its
+        -- starter at once, as before; Change… once it has writing.
+        local o = own_line()
+        local row = vim.api.nvim_win_get_cursor(0)[1] - 1
+        if o and not (o.catalog and not o.takes and starters.at(event.buf, row)) then
           act_own()
           return true
         end
@@ -744,7 +761,10 @@ function M.setup(opts)
         if vim.lsp.inline_completion.get() then
           return
         end
-        if own_line() then
+        -- A catalog part the site hasn't changed is changed from normal mode:
+        -- here the key fills its starter or asks now, as on any line.
+        local o = own_line()
+        if o and not (o.catalog and not o.takes) then
           vim.cmd.stopinsert()
           act_own()
           return

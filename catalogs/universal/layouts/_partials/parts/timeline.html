@@ -7,7 +7,7 @@
 {{- $what := cond (gt (len $parts) 1) (delimit (after 1 $parts) " — ") (string .title) }}
 <li>
 {{- with $when }}<p class="part-timeline-when">{{ . | safeHTML }}</p>{{ end }}
-<h3>{{ $what | safeHTML }}</h3>
+{{ with $what }}<h3>{{ . | safeHTML }}</h3>{{ end }}
 <div class="stack">
 {{ .body }}
 </div>

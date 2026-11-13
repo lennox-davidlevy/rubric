@@ -31,6 +31,9 @@ export interface Site {
   // catalog too, and what was wrong with any that are not.
   own: Record<string, Own>;
   ownProblems: string[];
+  // The catalog as catalog.yaml has it, without the skin's additions or the
+  // site's parts: what a site's own drawing of a catalog part starts from.
+  shared: Catalog;
   // Whether hugo.toml mounts .rubric/hugo/, so Hugo can draw them.
   ownMounted: boolean;
 }
@@ -46,7 +49,7 @@ export async function openSite(root: string, theme?: string): Promise<Site> {
   const themeDir = resolve(root, themesDir, catalogName);
   const params = rubricParams(config);
   const skin = await skinned(themeDir, theme ?? (typeof params.theme === "string" ? params.theme : "paper"));
-  const { own, problems } = readOwn(root, skin.catalog);
+  const { own, problems } = readOwn(root, skin.catalog, skin.shared, themeDir);
   return {
     root,
     pages: join(root, "pages"),
@@ -65,7 +68,7 @@ export async function openSite(root: string, theme?: string): Promise<Site> {
 
 // The catalog with the site's skin merged in: the skin of the theme the site
 // names under [params.rubric] (themes.yaml), and every other skin known.
-async function skinned(themeDir: string, theme: string): Promise<{ catalog: Catalog; skin?: string; theme: string }> {
+async function skinned(themeDir: string, theme: string): Promise<{ catalog: Catalog; shared: Catalog; skin?: string; theme: string }> {
   const base = await loadCatalog(join(themeDir, "catalog.yaml"));
   const skins: Record<string, Skin> = {};
   const dir = join(themeDir, "skins");
@@ -84,7 +87,7 @@ async function skinned(themeDir: string, theme: string): Promise<{ catalog: Cata
   const names = Object.keys(themes).length
     ? { themes: Object.keys(themes), palette: await pieces("palettes"), pairing: await pieces("pairings"), scale: await pieces("scales") }
     : undefined;
-  return { catalog: { ...withSkin(base, skins, active), ...(names ? { themes: names } : {}) }, ...(active ? { skin: active } : {}), theme };
+  return { catalog: { ...withSkin(base, skins, active), ...(names ? { themes: names } : {}) }, shared: base, ...(active ? { skin: active } : {}), theme };
 }
 
 function rubricParams(config: string): Record<string, unknown> {

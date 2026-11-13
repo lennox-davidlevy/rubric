@@ -1,188 +1,125 @@
-# Live test: new parts
-
-Step 7. When nothing in the catalog fits your words, Rubric offers to draft a part for them. Claude Code or OpenCode writes it in the background, with the model you choose, using your theme's colors and type, and it shows on your page in the browser. You then keep it, reroll it or cancel it. If you keep it, you choose whether every theme gets it or only this site.
-
-The theme list and parts with no closer passed; the whole run is in [TESTING-full.md](TESTING-full.md).
-
-Write what you find in the **Notes** section at the bottom, numbered as below.
-
-Last updated: 2026-11-11.
-
-## 0. Set up
-
-1. Quit **every** Neovim, so the new plugin and server load.
-2. Stop `bun run play` and start it again from the repo root. `testing/hugo.toml` changed (Hugo now also reads `.rubric/hugo/`, where drafts go), and Hugo reads that only at start.
-3. Open http://localhost:1415/posts/walk/ and `nvim testing/pages/posts/walk.md`.
-4. One drafter is the default: out of the box, Claude Code with Sonnet at low effort. Any one draft or reroll can use another, chosen as you start it (sections 1 and 3); that never changes the default.
-5. `:Rubric model` changes the default's model, then how hard it thinks: for Claude Code, low to max; for an OpenCode model, its variants (OpenAI: minimal to xhigh; Anthropic: high, max; Google: low, high). **its default effort** leaves it to the tool. A message says what drafts now.
-6. `:Rubric harness` does the same, choosing the tool first, Claude Code or OpenCode, each with its version or "not installed". Quit Neovim and open it again, then `:Rubric model`. **Should happen:** your choice was kept, and the model in use is marked.
-
-The default you choose here wins over `draft = {...}` in your setup, in every session. To go back to your setup's, use **Whatever my setup says** at the bottom of `:Rubric harness`.
-
-Each draft is one headless run of that tool on your plan. A first real one took 44 seconds. Sections 1 to 5 make about four drafts.
-
-## 1. Nothing fits, so you're offered a new part
-
-On a new line near the end of `walk.md`, type `::: a ring of little moons orbiting the heading`, then pause.
-
-**Should happen:**
-
-- The line gets a note saying nothing in the catalog fits.
-- The ghost text says `-> a new part, drafted for these words`.
-
-Press `<M-l>`.
-
-**Should happen:**
-
-- The line becomes `::: new: a ring of little moons orbiting the heading`, and its `:::` closer stays.
-- A menu asks how to draft it: **Draft it (sonnet, low)**, **Draft with a different setup…** or **Cancel**. **Cancel** puts your words back. Choose **Draft with a different setup…**: a short list with **Draft it** at the top and **Drafter: sonnet, low, the default…** under it. Choose **Drafter**: the default, any drafters you've used lately, and **Another tool or model…** (tool, then model, then effort). Pick one, then **Draft it with …** at the top. The default hasn't changed (`:Rubric model` shows it).
-- The block now reads apart from the page: a bracket in the sign column from the `new:` line down to its `:::` closer, a faint wash of color behind the block, and `new:` in bold in that color. Blue while drafting.
-- One spinner, on a line of its own under the `new:` line, with a running time: `drafting · 0:12`. Nothing spins in the sign column. The line wraps to the window, so none of it is cut off; make the window narrow to check.
-
-If Jev picks a part for these words instead, try other words. Anything nothing fits will do.
-
-Optionally, while it drafts, run `:Rubric log` with the cursor on the line (or `<M-l>`, then **Show the log**). **Should happen:** a window opens below with the draft's log, with a line for each step and the time since it started, and your cursor stays in the page. `:q` closes it.
-
-## 2. The draft shows up
-
-Keep writing elsewhere in the page while it works.
-
-**Should happen:**
-
-- When it's done, a message names the part.
-- The browser shows it where the line is, in your current theme (Terminal with Gruvbox Dark).
-- The spinner becomes a diamond, the line under it says `<name> drafted · <M-l> keep, reroll, cancel`, and the bracket and wash turn green.
-
-Look at it in dark mode too, with the theme switch in the header.
-
-## 3. Reroll, with a change
-
-With the cursor on the line, press `<M-l>` and choose **Reroll…**. **Should happen:** it asks **Just reroll** or **Change something first…**. Choose **Change something first…**: a short list with **Reroll** at the top, **Notes: none…** and **Drafter: sonnet, low, the default…**. Choose **Notes** and type something like `smaller, and only three moons`. Optionally choose **Drafter** and pick Opus for this one. Then **Reroll …** at the top.
-
-**Should happen:**
-
-- The old draft stays in the browser while the new one is made, and the line says so beside the spinner.
-- When it's done, the new one is drawn, and keeps what you didn't ask to change. The line under says `take 2 of 2 · <M-p> <M-n> other takes`.
-
-**Reroll…**, then **Just reroll**, gives a different take on the same words with the default; do one, for three takes.
-
-**Every take is kept.** With the cursor on the line, in normal or insert mode, press `<M-p>` and `<M-n>`. **Should happen:** the browser draws each take in turn, and the line says which (`take 1 of 3`), going round at either end. `<M-l>` also offers **Next take**. A reroll with a change starts from the take on screen.
-
-Reroll once more, and while it's drafting press `<M-l>` and choose **Stop, and go back to <name>**. **Should happen:** the spinner goes, the diamond comes back, and the draft you had is still drawn and can still be kept.
-
-## 4. Keep it, just for this site
-
-Move to the take you like best, then press `<M-l>`, choose **Keep**, then **No, just this site**. The take on screen is the one kept; the others go to the record (section 8).
-
-**Should happen:**
-
-- The line becomes `::: <name>`, a plain part like any other, with no note.
-- For a few seconds, a check under it says it's kept and lists the settings the part takes, such as `pace=slow|fast`. If it takes none, it says only that it's kept.
-- Type a space after the name. **Should happen:** completion offers its settings, then their values, as for any catalog part. A value it doesn't have gets a note, and hovering on the name describes the part.
-- The browser still draws it.
-- If the block is empty, what the browser draws faded inside the part (its starter) now shows in Neovim too: dimmed lines inside the block, just above `:::`, the first ending in `<M-l> fills it in`. With the cursor on an empty line inside the block or on its `:::`, press `<M-l>`. **Should happen:** the starter is written in for real, with your cursor on its first line, and the dimmed lines go. Typing anything in the block yourself makes them go too. On the part's own line (say at the end of its name), `<M-l>` opens the part's menu (section 10), with **Fill in the starter** first.
-- `git status` shows a new folder, `testing/parts/<name>/`, holding `part.yaml`, `part.html` and `part.css`. Read `part.css`: it should use only `var(--…)` for colors and fonts, never a color written out.
-- Quit Neovim and open the page again. The part is still there, and still drawn.
-
-Jev now chooses from a different list, so lines you haven't accepted yet are asked again as you reach them. Until then, they show as words in the browser, as after a catalog version bump.
-
-Then try it by words. On a new line, describe the part in other words, such as `::: moons around a title`. **Should happen:** Jev may pick your new part, since it's in the list Jev picks from now, for this site only.
-
-## 5. Typing `new:` yourself, and cancelling
-
-On a new line, type `::: new: a little weather forecast box` and leave insert mode.
-
-**Should happen:** the note says `<M-l>` drafts one, and nothing is drafted until you press it.
-
-Press `<M-l>`, then **Draft it**. While it's drafting, the line under it says `<M-l>` stops or cancels it. Press `<M-l>` and choose **Stop drafting**. **Should happen:** the spinner goes and the line stays `::: new: a little weather forecast box`, with `+` on the line under it and a gray bracket, so `<M-l>` starts it again.
-
-Press `<M-l>` and **Draft it** to start it again. While it's drafting, press `<M-l>` again and choose **Cancel the draft**.
-
-**Should happen:** the line goes back to `::: a little weather forecast box`, and nothing is drawn for it.
-
-**Cancelled takes come back.** Make one take of `::: new: a little sun and cloud`, let it finish, then `<M-l>` and **Cancel**. Type `::: new: a little sun and cloud` again on a new line and leave insert mode. **Should happen:** the line under it says `<M-l>` brings back 1 earlier take. `<M-l>` offers **Bring back 1 earlier take** or **Draft a new one**. Bringing it back draws it at once, with nothing drafted.
-
-## 6. A part the catalog already has
-
-Type `::: new: a pull quote from a book I read`, then `<M-l>`.
-
-**Should happen:** after a moment, a message says the catalog already has `quote`. `<M-l>` then offers **Use quote**, **Draft one anyway** or **Cancel**. **Use quote** turns the line into `::: quote`.
-
-## 7. For every theme (optional: this changes the catalog)
-
-Draft one more, and choose **Keep**, then **Yes, every theme**.
-
-**Should happen:**
-
-- A message says it's in the catalog now, as version 10.
-- `git diff catalogs/universal/catalog.yaml` shows the version bumped and the new part at the end.
-- The new part's drawing and CSS are in `catalogs/universal/layouts/` and `assets/css/parts/`.
-- `hugo server -s catalogs/universal/page` shows it on every theme's catalog page.
-
-To undo it: `git checkout catalogs/universal` and `git clean -n catalogs/universal` (check the list, then `-f`).
-
-A part you kept for the site in section 4 can go global from its line: `<M-l>`, then **Make it available to every theme** (section 10). `bun scripts/part.ts global testing <name>` still does the same.
-
-## 8. Starters for every part
-
-Starters aren't only for drafts. On a new line, type `::: steps`, then `:::` on the line below it, and leave insert mode.
-
-**Should happen:** the two `###` steps show dimmed inside the block, as the browser shows them faded. `<M-l>` on the `:::` fills them in. `::: cards`, `::: hero` and `::: timeline` work the same way.
-
-## 9. The record of every draft
-
-After the sections above, look in `testing/.rubric/logs/`.
-
-**Should happen:**
-
-- `drafts.jsonl` has a line for every draft you made: the words, the tool and model, how it ended (ready, failed, exists), what you did with it (kept, another take was kept, cancelled, stopped, replaced, used), and how many seconds it took.
-- Each line also says what it took, for comparing: `kind` (first, fresh, another, change), `drafter` (tool, model, effort), `brief` (a short code that changes whenever the brief's wording does), `runs` (2 when the checks sent it back once), `firstTry`, `resumed`, and the tool's own figures: `turns`, `cost` in dollars, tokens `input`, `cached`, `output` and `thinking`, and `apiSeconds`. OpenCode on a plan may report a cost of 0.
-- `drafts/<id>/` holds each one whole: `brief.md` (what the tool was asked), the part's files, `draft.log` (readable steps, with cost where the tool reports it) and `harness.log` (the tool's raw output).
-
-Nothing in the editor is needed for this; it's for looking back at how the tools behave.
-
-## 10. Another take of a part you kept
-
-Go to the line of the part you kept in section 4, `::: <name>`, in normal mode.
-
-**Should happen:** a dim hint at the end of the line says `<M-l>` rerolls, keeps or removes it. It goes when the cursor leaves the line. A catalog part's line, such as `::: quote`, has no hint, and `<M-l>` there does what it always did.
-
-Press `<M-l>`. **Should happen:** a menu with **Reroll…**, **Make it available to every theme** and **Remove from this site…**, and **Fill in the starter** first when the block is empty.
-
-**Reroll.** Choose **Reroll…**, then **Just reroll**. **Should happen:**
-
-- The line stays `::: <name>`. Under it, a spinner says it's drafting another take, with the bracket and wash of a `new:` block. The browser keeps drawing the part as it was meanwhile.
-- When it's ready, the browser draws the new take, in every block that uses the part, on every page. The line under it says take 2 of 2, with `<M-p>` `<M-n>`.
-- `<M-p>` goes back to take 1, which is the part as you kept it. `<M-n>` comes forward again.
-- `testing/parts/<name>/` hasn't changed yet (`git status`).
-
-**Reroll with words on the line.** Type ` : with a softer glow` after the name, so the line reads `::: <name> : with a softer glow`. Leave insert mode, then `<M-l>`. **Should happen:** **Reroll…** then offers **Reroll with “with a softer glow”** in place of **Just reroll**, and **Change something first…** starts with those words as the notes. Either takes the words off the line and drafts take 3 with that change. On your own part's line, those words are never sent to Jev: no ghost text and no note about settings appear for them.
-
-**Keep stays offered.** On take 2 or 3, start another reroll and open the menu while it drafts. **Should happen:** **Keep this take of <name>** is still offered, and keeps the take on screen. The same holds after a reroll fails.
-
-**Keep a take.** On a take other than the first, `<M-l>`, then **Keep this take of <name>**, then **No, just this site**. **Should happen:** the line stays the same and, for a few seconds, a check under it says it's kept. `git diff testing/parts/<name>/` shows the new take's files. The name never changes, since pages use it.
-
-**Go back.** Reroll once more, then `<M-l>` and **Go back to <name> as it was**. **Should happen:** the takes go, the browser draws the part as it was kept, and `testing/parts/<name>/` is unchanged.
-
-**Remove it** (optional: you'd make the part again afterwards). Put the part in a second block somewhere, then `<M-l>` on one of its lines and **Remove from this site…**. **Should happen:** it asks first, saying 1 other block on 1 page uses it. **No, keep it** does nothing. **Yes** removes it. `testing/parts/<name>/` is gone, and a copy is in `testing/.rubric/logs/removed/<name>-<time>/`. The lines that used it are read as words again. To undo: move the folder back to `testing/parts/<name>/`.
-
-A part already in the shared catalog has none of this: removing one of those is a job for git.
-
-## 11. Faster drafts: effort, takes that edit, and resuming
-
-This is for comparing speed against quality as you go. Each draft's line in `testing/.rubric/logs/drafts.jsonl` names the drafter with its effort ("claude with sonnet at low effort") and how many seconds it took.
-
-**Another take starts from the last one.** Reroll any take with a change. **Should happen:** the log (`:Rubric log`, or `draft.log` in its folder) shows the tool editing `part.html` and `part.css` rather than reading files first: their text is in its brief, and the files are already in its folder. Its brief (`brief.md`) has no list of the catalog's parts and no examples, which a first draft still gets. The tool's last line in the log is one sentence saying what it changed.
-
-**A take the tool didn't change** fails with "the tool changed nothing", instead of adding a copy of the take before it.
-
-**Going on with the conversation.** A reroll by the same tool and model as the take on screen continues that take's conversation (a copy of it), so the model has its own earlier work. **Should happen:** its log says "going on with the last take's conversation", and its line in `drafts.jsonl` has `"resumed":true`. Reroll the same take with another drafter (**Change something first…**, then **Drafter**): the log says the last take was drafted by the other model, so this one starts fresh, and `"resumed":false`. If the tool can't find the conversation, the log says so and it starts fresh, without failing. Compare `seconds` and `thinking` between resumed and fresh rerolls of similar changes.
-
-**None of your own setup reaches a draft.** Claude Code runs with only Read, Write, Edit, Glob and Grep, no skills or commands, no `CLAUDE.md` and no memory. OpenCode runs with an empty config folder of its own, so your `~/.config/opencode` (its `AGENTS.md`, agents, skills and MCP servers) stays out. To check after a draft: in its `harness.log`, Claude Code's first line lists `"tools":["Edit","Glob","Grep","Read","Write"]` and `"skills":[]`. An OpenCode draft's reasoning no longer mentions reviewers or delegation, and no `.cache` folder appears among the files it reads.
-
-**A resumed reroll that changes nothing** tries once more without the conversation, and the log says so; its line in `drafts.jsonl` has `"runs":2`.
-
-Try the same change, such as "at more of an angle" on moon-ring, with different drafters, and note the times and which take you'd keep.
+# Live test: picks by Jev, and drafts by both tools
+
+Three passes as tables: what Jev does with words, new parts drafted by Claude Code, and the same requests drafted by OpenCode. Then the flow around a draft, once, and changing a catalog part for the site (section E, branch `customize`).
+
+Earlier tables are in [TESTING-fast-drafts.md](TESTING-fast-drafts.md) (parts fixed, menus), the step-by-step walk through drafting in [TESTING-new-parts.md](TESTING-new-parts.md), and the whole product's run in [TESTING-full.md](TESTING-full.md).
+
+Write what you find in **Notes** at the bottom, by test number.
+
+Last updated: 2026-11-13.
+
+## Set up
+
+1. Quit every Neovim, stop `bun run play`, start it again from the repo root. Keep its terminal in view: it prints each call to Jev.
+2. Open http://localhost:1415/posts/walk/ and `nvim testing/pages/posts/walk.md`.
+
+`<M-l>` is the accept key: once to ask at once, again to accept. Sections B to D make paid drafts on your plans.
+
+## A. Jev: parts by words
+
+No drafts here; each call costs a fraction of a cent. Type the line, pause, then `<M-l>`.
+
+| # | Type this | Expect |
+|---|---|---|
+| A1 | `::: a big opening for the top of the page` | The closing `:::` appears at the first space. Ghost text `-> hero size=tall` with its starter; the page shows the hero faded. `<M-l>` puts `hero size=tall` on the line, writes the starter, and the hero turns solid. |
+| A2 | `::: a tip for the reader`, with a sentence written inside the block before accepting | Accepting changes only the `:::` line. The sentence stays. |
+| A3 | `::: a quote from my grandmother` | `-> quote`. In the terminal: one call, about 150 ms, with each part's probability. |
+| A4 | `::: the three things I learned, in order` | `-> steps`. `<M-l>` on the empty block writes its starter in. |
+| A5 | `::: something on the side` | If Jev is unsure, a dim "1 of 2" hint. `<M-n>` shows the other pick in the ghost text and on the page; `<M-p>` goes back; `<M-l>` keeps the one showing. Note whether you got the hint. |
+| A6 | `::: the menu as a pdf` | Stays as text on the page; the note says not sure, naming two parts; `<M-n>` draws each. |
+| A7 | `::: a small quote in smaller text` | `quote text=smaller`. |
+| A8 | `::: a big centered quote from the interview` | `quote size=large align=center`. |
+| A9 | On the A3 line, add ` : larger, and centered`, pause, `<M-l>` | Ghost text with the settings, such as `size=large align=center`. Accepting writes them on the line and drops the words. One "second pass" call in the terminal; the part is not asked again. |
+| A10 | Then ` : with a soft shadow and round corners` | `shadow=soft corners=round` added. |
+| A11 | `::: quote size=large`, typed in plain form | The quote draws at once. No call in the terminal. |
+| A12 | Delete the A3 block and type its words again | Ghost text at once, from the cache. No call in the terminal. |
+| A13 | `K` on a line of words, then on an accepted line; `<leader>e` on a line with a note | The pick, its fit and how each part scored; the part's description and settings; the note. |
+| A14 | `::: a paper boat that drifts across the page` | Ghost text offers a new part. Leave it as words for now, or accept to make it a `new:` line for section B. |
+| A15 | In `testing/rubric.md`: `::: a top navigation bar`, then `::: a footer with my name and the year` | `header`, then `footer`, on every page. |
+| A16 | In `rubric.md`, `<M-l>` on the `::: theme` line; move through the list; Enter on one | A picture of each theme; the page takes on the one under the cursor. Enter keeps it, Esc puts the old one back. |
+| A17 | `::: theme something warm and bookish`, `<M-l>` | The same list, in an order that fits the words. |
+| A18 | Pause on any new line and watch the clock | Ghost text within about a second of stopping. Note any line that felt slow. |
+
+## B. Drafts by Claude Code
+
+Set up: `:Rubric harness`, **Claude Code**, **opus**, **low**, **No tools**. The notice ends "no tools".
+
+Type each line, `<M-l>`, **Draft**. Cancel or keep as you like; keeping B1 and B4 helps section D.
+
+| # | Request | Drafter | Expect |
+|---|---|---|---|
+| B1 | `::: new: a row of postage stamps with perforated edges, each holding a word` | opus, low | Ready in about 20 s. Stamps that read as stamps, one per item, with the edge drawn. |
+| B2 | `::: new: a heading with a candle beside it whose flame flickers` | opus, low | About 20 s. The flame moves; with motion reduced in the system settings it holds still. |
+| B3 | `::: new: a ring that fills to show a percentage, with the number in the middle` | opus, low | The ring's fill follows the number written in the block. Change the number: the ring follows. |
+| B4 | `::: new: a recipe card with the ingredients on one side and the steps on the other` | opus, low | A card that stands off the page; two columns that stack at phone width. |
+| B5 | `::: new: a heading that feels like a quiet library` | opus, low | Its own idea of the feeling, not a plain heading. Note what it drew. |
+| B6 | `::: new: a picture frame with ivy growing around it, and a caption`, then put `![A sample](/images/sample.jpg)` and a caption inside | opus, low | The picture sits in the frame; the caption is under it. |
+| B7 | Any two of the above again, on new lines | sonnet, low (**Draft with…**) | 12 to 15 s. Note whether you would keep them. |
+| B8 | A draft that fell short: **Reroll…**, **Make changes…**, **Drafter**, opus, medium, then **Reroll** | opus, medium | 40 to 80 s. Note whether it was worth the wait. |
+| B9 | Throughout | | None borrows a paperclip, a rain window or waves from the brief's examples. Nothing scrolls sideways at phone width. |
+
+## C. Drafts by OpenCode
+
+Set up: `:Rubric harness`, **OpenCode**. The model list starts with `openai/gpt-6.1-terra-fast  (suggested)`: choose it. The effort list is none, low, medium, high, xhigh, max, with no "minimal": choose **low**, then **No tools**.
+
+The same six requests, on new lines, so each can be set beside its Claude draft.
+
+| # | Request | Drafter | Expect |
+|---|---|---|---|
+| C1 | The B1 line (postage stamps) | terra-fast, low | Ready in about 8 s. Plainer than Opus is expected; note where it falls short. |
+| C2 | The B2 line (candle) | terra-fast, low | About 8 s. The flame moves. |
+| C3 | The B3 line (ring) | terra-fast, low | The fill follows the number. |
+| C4 | The B4 line (recipe card) | terra-fast, low | Two columns that stack at phone width. |
+| C5 | The B5 line (quiet library) | terra-fast, low | Note what it drew, beside B5. |
+| C6 | The B6 line (ivy frame), with the picture and caption inside | terra-fast, low | The picture in the frame, the caption under it. |
+| C7 | The weakest of C1 to C6: **Reroll…**, **Make changes…**, **Drafter**, **Other…**, OpenCode, `openai/gpt-6.1-sol-fast`, low, then **Reroll** | sol-fast, low | About 20 s, and a better drawing. Note whether it was. |
+| C8 | `:Rubric log` on any OpenCode draft | | One step, three files written from the reply, no "asking for a fix". If a draft says "the reply had no files in it", paste its `harness.log` in Notes. |
+| C9 | `:Rubric harness`, OpenCode, a model with no efforts, such as an Ollama one | | The effort question is skipped. Go back to terra-fast after. |
+
+## D. Around a draft
+
+Once each, with whichever tool is set.
+
+| # | Do this | Expect |
+|---|---|---|
+| D1 | With B1 kept: `::: new: a strip of stamps along the top`, `<M-l>` | "Similar: …" with the kept part, marked "yours", above Draft. Moving through the list draws each on the page; Enter puts it on the line with no draft. |
+| D2 | On a ready draft: **Reroll…**, **Make changes…** | Only Notes, Drafter and Back. Nothing starts. |
+| D3 | **Notes**, type `bigger, and fewer of them` | The list gains **Reroll** at the top, with the notes on the Notes line. It starts the reroll. |
+| D4 | With two or more takes: `<M-l>`, **Takes (N)** | Oldest first, each with its time, drafter and notes; "(now)" on the one on screen, where the cursor starts. The page does not flash take 1 as the list opens. Moving draws each take; Enter stays, Esc goes back; both return to the menu. |
+| D5 | `<M-n>` and `<M-p>` on the line | Cycle the takes, as before. |
+| D6 | **Keep**, **This site** | The line becomes `::: name`. Three files in `testing/parts/<name>/`. |
+| D7 | On a new line, the kept part's idea in other words, such as `::: those stamps again` | Jev offers the kept part in a fraction of a second. No draft. |
+| D8 | `<M-l>` on the kept part's line, **Reroll…** | Another take that keeps the name; the Takes list's first entry reads "as kept". |
+| D9 | Start a draft, `<M-l>`, **Stop**; then Draft again at once | The new draft starts once the stopped one is gone. |
+| D10 | `:Rubric tooluse`, **Tools**; open any draft menu; then set **No tools** again | The menu reads "Draft (…, tools)" while tools are on, and loses it after. |
+| D11 | With tools on and a part kept, a `new:` line for the same thing, Draft | It drafts. It never stops to say the site has the part. |
+| D12 | After the session: `jq -r '[.started[11:16], .drafter.harness, .drafter.model, .mode, .seconds, .status, .outcome] \| @tsv' testing/.rubric/logs/drafts.jsonl \| tail -n 20` | One line a draft: the tool, model, mode, seconds and what became of it. Every one from B and C says `fast`. |
+| D13 | With no drafter chosen (`:Rubric harness`, the setup's choice), open a `new:` line's menu | It reads "Draft (opus, low)": Opus at low effort is the built-in drafter. |
+| D14 | `:Rubric model`, **sonnet**, **low**; then `:LspRestart`; open a `new:` line's menu | Still "Draft (sonnet, low)" after the restart. Set it back when done. |
+| D15 | `::: steps` on a new line, `:::` under it; cursor on the `::: steps` line, then on the empty line inside | The starter shows dimmed on the opening line only; inside the block, where you type, it is gone. `<M-l>` inside still fills it in. |
+| D16 | A kept part that splits by `###` (B4's recipe card), placed inside a slide of the kept carousel or a step of `::: steps` | The inner part draws whole inside its slide or step; its own `###` headings don't become slides or steps. |
+| D17 | Two recipe cards placed straight in the kept carousel, or two parts straight in `::: steps`, with no `###` around them | Each part is a slide or step of its own. `steps` draws no empty heading; the carousel kept today was drafted before this and draws an empty one per slide until it is rerolled. A `::: fold` holding a part straight in it stays one closed section. |
+
+## E. Changing a catalog part for the site
+
+Branch `customize`. Each change is a paid draft with whichever drafter is set. Use a page with two `::: quote` blocks, one `size=large`.
+
+| # | Do this | Expect |
+|---|---|---|
+| E1 | `<M-l>` in normal mode on a `::: quote` line with writing in it | A menu with **Change…** only. No "every theme", no remove. On an empty block the key fills the starter, as before. In insert mode the key never opens the menu. |
+| E2 | **Change…**, type `a torn paper edge`, Enter | A draft starts at once with the default drafter; the line stays `::: quote`. Ready in about 20 s: both quotes on the page draw the take. `<M-p>` shows the catalog's quote as take 1; `<M-n>` goes back. |
+| E3 | On the `::: quote` line, add ` : larger, and centered`, pause (not `map`: it can't be changed, E10) | Ghost text with settings from Jev, as before. `<M-l>`, **Change…**: the words are filled in. Enter starts the change and the words leave the line. |
+| E4 | On a ready take: `<M-l>`, **Keep this take** | Kept at once, with no "This site / Every theme" question. `testing/parts/quote/` has three files. Every page's quotes draw it. `git status catalogs/` shows nothing changed. |
+| E5 | Cursor on the kept part's line; then `<M-l>` | A hint at the line's end: "reroll quote, or back to the catalog's". The menu: **Reroll…**, **Back to the catalog's quote**, and no "Add to every theme". |
+| E6 | `::: quote size=large` and `align=center` after keeping | Both settings still work: a change can add settings, never drop one. |
+| E7 | **Reroll…**, **Make changes…**, Notes `drop the size setting`, **Reroll** | The take keeps `size`: the checks send back a take that drops it. If the draft fails instead, its message names `size`. |
+| E8 | **Back to the catalog's quote** | `parts/quote/` moves to `.rubric/logs/removed/`; the quotes draw as the catalog's again. |
+| E9 | In `rubric.md`, `::: theme blowfish`; change `callout` on a page and keep it | The page draws the site's callout, not Blowfish's own. Set the theme back after. |
+| E10 | `<M-l>` on a `::: tabs`, `::: map` or `::: video` line with writing in it | No menu: a part with a script, or one whose drawing fetches from another site, can't be changed. |
+| E11 | In `blowfish`, **Change…** on a `callout`, then `<M-p>` to take 1 | Take 1 is Blowfish's callout as it was on screen, not Paper's. |
+| E12 | On a `::: quote` line, add ` : with a torn paper edge`, pause | Ghost text `⇒ change quote`: no setting matches. `<M-l>` leaves the line and opens the quote's menu; **Change…** has the words filled in. Nothing is drafted until then. |
+| E13 | The same on a `::: map` line: ` : with a torn paper edge`, pause | Ghost text `⇒ nothing map can set`. `<M-l>` leaves the line as it was. |
 
 ## Notes
+
 

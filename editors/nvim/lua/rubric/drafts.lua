@@ -72,13 +72,13 @@ local function replace(bufnr, row, text, result)
     mark_kept(bufnr, at, result.part, result.version ~= nil)
   end
   if result.version then
-    vim.notify(("rubric: it's in the catalog now, version %d, for every theme"):format(result.version), vim.log.levels.INFO)
+    vim.notify(("rubric: added to the catalog for every theme, version %d"):format(result.version), vim.log.levels.INFO)
   end
 end
 
 local function started(view)
   if view and view.status == "drafting" then
-    vim.notify(("rubric: drafting a part for “%s”; keep writing, it takes a minute or two"):format(view.words), vim.log.levels.INFO)
+    vim.notify(("rubric: drafting “%s”"):format(view.words), vim.log.levels.INFO)
   end
 end
 
@@ -115,6 +115,144 @@ end
 -- Defined with the drafters, below.
 local reroll_menu, first_menu
 
+-- A list whose entry under the cursor the page in the browser draws, as the
+-- theme list does: snacks.nvim's picker when it is there, else a plain list,
+-- which draws nothing until one is chosen. Each item has `value`, `label`
+-- (the plain list's line), `text` (what the picker searches) and `chunks`
+-- (the picker's line). `show(item)` draws one; `done(item)` gets the one
+-- chosen, or nil on Esc. `at` is the entry the cursor starts on.
+local function preview_list(title, items, show, done, at)
+  vim.schedule(function()
+    if vim.api.nvim_get_mode().mode:sub(1, 1) == "i" then
+      vim.cmd.stopinsert()
+    end
+    local ok, snacks = pcall(require, "snacks")
+    if not ok or not snacks.picker then
+      vim.ui.select(items, {
+        prompt = title,
+        format_item = function(item)
+          return item.label
+        end,
+      }, done)
+      return
+    end
+    for i, item in ipairs(items) do
+      item.idx = i
+    end
+    local chosen
+    -- The picker reports its first entry as it opens, before the cursor is
+    -- put where it starts: nothing is drawn until then, or the page would
+    -- flash the first entry every time.
+    local shown = false
+    snacks.picker.pick({
+      title = title,
+      items = items,
+      format = function(item)
+        return item.chunks
+      end,
+      layout = { preset = "select" },
+      on_show = function(picker)
+        shown = true
+        if at and at > 1 then
+          pcall(function()
+            picker.list:set_target(at)
+          end)
+        elseif items[1] then
+          show(items[1])
+        end
+      end,
+      on_change = function(_, item)
+        if item and shown then
+          show(item)
+        end
+      end,
+      confirm = function(picker, item)
+        chosen = item
+        picker:close()
+      end,
+      on_close = function()
+        vim.schedule(function()
+          done(chosen)
+        end)
+      end,
+    })
+    vim.schedule(function()
+      vim.cmd.redraw()
+    end)
+  end)
+end
+
+-- The parts the writer already has that are near a `new:` line's words,
+-- their own first, each drawn where the line is, with the block's writing
+-- in it, while the cursor is on it. `use(name)` puts the chosen one on the
+-- line; Esc goes `back` to the menu it came from.
+local function near_list(client, bufnr, row, near, use, back)
+  local uri = vim.uri_from_bufnr(bufnr)
+  local function show(item)
+    client:notify("rubric/peek", { uri = uri, line = row, part = item and item.name or vim.NIL })
+  end
+  local items = {}
+  for _, n in ipairs(near) do
+    table.insert(items, {
+      name = n.name,
+      value = n.name,
+      label = n.name .. (n.own and "  yours" or "") .. "  " .. n.description,
+      text = n.name .. " " .. n.description,
+      chunks = {
+        { n.name, "SnacksPickerLabel" },
+        { n.own and "  yours" or "", "DiagnosticOk" },
+        { "  " .. n.description, "Comment" },
+      },
+    })
+  end
+  preview_list("Similar parts", items, show, function(item)
+    if item then
+      use(item.name)
+    else
+      show(nil)
+      back()
+    end
+  end)
+end
+
+-- When a take was made: the time today, the day too before that.
+local function made(at)
+  local t = math.floor(at / 1000)
+  return os.date(os.date("%Y%m%d", t) == os.date("%Y%m%d") and "%H:%M" or "%b %d %H:%M", t)
+end
+
+-- The takes of one line, oldest first, each with when it was made, what
+-- drafted it and what it was asked to change; the page draws the one under
+-- the cursor. Enter stays on it, Esc goes back to the take that was on
+-- screen; either way `back` reopens the menu it came from.
+local function takes_list(client, bufnr, row, view, back)
+  local function show(item)
+    request(client, bufnr, row, { action = "take", to = item.value })
+  end
+  local items = {}
+  for i, t in ipairs(view.list or {}) do
+    local what = t.original and "as kept" or ("take %d"):format(i)
+    local rest = (t.by and ("  " .. t.by) or "") .. (t.change and ("  “" .. t.change .. "”") or "")
+    local now = i == view.take and "  (now)" or ""
+    table.insert(items, {
+      value = i,
+      label = ("%s  %s%s%s"):format(what, made(t.at), rest, now),
+      text = what .. " " .. rest,
+      chunks = {
+        { what, "SnacksPickerLabel" },
+        { "  " .. made(t.at), "Number" },
+        { rest, "Comment" },
+        { now, "DiagnosticOk" },
+      },
+    })
+  end
+  preview_list(("Takes (%d)"):format(#items), items, show, function(item)
+    request(client, bufnr, row, { action = "take", to = item and item.value or view.take }, function()
+      back()
+    end)
+  end, view.take)
+end
+
 -- The accept key on a `new:` line.
 function M.act(client, bufnr, row)
   local text = vim.api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1]
@@ -126,9 +264,9 @@ function M.act(client, bufnr, row)
   -- Keep a draft: for this site, or for every theme.
   local function keep(name)
     choose({
-      { label = "No, just this site", value = false },
-      { label = "Yes, every theme", value = true },
-    }, ("Make %s available to all themes?"):format(name), function(global)
+      { label = "This site", value = false },
+      { label = "Every theme", value = true },
+    }, ("Keep %s for"):format(name), function(global)
       answer({ action = "keep", global = global })
     end)
   end
@@ -137,22 +275,38 @@ function M.act(client, bufnr, row)
       return
     end
     if view.words == "" then
-      vim.notify("rubric: say after new: what the part should be", vim.log.levels.INFO)
+      vim.notify("rubric: new: needs words after it", vim.log.levels.INFO)
       return
     end
     local status = view.status
     -- Takes cancelled before, for the same words: bring them back, or start over.
     if status == nil and (view.earlier or 0) > 0 then
-      choose({
-        { label = ("Bring back %d earlier take%s"):format(view.earlier, view.earlier == 1 and "" or "s"), value = "restore" },
-        { label = "Draft a new one", value = "build" },
-      }, "You drafted these words before", function(v)
-        if v == "restore" then
-          request(client, bufnr, row, { action = "restore" })
-        else
-          M.build(client, bufnr, row)
+      local function earlier()
+        local items = {
+          { label = ("Earlier takes (%d)"):format(view.earlier), value = "restore" },
+          { label = "New draft", value = "build" },
+        }
+        -- Parts the writer already has that may do, as in the first menu.
+        local near = view.near
+        if near and #near > 0 then
+          table.insert(items, 1, {
+            label = #near == 1 and ("Similar: %s"):format(near[1].name) or ("Similar parts (%d)"):format(#near),
+            value = "look",
+          })
         end
-      end)
+        choose(items, "Drafted before", function(v)
+          if v == "look" then
+            near_list(client, bufnr, row, near, function(name)
+              answer({ action = "use", part = name })
+            end, earlier)
+          elseif v == "restore" then
+            request(client, bufnr, row, { action = "restore" })
+          else
+            M.build(client, bufnr, row)
+          end
+        end)
+      end
+      earlier()
       return
     end
     -- A draft drawn while a reroll is made, or after one failed, can still be kept.
@@ -164,40 +318,43 @@ function M.act(client, bufnr, row)
     if status == "ready" then
       add(("Keep %s"):format(view.name), "keep")
       if (view.takes or 0) > 1 then
-        add(("Next take (%d of %d on screen)"):format(view.take, view.takes), "next")
+        add(("Takes (%d)"):format(view.takes), "takes")
       end
       add("Reroll…", "reroll")
-    elseif status == "exists" then
-      add(("Use %s"):format(view.name), "use")
-      add("Draft one anyway", "fresh")
     elseif status == "drafting" then
-      add("Keep waiting", "wait")
+      add("Wait", "wait")
       -- Taking too long: stop it, and keep what the line had before.
-      add(shown and ("Stop, and go back to %s"):format(shown) or "Stop drafting", "stop")
+      add(shown and ("Stop, back to %s"):format(shown) or "Stop", "stop")
     else
       -- Nothing drafted yet: with the default, or another setup.
       if status == nil and not shown then
-        first_menu(client, bufnr, view.drafter, function(d)
-          M.build(client, bufnr, row, d and { drafter = d } or nil)
-        end, function()
-          answer({ action = "cancel" })
-        end)
+        local function first()
+          first_menu(client, bufnr, view.drafter, function(d)
+            M.build(client, bufnr, row, d and { drafter = d } or nil)
+          end, function()
+            answer({ action = "cancel" })
+          end, view.near, function()
+            near_list(client, bufnr, row, view.near, function(name)
+              answer({ action = "use", part = name })
+            end, first)
+          end)
+        end
+        first()
         return
       end
-      add(status == "failed" and "Try again" or "Draft it", "build")
+      add(status == "failed" and "Retry" or "Draft", "build")
     end
     if shown and status ~= "ready" then
       add(("Keep %s"):format(shown), "keep")
     end
     if view.log then
-      add("Show the log", "log")
+      add("Log", "log")
     end
-    add(status == "drafting" and "Cancel the draft" or "Cancel", "cancel")
-    local prompt = status == "ready" and ("%s, drawn in the preview"):format(view.name)
-      or status == "exists" and ("The catalog has %s"):format(view.name)
-      or status == "drafting" and "Still drafting"
-      or status == "failed" and ("The draft failed: %s"):format(view.message or "no reason given")
-      or "A new part"
+    add(status == "drafting" and "Cancel draft" or "Cancel", "cancel")
+    local prompt = status == "ready" and ("%s, in the preview"):format(view.name)
+      or status == "drafting" and "Drafting"
+      or status == "failed" and ("Draft failed: %s"):format(view.message or "no reason given")
+      or "New part"
     choose(items, prompt, function(v)
       if v == "keep" then
         keep(status == "ready" and view.name or shown)
@@ -205,15 +362,15 @@ function M.act(client, bufnr, row)
         reroll_menu(client, bufnr, view.name, view.drafter, nil, function(change, d)
           M.build(client, bufnr, row, { action = "reroll", change = change, drafter = d })
         end)
-      elseif v == "next" then
-        M.cycle(client, bufnr, row, 1)
+      elseif v == "takes" then
+        takes_list(client, bufnr, row, view, function()
+          M.act(client, bufnr, row)
+        end)
       elseif v == "log" then
         M.show_log(view.log)
-      elseif v == "fresh" then
-        M.build(client, bufnr, row, { action = "fresh" })
       elseif v == "build" then
         M.build(client, bufnr, row)
-      elseif v == "use" or v == "cancel" or v == "stop" then
+      elseif v == "cancel" or v == "stop" then
         answer({ action = v })
       end
     end)
@@ -223,7 +380,10 @@ end
 -- The accept key on a line placing one of the site's own parts, a part a
 -- `new:` line made and the writer kept: another take of it (which keeps its
 -- name, so every page with it changes once kept), going back to it as it
--- was, putting it in the catalog for every theme, or taking it away.
+-- was, putting it in the catalog for every theme, or taking it away. On a
+-- catalog part's line: changing it for this site (`view.catalog`), which
+-- makes it the site's own drawing of the part (`view.changed`), taken away
+-- by going back to the catalog's.
 -- `fill` fills in the block's starter, when it is empty.
 function M.act_own(client, bufnr, row, fill)
   local text = vim.api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1]
@@ -243,17 +403,17 @@ function M.act_own(client, bufnr, row, fill)
       mark_kept(bufnr, at, r.part, r.version ~= nil)
     end
     if r.version then
-      vim.notify(("rubric: it's in the catalog now, version %d, for every theme"):format(r.version), vim.log.levels.INFO)
+      vim.notify(("rubric: added to the catalog for every theme, version %d"):format(r.version), vim.log.levels.INFO)
     end
     if r.removed then
-      vim.notify(("rubric: removed it from the site; its files are in %s"):format(r.removed), vim.log.levels.INFO)
+      vim.notify(("rubric: removed; files in %s"):format(r.removed), vim.log.levels.INFO)
     end
   end
   -- To the line where it is now: it may have moved while a menu was open.
   local function answer(params)
     local at = find(bufnr, row, text)
     if not at then
-      vim.notify("rubric: the part's line changed; press the key on it again", vim.log.levels.WARN)
+      vim.notify("rubric: the line changed: press the key again", vim.log.levels.WARN)
       return
     end
     request(client, bufnr, at, params, done)
@@ -263,7 +423,7 @@ function M.act_own(client, bufnr, row, fill)
   local function reroll(change, d)
     local at = find(bufnr, row, text)
     if not at then
-      vim.notify("rubric: the part's line changed; press the key on it again", vim.log.levels.WARN)
+      vim.notify("rubric: the line changed: press the key again", vim.log.levels.WARN)
       return
     end
     if refine then
@@ -279,51 +439,71 @@ function M.act_own(client, bufnr, row, fill)
       refine, colon = view.change.words, view.change.colon
     end
     local name, status = view.of, view.status
+    -- The catalog's part or the site's drawing of it: kept for this site only.
+    local shared = view.catalog or view.changed
     local items = {}
     local function add(label, value)
       table.insert(items, { label = label, value = value })
     end
     if fill then
-      add("Fill in the starter", "fill")
+      add("Fill starter", "fill")
     end
     -- The first take is the part as it was kept.
     local original = (view.take or 1) == 1
     if status == "drafting" then
-      add("Keep waiting", "wait")
-      add("Stop drafting", "stop")
+      add("Wait", "wait")
+      add("Stop", "stop")
     end
     -- A take on screen can be kept even while another drafts or after one failed.
     if not original and (status == "ready" or view.shown) then
-      add(("Keep this take of %s"):format(name), "keep")
+      add("Keep this take", "keep")
     end
     if (view.takes or 0) > 1 then
-      add(("Next take (%d of %d on screen)"):format(view.take, view.takes), "next")
+      add(("Takes (%d)"):format(view.takes), "takes")
     end
-    if status ~= "drafting" then
-      add(status == "failed" and "Try again…" or "Reroll…", "reroll")
+    if view.catalog and status == nil then
+      add("Change…", "change")
+    elseif status ~= "drafting" then
+      add(status == "failed" and "Retry…" or "Reroll…", "reroll")
     end
-    if status == nil then
-      add(("Make %s available to every theme"):format(name), "global")
+    if status == nil and view.changed then
+      add(("Back to the catalog's %s"):format(name), "remove")
+    elseif status == nil and not shared then
+      add(("Add %s to every theme"):format(name), "global")
       add(("Remove %s from this site…"):format(name), "remove")
     end
     if view.log then
-      add("Show the log", "log")
+      add("Log", "log")
     end
     if status ~= nil then
-      add(("Go back to %s as it was"):format(name), "cancel")
+      add(view.catalog and ("Back to the catalog's %s"):format(name) or ("Back to %s as kept"):format(name), "cancel")
     end
-    local prompt = status == "drafting" and ("Drafting another take of %s"):format(name)
-      or status == "failed" and ("Another take of %s failed: %s"):format(name, view.message or "no reason given")
-      or status == "ready" and (original and ("%s as it was kept"):format(name) or ("Take %d of %s, drawn in the preview"):format(view.take, name))
-      or ("%s, this site's own part"):format(name)
+    local kept = view.catalog and ("the catalog's %s"):format(name) or ("%s as kept"):format(name)
+    local prompt = status == "drafting" and ("Drafting a take of %s"):format(name)
+      or status == "failed" and ("Take of %s failed: %s"):format(name, view.message or "no reason given")
+      or status == "ready" and (original and kept or ("Take %d of %s, in the preview"):format(view.take, name))
+      or view.catalog and ("%s, catalog part"):format(name)
+      or view.changed and ("%s, changed for this site"):format(name)
+      or ("%s, site part"):format(name)
     choose(items, prompt, function(v)
       if v == "fill" then
         fill()
+      elseif v == "keep" and shared then
+        answer({ action = "keep", global = false })
+      elseif v == "change" then
+        -- What to change, then the draft starts with the default drafter.
+        vim.ui.input({ prompt = ("Change %s: "):format(name), default = refine or "" }, function(notes)
+          if notes and notes ~= "" then
+            reroll(notes)
+          end
+        end)
+      elseif v == "remove" and view.changed then
+        answer({ action = "remove" })
       elseif v == "keep" then
         choose({
-          { label = "No, just this site", value = false },
-          { label = "Yes, every theme", value = true },
-        }, ("Make %s available to all themes?"):format(name), function(global)
+          { label = "This site", value = false },
+          { label = "Every theme", value = true },
+        }, ("Keep %s for"):format(name), function(global)
           answer({ action = "keep", global = global })
         end)
       elseif v == "global" then
@@ -331,12 +511,12 @@ function M.act_own(client, bufnr, row, fill)
       elseif v == "remove" then
         local uses = view.uses or { blocks = 0, pages = 0 }
         local prompt = uses.blocks > 0
-            and ("%d other block%s on %d page%s use%s %s, and will show it as unknown. Remove it?"):format(
-              uses.blocks, uses.blocks == 1 and "" or "s", uses.pages, uses.pages == 1 and "" or "s", uses.blocks == 1 and "s" or "", name)
-          or ("Remove %s from this site? Its files go to .rubric/logs/removed/."):format(name)
+            and ("Remove %s: used by %d other block%s on %d page%s, which will show as unknown"):format(
+              name, uses.blocks, uses.blocks == 1 and "" or "s", uses.pages, uses.pages == 1 and "" or "s")
+          or ("Remove %s: files go to .rubric/logs/removed/"):format(name)
         choose({
-          { label = "No, keep it", value = false },
-          { label = ("Yes, remove %s"):format(name), value = true },
+          { label = "Keep", value = false },
+          { label = "Remove", value = true },
         }, prompt, function(yes)
           if yes then
             answer({ action = "remove" })
@@ -345,8 +525,10 @@ function M.act_own(client, bufnr, row, fill)
       elseif v == "reroll" then
         -- The words after ":" are the notes it starts with.
         reroll_menu(client, bufnr, name, view.drafter, refine, reroll)
-      elseif v == "next" then
-        M.cycle(client, bufnr, row, 1)
+      elseif v == "takes" then
+        takes_list(client, bufnr, row, view, function()
+          M.act_own(client, bufnr, row, fill)
+        end)
       elseif v == "log" then
         M.show_log(view.log)
       elseif v == "stop" or v == "cancel" then
@@ -361,7 +543,7 @@ end
 function M.cycle(client, bufnr, row, step)
   request(client, bufnr, row, { action = "take", step = step }, function(view)
     if view and (view.takes or 0) < 2 then
-      vim.notify("rubric: this line has one take; reroll for another", vim.log.levels.INFO)
+      vim.notify("rubric: one take only", vim.log.levels.INFO)
     end
   end)
 end
@@ -373,7 +555,7 @@ end
 -- unless the writer moved up to read.
 function M.show_log(path)
   if not path or vim.fn.filereadable(path) == 0 then
-    vim.notify("rubric: this draft has no log yet", vim.log.levels.INFO)
+    vim.notify("rubric: no log yet", vim.log.levels.INFO)
     return
   end
   local from = vim.api.nvim_get_current_win()
@@ -418,11 +600,11 @@ end
 function M.log(client, bufnr, row)
   request(client, bufnr, row, {}, function(view)
     if not view then
-      vim.notify("rubric: put the cursor on a ::: new: line, or a line of the site's own part", vim.log.levels.INFO)
+      vim.notify("rubric: not a new: line or a site part's line", vim.log.levels.INFO)
     elseif view.log then
       M.show_log(view.log)
     else
-      vim.notify("rubric: this line has no draft yet", vim.log.levels.INFO)
+      vim.notify("rubric: no draft yet", vim.log.levels.INFO)
     end
   end)
 end
@@ -456,9 +638,13 @@ local function same(a, b)
   return a and b and a.harness == b.harness and a.model == b.model and a.effort == b.effort
 end
 
--- A drafter in a few words: "sonnet, low".
+-- Whether drafts are made with tools, the slower way. Every label that
+-- names a drafter says so, since it changes how long each draft takes.
+local tools_now = false
+
+-- A drafter in a few words: "sonnet, low", or "sonnet, low, tools".
 local function short(d)
-  return ("%s%s"):format(d.model or (d.harness .. "'s default"), d.effort and (", " .. d.effort) or "")
+  return ("%s%s%s"):format(d.model or (d.harness .. "'s default"), d.effort and (", " .. d.effort) or "", tools_now and ", tools" or "")
 end
 
 -- The saved default and recent drafters. Older files are read too: one
@@ -473,7 +659,7 @@ function M.load_saved()
   if not ok2 or type(saved) ~= "table" then
     return { recent = {} }
   end
-  local out = { recent = {} }
+  local out = { recent = {}, drafting = (saved.drafting == "fast" or saved.drafting == "tools") and saved.drafting or nil }
   if saved.harness then
     table.insert(out.recent, valid(saved))
   elseif saved.fast or saved.careful then
@@ -492,12 +678,12 @@ function M.load_saved()
 end
 
 local function write_saved(saved)
-  if not saved.default and #saved.recent == 0 then
+  if not saved.default and #saved.recent == 0 and not saved.drafting then
     pcall(vim.fn.delete, saved_file)
     return
   end
   vim.fn.mkdir(vim.fs.dirname(saved_file), "p")
-  vim.fn.writefile({ vim.json.encode({ default = saved.default, recent = saved.recent }) }, saved_file)
+  vim.fn.writefile({ vim.json.encode({ default = saved.default, recent = saved.recent, drafting = saved.drafting }) }, saved_file)
 end
 
 -- A drafter used, first among the recent ones.
@@ -529,6 +715,70 @@ function M.drafter(defaults, setup)
   return M.load_saved().default or M.from_setup(setup) or defaults
 end
 
+-- How drafts are asked for when the server starts: what :Rubric tooluse
+-- chose, else the setup's, "fast" (one call with no tools, the files in the
+-- reply) or "tools" (the tool writes them, a turn a step).
+function M.drafting(setup)
+  local mode = M.load_saved().drafting or ((setup == "fast" or setup == "tools") and setup or "fast")
+  tools_now = mode == "tools"
+  return mode
+end
+
+-- A server starts with the mode and the drafter the setup had when Neovim
+-- opened, so each one is told the kept ones as it attaches: after a
+-- restart, or in another site, the labels and the drafts agree.
+-- `started` is the drafter the server's command line names: when the kept
+-- one is still that, nothing is sent, so no tool is asked for its models.
+function M.sync(client, bufnr, setup, started, defaults, draft_setup)
+  client:request("rubric/drafting", { mode = M.drafting(setup) }, function() end, bufnr)
+  local d = M.drafter(defaults, draft_setup)
+  local same = d and started and d.harness == started.harness and d.model == started.model and d.effort == started.effort
+  if d and not same then
+    client:request("rubric/setDrafter", { harness = d.harness, model = d.model, effort = d.effort }, function() end, bufnr)
+  end
+end
+
+-- With tools or without: a list like the model's, with the one in use marked.
+local function pick_tools(done, back)
+  choose({
+    { label = "No tools: one call, files in the reply" .. (tools_now and "" or "  (now)"), value = "fast" },
+    { label = "Tools: the tool writes the files, slower" .. (tools_now and "  (now)" or ""), value = "tools" },
+  }, "Tool use", done, back)
+end
+
+-- The server takes the mode for drafts from now on, and it is kept for
+-- every session.
+local function set_tools(client, bufnr, mode, done)
+  client:request("rubric/drafting", { mode = mode }, function(e, r)
+    if e or not r or r.error then
+      vim.notify("rubric: " .. ((r and r.error) or (e and e.message) or "could not change it"), vim.log.levels.WARN)
+      return
+    end
+    local saved = M.load_saved()
+    saved.drafting = r.mode
+    write_saved(saved)
+    tools_now = r.mode == "tools"
+    done()
+  end, bufnr)
+end
+
+-- :Rubric tooluse: whether a draft is one call with no tools or the tool
+-- writing the files.
+function M.choose_tooluse(client, bufnr)
+  client:request("rubric/drafting", {}, function(err, now)
+    if err or not now or not now.mode then
+      vim.notify("rubric: " .. ((err and err.message) or "no answer from the server"), vim.log.levels.WARN)
+      return
+    end
+    tools_now = now.mode == "tools"
+    pick_tools(function(mode)
+      set_tools(client, bufnr, mode, function()
+        vim.notify("rubric: tool use: " .. (tools_now and "tools" or "no tools"), vim.log.levels.INFO)
+      end)
+    end)
+  end, bufnr)
+end
+
 -- The server's command line for it.
 function M.args(d)
   local args = { "--harness", d.harness }
@@ -547,7 +797,9 @@ function M.remember_setup(defaults, setup)
   setup_choice = M.from_setup(setup) or defaults
 end
 
-local function set_default(client, bufnr, d, back)
+-- `mode`, when given, is set once the server has taken the drafter, so a
+-- refused drafter changes nothing.
+local function set_default(client, bufnr, d, back, mode)
   client:request("rubric/setDrafter", { harness = d.harness, model = d.model, effort = d.effort }, function(e, r)
     if e or (r and r.error) then
       vim.notify("rubric: " .. ((r and r.error) or (e and e.message) or "could not change it"), vim.log.levels.WARN)
@@ -559,7 +811,14 @@ local function set_default(client, bufnr, d, back)
     if not back then
       remember(d)
     end
-    vim.notify("rubric: new parts are drafted by " .. r.drafter, vim.log.levels.INFO)
+    local function say()
+      vim.notify(("rubric: drafter: %s, %s"):format(r.drafter, tools_now and "with tools" or "no tools"), vim.log.levels.INFO)
+    end
+    if mode then
+      set_tools(client, bufnr, mode, say)
+    else
+      say()
+    end
   end, bufnr)
 end
 
@@ -572,7 +831,7 @@ local function pick_effort(client, bufnr, harness, model, current, done, back)
       done(d)
       return
     end
-    local items = { { label = "its default effort", value = "default" } }
+    local items = { { label = "default effort", value = "default" } }
     for _, level in ipairs(offered) do
       table.insert(items, { label = level == current and (level .. "  (now)") or level, value = level })
     end
@@ -595,9 +854,16 @@ local function pick_model(client, bufnr, harness, now, done, back)
       return
     end
     -- Drafts don't read OpenCode's config, so its default is its own, not the config's.
-    local items = { { label = harness == "opencode" and "OpenCode's own default (your config isn't read)" or "its default model", value = "default" } }
+    local items = { { label = harness == "opencode" and "OpenCode default (config not read)" or "default model", value = "default" } }
+    -- The model measured as the quickest good one for this tool, first.
+    local first = r.suggested ~= vim.NIL and r.suggested or nil
+    if first then
+      table.insert(items, 1, { label = first .. "  (suggested)" .. (first == now.model and "  (now)" or ""), value = first })
+    end
     for _, m in ipairs(r.models or {}) do
-      table.insert(items, { label = m == now.model and (m .. "  (now)") or m, value = m })
+      if m ~= first then
+        table.insert(items, { label = m == now.model and (m .. "  (now)") or m, value = m })
+      end
     end
     choose(items, ("%s with which model? (%d)"):format(harness, #items - 1), function(m)
       local model = m ~= "default" and m or nil
@@ -626,7 +892,7 @@ local function pick_tool(client, bufnr, prompt, extra, done, other, back)
       if versions[v] then
         pick_model(client, bufnr, v, {}, done, back)
       elseif labels[v] then
-        vim.notify(("rubric: %s is not installed, or not on the PATH"):format(labels[v]), vim.log.levels.WARN)
+        vim.notify(("rubric: %s not found on the PATH"):format(labels[v]), vim.log.levels.WARN)
         if back then
           back()
         end
@@ -637,14 +903,16 @@ local function pick_tool(client, bufnr, prompt, extra, done, other, back)
   end, bufnr)
 end
 
--- :Rubric harness: the default's tool, model and effort; or the setup's
--- choice again.
+-- :Rubric harness: the default's tool, model and effort, then whether it
+-- drafts with tools; or the setup's choice again.
 function M.choose_harness(client, bufnr)
   local extra = setup_choice and {
-    { value = "setup", label = ("Whatever my setup says (%s)"):format(short(setup_choice)) },
+    { value = "setup", label = ("From setup (%s)"):format(short(setup_choice)) },
   } or {}
-  pick_tool(client, bufnr, "Draft new parts with", extra, function(d)
-    set_default(client, bufnr, d)
+  pick_tool(client, bufnr, "Default drafter", extra, function(d)
+    pick_tools(function(mode)
+      set_default(client, bufnr, d, false, mode)
+    end)
   end, function()
     set_default(client, bufnr, setup_choice, true)
   end)
@@ -681,12 +949,12 @@ local function pick_once(client, bufnr, chosen, done, back)
     for i, d in ipairs(recent) do
       table.insert(items, { label = short(d) .. (same(d, chosen) and "  (chosen)" or "") .. ("  · %s"):format(d.harness), value = i })
     end
-    table.insert(items, { label = "Another tool or model…", value = "other" })
-    choose(items, "Draft it with", function(v)
+    table.insert(items, { label = "Other…", value = "other" })
+    choose(items, "Drafter", function(v)
       if v == 0 then
         done(nil)
       elseif v == "other" then
-        pick_tool(client, bufnr, "Draft it with", {}, done, nil, back)
+        pick_tool(client, bufnr, "Drafter", {}, done, nil, back)
       else
         done(recent[v])
       end
@@ -694,76 +962,109 @@ local function pick_once(client, bufnr, chosen, done, back)
   end, bufnr)
 end
 
--- What a draft or reroll is made with, before it starts: notes on what to
--- change (a reroll's) and the drafter, for this one alone. `go(notes,
--- drafter)` starts it; Esc leaves it.
-local function setup(client, bufnr, o, go)
-  local notes, drafter = o.notes, nil
+-- What a reroll changes, before it starts: notes on what to change and the
+-- drafter, for this one alone, kept in `state`. Once either is set, the
+-- list gains Reroll, which `start`s it from here. Back (or Esc) goes `back`
+-- to the menu before, which starts it too.
+local function changes(client, bufnr, prompt, default, state, start, back)
   local function show()
     local items = {
-      { label = o.verb .. (drafter and (" with " .. short(drafter)) or "") .. (notes and (": “" .. notes .. "”") or ""), value = "go" },
+      { label = ("Notes: %s…"):format(state.notes and ("“" .. state.notes .. "”") or "none"), value = "notes" },
+      { label = ("Drafter: %s…"):format(state.drafter and short(state.drafter) or ((default or "default") .. " (default)")), value = "drafter" },
+      { label = "Back", value = "back" },
     }
-    if o.notes_allowed then
-      table.insert(items, { label = ("Notes: %s…"):format(notes and ("“" .. notes .. "”") or "none"), value = "notes" })
+    if state.notes or state.drafter then
+      table.insert(items, 1, { label = "Reroll", value = "start" })
     end
-    table.insert(items, { label = ("Drafter: %s…"):format(drafter and short(drafter) or ((o.default or "the default") .. ", the default")), value = "drafter" })
-    choose(items, o.prompt, function(v)
-      if v == "go" then
-        -- Used, so it's among the recent ones from now on.
-        if drafter then
-          remember(drafter)
-        end
-        go(notes or "", drafter)
+    choose(items, prompt, function(v)
+      if v == "start" then
+        start()
       elseif v == "notes" then
-        vim.ui.input({ prompt = "What should change? ", default = notes or "" }, function(text)
+        vim.ui.input({ prompt = "Change: ", default = state.notes or "" }, function(text)
           if text then
-            notes = text ~= "" and text or nil
+            state.notes = text ~= "" and text or nil
           end
           show()
         end)
       elseif v == "drafter" then
-        pick_once(client, bufnr, drafter, function(d)
-          drafter = d
+        pick_once(client, bufnr, state.drafter, function(d)
+          state.drafter = d
           show()
         end, show)
+      else
+        back()
+      end
+    end, back)
+  end
+  show()
+end
+
+-- Reroll: as it is, or with notes and a drafter chosen first; the changes'
+-- own list starts it once there is one, and so does this one, whose entry
+-- then names them. `notes` are words the line already has
+-- for the change.
+function reroll_menu(client, bufnr, name, default, notes, go)
+  local state = { notes = notes, drafter = nil }
+  local prompt = ("Reroll %s"):format(name)
+  local function start()
+    -- Used, so it's among the recent ones from now on.
+    if state.drafter then
+      remember(state.drafter)
+    end
+    go(state.notes or "", state.drafter)
+  end
+  local function show()
+    local with = (state.drafter and (" with " .. short(state.drafter)) or "") .. (state.notes and (": “" .. state.notes .. "”") or "")
+    choose({
+      { label = "Reroll" .. with, value = "just" },
+      { label = "Make changes…", value = "change" },
+    }, prompt, function(v)
+      if v == "just" then
+        start()
+      else
+        changes(client, bufnr, prompt, default, state, start, show)
       end
     end)
   end
   show()
 end
 
--- Reroll: as it is, or with something changed first. `notes` are words the
--- line already has for the change.
-function reroll_menu(client, bufnr, name, default, notes, go)
-  choose({
-    { label = notes and ("Reroll with “%s”"):format(notes) or "Just reroll", value = "just" },
-    { label = "Change something first…", value = "change" },
-  }, ("Reroll %s"):format(name), function(v)
-    if v == "just" then
-      go(notes or "", nil)
-    else
-      setup(client, bufnr, { verb = "Reroll", prompt = ("Reroll %s"):format(name), notes_allowed = true, notes = notes, default = default }, go)
-    end
-  end)
-end
-
 -- A first draft: with the default, or with another drafter for this one.
-function first_menu(client, bufnr, default, go, cancel)
-  choose({
-    { label = ("Draft it (%s)"):format(default or "the default"), value = "draft" },
-    { label = "Draft with a different setup…", value = "setup" },
-    { label = "Cancel", value = "cancel" },
-  }, "A new part", function(v)
-    if v == "draft" then
-      go(nil)
-    elseif v == "setup" then
-      setup(client, bufnr, { verb = "Draft it", prompt = "A new part", default = default }, function(_, d)
-        go(d)
-      end)
-    else
-      cancel()
+-- `near` are parts the writer already has that may do; `look` lists them.
+function first_menu(client, bufnr, default, go, cancel, near, look)
+  local drafter
+  local function show()
+    local items = {
+      { label = ("Draft (%s)"):format(drafter and short(drafter) or default or "default"), value = "draft" },
+      { label = "Draft with…", value = "setup" },
+      { label = "Cancel", value = "cancel" },
+    }
+    if near and #near > 0 then
+      table.insert(items, 1, {
+        label = #near == 1 and ("Similar: %s"):format(near[1].name) or ("Similar parts (%d)"):format(#near),
+        value = "look",
+      })
     end
-  end)
+    choose(items, "New part", function(v)
+      if v == "look" then
+        look()
+      elseif v == "draft" then
+        if drafter then
+          remember(drafter)
+        end
+        go(drafter)
+      elseif v == "setup" then
+        -- Another drafter for this one: chosen, then back here to start it.
+        pick_once(client, bufnr, drafter, function(d)
+          drafter = d
+          show()
+        end, show)
+      else
+        cancel()
+      end
+    end)
+  end
+  show()
 end
 
 -- ── Where each draft is, on its line ────────────────────────────────────
@@ -883,11 +1184,15 @@ local function looks(d)
     local also = data.shown and (" · %s still shown"):format(data.shown) or ""
     return SPIN[frame], ("drafting%s%s · %s stop or cancel"):format(clock(data.started), also, accept_key), "info", true
   elseif d.code == "draft-ready" then
-    return "◆", ("%s drafted%s · %s keep, reroll, cancel"):format(data.name or "part", takes, accept_key), "ok"
+    -- The settings it takes, by name: their values are in the line's note.
+    local names = {}
+    for _, s in ipairs(data.settings or {}) do
+      table.insert(names, s.name)
+    end
+    local sets = #names > 0 and (" · takes " .. table.concat(names, ", ")) or ""
+    return "◆", ("%s drafted%s%s · %s keep, reroll, cancel"):format(data.name or "part", takes, sets, accept_key), "ok"
   elseif d.code == "draft-failed" then
     return "✗", ("draft failed%s · %s try again"):format(takes, accept_key), "warn"
-  elseif d.code == "draft-exists" then
-    return "↪", ("catalog has %s · %s use it"):format(data.name or "this", accept_key), "info"
   elseif d.code == "new-part" and data.status == "none" then
     if type(data.earlier) == "number" and data.earlier > 0 then
       return "+", ("%s bring back %d earlier take%s, or draft a new part"):format(accept_key, data.earlier, data.earlier == 1 and "" or "s"), "none"
@@ -942,7 +1247,7 @@ end
 -- The notes on `new:` lines carry where the draft is, which the block's own
 -- look shows; underlined too, the request would read as a mistake. Every
 -- other note, Rubric's included, is underlined as before.
-local NEW_CODES = { ["new-part"] = true, drafting = true, ["draft-ready"] = true, ["draft-failed"] = true, ["draft-exists"] = true }
+local NEW_CODES = { ["new-part"] = true, drafting = true, ["draft-ready"] = true, ["draft-failed"] = true }
 local underline = vim.diagnostic.handlers.underline
 if underline and not underline.rubric then
   vim.diagnostic.handlers.underline = {
@@ -1056,11 +1361,9 @@ function M.drafted(_, state)
     return
   end
   if state.status == "ready" then
-    vim.notify(("rubric: %s is drafted and drawn in the preview; %s on its line keeps, rerolls or cancels it"):format(state.name, accept_key), vim.log.levels.INFO)
-  elseif state.status == "exists" then
-    vim.notify(("rubric: the catalog already has %s for “%s”"):format(state.name, state.words), vim.log.levels.INFO)
+    vim.notify(("rubric: %s drafted, in the preview · %s keep, reroll, cancel"):format(state.name, accept_key), vim.log.levels.INFO)
   elseif state.status == "failed" and state.message ~= "stopped" then
-    vim.notify(("rubric: the draft for “%s” failed: %s"):format(state.words, state.message or "no reason given"), vim.log.levels.WARN)
+    vim.notify(("rubric: draft failed for “%s”: %s"):format(state.words, state.message or "no reason given"), vim.log.levels.WARN)
   end
 end
 
