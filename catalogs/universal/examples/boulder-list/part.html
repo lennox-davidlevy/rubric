@@ -55,7 +55,7 @@
 {{- end }}
 </svg></span>
 <div class="boulder-text">
-<h3>{{ $it.title }}</h3>
+{{ with $it.title }}<h3>{{ . }}</h3>{{ end }}
 <div class="stack">{{ $it.body }}</div>
 </div>
 </li>

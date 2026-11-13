@@ -12,7 +12,7 @@
 <span class="part-timeline-mark" aria-hidden="true">{{ with $check }}{{ .Content | safeHTML }}{{ end }}</span>
 <div class="part-timeline-card">
 {{- with $when }}<p class="part-timeline-when">{{ . | safeHTML }}</p>{{ end }}
-<h3>{{ $what | safeHTML }}</h3>
+{{ with $what }}<h3>{{ . | safeHTML }}</h3>{{ end }}
 <div class="stack">
 {{ .body }}
 </div>

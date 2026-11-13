@@ -5,7 +5,7 @@
 {{- range $i, $it := $x.items }}
 <li style="--level: {{ $i }}">
 <div class="tide-chart-text">
-<h3>{{ $it.title }}</h3>
+{{ with $it.title }}<h3>{{ . }}</h3>{{ end }}
 <div class="stack">{{ $it.body }}</div>
 </div>
 <div class="tide-chart-sea" aria-hidden="true">

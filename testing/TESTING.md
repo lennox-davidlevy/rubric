@@ -98,6 +98,7 @@ Once each, with whichever tool is set.
 | D14 | `:Rubric model`, **sonnet**, **low**; then `:LspRestart`; open a `new:` line's menu | Still "Draft (sonnet, low)" after the restart. Set it back when done. |
 | D15 | `::: steps` on a new line, `:::` under it; cursor on the `::: steps` line, then on the empty line inside | The starter shows dimmed on the opening line only; inside the block, where you type, it is gone. `<M-l>` inside still fills it in. |
 | D16 | A kept part that splits by `###` (B4's recipe card), placed inside a slide of the kept carousel or a step of `::: steps` | The inner part draws whole inside its slide or step; its own `###` headings don't become slides or steps. |
+| D17 | Two recipe cards placed straight in the kept carousel, or two parts straight in `::: steps`, with no `###` around them | Each part is a slide or step of its own. `steps` draws no empty heading; the carousel kept today was drafted before this and draws an empty one per slide until it is rerolled. A `::: fold` holding a part straight in it stays one closed section. |
 
 ## E. Changing a catalog part for the site
 
@@ -116,6 +117,8 @@ Branch `customize`. Each change is a paid draft with whichever drafter is set. U
 | E9 | In `rubric.md`, `::: theme blowfish`; change `callout` on a page and keep it | The page draws the site's callout, not Blowfish's own. Set the theme back after. |
 | E10 | `<M-l>` on a `::: tabs`, `::: map` or `::: video` line with writing in it | No menu: a part with a script, or one whose drawing fetches from another site, can't be changed. |
 | E11 | In `blowfish`, **Change…** on a `callout`, then `<M-p>` to take 1 | Take 1 is Blowfish's callout as it was on screen, not Paper's. |
+| E12 | On a `::: quote` line, add ` : with a torn paper edge`, pause | Ghost text `⇒ change quote`: no setting matches. `<M-l>` leaves the line and opens the quote's menu; **Change…** has the words filled in. Nothing is drafted until then. |
+| E13 | The same on a `::: map` line: ` : with a torn paper edge`, pause | Ghost text `⇒ nothing map can set`. `<M-l>` leaves the line as it was. |
 
 ## Notes
 

@@ -12,7 +12,7 @@ import { atPlace, Cache, scan, type PageKind } from "../src/core/index.ts";
 import { DRAFT_INDEX, DRAFT_LOGS, DRAFTS, HUGO_TREE, readDrafts, shownTake } from "../src/parts.ts";
 import { checkDraft, type Harness } from "../src/server/draft.ts";
 import type { Mode } from "../src/server/harness.ts";
-import { stubHarness, stubResolver } from "../src/server/stub.ts";
+import { stubHarness, stubRefiner, stubResolver } from "../src/server/stub.ts";
 import { Workspace, type Note } from "../src/server/workspace.ts";
 import { openSite } from "../src/site.ts";
 import { copyTestingSite } from "./testing-site.ts";
@@ -58,6 +58,11 @@ async function workspace(): Promise<Workspace> {
   return new Workspace(site, await Cache.load(site.cache), resolver, (f, n) => notes.set(f, n), {
     idleMs: 5, waitMs: 1000, drawMs: 5,
     mode: () => mode,
+    refiner: async (words, part, kind) => {
+      const r = await stubRefiner(current().catalog, 5)(words, part, kind);
+      // "maybe" stands for an answer Jev is unsure of: a setting it may ask for.
+      return words.includes("maybe") && r.refined ? { ...r, refined: { ...r.refined, unsettled: ["size"] } } : r;
+    },
     traits: async (words) => {
       traitsAsked.push(words);
       return { moves: 0.9 };
@@ -790,6 +795,31 @@ describe("changing a catalog part for the site", () => {
   const quotes = `${front}::: quote size=large\nSaid.\n:::\n\n::: quote\nWritten.\n:::\n`;
 
   beforeAll(async () => {
+    await write(quotes);
+  });
+
+  // Words after ":" that set nothing the part has ask for a change to the
+  // part itself: the ghost offers it, and accepting opens the part's menu.
+  // A part that can't be changed says only that nothing was set.
+  test("words that set nothing offer a change, on a part that can have one", async () => {
+    const torn = "::: quote : with a torn edge";
+    await write(`${front}${torn}\nSaid.\n:::\n\n::: map : with a torn edge\nParis\n:::\n`);
+    await ws.settle();
+    const [g] = await ws.ghost(page(), 4);
+    expect(g).toMatchObject({ change: true, replace: torn });
+    expect(g?.text).toContain("quote");
+    const [m] = await ws.ghost(page(), 8);
+    expect(m?.change).toBeUndefined();
+    expect(m?.replace).toBe("::: map : with a torn edge");
+    // A setting Jev is unsure of gets its note, not the offer.
+    await write(`${front}::: quote : maybe roomier\nSaid.\n:::\n`);
+    await ws.settle();
+    expect(await ws.ghost(page(), 4)).toEqual([]);
+    // Words that set something get the settings, not the offer.
+    await write(`${front}::: quote : large\nSaid.\n:::\n`);
+    await ws.settle();
+    expect(await ws.ghost(page(), 4)).toMatchObject([{ replace: "::: quote size=large" }]);
+    expect((await ws.ghost(page(), 4))[0]?.change).toBeUndefined();
     await write(quotes);
   });
 

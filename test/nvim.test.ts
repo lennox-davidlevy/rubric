@@ -814,6 +814,16 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
     keys(":call cursor(10, 1)<CR><M-l>");
     expect(await until(() => !existsSync(join(site, "parts/callout")))).toBe(true);
     expect(expr("RubricTest.line(10)")).toBe("::: callout");
+    // Words after ":" that set nothing it has: the ghost offers a change, and
+    // accepting it opens the part's menu and leaves the line as it was.
+    const menusThen = Number(expr("RubricTest.menus"));
+    expr("RubricTest.answer()");
+    keys(":call cursor(10, 1)<CR>A : with a torn edge");
+    expect(await until(() => expr("RubricTest.ghost()").includes("change callout"))).toBe(true);
+    keys("<M-l>");
+    expect(await until(() => Number(expr("RubricTest.menus")) === menusThen + 1)).toBe(true);
+    expect(expr("RubricTest.line(10)")).toBe("::: callout : with a torn edge");
+    keys("<Esc>:call setline(10, '::: callout')<CR>");
 
     // A `new:` typed by hand is drafted only on the accept key; cancel puts
     // the words back.

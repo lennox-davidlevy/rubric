@@ -6,7 +6,10 @@
 
   Headings of a part placed inside this one (marked data-in-part by
   rubric/draw.html) are left where they are: a recipe card in a carousel's
-  slide keeps its "### Ingredients", and the slide stays one slide.
+  slide keeps its "### Ingredients", and the slide stays one slide. A block
+  with no such headings of its own makes each part placed in it an item,
+  whose title is empty; a part that needs a title on each item (tabs,
+  fold, pricing) passes "parts" false.
 
   Usage: {{ $x := partial "rubric/sections.html" (dict "html" .inner "level" 3) }}
 */ -}}
@@ -22,4 +25,17 @@
   {{- $body := replace (replaceRE (printf `(?s)^[^>]*>.*?</%s>` $tag) "" .) $hidden $nested -}}
   {{- $items = $items | append (dict "title" ($title | safeHTML) "id" $id "body" ($body | safeHTML)) -}}
 {{- end -}}
-{{- return dict "before" (replace (index $chunks 0) $hidden $nested | safeHTML) "items" $items -}}
+{{- $before := replace (index $chunks 0) $hidden $nested -}}
+{{- /* A block with no headings of its own, holding parts placed straight in
+     it (two recipe cards in a carousel): each part is an item, with no
+     title. draw.html marks where each part it holds starts and ends. */ -}}
+{{- $byPart := cond (isset . "parts") .parts true -}}
+{{- if and (not $items) $byPart -}}
+  {{- $parts := findRE `(?s)<!--rubric-part-->.*?<!--/rubric-part-->` $before -}}
+  {{- range $parts -}}
+    {{- $items = $items | append (dict "title" "" "id" "" "body" (. | safeHTML)) -}}
+    {{- $before = replace $before . "" -}}
+  {{- end -}}
+  {{- if $parts }}{{ $before = trim $before " \n" }}{{ end -}}
+{{- end -}}
+{{- return dict "before" ($before | safeHTML) "items" $items -}}

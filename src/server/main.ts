@@ -322,7 +322,7 @@ export function serve(opts: { stub: boolean; drafter?: Drafter; mode?: Mode }): 
     return ghosts.map((g) => ({
       insertText: g.text,
       range: { start: { line: g.line, character: g.character }, end: { line: g.line, character: g.character } },
-      ...(g.replace === undefined ? {} : { command: { title: "Pin", command: "rubric.pin", arguments: [{ line: g.line, text: g.replace, ...(g.drop === undefined ? {} : { drop: g.drop }), ...(g.build ? { build: true } : {}) }] } }),
+      ...(g.replace === undefined ? {} : { command: { title: "Pin", command: "rubric.pin", arguments: [{ line: g.line, text: g.replace, ...(g.drop === undefined ? {} : { drop: g.drop }), ...(g.build ? { build: true } : {}), ...(g.change ? { change: true } : {}) }] } }),
     }));
   });
 

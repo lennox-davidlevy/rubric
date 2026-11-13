@@ -47,6 +47,9 @@ export interface Ghost {
   // Accepting asks for a new part to be drafted: the line becomes a `new:`
   // line, and the editor then asks the server to start.
   build?: true;
+  // Accepting leaves the line as it is and opens the part's menu, where
+  // Change… starts with the words after its ":".
+  change?: true;
 }
 
 // What the editor shows and does for a `::: new:` line.
@@ -564,11 +567,22 @@ export class Workspace {
     const now = current();
     if (!hit || !now || !same()) return [];
 
+    const lineText = splitLines(now.doc.text)[line] ?? "";
+    // The words set nothing the part has, and Jev is sure of it (a setting it
+    // was unsure of gets its note instead): they ask for a change to the part
+    // itself, which a draft makes, when the site can have its own drawing of
+    // it. Accepting opens its menu; nothing is drafted until Change… is chosen.
+    if (Object.keys(hit.settings).length === 0 && hit.unsettled.length === 0) {
+      const sep = lineText.endsWith(" ") ? "" : " ";
+      const drafts = this.#harness && this.site.ownMounted && this.#ownPart(now.doc, now.d);
+      return [drafts
+        ? { text: `${sep}⇒ change ${part}`, line, character: lineText.length, replace: lineText, change: true }
+        : { text: `${sep}⇒ nothing ${part} can set`, line, character: lineText.length, replace: lineText }];
+    }
     const next = applyRefine(now.plain, hit, this.site.catalog);
     const before = formatPlain(now.plain);
     const after = formatPlain(next);
     if (after === before) return [];
-    const lineText = splitLines(now.doc.text)[line] ?? "";
     const was = new Map(now.plain.settings.map((s) => [s.key, s.value]));
     const changes = [
       ...next.settings.filter((s) => was.get(s.key) !== s.value).map((s) => `${s.key}=${s.value}`),

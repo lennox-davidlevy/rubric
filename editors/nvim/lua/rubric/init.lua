@@ -505,9 +505,13 @@ function M.setup(opts)
     end
     -- Nothing in the catalog fitted, and the writer took the offer of a new
     -- part: the line is a `new:` line now, and they choose how to draft it.
-    local client = arg.build and vim.lsp.get_client_by_id(ctx.client_id)
-    if client then
+    local client = (arg.build or arg.change) and vim.lsp.get_client_by_id(ctx.client_id)
+    if client and arg.build then
       drafts.act(client, ctx.bufnr, arg.line)
+    elseif client then
+      -- The words set nothing the part has: its menu, with Change… on it.
+      vim.cmd.stopinsert()
+      drafts.act_own(client, ctx.bufnr, arg.line)
     end
   end
 

@@ -148,6 +148,68 @@ test.skipIf(!hugo)("a part's pieces are split at its own headings, not those of 
   }
 });
 
+// A block with no headings of its own makes each part placed straight in it
+// an item: two parts in a steps block are two steps, with no empty heading.
+// Only the parts it holds directly: a quote inside the cards stays there. A
+// fold, which needs a title for each item, keeps its one section.
+test.skipIf(!hugo)("parts placed straight in a block with no headings are its items", () => {
+  const site = mkdtempSync(join(tmpdir(), "rubric-hugo-items-"));
+  try {
+    writeFileSync(
+      join(site, "hugo.toml"),
+      readFileSync(join(root, "testing/hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(root, "catalogs"))}`),
+    );
+    mkdirSync(join(site, "content/posts"), { recursive: true });
+    writeFileSync(
+      join(site, "content/posts/p.md"),
+      ["---", "title: P", "---", "",
+        "{{< steps >}}\n{{< cards >}}\n### Card A\n\nA.\n\n{{< quote >}}\nDeep.\n{{< /quote >}}\n{{< /cards >}}\n\n{{< quote >}}\nSaid.\n{{< /quote >}}\n{{< /steps >}}",
+        "{{< fold >}}\n{{< quote >}}\nFolded.\n{{< /quote >}}\n{{< /fold >}}",
+      ].join("\n\n"),
+    );
+    const build = Bun.spawnSync([hugo!, "--quiet", "-s", site, "-d", join(site, "public")]);
+    expect(build.stderr.toString()).toBe("");
+    const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");
+    const start = html.indexOf(`class="part part-steps"`);
+    const steps = html.slice(start, html.indexOf("</ol>", html.indexOf("Said.")));
+    const items = steps.split("<li>").slice(1);
+    expect(items.length).toBe(2);
+    expect(items[0]).toContain("part-cards");
+    expect(items[0]).toContain("Deep.");
+    expect(items[1]).toContain("Said.");
+    expect(steps).not.toMatch(/<h3[^>]*>\s*<\/h3>/);
+    const fold = html.slice(html.indexOf("part-fold"));
+    expect(fold).toContain("Folded.");
+    expect(fold.slice(0, fold.indexOf("Folded."))).not.toContain("part-fold-group");
+  } finally {
+    rmSync(site, { recursive: true, force: true });
+  }
+});
+
+// The marks around a part are only for a part that draws something: a frame
+// part with nothing to show leaves its side column out, as before.
+test.skipIf(!hugo)("a frame part that draws nothing leaves no side column", () => {
+  const site = mkdtempSync(join(tmpdir(), "rubric-hugo-empty-"));
+  try {
+    writeFileSync(
+      join(site, "hugo.toml"),
+      readFileSync(join(root, "testing/hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(root, "catalogs"))}`),
+    );
+    mkdirSync(join(site, "content/posts"), { recursive: true });
+    mkdirSync(join(site, "content/rubric-frame"), { recursive: true });
+    writeFileSync(join(site, "content/rubric-frame/index.md"), JSON.stringify({ title: "f", build: { render: "never", list: "never" }, frame: [{ part: "page-contents", settings: {} }], theme: { name: "paper" } }));
+    writeFileSync(join(site, "content/posts/plain.md"), "---\ntitle: Plain\n---\n\nOne paragraph.\n");
+    writeFileSync(join(site, "content/posts/headed.md"), "---\ntitle: Headed\n---\n\n## One\n\nA.\n\n## Two\n\nB.\n");
+    const build = Bun.spawnSync([hugo!, "--quiet", "-s", site, "-d", join(site, "public")]);
+    expect(build.stderr.toString()).toBe("");
+    const shell = (p: string) => readFileSync(join(site, `public/posts/${p}/index.html`), "utf8").match(/class="shell[^"]*"/)?.[0];
+    expect(shell("headed")).toContain("has-right");
+    expect(shell("plain")).not.toContain("has-right");
+  } finally {
+    rmSync(site, { recursive: true, force: true });
+  }
+});
+
 // A link in an embed is drawn as a chat app draws a shared one: the page's
 // title, description and picture, the picture copied into the site. A page
 // that gives none, or a fetch that fails, leaves the plain card. Served from
