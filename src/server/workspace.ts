@@ -5,14 +5,14 @@
 
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, statSync, unlinkSync } from "node:fs";
-import { appendFile, copyFile, mkdir, readFile, readdir, rename, rm, unlink } from "node:fs/promises";
+import { appendFile, copyFile, mkdir, readFile, readdir, rename, rm, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   applyRefine, atPlace, Cache, frontMatterProblem, liveContent, settingsOf, formatPlain, frame, FRAME_PAGE, framePage, parsePlain, preprocess, refineWords, scan, lines as splitLines,
   formatThemeLine, PIECES, THEME, THRESHOLDS, writeWhole, type Piece,
   type Catalog, type Diagnostic, type Directive, type Entry, type PageKind, type Place, type Refined, type Resolution, type Resolve, type ThemeChoice,
 } from "../core/index.ts";
-import { DRAFT_INDEX, DRAFT_LOGS, draftKey, DRAFTS, keepLocal, keepTake, makeGlobal, ownKey, putAway, readDrafts, shownTake, takesFor, writeHugoTree, type DraftState } from "../parts.ts";
+import { catalogFiles, changeable, DRAFT_INDEX, DRAFT_LOGS, draftKey, DRAFTS, keepLocal, keepTake, makeGlobal, ownKey, putAway, readDrafts, shownTake, takesFor, writeHugoTree, type DraftState } from "../parts.ts";
 import { openSite, pageKind, pagePath, type Site } from "../site.ts";
 import { LOG, newDraft, NOT_MOUNTED, runDraft, saveState, type Harness } from "./draft.ts";
 import { brief as shortDrafter, type Drafter, type HarnessName, type Mode } from "./harness.ts";
@@ -82,6 +82,10 @@ export interface DraftView {
   // how many other blocks on the site's pages use it.
   of?: string;
   uses?: { blocks: number; pages: number };
+  // `of` is the catalog's part, which the site has no drawing of yet
+  // (`catalog`), or the site's own drawing of it (`changed`).
+  catalog?: true;
+  changed?: true;
   // Words after ":" on that line, the change a reroll asks for, and the
   // column of the ":", where the line is cut once the reroll starts.
   change?: { words: string; colon: number };
@@ -141,6 +145,8 @@ export interface OwnLine {
   opener: string;
   part: string;
   takes?: number;
+  catalog?: true;
+  changed?: true;
 }
 
 interface Doc {
@@ -489,7 +495,7 @@ export class Workspace {
     const doc = this.#docs.get(file);
     const at = doc && this.#directiveAt(doc, line);
     // On a site's own part, words after ":" are a reroll's change, from its menu.
-    if (doc && at?.plain && at.refine) return this.#isOwn(at.plain.part) ? [] : this.#refineGhost(file, line);
+    if (doc && at?.plain && at.refine) return this.#ownOnly(at.plain.part) ? [] : this.#refineGhost(file, line);
     const words = () => {
       const d = this.#docs.get(file) && this.#directiveAt(this.#docs.get(file)!, line);
       return d?.kind === "words" ? d.words : undefined;
@@ -659,16 +665,29 @@ export class Workspace {
     return of ? { doc: doc!, d: d!, key: ownKey(of), words: this.site.catalog.parts[of]!.description, of } : undefined;
   }
 
-  // The site's own part a line places in its plain form, if it is one. By
-  // its name alone: a take on screen may lack a setting the line sets, and
-  // the line must stay the part's, to keep, cycle or go back.
+  // The part a line places in its plain form, if the site has its own
+  // drawing of it or can have one: the site's own parts, and the catalog's
+  // parts in the writing. By its name alone: a take on screen may lack a
+  // setting the line sets, and the line must stay the part's, to keep, cycle
+  // or go back.
   #ownPart(doc: Doc, d: Directive): string | undefined {
     const name = d.plain?.part;
-    return doc.page !== "site" && name && this.#isOwn(name) ? name : undefined;
+    return doc.page !== "site" && name && (this.#isOwn(name) || changeable(this.site.shared, name, this.site.themeDir)) ? name : undefined;
   }
 
   #isOwn(name: string): boolean {
     return Object.hasOwn(this.site.catalog.parts, name) && this.site.catalog.parts[name]!.origin === "site";
+  }
+
+  // A part of the site's own, not its drawing of a catalog part: Jev knows
+  // nothing of it, so words after its ":" are a reroll's change.
+  #ownOnly(name: string): boolean {
+    return this.#isOwn(name) && !this.site.catalog.parts[name]!.changed;
+  }
+
+  // Whether `name` is the catalog's part, as the site draws it or not.
+  #shared(name: string): boolean {
+    return Object.hasOwn(this.site.shared.parts, name);
   }
 
   // How many blocks on the site's pages place `name`, besides the one at
@@ -687,13 +706,21 @@ export class Workspace {
   }
 
   // The site's part as it is kept, as the first of its takes, so the writer
-  // can go back to it from the others.
+  // can go back to it from the others; the catalog's, when the site has no
+  // drawing of its own.
   async #original(name: string, words: string): Promise<void> {
     if (takesFor(this.#drafts.values(), ownKey(name)).length > 0) return;
     const { dir, state } = await newDraft(this.site.root, words, undefined, name);
-    for (const f of ["part.yaml", "part.html", "part.css"]) {
-      const from = join(this.site.root, "parts", name, f);
-      if (existsSync(from)) await copyFile(from, join(dir, f));
+    if (existsSync(join(this.site.root, "parts", name))) {
+      for (const f of ["part.yaml", "part.html", "part.css"]) {
+        const from = join(this.site.root, "parts", name, f);
+        if (existsSync(from)) await copyFile(from, join(dir, f));
+      }
+    } else {
+      // As the site shows it: the skin's own drawing, when it has one.
+      const files = catalogFiles(this.site.themeDir, name, this.site.skin);
+      if (!files) throw new Error(`the catalog has no ${name}`);
+      for (const [f, text] of [["part.yaml", files.yaml], ["part.html", files.html], ["part.css", files.css]] as const) await writeFile(join(dir, f), text + "\n");
     }
     const at = state.started - 1;
     const kept: DraftState = { ...state, status: "ready", name, original: true, started: at, finished: at };
@@ -712,6 +739,7 @@ export class Workspace {
     return {
       words,
       ...(at.of !== undefined ? { of: at.of } : {}),
+      ...(at.of !== undefined && this.#shared(at.of) ? (existsSync(join(this.site.root, "parts", at.of)) ? { changed: true as const } : { catalog: true as const }) : {}),
       ...(this.#drafter ? { drafter: this.#drafter().short } : {}),
       ...(at.of !== undefined && at.d.refine && refineWords(at.d.refine.words) !== "" ? { change: { words: refineWords(at.d.refine.words), colon: at.d.refine.colon } } : {}),
       // A ready line names the take on screen, which is the one Keep keeps.
@@ -747,7 +775,7 @@ export class Workspace {
       .filter(([name, p]) => p >= THRESHOLDS.near && Object.hasOwn(parts, name) && parts[name]!.origin !== "draft")
       .sort((a, b) => b[1] - a[1])
       .slice(0, THRESHOLDS.nearMost)
-      .map(([name]) => ({ name, description: parts[name]!.description, own: parts[name]!.origin === "site" || parts[name]!.drafted === true }));
+      .map(([name]) => ({ name, description: parts[name]!.description, own: (parts[name]!.origin === "site" && !parts[name]!.changed) || parts[name]!.drafted === true }));
     return [...near.filter((n) => n.own), ...near.filter((n) => !n.own)];
   }
 
@@ -776,7 +804,7 @@ export class Workspace {
       await Promise.race([this.#ask(at.doc.page, at.d.words), new Promise((r) => setTimeout(r, NEAR_WAIT_MS))]);
     }
     const view = this.draft(file, line);
-    return view?.of !== undefined ? { ...view, uses: await this.#uses(view.of, file, line) } : view;
+    return view?.of !== undefined && !view.catalog && !view.changed ? { ...view, uses: await this.#uses(view.of, file, line) } : view;
   }
 
   // Moves the preview to the next take (step 1) or the one before (-1),
@@ -963,13 +991,17 @@ export class Workspace {
     const shown = this.#shown(key);
     const dir = shown ? join(this.site.root, DRAFTS, shown.id) : join(this.site.root, "parts", of);
     let version: number | undefined;
+    // The site's drawing of a catalog part is for this site: the catalog
+    // already has the part.
+    const shared = this.#shared(of);
+    if (global && shared) return { error: `${of} is the catalog's already; this drawing is for this site` };
     try {
       if (global) {
         version = await makeGlobal(this.site.themeDir, dir, of);
         await putAway(this.site.root, of).catch((err: Error) => {
           throw new Error(`${of} is in the catalog now, version ${version}, but parts/${of} could not be moved out of the site, so both have it; move it yourself: ${err.message}`);
         });
-      } else if (shown && !shown.original) await keepTake(this.site.root, dir, of);
+      } else if (shown && !shown.original) await keepTake(this.site.root, dir, of, shared);
     } catch (err) {
       return { error: (err as Error).message };
     }
@@ -986,7 +1018,7 @@ export class Workspace {
   // and say the part is unknown.
   async remove(file: string, line: number): Promise<DraftDone> {
     const at = this.#draftLine(file, line);
-    if (at?.of === undefined) return { error: "this line is not one of the site's own parts" };
+    if (at?.of === undefined || (this.#shared(at.of) && !existsSync(join(this.site.root, "parts", at.of)))) return { error: "this line is not one of the site's own parts" };
     await this.#stop(at.key, "the part was removed");
     let removed: string;
     try {
@@ -1386,7 +1418,7 @@ export class Workspace {
       // opening a page, and only for a pin with nothing wrong in it.
       if (
         this.#refiner && d.plain && d.refine && d.line !== except && d.problems.length === 0 &&
-        refineWords(d.refine.words) !== "" && Object.hasOwn(this.site.catalog.parts, d.plain.part) && !this.#isOwn(d.plain.part) &&
+        refineWords(d.refine.words) !== "" && Object.hasOwn(this.site.catalog.parts, d.plain.part) && !this.#ownOnly(d.plain.part) &&
         !this.#cache.getRefine(this.site.catalog, d.plain.part, d.refine.words)
       ) {
         void this.#askRefine(doc.page, d.plain.part, d.refine.words);
@@ -1518,7 +1550,8 @@ export class Workspace {
       const part = this.#ownPart(doc, d);
       if (part === undefined) return [];
       const { takes } = this.#takes(ownKey(part));
-      return [{ line: d.line, opener: src[d.line]!, part, ...(takes ? { takes } : {}) }];
+      const shared = this.#shared(part) ? (existsSync(join(this.site.root, "parts", part)) ? { changed: true as const } : { catalog: true as const }) : {};
+      return [{ line: d.line, opener: src[d.line]!, part, ...(takes ? { takes } : {}), ...shared }];
     });
   }
 
@@ -1706,7 +1739,7 @@ export class Workspace {
     const src = splitLines(doc.text);
     const notes: Note[] = [];
     for (const d of scan(doc.text, this.site.catalog).directives) {
-      if (!d.plain || !d.refine || refineWords(d.refine.words) === "" || this.#isOwn(d.plain.part)) continue;
+      if (!d.plain || !d.refine || refineWords(d.refine.words) === "" || this.#ownOnly(d.plain.part)) continue;
       const at = { line: d.line, start: d.refine.start, end: src[d.line]!.length };
       const part = d.plain.part;
       const hit = this.#cache.getRefine(this.site.catalog, part, d.refine.words);

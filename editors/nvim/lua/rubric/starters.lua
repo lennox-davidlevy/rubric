@@ -1,7 +1,9 @@
 -- A part's starter, in the editor: what the preview draws faded in a block
 -- with nothing in it yet (three `###` steps, a heading and a line), shown
 -- dimmed inside the block, so the writer sees what to write instead of
--- guessing it. The accept key anywhere in the block, its part's line too, fills it
+-- guessing it. It shows only while the cursor is on the block's opening
+-- line: inside the block, where the writer types, it would stand in the way.
+-- The accept key anywhere in the block, its part's line too, fills it
 -- in for real. The server sends each page's empty blocks and their starters
 -- whenever they change (rubric/starters), with the lines placing the site's
 -- own parts, where the accept key opens the part's menu instead (drafts.lua).
@@ -47,8 +49,12 @@ function M.render(bufnr)
     return
   end
   vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+  if vim.api.nvim_get_current_buf() ~= bufnr then
+    return
+  end
+  local row = vim.api.nvim_win_get_cursor(0)[1] - 1
   for _, s in ipairs(by_buf[bufnr] or {}) do
-    if still(bufnr, s) then
+    if s.line == row and still(bufnr, s) then
       local indent = vim.api.nvim_buf_get_lines(bufnr, s.line, s.line + 1, false)[1]:match("^%s*")
       local lines = {}
       for i, text in ipairs(s.body) do
@@ -100,9 +106,12 @@ function M.hint(bufnr)
   end
   local row = vim.api.nvim_win_get_cursor(0)[1] - 1
   local o = M.own_at(bufnr, row)
-  if o and not o.takes then
+  -- A catalog part the site has not changed: the key changes it, which is
+  -- not worth a word on every line that places one.
+  if o and not o.takes and not o.catalog then
+    local hint = o.changed and ("  %s reroll %s, or back to the catalog's") or ("  %s reroll, keep or remove %s")
     pcall(vim.api.nvim_buf_set_extmark, bufnr, own_ns, row, 0, {
-      virt_text = { { ("  %s reroll, keep or remove %s"):format(accept_key, o.part), "RubricStarterHint" } },
+      virt_text = { { hint:format(accept_key, o.part), "RubricStarterHint" } },
       virt_text_pos = "eol",
     })
   end
@@ -145,14 +154,18 @@ function M.watch(bufnr)
       M.render(bufnr)
     end,
   })
-  vim.api.nvim_create_autocmd({ "CursorMoved", "ModeChanged", "BufEnter", "BufLeave" }, {
+  vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI", "ModeChanged", "BufEnter", "BufLeave" }, {
     group = group,
     buffer = bufnr,
     callback = function(ev)
       if ev.event == "BufLeave" then
         vim.api.nvim_buf_clear_namespace(bufnr, own_ns, 0, -1)
+        vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
       else
-        M.hint(bufnr)
+        M.render(bufnr)
+        if ev.event ~= "CursorMovedI" then
+          M.hint(bufnr)
+        end
       end
     end,
   })

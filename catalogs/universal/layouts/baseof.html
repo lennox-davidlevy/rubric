@@ -30,7 +30,7 @@
 {{- range partial "rubric/frame-list.html" . }}{{ $framed = $framed | append .part }}{{ end }}
 {{- /* The site's own parts and the draft being looked at are beside the
      catalog's, in data/siteparts.json (.rubric/hugo/, which the site mounts). */}}
-{{- range $name, $part := merge (hugo.Data.siteparts | default dict) hugo.Data.catalog.parts }}
+{{- range $name, $part := merge hugo.Data.catalog.parts (hugo.Data.siteparts | default dict) }}
   {{- if or $catalog ($.HasShortcode $name) (in $framed $name) }}
     {{- with resources.Get (printf "css/parts/%s.css" $name) }}
       {{- $css = $css | append . }}

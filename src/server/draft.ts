@@ -10,9 +10,9 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { parse, stringify } from "yaml";
-import { NAME, parseOwnPart, writeWhole } from "../core/index.ts";
-import { draftKey, DRAFTS, hugoFiles, readDrafts, type DraftState } from "../parts.ts";
+import { parse } from "yaml";
+import { missingSettings, NAME, parseOwnPart, writeWhole, type Part } from "../core/index.ts";
+import { catalogFiles, draftKey, drawingProblems, DRAFTS, hugoFiles, readDrafts, type DraftState } from "../parts.ts";
 import type { Site } from "../site.ts";
 import { lint } from "../theme.ts";
 import { FILE_LINE, type Drafter, type Mode, type RunStats, type Session } from "./harness.ts";
@@ -82,16 +82,11 @@ export const EXAMPLES: [string, string][] = [
 ];
 
 // An example's files: the catalog's own part, or one in its examples/.
-function example(site: Site, raw: Record<string, unknown>, name: string): { yaml: string; html: string; css: string } | undefined {
+function example(site: Site, name: string): { yaml: string; html: string; css: string } | undefined {
   const dir = join(site.themeDir, "examples", name);
   const kept = PART_FILES.map((f) => readText(join(dir, f))?.trim());
   if (kept.every((t) => t !== undefined)) return { yaml: kept[0]!, html: kept[1]!, css: kept[2]! };
-  if (!raw[name]) return undefined;
-  return {
-    yaml: stringify({ name, ...(raw[name] as object) }).trim(),
-    html: readText(join(site.themeDir, "layouts/_partials/parts", `${name}.html`))?.trim() ?? "",
-    css: readText(join(site.themeDir, "assets/css/parts", `${name}.css`))?.trim() ?? "",
-  };
+  return catalogFiles(site.themeDir, name);
 }
 
 export interface DraftRequest {
@@ -158,10 +153,9 @@ export function brief(site: Site, req: DraftRequest, mode: Mode = "tools"): stri
   const themes = (readYaml(join(site.themeDir, "themes.yaml")) ?? {}) as Record<string, { description?: string; palette?: string; pairing?: string; scale?: string; skin?: string }>;
   const theme = themes[site.theme] ?? {};
   const piece = (kind: string, name?: string) => (name ? readText(join(site.themeDir, "themes", kind, `${name}.yaml`)) : undefined);
-  const raw = (readYaml(join(site.themeDir, "catalog.yaml")) as { parts?: Record<string, unknown> } | undefined)?.parts ?? {};
   const parts = Object.entries(catalog.parts).filter(([, p]) => p.place === "writing" && p.origin !== "draft");
   const examples = EXAMPLES.flatMap(([n, why]) => {
-    const files = example(site, raw, n);
+    const files = example(site, n);
     return files ? [[
       `### ${n}`,
       why,
@@ -177,9 +171,13 @@ export function brief(site: Site, req: DraftRequest, mode: Mode = "tools"): stri
     ...Object.entries(catalog.parts).filter(([, p]) => p.origin !== "draft").map(([n]) => n),
     ...readDrafts(site.root).filter((d) => d.status === "ready" && d.name !== undefined && draftKey(d) !== req.words).map((d) => d.name!),
   ])];
-  const asked = req.of
-    ? `The writer has a part of their own, **${req.of}**, and wants another take of it. What it is:`
-    : "The writer asked for a part the catalog does not have:";
+  // A catalog part the site is changing, rather than a part of its own.
+  const shared = req.of !== undefined && Object.hasOwn(site.shared.parts, req.of);
+  const asked = shared
+    ? `The writer wants this site's own version of the catalog's part **${req.of}**, which every page with it on this site will draw. What it is:`
+    : req.of
+      ? `The writer has a part of their own, **${req.of}**, and wants another take of it. What it is:`
+      : "The writer asked for a part the catalog does not have:";
   // Another take starts from the last one, whose files are already in the
   // folder and shown here: the catalog's list and its examples would only
   // say again what that take already settled.
@@ -198,7 +196,7 @@ export function brief(site: Site, req: DraftRequest, mode: Mode = "tools"): stri
   // has the part, and nothing but the writer stops one.
   const catalogSection = prev ? "" : "## The catalog's parts\n\nThe writer asked for a new part, so draft one. These are the parts the catalog has; make it plainly different from them:";
   const naming = req.of
-    ? `\`name\`: \`${req.of}\`, as it is now. Pages already use it by that name.`
+    ? `\`name\`: \`${req.of}\`, as it is now. Pages already use it by that name. Keep every setting and every value it has, since lines already set them; add one if the change needs it.${shared ? " Keep the description unless the change makes it untrue." : ""}`
     : prev
       ? "`name`: as it is, unless the change asks for another; lowercase letters, digits and hyphens, and not a name the catalog has."
       // A fast draft isn't shown the catalog's parts, only what they are called.
@@ -211,7 +209,7 @@ ${req.inside.trim() ? `\nWhat they have already written inside its block, which 
    - \`children: true\` if the block holds Markdown the part draws (most do). \`empty: true\` instead for a part that takes nothing inside.
    - \`settings\`: for a real variation the writer might ask for. When the words name a quantity, a speed, a direction, a size or a style ("a ring of moons", "a slow scroll"), offer it as a setting (\`count\`, \`pace\`); one or two, not more. Each \`choice\` has a \`default\` and at least two \`values\`, each a few words saying what it does. Value and setting names are lowercase with hyphens. None named ${Object.keys(catalog.look).join(", ")}: every part already has those.
    - \`body\`: a short starter written into an empty block, so the writer sees what the part expects. It has exactly the structure the drawing reads: if part.html draws each \`###\` as a step, the starter has the \`###\`s. It never commits to content (\`### When: What happened\`, not \`### 2024\`).
-2. **part.html**: the drawing, a Hugo partial. It gets \`.s\` (every setting, defaults filled in), \`.inner\` (the block's Markdown, already rendered to HTML), \`.raw\` (the block's Markdown as written) and \`.page\`. The outer element's class attribute starts with \`part part-<name>\`, so the theme can add classes to it. Turn settings into classes (\`size-{{ .s.size }}\`). To draw the block's \`###\` sections as items, use \`partial "rubric/sections.html" (dict "html" .inner "level" 3)\`: it gives \`.items\`, each with \`.title\` and \`.body\`, and \`.before\`, what comes before the first.
+2. **part.html**: the drawing, a Hugo partial. It gets \`.s\` (every setting, defaults filled in), \`.inner\` (the block's Markdown, already rendered to HTML), \`.raw\` (the block's Markdown as written) and \`.page\`. The outer element's class attribute starts with \`part part-<name>\`, so the theme can add classes to it. Turn settings into classes (\`size-{{ .s.size }}\`). To draw the block's \`###\` sections as items, use \`partial "rubric/sections.html" (dict "html" .inner "level" 3)\`: it gives \`.items\`, each with \`.title\` and \`.body\`, and \`.before\`, what comes before the first. A block can hold other parts (\`::: quote\` inside a slide): they arrive in \`.inner\` already drawn, their headings stay inside them, and the part only gives them room. Never redraw another part.
 3. **part.css**: the part's CSS. Every rule starts with \`.part-<name>\`.`;
   const rest = `## Rules
 
@@ -311,6 +309,12 @@ export async function checkDraft(site: Site, dir: string, words?: string, of?: s
   if (of !== undefined) {
     // Another take of a site's part keeps its name: pages use it.
     if (name !== of) problems.push(`part.yaml: the name must stay ${of}, which pages already use`);
+    // Against the part as pages use it, and the catalog's too: a site's copy
+    // may have fallen behind it.
+    const shared = Object.hasOwn(site.shared.parts, of) ? site.shared.parts[of] : undefined;
+    const was = keptPart(site, of);
+    const missing = [...new Set([...(was ? missingSettings(was, parsed.part) : []), ...(shared ? missingSettings(shared, parsed.part) : [])])];
+    if (missing.length) problems.push(`part.yaml: ${missing.join(", ")} must stay, since lines already use ${missing.length === 1 ? "it" : "them"}`);
   } else {
     // A draft for the same words is the one this replaces; any other part,
     // or another line's draft, has the name already.
@@ -327,9 +331,7 @@ export async function checkDraft(site: Site, dir: string, words?: string, of?: s
   if (html === undefined) problems.push("there is no part.html");
   else {
     if (!new RegExp(`class="part part-${name}[ "]`).test(html)) problems.push(`part.html: the outer element's class must start with "part part-${name}"`);
-    if (/<script/i.test(html)) problems.push("part.html: no scripts");
-    if (/\b(src|srcset)=["']?(https?:)?\/\//i.test(html) || /url\(\s*["']?(https?:)?\/\//i.test(html)) problems.push("part.html: nothing fetched from another site");
-    if (/\b(resources\.GetRemote|GetRemote|readFile|readDir|os\.ReadFile|os\.ReadDir|getenv|os\.Getenv)\b/.test(html)) problems.push("part.html: no reading files, the environment or other sites from the template");
+    problems.push(...drawingProblems(html));
   }
   const css = await readFile(join(dir, "part.css"), "utf8").catch(() => undefined);
   if (css === undefined) problems.push("there is no part.css");
@@ -350,6 +352,20 @@ export async function checkDraft(site: Site, dir: string, words?: string, of?: s
 
   problems.push(...(await hugoCheck(site, dir, name, parsed.part)));
   return { name, problems };
+}
+
+// The part `name` as pages use it now, before any take: the site's own, as
+// kept in parts/, or the catalog's.
+function keptPart(site: Site, name: string): Part | undefined {
+  const text = readText(join(site.root, "parts", name, "part.yaml"));
+  if (text !== undefined) {
+    try {
+      return parseOwnPart(text, site.catalog).part;
+    } catch {
+      return undefined;
+    }
+  }
+  return Object.hasOwn(site.shared.parts, name) ? site.shared.parts[name] : undefined;
 }
 
 // Builds a page with the part on it, once for each value of each setting, in

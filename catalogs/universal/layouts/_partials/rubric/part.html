@@ -1,12 +1,15 @@
 {{- /*
   A part as a page in one skin sees it: the catalog's part with the skin's
-  added settings, or a part the skin adds; with the look settings if it is in
+  added settings, the site's own, or a part the skin adds; with the look settings if it is in
   the writing. Returns a dict, "def" and "settings", or false.
 
   Usage: {{ $p := partial "rubric/part.html" (dict "part" "callout" "skin" $skin) }}
 */ -}}
-{{- $base := index hugo.Data.catalog.parts .part | default (index (hugo.Data.siteparts | default dict) .part) -}}
-{{- $skin := cond (ne .skin "") (index (hugo.Data.skins | default dict) .skin | default dict) dict -}}
+{{- /* The site's own drawing of a catalog part takes the catalog's place,
+     and the skin's additions to it, which the skin's drawing draws. */ -}}
+{{- $site := index (hugo.Data.siteparts | default dict) .part -}}
+{{- $base := $site | default (index hugo.Data.catalog.parts .part) -}}
+{{- $skin := cond (and (ne .skin "") (not $site)) (index (hugo.Data.skins | default dict) .skin | default dict) dict -}}
 {{- $added := index ($skin.parts | default dict) .part -}}
 {{- $def := $base | default $added -}}
 {{- if not $def }}{{ return false }}{{ end -}}

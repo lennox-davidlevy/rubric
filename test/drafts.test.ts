@@ -15,6 +15,7 @@ import type { Mode } from "../src/server/harness.ts";
 import { stubHarness, stubResolver } from "../src/server/stub.ts";
 import { Workspace, type Note } from "../src/server/workspace.ts";
 import { openSite } from "../src/site.ts";
+import { copyTestingSite } from "./testing-site.ts";
 
 const repo = join(import.meta.dir, "..");
 const hugo = Bun.which("hugo");
@@ -41,7 +42,7 @@ beforeAll(async () => {
   catalogDir = join(tmp, "catalogs/universal");
   cpSync(join(repo, "catalogs/universal"), catalogDir, { recursive: true, filter: (src) => !/\/universal\/(shots|previews)(\/|$)|\/page\/(public|resources)(\/|$)/.test(src) });
   dir = join(tmp, "site");
-  cpSync(join(repo, "testing"), dir, { recursive: true, filter: (src) => !/\/(content|\.rubric|public|resources)(\/|$)/.test(src) });
+  copyTestingSite(dir);
   writeFileSync(join(dir, "hugo.toml"), readFileSync(join(dir, "hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(tmp, "catalogs"))}`));
   ws = await workspace();
 });
@@ -657,10 +658,12 @@ describe("another take of the site's own part", () => {
     expect(ws.ownLines(page()).map((o) => [o.line, o.part])).toEqual([[4, "harbor-lights"], [8, "harbor-lights"]]);
     expect(await ws.look(page(), 4)).toMatchObject({ of: "harbor-lights", uses: { blocks: 1, pages: 1 } });
     expect(ws.draft(page(), 4)?.status).toBeUndefined();
-    // A catalog part's line is not one.
+    // A catalog part's line can be changed for the site, and is not the site's own.
     await write(`${front}::: quote\nSaid.\n:::\n`);
-    expect(await ws.look(page(), 4)).toBeUndefined();
+    const view = await ws.look(page(), 4);
     await write(twoBlocks);
+    expect(view).toMatchObject({ of: "quote", catalog: true });
+    expect(view?.uses).toBeUndefined();
   });
 
   test("rerolls under the same name, drawn in the preview for every block, with the kept one as the first take", async () => {
@@ -730,17 +733,16 @@ describe("another take of the site's own part", () => {
     await ws.cancel(page(), 4);
   });
 
-  test("a take without a setting the line sets is still the part's take, to keep, cycle or go back from", async () => {
+  test("a take that drops a setting is refused: lines already set it", async () => {
     await write(twoBlocks.replace("::: harbor-lights\nThe pier.", "::: harbor-lights pace=fast\nThe pier."));
     await ws.build(page(), 4, { change: "no settings" });
     await ws.drafted();
-    expect(ws.site.catalog.parts["harbor-lights"]?.settings).not.toHaveProperty("pace");
-    expect(ws.draft(page(), 4)).toMatchObject({ status: "ready", of: "harbor-lights", take: 2, takes: 2 });
-    expect(ws.ownLines(page()).map((o) => o.line)).toEqual([4, 8]);
-    await ws.settle();
-    expect(codes(4)).toContain("draft-ready");
-    expect(await ws.take(page(), 4, -1)).toMatchObject({ take: 1 });
+    const view = ws.draft(page(), 4)!;
+    expect(view.status).toBe("failed");
+    expect(view.message).toContain("pace");
     expect(ws.site.catalog.parts["harbor-lights"]?.settings).toHaveProperty("pace");
+    await ws.settle();
+    expect(codes(4)).not.toContain("bad-value");
     await ws.cancel(page(), 4);
     await write(twoBlocks);
   });
@@ -779,6 +781,112 @@ describe("another take of the site's own part", () => {
     expect(existsSync(join(dir, "parts/lamp-posts"))).toBe(false);
     expect(existsSync(join(catalogDir, "layouts/_partials/parts/lamp-posts.html"))).toBe(true);
     expect(ws.site.ownProblems).toEqual([]);
+  });
+});
+
+describe("changing a catalog part for the site", () => {
+  const drawn = () => readFileSync(join(dir, HUGO_TREE, "layouts/_partials/parts/quote.html"), "utf8");
+  const catalogQuote = () => readFileSync(join(catalogDir, "layouts/_partials/parts/quote.html"), "utf8");
+  const quotes = `${front}::: quote size=large\nSaid.\n:::\n\n::: quote\nWritten.\n:::\n`;
+
+  beforeAll(async () => {
+    await write(quotes);
+  });
+
+  test("a take starts from the catalog's part, keeps its name and settings, and is drawn for every block", async () => {
+    const was = catalogQuote();
+    await ws.build(page(), 4, { change: "a torn paper edge" });
+    await ws.drafted();
+    expect(ws.draft(page(), 4)).toMatchObject({ status: "ready", of: "quote", catalog: true, take: 2, takes: 2 });
+    expect(drawn()).toContain(`data-change="a torn paper edge"`);
+    expect(ws.site.catalog.parts.quote?.settings).toHaveProperty("size");
+    expect(content().match(/\{\{< quote/g)).toHaveLength(2);
+    // Take 1 is the catalog's, to go back to.
+    expect(await ws.take(page(), 4, -1)).toMatchObject({ take: 1 });
+    expect(drawn().trim()).toBe(was.trim());
+    await ws.take(page(), 4, 1);
+    expect(catalogQuote()).toBe(was);
+  });
+
+  test("kept for this site only: parts/quote/ takes the catalog's place, and the catalog is untouched", async () => {
+    const version = ws.site.catalog.version;
+    expect((await ws.keep(page(), 4, true)).error).toBeDefined();
+    const done = await ws.keep(page(), 4, false);
+    expect(done.error).toBeUndefined();
+    expect(readFileSync(join(dir, "parts/quote/part.html"), "utf8")).toContain(`data-change="a torn paper edge"`);
+    expect(ws.site.catalog.parts.quote).toMatchObject({ origin: "site", changed: true });
+    expect(ws.site.catalog.version).toBe(version);
+    expect(ws.site.ownProblems).toEqual([]);
+    expect(ws.ownLines(page()).map((o) => [o.line, o.changed])).toEqual([[4, true], [8, true]]);
+    expect(await ws.look(page(), 4)).toMatchObject({ of: "quote", changed: true });
+  });
+
+  test("words after its \":\" are the notes a change starts with", async () => {
+    await write(quotes.replace("::: quote size=large", "::: quote : centered"));
+    expect(ws.draft(page(), 4)?.change?.words).toBe("centered");
+    await write(quotes);
+  });
+
+  test("back to the catalog's: the site's drawing goes to the record and the catalog's is drawn", async () => {
+    const done = await ws.remove(page(), 4);
+    expect(done.error).toBeUndefined();
+    expect(existsSync(join(dir, "parts/quote"))).toBe(false);
+    expect(ws.site.catalog.parts.quote?.changed).toBeUndefined();
+    expect(existsSync(join(dir, HUGO_TREE, "layouts/_partials/parts/quote.html"))).toBe(false);
+    expect(await ws.look(page(), 4)).toMatchObject({ of: "quote", catalog: true });
+  });
+
+  test("going back from a take before keeping leaves nothing in parts/", async () => {
+    await ws.build(page(), 4, { change: "smaller" });
+    await ws.drafted();
+    await ws.cancel(page(), 4);
+    expect(existsSync(join(dir, "parts/quote"))).toBe(false);
+    expect(ws.site.catalog.parts.quote?.origin).toBeUndefined();
+  });
+
+  test("a site's copy that lacks a setting the catalog's has is left out, and says which", async () => {
+    const { catalogFiles, readOwn } = await import("../src/parts.ts");
+    const root = join(tmp, "behind-site");
+    const files = catalogFiles(catalogDir, "quote")!;
+    mkdirSync(join(root, "parts/quote"), { recursive: true });
+    writeFileSync(join(root, "parts/quote/part.yaml"), files.yaml.replace(/^  cite:\n    type: text\n?/m, ""));
+    const { own, problems } = readOwn(root, ws.site.catalog, ws.site.shared);
+    expect(own.quote).toBeUndefined();
+    expect(problems.join()).toContain("has cite");
+  });
+
+  test("a part with a script, or whose drawing fetches from another site, can't be changed: no take of it could pass the checks", async () => {
+    const scripted = Object.entries(ws.site.shared.parts).find(([, p]) => p.script && p.place === "writing")![0];
+    for (const line of [`::: ${scripted}`, "::: map", "::: video"]) {
+      await write(`${front}${line}\n:::\n`);
+      expect(await ws.look(page(), 4)).toBeUndefined();
+    }
+    await write(quotes);
+  });
+
+  test("in a theme whose skin draws the part its own way, the first take is the skin's drawing", async () => {
+    const { catalogFiles } = await import("../src/parts.ts");
+    const skinned = readFileSync(join(catalogDir, "layouts/_partials/skins/blowfish/parts/callout.html"), "utf8").trim();
+    expect(catalogFiles(catalogDir, "callout", "blowfish")!.html).toBe(skinned);
+    expect(catalogFiles(catalogDir, "callout", "paper")!.html).not.toBe(skinned);
+  });
+
+  test("a take of a site's copy that has fallen behind is held to the catalog's settings too", async () => {
+    const { catalogFiles } = await import("../src/parts.ts");
+    const files = catalogFiles(catalogDir, "quote")!;
+    const behind = files.yaml.replace(/^  cite:\n    type: text\n?/m, "");
+    const take = join(tmp, "behind-take");
+    for (const d of [join(dir, "parts/quote"), take]) {
+      mkdirSync(d, { recursive: true });
+      writeFileSync(join(d, "part.yaml"), behind);
+      writeFileSync(join(d, "part.html"), files.html);
+      writeFileSync(join(d, "part.css"), files.css);
+    }
+    try {
+      expect((await checkDraft(ws.site, take, undefined, "quote")).problems.join()).toContain("cite");
+    } finally {
+      rmSync(join(dir, "parts/quote"), { recursive: true, force: true });
+    }
   });
 });
 

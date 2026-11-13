@@ -117,6 +117,37 @@ test.skipIf(!hugo)("a map, a PDF, a file tree and progress bars draw from their 
   }
 });
 
+// A part split into titled pieces splits only at its own headings: cards
+// inside a step keep theirs, and the step stays one step.
+test.skipIf(!hugo)("a part's pieces are split at its own headings, not those of a part inside it", () => {
+  const site = mkdtempSync(join(tmpdir(), "rubric-hugo-nest-"));
+  try {
+    writeFileSync(
+      join(site, "hugo.toml"),
+      readFileSync(join(root, "testing/hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(root, "catalogs"))}`),
+    );
+    mkdirSync(join(site, "content/posts"), { recursive: true });
+    writeFileSync(
+      join(site, "content/posts/p.md"),
+      ["---", "title: P", "---", "",
+        "{{< steps >}}\n### One\n\nFirst.\n\n{{< cards >}}\n### Card A\n\nA.\n\n### Card B\n\nB.\n{{< /cards >}}\n\n### Two\n\nSecond.\n{{< /steps >}}",
+      ].join("\n"),
+    );
+    const build = Bun.spawnSync([hugo!, "--quiet", "-s", site, "-d", join(site, "public")]);
+    expect(build.stderr.toString()).toBe("");
+    const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");
+    const steps = html.slice(html.indexOf("part-steps"), html.lastIndexOf("</ol>"));
+    // Two steps, the cards whole inside the first.
+    expect(steps.match(/<li>/g)?.length).toBe(2);
+    const first = steps.slice(0, steps.indexOf("Second."));
+    expect(first).toContain("Card A");
+    expect(first).toContain("Card B");
+    expect(first).toContain("part-cards");
+  } finally {
+    rmSync(site, { recursive: true, force: true });
+  }
+});
+
 // A link in an embed is drawn as a chat app draws a shared one: the page's
 // title, description and picture, the picture copied into the site. A page
 // that gives none, or a fetch that fails, leaves the plain card. Served from
@@ -194,3 +225,42 @@ test.skipIf(!hugo)("an embed's link shows the page's title, description and pict
   }
 });
 
+
+// A site's own drawing of a catalog part: in a theme whose skin draws the
+// part its own way, the site's drawing, its added setting and its CSS are
+// what Hugo uses, while a part it did not change is drawn as before.
+test.skipIf(!hugo)("the site's own drawing of a catalog part comes before the skin's, with the settings it adds", async () => {
+  const { catalogFiles, writeHugoTree } = await import("../src/parts.ts");
+  const { parseOwnPart, loadCatalog } = await import("../src/core/index.ts");
+  const site = mkdtempSync(join(tmpdir(), "rubric-hugo-changed-"));
+  try {
+    writeFileSync(
+      join(site, "hugo.toml"),
+      readFileSync(join(root, "testing/hugo.toml"), "utf8")
+        .replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(root, "catalogs"))}`)
+        .replace(/^theme = "(?!universal).*"$/m, `theme = "blowfish"`),
+    );
+    const files = catalogFiles(join(root, "catalogs/universal"), "callout")!;
+    const dir = join(site, "parts/callout");
+    mkdirSync(dir, { recursive: true });
+    const yaml = files.yaml.replace(/^settings:\n/m, "settings:\n  edge:\n    type: choice\n    default: plain\n    values:\n      plain: a straight edge\n      torn: a torn edge\n");
+    writeFileSync(join(dir, "part.yaml"), yaml);
+    writeFileSync(join(dir, "part.html"), `<aside class="part part-callout site-drawn edge-{{ .s.edge }} kind-{{ .s.kind }}">{{ .inner }}</aside>\n`);
+    writeFileSync(join(dir, "part.css"), `.part-callout.site-drawn { outline: 1px dashed var(--rule); }\n`);
+    const catalog = await loadCatalog(join(root, "catalogs/universal/catalog.yaml"));
+    await writeHugoTree(site, { callout: { part: parseOwnPart(yaml, catalog).part, dir } });
+    mkdirSync(join(site, "content/posts"), { recursive: true });
+    writeFileSync(join(site, "content/posts/p.md"), `---\ntitle: P\n---\n\n{{< callout kind="tip" edge="torn" >}}\nHello.\n{{< /callout >}}\n\n{{< quote >}}\nSaid.\n{{< /quote >}}\n`);
+    const build = Bun.spawnSync([hugo!, "--quiet", "-s", site, "-d", join(site, "public")]);
+    expect(build.stderr.toString()).toBe("");
+    expect(build.exitCode).toBe(0);
+    const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");
+    expect(html).toContain(`class="part part-callout site-drawn edge-torn kind-tip"`);
+    expect(html).not.toContain("has-icon");
+    expect(html).toContain(`class="part part-quote`);
+    const sheet = /href="\/(css\/[^"]+\.css)"/.exec(html)![1]!;
+    expect(readFileSync(join(site, "public", sheet), "utf8")).toMatch(/\.part-callout\.site-drawn\s*\{\s*outline/);
+  } finally {
+    rmSync(site, { recursive: true, force: true });
+  }
+});

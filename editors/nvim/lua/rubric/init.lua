@@ -641,7 +641,12 @@ function M.setup(opts)
         elseif on_new_line() then
           act_new()
           return true
-        elseif own_line() then
+        end
+        -- An empty block of a catalog part the site hasn't changed: its
+        -- starter at once, as before; Change… once it has writing.
+        local o = own_line()
+        local row = vim.api.nvim_win_get_cursor(0)[1] - 1
+        if o and not (o.catalog and not o.takes and starters.at(event.buf, row)) then
           act_own()
           return true
         end
@@ -752,7 +757,10 @@ function M.setup(opts)
         if vim.lsp.inline_completion.get() then
           return
         end
-        if own_line() then
+        -- A catalog part the site hasn't changed is changed from normal mode:
+        -- here the key fills its starter or asks now, as on any line.
+        local o = own_line()
+        if o and not (o.catalog and not o.takes) then
           vim.cmd.stopinsert()
           act_own()
           return

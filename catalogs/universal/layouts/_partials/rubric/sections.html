@@ -4,16 +4,22 @@
   questions. Returns a dict: "before" (what comes ahead of the first heading)
   and "items", each with "title" (HTML), "id" and "body" (HTML).
 
+  Headings of a part placed inside this one (marked data-in-part by
+  rubric/draw.html) are left where they are: a recipe card in a carousel's
+  slide keeps its "### Ingredients", and the slide stays one slide.
+
   Usage: {{ $x := partial "rubric/sections.html" (dict "html" .inner "level" 3) }}
 */ -}}
 {{- $tag := printf "h%d" .level -}}
-{{- $chunks := split (string .html) (printf "<%s" $tag) -}}
+{{- $nested := printf "<%s data-in-part" $tag -}}
+{{- $hidden := "<rubric-nested-heading" -}}
+{{- $chunks := split (replace (string .html) $nested $hidden) (printf "<%s" $tag) -}}
 {{- $items := slice -}}
 {{- range after 1 $chunks -}}
-  {{- $title := replaceRE (printf `(?s)^[^>]*>(.*?)</%s>.*$` $tag) "$1" . -}}
+  {{- $title := replace (replaceRE (printf `(?s)^[^>]*>(.*?)</%s>.*$` $tag) "$1" .) $hidden $nested -}}
   {{- $id := replaceRE `(?s)^\s*id="([^"]*)".*$` "$1" . -}}
   {{- if eq $id . }}{{ $id = "" }}{{ end -}}
-  {{- $body := replaceRE (printf `(?s)^[^>]*>.*?</%s>` $tag) "" . -}}
+  {{- $body := replace (replaceRE (printf `(?s)^[^>]*>.*?</%s>` $tag) "" .) $hidden $nested -}}
   {{- $items = $items | append (dict "title" ($title | safeHTML) "id" $id "body" ($body | safeHTML)) -}}
 {{- end -}}
-{{- return dict "before" (index $chunks 0 | safeHTML) "items" $items -}}
+{{- return dict "before" (replace (index $chunks 0) $hidden $nested | safeHTML) "items" $items -}}

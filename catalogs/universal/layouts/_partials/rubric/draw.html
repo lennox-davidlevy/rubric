@@ -1,6 +1,7 @@
 {{- /*
-  Draws one part: the skin's own version of it when the skin has one
-  (_partials/skins/<skin>/parts/<part>.html), the catalog's otherwise. Then
+  Draws one part: the site's own when it has one (.rubric/hugo/), else the
+  skin's own version of it when the skin has one
+  (_partials/skins/<skin>/parts/<part>.html), else the catalog's. Then
   the look settings that are not at their default become classes on the
   part's outer element (look-shadow-soft…), which the skin draws.
 
@@ -10,7 +11,8 @@
      another page. */ -}}
 {{- $skin := cond (isset . "skin") .skin (partial "rubric/skin.html" .args.page) -}}
 {{- $path := printf "parts/%s.html" .name -}}
-{{- with $skin -}}
+{{- /* The site's own drawing of a part comes before the skin's. */ -}}
+{{- with and $skin (not (index (hugo.Data.siteparts | default dict) .name)) $skin -}}
   {{- $own := printf "skins/%s/parts/%s.html" . $.name -}}
   {{- if templates.Exists (printf "_partials/%s" $own) }}{{ $path = $own }}{{ end -}}
 {{- end -}}
@@ -21,5 +23,8 @@
   {{- if and $v (ne (string $v) (string $def.default)) }}{{ $classes = $classes | append (printf "look-%s-%s" $key $v) }}{{ end -}}
 {{- end -}}
 {{- with $classes }}{{ $html = replaceRE `class="part ` (printf `class="part %s ` (delimit . " ")) (string $html) 1 }}{{ end -}}
+{{- /* Its headings are marked as a part's, so a part this one is placed in
+     splits its pieces at its own headings only (rubric/sections.html). */ -}}
+{{- $html = replaceRE `<h([1-6])(?: data-in-part)*([\s>])` `<h$1 data-in-part$2` (string $html) -}}
 {{- $html = $html | safeHTML -}}
 {{- return $html -}}

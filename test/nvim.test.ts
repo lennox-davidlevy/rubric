@@ -6,6 +6,7 @@ import { expect, test } from "bun:test";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { copyTestingSite } from "./testing-site.ts";
 
 // The editor's language server can still be writing as it exits, and put
 // back a folder just removed: remove it, wait, and remove it again.
@@ -597,7 +598,7 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
   const dir = mkdtempSync(join(tmpdir(), "rubric-nvim-new-"));
   const sock = join(dir, "nvim.sock");
   // The testing site, whose hugo.toml mounts .rubric/hugo/ for drafts.
-  cpSync(join(repo, "testing"), join(dir, "site"), { recursive: true, filter: (src) => !/\/(content|\.rubric|public|resources)(\/|$)/.test(src) });
+  copyTestingSite(join(dir, "site"));
   const site = join(dir, "site");
   writeFileSync(join(site, "hugo.toml"), readFileSync(join(site, "hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(repo, "catalogs"))}`));
   const page = join(site, "pages/posts/new.md");
@@ -746,6 +747,11 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
     // Undone, the block is empty again, and the page as the rest expects it.
     keys(":undo<CR>");
     expect(await until(() => expr("RubricTest.line(5)") === ":::")).toBe(true);
+    // The starter shows only on the block's opening line, not inside it,
+    // where the writer types.
+    keys(":call cursor(5, 1)<CR>");
+    expect(await until(() => starter() === "")).toBe(true);
+    keys(":call cursor(4, 1)<CR>");
     expect(await until(() => /^4:\S/.test(starter()))).toBe(true);
     // On the part's own line, a part of the site's own, the accept key opens
     // its menu, which fills in the starter too; a quiet hint says so.
@@ -783,6 +789,31 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
     expect(await until(() => note(4) === "")).toBe(true);
     expect(await until(() => readdirSync(join(site, ".rubric/drafts")).every((d) => !d.startsWith("wobbly-orbit")))).toBe(true);
     expect(expr("RubricTest.line(4)")).toBe("::: wobbly-orbit");
+
+    // In insert mode the key on a catalog part's line opens no menu: it asks
+    // now, as on any line.
+    const menusBefore = Number(expr("RubricTest.menus"));
+    keys(":call cursor(10, 1)<CR>A<M-l><Esc>");
+    await Bun.sleep(200);
+    expect(Number(expr("RubricTest.menus"))).toBe(menusBefore);
+    expect(expr("RubricTest.line(10)")).toBe("::: callout");
+
+    // A catalog part's line: Change… asks what to change and drafts a take
+    // of it for this site, under its name; Keep keeps it for this site
+    // without asking where; going back to the catalog's takes it away.
+    expr("RubricTest.answer('change', 'a torn edge')");
+    keys(":call cursor(10, 1)<CR><M-l>");
+    expect(await until(() => note(10) === "draft-ready")).toBe(true);
+    expect(expr("RubricTest.line(10)")).toBe("::: callout");
+    expr("RubricTest.answer('keep')");
+    keys(":call cursor(10, 1)<CR><M-l>");
+    expect(await until(() => existsSync(join(site, "parts/callout/part.html")))).toBe(true);
+    expect(readFileSync(join(site, "parts/callout/part.html"), "utf8")).toContain("a torn edge");
+    expect(await until(() => note(10) === "")).toBe(true);
+    expr("RubricTest.answer('remove')");
+    keys(":call cursor(10, 1)<CR><M-l>");
+    expect(await until(() => !existsSync(join(site, "parts/callout")))).toBe(true);
+    expect(expr("RubricTest.line(10)")).toBe("::: callout");
 
     // A `new:` typed by hand is drafted only on the accept key; cancel puts
     // the words back.

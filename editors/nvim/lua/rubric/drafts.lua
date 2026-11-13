@@ -380,7 +380,10 @@ end
 -- The accept key on a line placing one of the site's own parts, a part a
 -- `new:` line made and the writer kept: another take of it (which keeps its
 -- name, so every page with it changes once kept), going back to it as it
--- was, putting it in the catalog for every theme, or taking it away.
+-- was, putting it in the catalog for every theme, or taking it away. On a
+-- catalog part's line: changing it for this site (`view.catalog`), which
+-- makes it the site's own drawing of the part (`view.changed`), taken away
+-- by going back to the catalog's.
 -- `fill` fills in the block's starter, when it is empty.
 function M.act_own(client, bufnr, row, fill)
   local text = vim.api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1]
@@ -436,6 +439,8 @@ function M.act_own(client, bufnr, row, fill)
       refine, colon = view.change.words, view.change.colon
     end
     local name, status = view.of, view.status
+    -- The catalog's part or the site's drawing of it: kept for this site only.
+    local shared = view.catalog or view.changed
     local items = {}
     local function add(label, value)
       table.insert(items, { label = label, value = value })
@@ -456,10 +461,14 @@ function M.act_own(client, bufnr, row, fill)
     if (view.takes or 0) > 1 then
       add(("Takes (%d)"):format(view.takes), "takes")
     end
-    if status ~= "drafting" then
+    if view.catalog and status == nil then
+      add("Change…", "change")
+    elseif status ~= "drafting" then
       add(status == "failed" and "Retry…" or "Reroll…", "reroll")
     end
-    if status == nil then
+    if status == nil and view.changed then
+      add(("Back to the catalog's %s"):format(name), "remove")
+    elseif status == nil and not shared then
       add(("Add %s to every theme"):format(name), "global")
       add(("Remove %s from this site…"):format(name), "remove")
     end
@@ -467,15 +476,29 @@ function M.act_own(client, bufnr, row, fill)
       add("Log", "log")
     end
     if status ~= nil then
-      add(("Back to %s as kept"):format(name), "cancel")
+      add(view.catalog and ("Back to the catalog's %s"):format(name) or ("Back to %s as kept"):format(name), "cancel")
     end
+    local kept = view.catalog and ("the catalog's %s"):format(name) or ("%s as kept"):format(name)
     local prompt = status == "drafting" and ("Drafting a take of %s"):format(name)
       or status == "failed" and ("Take of %s failed: %s"):format(name, view.message or "no reason given")
-      or status == "ready" and (original and ("%s as kept"):format(name) or ("Take %d of %s, in the preview"):format(view.take, name))
+      or status == "ready" and (original and kept or ("Take %d of %s, in the preview"):format(view.take, name))
+      or view.catalog and ("%s, catalog part"):format(name)
+      or view.changed and ("%s, changed for this site"):format(name)
       or ("%s, site part"):format(name)
     choose(items, prompt, function(v)
       if v == "fill" then
         fill()
+      elseif v == "keep" and shared then
+        answer({ action = "keep", global = false })
+      elseif v == "change" then
+        -- What to change, then the draft starts with the default drafter.
+        vim.ui.input({ prompt = ("Change %s: "):format(name), default = refine or "" }, function(notes)
+          if notes and notes ~= "" then
+            reroll(notes)
+          end
+        end)
+      elseif v == "remove" and view.changed then
+        answer({ action = "remove" })
       elseif v == "keep" then
         choose({
           { label = "This site", value = false },

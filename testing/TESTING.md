@@ -1,12 +1,12 @@
 # Live test: picks by Jev, and drafts by both tools
 
-Three passes as tables: what Jev does with words, new parts drafted by Claude Code, and the same requests drafted by OpenCode. Then the flow around a draft, once.
+Three passes as tables: what Jev does with words, new parts drafted by Claude Code, and the same requests drafted by OpenCode. Then the flow around a draft, once, and changing a catalog part for the site (section E, branch `customize`).
 
 Earlier tables are in [TESTING-fast-drafts.md](TESTING-fast-drafts.md) (parts fixed, menus), the step-by-step walk through drafting in [TESTING-new-parts.md](TESTING-new-parts.md), and the whole product's run in [TESTING-full.md](TESTING-full.md).
 
 Write what you find in **Notes** at the bottom, by test number.
 
-Last updated: 2026-11-12.
+Last updated: 2026-11-13.
 
 ## Set up
 
@@ -96,6 +96,26 @@ Once each, with whichever tool is set.
 | D12 | After the session: `jq -r '[.started[11:16], .drafter.harness, .drafter.model, .mode, .seconds, .status, .outcome] \| @tsv' testing/.rubric/logs/drafts.jsonl \| tail -n 20` | One line a draft: the tool, model, mode, seconds and what became of it. Every one from B and C says `fast`. |
 | D13 | With no drafter chosen (`:Rubric harness`, the setup's choice), open a `new:` line's menu | It reads "Draft (opus, low)": Opus at low effort is the built-in drafter. |
 | D14 | `:Rubric model`, **sonnet**, **low**; then `:LspRestart`; open a `new:` line's menu | Still "Draft (sonnet, low)" after the restart. Set it back when done. |
+| D15 | `::: steps` on a new line, `:::` under it; cursor on the `::: steps` line, then on the empty line inside | The starter shows dimmed on the opening line only; inside the block, where you type, it is gone. `<M-l>` inside still fills it in. |
+| D16 | A kept part that splits by `###` (B4's recipe card), placed inside a slide of the kept carousel or a step of `::: steps` | The inner part draws whole inside its slide or step; its own `###` headings don't become slides or steps. |
+
+## E. Changing a catalog part for the site
+
+Branch `customize`. Each change is a paid draft with whichever drafter is set. Use a page with two `::: quote` blocks, one `size=large`.
+
+| # | Do this | Expect |
+|---|---|---|
+| E1 | `<M-l>` in normal mode on a `::: quote` line with writing in it | A menu with **Change…** only. No "every theme", no remove. On an empty block the key fills the starter, as before. In insert mode the key never opens the menu. |
+| E2 | **Change…**, type `a torn paper edge`, Enter | A draft starts at once with the default drafter; the line stays `::: quote`. Ready in about 20 s: both quotes on the page draw the take. `<M-p>` shows the catalog's quote as take 1; `<M-n>` goes back. |
+| E3 | On the `::: quote` line, add ` : larger, and centered`, pause (not `map`: it can't be changed, E10) | Ghost text with settings from Jev, as before. `<M-l>`, **Change…**: the words are filled in. Enter starts the change and the words leave the line. |
+| E4 | On a ready take: `<M-l>`, **Keep this take** | Kept at once, with no "This site / Every theme" question. `testing/parts/quote/` has three files. Every page's quotes draw it. `git status catalogs/` shows nothing changed. |
+| E5 | Cursor on the kept part's line; then `<M-l>` | A hint at the line's end: "reroll quote, or back to the catalog's". The menu: **Reroll…**, **Back to the catalog's quote**, and no "Add to every theme". |
+| E6 | `::: quote size=large` and `align=center` after keeping | Both settings still work: a change can add settings, never drop one. |
+| E7 | **Reroll…**, **Make changes…**, Notes `drop the size setting`, **Reroll** | The take keeps `size`: the checks send back a take that drops it. If the draft fails instead, its message names `size`. |
+| E8 | **Back to the catalog's quote** | `parts/quote/` moves to `.rubric/logs/removed/`; the quotes draw as the catalog's again. |
+| E9 | In `rubric.md`, `::: theme blowfish`; change `callout` on a page and keep it | The page draws the site's callout, not Blowfish's own. Set the theme back after. |
+| E10 | `<M-l>` on a `::: tabs`, `::: map` or `::: video` line with writing in it | No menu: a part with a script, or one whose drawing fetches from another site, can't be changed. |
+| E11 | In `blowfish`, **Change…** on a `callout`, then `<M-p>` to take 1 | Take 1 is Blowfish's callout as it was on screen, not Paper's. |
 
 ## Notes
 
