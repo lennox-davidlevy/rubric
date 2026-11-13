@@ -321,9 +321,6 @@ function M.act(client, bufnr, row)
         add(("Takes (%d)"):format(view.takes), "takes")
       end
       add("Reroll…", "reroll")
-    elseif status == "exists" then
-      add(("Use %s"):format(view.name), "use")
-      add("Draft new", "fresh")
     elseif status == "drafting" then
       add("Wait", "wait")
       -- Taking too long: stop it, and keep what the line had before.
@@ -355,7 +352,6 @@ function M.act(client, bufnr, row)
     end
     add(status == "drafting" and "Cancel draft" or "Cancel", "cancel")
     local prompt = status == "ready" and ("%s, in the preview"):format(view.name)
-      or status == "exists" and ("The catalog has %s"):format(view.name)
       or status == "drafting" and "Drafting"
       or status == "failed" and ("Draft failed: %s"):format(view.message or "no reason given")
       or "New part"
@@ -372,11 +368,9 @@ function M.act(client, bufnr, row)
         end)
       elseif v == "log" then
         M.show_log(view.log)
-      elseif v == "fresh" then
-        M.build(client, bufnr, row, { action = "fresh" })
       elseif v == "build" then
         M.build(client, bufnr, row)
-      elseif v == "use" or v == "cancel" or v == "stop" then
+      elseif v == "cancel" or v == "stop" then
         answer({ action = v })
       end
     end)
@@ -707,11 +701,18 @@ function M.drafting(setup)
   return mode
 end
 
--- A server starts with the mode the setup had when Neovim opened, so each
--- one is told the kept mode as it attaches: after a restart, or in another
--- site, the labels and the drafts agree.
-function M.sync(client, bufnr, setup)
+-- A server starts with the mode and the drafter the setup had when Neovim
+-- opened, so each one is told the kept ones as it attaches: after a
+-- restart, or in another site, the labels and the drafts agree.
+-- `started` is the drafter the server's command line names: when the kept
+-- one is still that, nothing is sent, so no tool is asked for its models.
+function M.sync(client, bufnr, setup, started, defaults, draft_setup)
   client:request("rubric/drafting", { mode = M.drafting(setup) }, function() end, bufnr)
+  local d = M.drafter(defaults, draft_setup)
+  local same = d and started and d.harness == started.harness and d.model == started.model and d.effort == started.effort
+  if d and not same then
+    client:request("rubric/setDrafter", { harness = d.harness, model = d.model, effort = d.effort }, function() end, bufnr)
+  end
 end
 
 -- With tools or without: a list like the model's, with the one in use marked.
@@ -1169,8 +1170,6 @@ local function looks(d)
     return "◆", ("%s drafted%s%s · %s keep, reroll, cancel"):format(data.name or "part", takes, sets, accept_key), "ok"
   elseif d.code == "draft-failed" then
     return "✗", ("draft failed%s · %s try again"):format(takes, accept_key), "warn"
-  elseif d.code == "draft-exists" then
-    return "↪", ("catalog has %s · %s use it"):format(data.name or "this", accept_key), "info"
   elseif d.code == "new-part" and data.status == "none" then
     if type(data.earlier) == "number" and data.earlier > 0 then
       return "+", ("%s bring back %d earlier take%s, or draft a new part"):format(accept_key, data.earlier, data.earlier == 1 and "" or "s"), "none"
@@ -1225,7 +1224,7 @@ end
 -- The notes on `new:` lines carry where the draft is, which the block's own
 -- look shows; underlined too, the request would read as a mistake. Every
 -- other note, Rubric's included, is underlined as before.
-local NEW_CODES = { ["new-part"] = true, drafting = true, ["draft-ready"] = true, ["draft-failed"] = true, ["draft-exists"] = true }
+local NEW_CODES = { ["new-part"] = true, drafting = true, ["draft-ready"] = true, ["draft-failed"] = true }
 local underline = vim.diagnostic.handlers.underline
 if underline and not underline.rubric then
   vim.diagnostic.handlers.underline = {
@@ -1340,8 +1339,6 @@ function M.drafted(_, state)
   end
   if state.status == "ready" then
     vim.notify(("rubric: %s drafted, in the preview · %s keep, reroll, cancel"):format(state.name, accept_key), vim.log.levels.INFO)
-  elseif state.status == "exists" then
-    vim.notify(("rubric: catalog has %s for “%s”"):format(state.name, state.words), vim.log.levels.INFO)
   elseif state.status == "failed" and state.message ~= "stopped" then
     vim.notify(("rubric: draft failed for “%s”: %s"):format(state.words, state.message or "no reason given"), vim.log.levels.WARN)
   end

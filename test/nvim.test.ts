@@ -702,7 +702,7 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
       expect(JSON.parse(readFileSync(saved, "utf8")).recent?.[0]).toEqual({ harness: "claude", model: "opus", effort: "high" });
       expect(JSON.parse(readFileSync(saved, "utf8")).default).toBeUndefined();
     }
-    expect(expr("RubricTest.drafter()")).toBe("claude sonnet low");
+    expect(expr("RubricTest.drafter()")).toBe("claude opus low");
     // A drafter the tool doesn't have is refused before anything starts.
     const refused = expr(`(function() local c = vim.lsp.get_clients({ name = 'rubric' })[1] local r = c:request_sync('rubric/draft', { uri = vim.uri_from_bufnr(0), line = 3, action = 'reroll', change = '', drafter = { harness = 'claude', model = 'no-such-model' } }, 5000, 0) return r and r.result and r.result.error or '' end)()`);
     expect(refused).toContain("no-such-model");
@@ -819,6 +819,12 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
     keys(":Rubric model<CR>");
     expect(await until(() => expr("RubricTest.drafter()") === "claude haiku medium")).toBe(true);
     expect(JSON.parse(readFileSync(saved, "utf8")).default).toEqual({ harness: "claude", model: "haiku", effort: "medium" });
+    // A server that starts with another drafter, as after a restart, is
+    // told the kept one when it attaches.
+    expr(`vim.lsp.get_clients({ name = 'rubric' })[1]:request_sync('rubric/setDrafter', { harness = 'claude', model = 'opus', effort = 'high' }, 5000, 0)`);
+    expect(expr("RubricTest.drafter()")).toBe("claude opus high");
+    expr(`require('rubric.drafts').sync(vim.lsp.get_clients({ name = 'rubric' })[1], 0, nil, { harness = 'claude', model = 'opus', effort = 'low' }, { harness = 'claude' }, nil)`);
+    expect(await until(() => expr("RubricTest.drafter()") === "claude haiku medium")).toBe(true);
     // The tool's own defaults: no model or effort, and the setup's don't
     // come back at the next start.
     expr("RubricTest.answer('default', 'default')");
@@ -841,7 +847,7 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
     }
     expr("RubricTest.answer('setup')");
     keys(":Rubric harness<CR>");
-    expect(await until(() => expr("RubricTest.drafter()") === "claude sonnet low")).toBe(true);
+    expect(await until(() => expr("RubricTest.drafter()") === "claude opus low")).toBe(true);
     expect(await until(() => existsSync(saved) ? JSON.parse(readFileSync(saved, "utf8")).default === undefined : true)).toBe(true);
     // :Rubric tooluse chooses drafts with tools or without; the server
     // takes it, and the choice is kept for the next start.

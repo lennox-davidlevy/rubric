@@ -94,6 +94,8 @@ Once each, with whichever tool is set.
 | D10 | `:Rubric tooluse`, **Tools**; open any draft menu; then set **No tools** again | The menu reads "Draft (…, tools)" while tools are on, and loses it after. |
 | D11 | With tools on and a part kept, a `new:` line for the same thing, Draft | It drafts. It never stops to say the site has the part. |
 | D12 | After the session: `jq -r '[.started[11:16], .drafter.harness, .drafter.model, .mode, .seconds, .status, .outcome] \| @tsv' testing/.rubric/logs/drafts.jsonl \| tail -n 20` | One line a draft: the tool, model, mode, seconds and what became of it. Every one from B and C says `fast`. |
+| D13 | With no drafter chosen (`:Rubric harness`, the setup's choice), open a `new:` line's menu | It reads "Draft (opus, low)": Opus at low effort is the built-in drafter. |
+| D14 | `:Rubric model`, **sonnet**, **low**; then `:LspRestart`; open a `new:` line's menu | Still "Draft (sonnet, low)" after the restart. Set it back when done. |
 
 ## Notes
 

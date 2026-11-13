@@ -101,9 +101,6 @@ export interface DraftRequest {
   // Reroll: what to change about the last draft, and where it is. With no
   // change, a different take.
   previous?: { dir: string; change: string };
-  // Drafted though the catalog has a part for it: the writer saw that part
-  // and wants one of their own.
-  fresh?: boolean;
   // Another take of the site's own part of this name, which keeps it; the
   // words are its description, and `previous` the take it starts from.
   of?: string;
@@ -405,7 +402,7 @@ export async function runDraft(site: Site, dir: string, state: DraftState, req: 
   const { log, flush } = draftLog(dir, state.started);
   // What the runs cost, added up; the drafter, the session and whether it
   // resumed, from the last run.
-  const kind: DraftState["kind"] = req.previous ? (req.previous.change ? "change" : "another") : req.fresh ? "fresh" : "first";
+  const kind: DraftState["kind"] = req.previous ? (req.previous.change ? "change" : "another") : "first";
   const mode: Mode = req.mode ?? "tools";
   const fast = mode === "fast";
   const measured: Partial<DraftState> = { kind, ...(req.previous?.change ? { change: req.previous.change } : {}), mode, brief: briefVersion(site), runs: 0 };
@@ -425,9 +422,7 @@ export async function runDraft(site: Site, dir: string, state: DraftState, req: 
   };
   const done = async (s: Partial<DraftState>) => {
     const next: DraftState = { ...state, ...measured, ...s, finished: Date.now() };
-    log(next.status === "ready" ? `ready: ${next.name}`
-      : next.status === "exists" ? `the catalog has ${next.name} for these words`
-      : `failed: ${next.message ?? "no reason given"}`);
+    log(next.status === "ready" ? `ready: ${next.name}` : `failed: ${next.message ?? "no reason given"}`);
     await flush();
     await save(next);
     return next;
@@ -457,7 +452,6 @@ export async function runDraft(site: Site, dir: string, state: DraftState, req: 
       await writeFile(join(dir, f), text);
     }
   }
-  if (req.fresh) log("drafting one anyway, though the catalog may have one");
   const briefText = brief(site, req, mode);
   await writeFile(join(dir, "brief.md"), briefText);
 
@@ -480,19 +474,6 @@ export async function runDraft(site: Site, dir: string, state: DraftState, req: 
       for (const [f, text] of Object.entries(files)) await writeFile(join(dir, f), text);
     }
 
-    const exists = await readFile(join(dir, "exists.txt"), "utf8").catch(() => undefined);
-    // Only a first draft asks whether the catalog has it; a take doesn't.
-    if (exists !== undefined && !req.fresh && req.of === undefined && !req.previous) {
-      const [first = "", ...rest] = exists.trim().split("\n");
-      const part = first.trim();
-      if (Object.hasOwn(site.catalog.parts, part) && site.catalog.parts[part]!.origin !== "draft") {
-        return done({ status: "exists", name: part, message: rest.join(" ").trim() });
-      }
-      await rm(join(dir, "exists.txt"), { force: true });
-      log(`it named ${part}, which the catalog doesn't have; asking again`);
-      prompt = `exists.txt names "${part}", which is not one of the catalog's parts. Either write the part, or name one that is.`;
-      continue;
-    }
     // The last take's files, untouched: the tool did nothing. Going on with
     // an earlier conversation, a model may take the work for done; once more
     // without it, then it's a failure.

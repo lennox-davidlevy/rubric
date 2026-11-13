@@ -1042,3 +1042,16 @@ describe("the record, to study the tools by", () => {
     await ws.cancel(page(), 4);
   });
 });
+
+test("a state left by a version that found the catalog's part is not read as a draft", () => {
+  const root = mkdtempSync(join(tmpdir(), "rubric-old-state-"));
+  try {
+    for (const [id, status] of [["a", "exists"], ["b", "ready"]] as const) {
+      mkdirSync(join(root, DRAFTS, id), { recursive: true });
+      writeFileSync(join(root, DRAFTS, id, "state.json"), JSON.stringify({ id, words: "a quote", status, name: "quote", started: 1 }));
+    }
+    expect(readDrafts(root).map((d) => d.id)).toEqual(["b"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

@@ -47,9 +47,10 @@ export interface RunStats {
   apiSeconds?: number;
 }
 
-// What drafts unless the writer chose otherwise: a fast model. Any one
-// draft can be made by another, chosen for it alone.
-export const DEFAULT_DRAFTER: Drafter = { harness: "claude", model: "sonnet", effort: "low" };
+// What drafts unless the writer chose otherwise: the best look for the
+// wait, as measured. Any one draft can be made by another, chosen for it
+// alone.
+export const DEFAULT_DRAFTER: Drafter = { harness: "claude", model: "opus", effort: "low" };
 
 // How hard a model can be asked to think: Claude Code's --effort levels for
 // any model, and OpenCode's built-in variants, which differ by provider
@@ -125,7 +126,7 @@ function fastSystem(d: Drafter): string {
 }
 
 // The files a draft is made of, copied back from the tool's folder.
-const RESULT = ["part.yaml", "part.html", "part.css", "exists.txt"];
+const RESULT = ["part.yaml", "part.html", "part.css"];
 
 // Claude Code's short names for its latest models; it also takes full names.
 const CLAUDE_ALIASES = ["opus", "sonnet", "haiku", "fable"];

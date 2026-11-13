@@ -28,6 +28,7 @@ export function serve(opts: { stub: boolean; drafter?: Drafter; mode?: Mode }): 
   // editor's setup, and changed for the session from the editor's lists.
   // A draft may be made by another, chosen for it alone.
   let drafter: Drafter = opts.drafter ?? DEFAULT_DRAFTER;
+  let drafterAsked = 0;
   // How drafts are asked for: fast, one turn with the files in the reply,
   // unless the writer chose the tools, to compare the two.
   let mode: Mode = opts.mode ?? "fast";
@@ -231,14 +232,14 @@ export function serve(opts: { stub: boolean; drafter?: Drafter; mode?: Mode }): 
   // `drafter` drafts this one alone, in place of the writer's default; it is
   // checked before anything starts.
   type DraftParams = {
-    uri: string; line: number; action?: "build" | "reroll" | "fresh" | "keep" | "cancel" | "stop" | "use" | "take" | "restore" | "remove";
+    uri: string; line: number; action?: "build" | "reroll" | "keep" | "cancel" | "stop" | "use" | "take" | "restore" | "remove";
     change?: string; global?: boolean; step?: number; to?: number; part?: string; drafter?: { harness: HarnessName; model?: string | null; effort?: string | null };
   };
   connection.onRequest("rubric/draft", async (params: DraftParams): Promise<object | null> => {
     const f = file(params.uri);
     if (!f || !workspace) return null;
     let use: Drafter | undefined;
-    if (params.drafter && (params.action === "build" || params.action === "reroll" || params.action === "fresh")) {
+    if (params.drafter && (params.action === "build" || params.action === "reroll")) {
       const d = params.drafter;
       if (!HARNESSES.includes(d.harness)) return { error: `no harness "${d.harness}"` };
       use = { harness: d.harness, ...(d.model ? { model: d.model } : {}), ...(d.effort ? { effort: d.effort } : {}) };
@@ -249,13 +250,12 @@ export function serve(opts: { stub: boolean; drafter?: Drafter; mode?: Mode }): 
     switch (params.action) {
       case "build": return (await workspace.build(f, params.line, who)) ?? null;
       case "reroll": return (await workspace.build(f, params.line, { change: params.change ?? "", ...who })) ?? null;
-      case "fresh": return (await workspace.build(f, params.line, { fresh: true, ...who })) ?? null;
       case "keep": return workspace.keep(f, params.line, params.global === true);
       case "cancel": return workspace.cancel(f, params.line);
       case "stop": return workspace.stop(f, params.line);
       case "take": return (await workspace.take(f, params.line, params.step === -1 ? -1 : 1, Number.isInteger(params.to) ? params.to : undefined)) ?? null;
       case "restore": return (await workspace.restore(f, params.line)) ?? null;
-      case "use": return workspace.use(f, params.line, typeof params.part === "string" ? params.part : undefined);
+      case "use": return typeof params.part === "string" ? workspace.use(f, params.line, params.part) : { error: "no part named" };
       case "remove": return workspace.remove(f, params.line);
       default: return (await workspace.look(f, params.line)) ?? null;
     }
@@ -293,9 +293,11 @@ export function serve(opts: { stub: boolean; drafter?: Drafter; mode?: Mode }): 
   connection.onRequest("rubric/setDrafter", async (params: { harness: HarnessName; model?: string | null; effort?: string | null }): Promise<object> => {
     if (!HARNESSES.includes(params.harness)) return { error: `no harness "${params.harness}"` };
     const next: Drafter = { harness: params.harness, ...(params.model ? { model: params.model } : {}), ...(params.effort ? { effort: params.effort } : {}) };
+    // Checking a model can wait on the tool; a choice made meanwhile stands.
+    const asked = ++drafterAsked;
     const problem = await modelProblem(next);
     if (problem) return { error: problem };
-    drafter = next;
+    if (asked === drafterAsked) drafter = next;
     return { drafter: describe(next), short: shortName(next) };
   });
 

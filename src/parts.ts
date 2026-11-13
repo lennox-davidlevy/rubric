@@ -18,17 +18,16 @@ import { join, relative } from "node:path";
 import { parse, stringify } from "yaml";
 import { CatalogError, parseCatalog, parseOwnPart, writeWhole, type Catalog, type Part } from "./core/index.ts";
 
-export type DraftStatus = "drafting" | "ready" | "failed" | "exists";
+export type DraftStatus = "drafting" | "ready" | "failed";
 
 export interface DraftState {
   id: string;
   // What the `::: new:` line asks for.
   words: string;
   status: DraftStatus;
-  // The part's name once drafted, or the catalog's part that already does
-  // this ("exists").
+  // The part's name once drafted.
   name?: string;
-  // Why it failed, or why the existing part fits.
+  // Why it failed.
   message?: string;
   started: number;
   finished?: number;
@@ -46,7 +45,7 @@ export interface DraftState {
   // step 7): what kind of draft, the drafter in parts, the brief's version,
   // the runs it took (2 when the checks sent it back), what they cost, and
   // whether it went on with the last take's conversation.
-  kind?: "first" | "fresh" | "another" | "change";
+  kind?: "first" | "another" | "change";
   // What a reroll was asked to change, in the writer's words: the notes are
   // the record of what a draft got wrong.
   change?: string;
@@ -140,7 +139,9 @@ export function readOwn(root: string, catalog: Catalog): { own: Record<string, O
 export function readDrafts(root: string): DraftState[] {
   return folders(join(root, DRAFTS)).flatMap((id) => {
     try {
-      return [JSON.parse(readFileSync(join(root, DRAFTS, id, "state.json"), "utf8")) as DraftState];
+      const state = JSON.parse(readFileSync(join(root, DRAFTS, id, "state.json"), "utf8")) as DraftState;
+      // Left by a version that asked whether the catalog had the part: not a draft.
+      return (state.status as string) === "exists" ? [] : [state];
     } catch {
       return [];
     }

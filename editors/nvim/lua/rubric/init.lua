@@ -33,7 +33,7 @@ local defaults = {
   -- No model or effort is the tool's default. A choice made with :Rubric
   -- harness or :Rubric model is kept and used instead, in every session,
   -- until :Rubric harness goes back to this one.
-  draft = { harness = "claude", model = "sonnet", effort = "low" },
+  draft = { harness = "claude", model = "opus", effort = "low" },
   -- How a draft is asked for: "fast", one turn with the files in the reply,
   -- or "tools", the tool writing them a turn a step. :Rubric tooluse
   -- (and :Rubric harness) changes it, and that choice is kept.
@@ -566,7 +566,7 @@ function M.setup(opts)
       watch_picks(event.buf)
       watch_spell(event.buf)
       send_cursor(event.buf, client.id)
-      drafts.sync(client, event.buf, opts.drafting)
+      drafts.sync(client, event.buf, opts.drafting, chosen, defaults.draft, opts.draft)
       local experimental = client.server_capabilities.experimental
       set_alone(experimental and experimental.rubric and experimental.rubric.alone)
       local on_rubric_md = themes.is_rubric_md(event.buf)

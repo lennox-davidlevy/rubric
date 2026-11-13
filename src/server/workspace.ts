@@ -825,9 +825,9 @@ export class Workspace {
 
   // Starts a draft for the `new:` line at `line`. A reroll passes what to
   // change ("" for another take); the draft shown stays until the new one is
-  // ready. `fresh` drafts even when the catalog has a part for it already.
+  // ready.
   // `drafter` drafts this one alone, in place of the writer's default.
-  async build(file: string, line: number, opts: { change?: string; fresh?: boolean; drafter?: Drafter } = {}): Promise<DraftView | undefined> {
+  async build(file: string, line: number, opts: { change?: string; drafter?: Drafter } = {}): Promise<DraftView | undefined> {
     const at = this.#draftLine(file, line);
     if (!at || !this.#harness) return this.draft(file, line);
     const { words, key, of } = at;
@@ -887,7 +887,6 @@ export class Workspace {
         end = await runDraft(site, dir, state, {
           words, inside,
           ...(previous ? { previous: { dir: join(this.site.root, DRAFTS, previous.id), change: opts.change ?? "" } } : {}),
-          ...(opts.fresh ? { fresh: true } : {}),
           ...(of !== undefined ? { of } : {}),
           ...(previous?.session ? { resume: previous.session } : {}),
           ...(opts.drafter ? { use: opts.drafter } : {}),
@@ -902,9 +901,9 @@ export class Workspace {
       if (!this.#drafts.has(state.id)) return;
       this.#drafts.set(state.id, end);
       // A new take joins the ones before it and goes on screen; drafts that
-      // failed or found the catalog's part go to the record.
+      // failed go to the record.
       if (end.status === "ready") {
-        for (const old of this.#draftsFor(key)) if (old.id !== end.id && (old.status === "failed" || old.status === "exists")) await this.#forget(old.id, "replaced");
+        for (const old of this.#draftsFor(key)) if (old.id !== end.id && old.status === "failed") await this.#forget(old.id, "replaced");
       }
       await this.#reopen();
       this.#onDraft?.(end);
@@ -1035,20 +1034,15 @@ export class Workspace {
     return {};
   }
 
-  // The catalog's part that does this already, in place of the line.
-  // `part` is one the writer chose from the near ones, before any draft.
-  async use(file: string, line: number, part?: string): Promise<DraftDone> {
+  // One of the catalog's parts near the words, chosen by the writer from
+  // the list, in place of the line.
+  async use(file: string, line: number, part: string): Promise<DraftDone> {
     const at = this.#newLine(file, line);
-    if (at && part !== undefined) {
-      // The list is closed either way: the preview stops drawing its part.
-      this.peek(file, line);
-      if (!this.#near(at.doc.page, at.d.words!).some((n) => n.name === part)) return { error: `${part} is not one of the parts near this line` };
-      return { replace: `${opener(splitLines(at.doc.text)[line] ?? "")} ${part}`, ...this.#drop(at.d, part) };
-    }
-    const latest = at && this.#draftsFor(at.d.words!)[0];
-    if (!at || latest?.status !== "exists" || !latest.name) return { error: "no part of the catalog was found for this line" };
-    for (const d of this.#draftsFor(at.d.words!)) await this.#forget(d.id, `used ${latest.name}`);
-    return { replace: `${opener(splitLines(at.doc.text)[line] ?? "")} ${latest.name}`, ...this.#drop(at.d, latest.name) };
+    if (!at) return { error: "no new part is asked for on this line" };
+    // The list is closed either way: the preview stops drawing its part.
+    this.peek(file, line);
+    if (!this.#near(at.doc.page, at.d.words!).some((n) => n.name === part)) return { error: `${part} is not one of the parts near this line` };
+    return { replace: `${opener(splitLines(at.doc.text)[line] ?? "")} ${part}`, ...this.#drop(at.d, part) };
   }
 
   // A part that takes nothing inside has no block, so the `new:` line's closer goes.
@@ -1151,7 +1145,6 @@ export class Workspace {
       else if (!latest) notes.push({ ...here, code: "new-part", severity: "information", message: `new part: the accept key drafts it${near}` });
       else if (latest.status === "drafting") notes.push({ ...here, code: "drafting", severity: "information", message: `drafting${showing}${near}` });
       else if (latest.status === "ready") notes.push({ ...here, code: "draft-ready", severity: "information", message: `${latest.name} drafted, in the preview: the accept key keeps, rerolls or cancels${sets}${near}` });
-      else if (latest.status === "exists") notes.push({ ...here, code: "draft-exists", severity: "information", message: `catalog has ${latest.name}${latest.message ? `. ${latest.message}` : "."} The accept key uses it or drafts new` });
       else notes.push({ ...here, code: "draft-failed", severity: "warning", message: `draft failed: ${latest.message ?? "no reason given"}. The accept key retries${showing}` });
     }
     // A site's own part being redrafted: where its takes are.
