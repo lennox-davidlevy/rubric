@@ -650,7 +650,13 @@ function M.setup(opts)
         -- starter at once, as before; Change… once it has writing.
         local o = own_line()
         local row = vim.api.nvim_win_get_cursor(0)[1] - 1
-        if o and not (o.catalog and not o.takes and starters.at(event.buf, row)) then
+        if o and o.fixed and not starters.at(event.buf, row) then
+          vim.schedule(function()
+            starters.say(event.buf, row, ("%s has no variants"):format(o.part))
+          end)
+          return true
+        end
+        if o and not o.fixed and not (o.catalog and not o.takes and starters.at(event.buf, row)) then
           act_own()
           return true
         end

@@ -156,6 +156,8 @@ export interface OwnLine {
   catalog?: true;
   // The variant of the part the line draws, by its own name.
   variant?: string;
+  // A catalog part that can't have variants.
+  fixed?: true;
 }
 
 interface Doc {
@@ -583,11 +585,12 @@ export class Workspace {
     if (!hit || !now || !same()) return [];
 
     const lineText = splitLines(now.doc.text)[line] ?? "";
-    // The words set nothing the part has, and Jev is sure of it (a setting it
-    // was unsure of gets its note instead): they ask for a change to the part
-    // itself, which a draft makes, when the site can have its own drawing of
-    // it. Accepting opens its menu; nothing is drafted until Change… is chosen.
-    if (Object.keys(hit.settings).length === 0 && hit.unsettled.length === 0) {
+    // The words set nothing the part has, and Jev is sure of it, or sure they
+    // ask for more than its settings say (a setting it was unsure of, alone,
+    // gets its note instead): they ask for a change to the part itself, which
+    // a draft makes, when the site can have its own drawing of it. Accepting
+    // opens its menu; nothing is drafted until Change… is chosen.
+    if (Object.keys(hit.settings).length === 0 && (hit.unsettled.length === 0 || hit.beyond > THRESHOLDS.yes)) {
       const sep = lineText.endsWith(" ") ? "" : " ";
       const drafts = this.#harness && this.site.ownMounted && this.#ownPart(now.doc, now.d);
       return [drafts
@@ -1165,7 +1168,12 @@ export class Workspace {
       return { error: (err as Error).message };
     }
     for (const d of this.#draftsFor(at.key)) await this.#forget(d.id, "the part was removed");
+    const variant = this.site.own[at.of]?.part.variant;
     await this.#reopen();
+    // A variant's own line goes back to its part, which still draws.
+    const doc = this.#docs.get(file);
+    const d = doc && this.#directiveAt(doc, line);
+    if (variant !== undefined && doc && d?.plain?.part === variant) return { removed, replace: this.#withVariant(doc, d, PLAIN, true) };
     return { removed };
   }
 
@@ -1697,9 +1705,15 @@ export class Workspace {
 
   #ownLines(doc: Doc): OwnLine[] {
     const src = splitLines(doc.text);
-    return scan(doc.text, this.site.catalog).directives.flatMap((d) => {
+    return scan(doc.text, this.site.catalog).directives.flatMap((d): OwnLine[] => {
       const own = this.#lineDrafts(doc, d);
-      if (own === undefined) return [];
+      if (own === undefined) {
+        // A catalog part that can't have variants: the editor says so.
+        const part = d.plain?.part;
+        return doc.page !== "site" && part !== undefined && Object.hasOwn(this.site.catalog.parts, part) && !this.#isOwn(part) && !changeable(this.site.shared, part, this.site.themeDir)
+          ? [{ line: d.line, opener: src[d.line]!, part, catalog: true as const, fixed: true as const }]
+          : [];
+      }
       const { takes } = this.#takes(own.key);
       // By the part the line names, which the editor finds it by.
       const variant = this.site.own[own.of]?.part.variant;

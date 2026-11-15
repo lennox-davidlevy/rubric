@@ -327,7 +327,7 @@ export async function checkDraft(site: Site, dir: string, words?: string, of?: s
     else if (site.own[name]?.part.origin === "site" || existsSync(join(site.root, "parts", name)) || others) problems.push(`part.yaml: ${name} is already a variant; choose another name`);
     const was = keptPart(site, variant);
     const missing = was ? missingSettings(was, parsed.part) : [];
-    if (missing.length) problems.push(`part.yaml: ${missing.join(", ")} must stay, since lines of ${variant} already use ${missing.length === 1 ? "it" : "them"}`);
+    if (missing.length) problems.push(`part.yaml: ${missing.join(", ")} must stay: a variant takes every setting ${variant} has`);
   } else if (of !== undefined) {
     // Another take of a site's part keeps its name: pages use it.
     if (name !== of) problems.push(`part.yaml: the name must stay ${of}, which pages already use`);
@@ -336,7 +336,14 @@ export async function checkDraft(site: Site, dir: string, words?: string, of?: s
     const shared = Object.hasOwn(site.shared.parts, of) ? site.shared.parts[of] : undefined;
     const was = keptPart(site, of);
     const missing = [...new Set([...(was ? missingSettings(was, parsed.part) : []), ...(shared ? missingSettings(shared, parsed.part) : [])])];
-    if (missing.length) problems.push(`part.yaml: ${missing.join(", ")} must stay, since lines already use ${missing.length === 1 ? "it" : "them"}`);
+    // A variant's are its part's, which it must take, and any it added,
+    // which lines may already use.
+    const base = site.own[of]?.part.variant;
+    const ofBase = base !== undefined ? keptPart(site, base) : undefined;
+    const fromBase = missing.filter((s) => ofBase?.settings[s] !== undefined);
+    const own = missing.filter((s) => !fromBase.includes(s));
+    if (fromBase.length) problems.push(`part.yaml: ${fromBase.join(", ")} must stay: a variant takes every setting ${base} has`);
+    if (own.length) problems.push(`part.yaml: ${own.join(", ")} must stay, since lines already use ${own.length === 1 ? "it" : "them"}`);
   } else {
     // A draft for the same words is the one this replaces; any other part,
     // or another line's draft, has the name already.

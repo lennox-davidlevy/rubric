@@ -821,7 +821,8 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
     expr("RubricTest.answer('remove', true)");
     keys(":call cursor(10, 1)<CR><M-l>");
     expect(await until(() => !existsSync(join(site, "parts/callout--torn-edge")))).toBe(true);
-    keys(":call setline(10, '::: callout')<CR>");
+    // Its line goes back to the part, which still draws.
+    expect(await until(() => expr("RubricTest.line(10)") === "::: callout")).toBe(true);
     // Words after ":" that set nothing it has: the ghost offers a change, and
     // accepting it opens the part's menu and leaves the line as it was.
     const menusThen = Number(expr("RubricTest.menus"));
@@ -831,7 +832,17 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
     keys("<M-l>");
     expect(await until(() => Number(expr("RubricTest.menus")) === menusThen + 1)).toBe(true);
     expect(expr("RubricTest.line(10)")).toBe("::: callout : with a torn edge");
-    keys("<Esc>:call setline(10, '::: callout')<CR>");
+    // A part that can't have variants: the key says so, opens nothing and
+    // leaves the cursor where it was.
+    keys("<Esc>:call setline(10, '::: tabs')<CR>");
+    expect(await until(() => expr("(require('rubric.starters').own_at(vim.api.nvim_get_current_buf(), 9) or {}).fixed and 'y' or ''") === "y")).toBe(true);
+    const menusFixed = Number(expr("RubricTest.menus"));
+    keys(":call cursor(10, 1)<CR><M-l>");
+    const said = "#vim.api.nvim_buf_get_extmarks(0, vim.api.nvim_create_namespace('rubric.own'), {9, 0}, {9, -1}, {})";
+    expect(await until(() => expr(said) === "1")).toBe(true);
+    expect(Number(expr("RubricTest.menus"))).toBe(menusFixed);
+    expect(expr("vim.fn.col('.')")).toBe("1");
+    keys(":call setline(10, '::: callout')<CR>");
 
     // A `new:` typed by hand is drafted only on the accept key; cancel puts
     // the words back.

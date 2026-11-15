@@ -400,6 +400,9 @@ function M.act_own(client, bufnr, row, fill)
       vim.notify("rubric: " .. r.error, vim.log.levels.WARN)
       return
     end
+    if r.removed then
+      vim.notify(("rubric: removed; files in %s"):format(r.removed), vim.log.levels.INFO)
+    end
     if r.replace then
       replace(bufnr, row, text, r)
       return
@@ -410,9 +413,6 @@ function M.act_own(client, bufnr, row, fill)
     end
     if r.version then
       vim.notify(("rubric: added to the catalog for every theme, version %d"):format(r.version), vim.log.levels.INFO)
-    end
-    if r.removed then
-      vim.notify(("rubric: removed; files in %s"):format(r.removed), vim.log.levels.INFO)
     end
   end
   -- To the line where it is now: it may have moved while a menu was open.

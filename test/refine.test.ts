@@ -179,6 +179,18 @@ describe("in the editor", () => {
     );
   });
 
+  test("words that set nothing still get ghost text when Jev is unsure of a setting but sure they ask for more", async () => {
+    const line = "::: video : unsure, with sparkles";
+    await ws.change(page(), `${head}${line}\nhttps://youtu.be/x\n:::\n`);
+    await ws.settle();
+    const ghost = await ws.ghost(page(), 3);
+    expect(ghost).toHaveLength(1);
+    expect(ghost[0]!.replace).toBe(line);
+    await ws.change(page(), `${head}::: video : unsure\nhttps://youtu.be/x\n:::\n`);
+    await ws.settle();
+    expect(await ws.ghost(page(), 3)).toEqual([]);
+  });
+
   test("the note says what was taken when some of it fit", async () => {
     await ws.change(page(), `${head}::: video : wide, with sparkles\nhttps://youtu.be/x\n:::\n`);
     await ws.settle();

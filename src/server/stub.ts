@@ -54,7 +54,8 @@ export function stubRefiner(catalog: Catalog, delayMs = 50): Refiner {
       const v = values.find((x) => said.includes(x));
       if (v) settings[name] = v;
     }
-    return { refined: { settings, unsettled: [], beyond: said.includes("sparkles") ? 0.9 : 0.1 }, model: "stub" };
+    const unsettled = said.includes("unsure") ? Object.keys(settingsOf(catalog, part)).slice(0, 1) : [];
+    return { refined: { settings, unsettled, beyond: said.includes("sparkles") ? 0.9 : 0.1 }, model: "stub" };
   };
 }
 

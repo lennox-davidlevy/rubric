@@ -118,6 +118,15 @@ function M.hint(bufnr)
   end
 end
 
+-- A word at the end of line `row` until the cursor moves.
+function M.say(bufnr, row, text)
+  vim.api.nvim_buf_clear_namespace(bufnr, own_ns, 0, -1)
+  pcall(vim.api.nvim_buf_set_extmark, bufnr, own_ns, row, 0, {
+    virt_text = { { "  " .. text, "RubricStarterHint" } },
+    virt_text_pos = "eol",
+  })
+end
+
 -- The starter for the block `row` opens, is inside of or closes, if any.
 function M.at(bufnr, row)
   for _, s in ipairs(by_buf[bufnr] or {}) do

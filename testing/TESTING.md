@@ -9,7 +9,7 @@ Last updated: 2026-11-14.
 ## Set up
 
 1. Quit every Neovim, stop `bun run play`, start it again from the repo root on branch `variants`.
-2. Open http://localhost:1415/posts/walk/ and `nvim testing/pages/posts/walk.md`. It has two `::: quote` blocks, one `size=large`.
+2. Open http://localhost:1415/posts/walk/ and `nvim testing/pages/posts/walk.md`. It has two `::: quote` blocks: `size=large align=center`, and `size=large` below it.
 
 `<M-l>` opens a part's menu in **normal mode** only (Esc first); in insert mode it accepts the ghost text. E2, E9, E10, E11, E12 and E15 make paid drafts with whichever drafter is set; ask Claude before running them if unsure.
 
@@ -34,8 +34,19 @@ Last updated: 2026-11-14.
 | E13 | On a new `::: quote : with a gold border` line, `<M-l>` on the `⇒ change quote` ghost text, **Change…** (filled in), Enter; then `<M-l>`, **Back to the catalog's quote** | The line goes back to `::: quote`; nothing new in `testing/parts/`. |
 | E14 | **Remove quote--<name> from this site…** on a variant's line | Its files move to `.rubric/logs/removed/`; lines that still ask for it get a note, and the quote draws as text until they change. |
 | E15 | In `rubric.md`, `::: theme blowfish`; on a `::: callout` with writing, **Change…** `with a torn edge` | Take 1 (`<M-p>`) is Blowfish's callout. Kept: the variant draws in Blowfish, and every other callout stays Blowfish's. Set the theme back after. |
-| E16 | `<M-l>` on a `::: tabs`, `::: map` or `::: video` line with writing in it | No menu: a part with a script, or one whose drawing fetches from another site, can't have variants. |
-| E17 | On a `::: map` line, add ` : with a torn paper edge`, pause | Ghost text `⇒ nothing map can set`. `<M-l>` leaves the line as it was. |
+| E16 | In `testing/pages/parts.md`, `<M-l>` on a `::: tabs`, `::: map` or `::: video` line with writing in it | No menu: a part with a script, or one whose drawing fetches from another site, can't have variants. |
+| E17 | On the `::: map zoom=street` line in `parts.md`, add ` : with a torn paper edge`, pause | Ghost text `⇒ nothing map can set`. `<M-l>` leaves the line as it was. |
+
+## F. Fixes from the first run (2026-11-15)
+
+Restart `bun run play` and Neovim first.
+
+| # | Do this | Expect |
+|---|---|---|
+| F1 | On a variant's line, such as `::: stamps variant=gold`, **Remove stamps--gold from this site…** | The line becomes `::: stamps` and draws the part. Other lines that still say `variant=gold` get a note. |
+| F2 | `<M-l>` in normal mode on the `::: tabs` or `::: map zoom=street` line in `parts.md` | Dim text at the line's end: "tabs has no variants". No menu; the cursor stays put. Moving the cursor clears it. |
+| F3 | On the `::: map zoom=street` line, add ` : with a torn paper edge`, pause | Ghost text `⇒ nothing map can set`. |
+| F4 | In `rubric.md`, change the theme name on `::: theme …` by typing over it (`ciw`, or backspace, then `bl`) | A completion menu with `blowfish` and `blog-awesome`. If none shows, note the exact keys. |
 
 ## Notes
 

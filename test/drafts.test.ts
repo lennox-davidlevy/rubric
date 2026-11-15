@@ -1026,10 +1026,11 @@ describe("variants", () => {
     writeFileSync(join(dir, DRAFTS, ws.draft(page(), 4)!.log!.split("/").at(-2)!, "part.yaml"), yaml("quote--torn-paper").replace(/^everywhere:.*\n?/m, ""));
     expect((await ws.keep(page(), 4, false)).error).toBeUndefined();
     expect(yaml("quote--torn-paper")).toContain("everywhere: true");
-    // With every variant gone, a line that says plain is still the part.
-    await ws.remove(page(), 4);
-    await write(`${front}::: quote variant=ivy\nSaid.\n:::\n\n::: quote variant=plain\nWritten.\n:::\n`);
-    await ws.remove(page(), 4);
+    // Removing a variant puts its line back to the part, which still draws;
+    // with every variant gone, a line that says plain is still the part.
+    expect((await ws.remove(page(), 4)).replace).toBe("::: quote");
+    await write(`${front}::: quote variant=ivy : darker\nSaid.\n:::\n\n::: quote variant=plain\nWritten.\n:::\n`);
+    expect((await ws.remove(page(), 4)).replace).toBe("::: quote : darker");
     await write(`${front}::: quote variant=plain\nWritten.\n:::\n`);
     expect(ws.site.catalog.parts.quote?.settings.variant).toBeUndefined();
     expect(codes(4)).toEqual([]);
@@ -1069,6 +1070,24 @@ describe("variants", () => {
     // A new part's name never has "--", which is for variants.
     writeFileSync(join(take, "part.yaml"), "name: kites--tails\ndescription: Kites.\nchildren: true\n");
     expect((await checkDraft(ws.site, take, "kites")).problems.join()).toContain("--");
+    // A reroll of a kept variant keeps its part's settings and its own, each
+    // refused for its own reason.
+    const kept = join(dir, "parts/quote--edgy");
+    mkdirSync(kept, { recursive: true });
+    writeFileSync(join(kept, "part.yaml"), files.yaml.replace(/^name: .*$/m, "name: quote--edgy").replace(/^settings:\n/m, "settings:\n  edge:\n    type: choice\n    default: torn\n    values:\n      torn: a torn edge\n      cut: a cut edge\n"));
+    writeFileSync(join(kept, "part.html"), files.html.replace("part part-quote", "part part-quote--edgy"));
+    writeFileSync(join(kept, "part.css"), ".part-quote--edgy { color: var(--ink); }\n");
+    await ws.reload(await openSite(dir));
+    expect(ws.site.own["quote--edgy"]?.part.variant).toBe("quote");
+    writeFileSync(join(take, "part.yaml"), files.yaml.replace(/^name: .*$/m, "name: quote--edgy").replace(/^  size:\n(    .*\n|      .*\n)*/m, ""));
+    writeFileSync(join(take, "part.html"), files.html.replace("part part-quote", "part part-quote--edgy"));
+    writeFileSync(join(take, "part.css"), ".part-quote--edgy { color: var(--ink); }\n");
+    const problems = (await checkDraft(ws.site, take, undefined, "quote--edgy")).problems.filter((p) => p.includes("must stay"));
+    expect(problems).toHaveLength(2);
+    expect(problems.find((p) => p.includes("size"))).not.toContain("edge");
+    expect(problems.find((p) => p.includes("edge"))).not.toContain("size");
+    rmSync(kept, { recursive: true });
+    await ws.reload(await openSite(dir));
   });
 
   test("a part with a script, or whose drawing fetches from another site, can't be changed: no take of it could pass the checks", async () => {
