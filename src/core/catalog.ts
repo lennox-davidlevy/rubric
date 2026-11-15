@@ -3,6 +3,7 @@
 
 import { readFile } from "node:fs/promises";
 import { parse } from "yaml";
+import { PLAIN, VARIANT } from "./variant.ts";
 
 // Choice, level and flag settings are asked of Jev; `question` overrides the
 // generated wording when it reads badly. Choice and level need a default,
@@ -51,9 +52,12 @@ export interface Part {
   // part like any other, but offered with the writer's own when they look
   // for parts they already have.
   drafted?: true;
-  // The site's own drawing of a catalog part, under the catalog's name: it
-  // takes the catalog's place on this site.
-  changed?: true;
+  // A variant of the part of this name (variant.ts): its own drawing, which
+  // a line asks for with `variant=` on that part. It is never a part of the
+  // catalog itself: the part's `variant` setting lists it.
+  variant?: string;
+  // The variant drawn for every line of its part that sets none.
+  everywhere?: true;
 }
 
 export interface Catalog {
@@ -174,12 +178,25 @@ export function parseSkin(text: string, catalog: Catalog): Skin {
 // A name the catalog already has stays the catalog's, unless the site's part
 // is its own drawing of it.
 export function withOwn(catalog: Catalog, own: Record<string, Part>): Catalog {
-  const added = Object.entries(own).filter(([name, p]) => !Object.hasOwn(catalog.parts, name) || p.changed);
-  if (added.length === 0) return catalog;
-  const kept = added.filter(([, p]) => p.origin === "site").sort(([a], [b]) => a.localeCompare(b));
+  const added = Object.entries(own).filter(([name, p]) => p.variant === undefined && !Object.hasOwn(catalog.parts, name));
+  // A draft's variant is drawn only on its line, and Jev never hears of it.
+  const variants = Object.entries(own).filter(([, p]) => p.variant !== undefined && p.origin === "site").sort(([a], [b]) => a.localeCompare(b));
+  if (added.length === 0 && variants.length === 0) return catalog;
+  const parts = { ...catalog.parts, ...Object.fromEntries(added) };
+  for (const [name, p] of variants) {
+    const of = p.variant!;
+    if (!Object.hasOwn(parts, of)) continue;
+    const was = parts[of]!.settings[VARIANT];
+    const values: Record<string, string> = was?.type === "choice" ? { ...was.values } : { [PLAIN]: `the ${of} as it is, with no variant` };
+    const v = name.slice(of.length + 2);
+    values[v] = p.description;
+    const def = p.everywhere ? v : was?.type === "choice" ? was.default : PLAIN;
+    parts[of] = { ...parts[of]!, settings: { ...parts[of]!.settings, [VARIANT]: { type: "choice", default: def, values } } };
+  }
+  const kept = [...added, ...variants].filter(([, p]) => p.origin === "site").sort(([a], [b]) => a.localeCompare(b));
   return {
     ...catalog,
-    parts: { ...catalog.parts, ...Object.fromEntries(added) },
+    parts,
     ...(kept.length ? { own: fingerprint(JSON.stringify(kept)) } : {}),
   };
 }
@@ -213,8 +230,9 @@ export function parseOwnPart(text: string, catalog: Catalog): { name: string; pa
   if (part.place !== "writing") throw new CatalogError(`${name}: a part of your own goes in the writing, for now`);
   for (const k of Object.keys(part.settings)) {
     if (Object.hasOwn(catalog.look, k)) throw new CatalogError(`${name}.settings.${k}: every part already has it, from look`);
+    if (k === VARIANT) throw new CatalogError(`${name}.settings.${k}: Rubric's own, for the part's variants`);
   }
-  return { name, part };
+  return { name, part: root.everywhere === true ? { ...part, everywhere: true } : part };
 }
 
 // A short, stable fingerprint of some text (FNV-1a).

@@ -1,6 +1,6 @@
-# Live test: around a draft, and changing a catalog part
+# Live test: variants
 
-Only the rows not yet run. The rest of this test ran on 2026-11-13 and is in [TESTING-jev-and-drafts.md](TESTING-jev-and-drafts.md); earlier tables are in [TESTING-fast-drafts.md](TESTING-fast-drafts.md), the step-by-step walk through drafting in [TESTING-new-parts.md](TESTING-new-parts.md), and the whole product's run in [TESTING-full.md](TESTING-full.md).
+A change to a part is now a variant beside it, not a replacement of it. Branch `variants`. Earlier tables are in [TESTING-jev-and-drafts.md](TESTING-jev-and-drafts.md) (Jev's picks, drafts by both tools, around a draft), [TESTING-fast-drafts.md](TESTING-fast-drafts.md), [TESTING-new-parts.md](TESTING-new-parts.md) and [TESTING-full.md](TESTING-full.md).
 
 Write what you find in **Notes** at the bottom, by test number.
 
@@ -8,39 +8,34 @@ Last updated: 2026-11-14.
 
 ## Set up
 
-1. Quit every Neovim, stop `bun run play`, start it again from the repo root. Keep its terminal in view: it prints each call to Jev.
-2. Open http://localhost:1415/posts/walk/ and `nvim testing/pages/posts/walk.md`.
+1. Quit every Neovim, stop `bun run play`, start it again from the repo root on branch `variants`.
+2. Open http://localhost:1415/posts/walk/ and `nvim testing/pages/posts/walk.md`. It has two `::: quote` blocks, one `size=large`.
 
-`<M-l>` is the accept key: once to ask at once, again to accept. D18 and section E make paid drafts with whichever drafter is set.
+`<M-l>` opens a part's menu in **normal mode** only (Esc first); in insert mode it accepts the ghost text. E2, E9, E10, E11, E12 and E15 make paid drafts with whichever drafter is set; ask Claude before running them if unsure.
 
-## D. Around a draft
+## E. Variants
 
-D16 and D17 use the recipe card and carousel already kept in `testing/parts/`; D18 uses the kept stamps.
-
-| # | Do this | Expect |
-|---|---|---|
-| D15 | `::: steps` on a new line, `:::` under it; cursor on the `::: steps` line, then on the empty line inside | The starter shows dimmed on the opening line only; inside the block, where you type, it is gone. `<M-l>` inside still fills it in. |
-| D16 | A kept part that splits by `###` (the recipe card), placed inside a slide of the kept carousel or a step of `::: steps` | The inner part draws whole inside its slide or step; its own `###` headings don't become slides or steps. |
-| D17 | Two recipe cards placed straight in the kept carousel, or two parts straight in `::: steps`, with no `###` around them | Each part is a slide or step of its own. `steps` draws no empty heading; the kept carousel was drafted before this and draws an empty one per slide until it is rerolled. A `::: fold` holding a part straight in it stays one closed section. |
-| D18 | `::: new: a row of postage stamps with perforated edges, each holding a word`, **Draft**, then `<M-l>`, **Cancel** | The line is your words again, with no ghost text and nothing drawn: the page shows the words as text. Change a word: the kept part is offered again. `::: new:` with the same words still offers the cancelled takes back. |
-
-## E. Changing a catalog part for the site
-
-Use the two `::: quote` blocks on the walk page, one `size=large`. Set up as on 2026-11-13: `<M-l>` on a quote line with writing in it, **Change…**, `a torn paper edge`, Enter, and wait for the take (paid).
+`<name>` is the name the drafter gives the variant, such as `torn-edge`.
 
 | # | Do this | Expect |
 |---|---|---|
-| E3 | On the `::: quote` line, add ` : larger, and centered`, pause (not `map`: it can't be changed, E10) | Ghost text with settings from Jev, as before. `<M-l>`, **Change…**: the words are filled in. Enter starts the change and the words leave the line. |
-| E4 | On a ready take: `<M-l>`, **Keep this take** | Kept at once, with no "This site / Every theme" question. `testing/parts/quote/` has three files. Every page's quotes draw it. `git status catalogs/` shows nothing changed. |
-| E5 | Cursor on the kept part's line; then `<M-l>` | A hint at the line's end: "reroll quote, or back to the catalog's". The menu: **Reroll…**, **Back to the catalog's quote**, and no "Add to every theme". |
-| E6 | `::: quote size=large` and `align=center` after keeping | Both settings still work: a change can add settings, never drop one. |
-| E7 | **Reroll…**, **Make changes…**, Notes `drop the size setting`, **Reroll** | The take keeps `size`: the checks send back a take that drops it. If the draft fails instead, its message names `size`. |
-| E8 | **Back to the catalog's quote** | `parts/quote/` moves to `.rubric/logs/removed/`; the quotes draw as the catalog's again. |
-| E9 | In `rubric.md`, `::: theme blowfish`; change `callout` on a page and keep it | The page draws the site's callout, not Blowfish's own. Set the theme back after. |
-| E10 | `<M-l>` on a `::: tabs`, `::: map` or `::: video` line with writing in it | No menu: a part with a script, or one whose drawing fetches from another site, can't be changed. |
-| E11 | In `blowfish`, **Change…** on a `callout`, then `<M-p>` to take 1 | Take 1 is Blowfish's callout as it was on screen, not Paper's. |
-| E12 | On a `::: quote` line, add ` : with a torn paper edge`, pause | Ghost text `⇒ change quote`: no setting matches. `<M-l>` leaves the line and opens the quote's menu; **Change…** has the words filled in. Nothing is drafted until then. |
-| E13 | The same on a `::: map` line: ` : with a torn paper edge`, pause | Ghost text `⇒ nothing map can set`. `<M-l>` leaves the line as it was. |
+| E1 | Normal mode, `<M-l>` on the `::: quote size=large` line | A menu with **Change…**, and no Reroll, Keep or Remove. |
+| E2 | **Change…**, `a torn paper edge`, Enter | The line reads `::: quote size=large : a torn paper edge` while it drafts, with no ghost text. Ready in about 20 s: only this quote draws the take; the other quote stays as it was. `<M-p>` shows the quote as it was; `<M-n>` goes back. |
+| E3 | `<M-l>`, **Keep this take** | The line becomes `::: quote size=large variant=<name>`. `testing/parts/quote--<name>/` has three files. The other quote is unchanged. `git status catalogs/` shows nothing changed. |
+| E4 | On the other quote's line, add ` : with a torn paper edge`, pause | Ghost text `⇒ variant=<name>`, Jev reading the variant's description. If it says `⇒ change quote` instead, note the words and the variant's description from its part.yaml. |
+| E5 | `::: a quote with a torn paper edge` on a new line, pause | Note whether the ghost text is `quote variant=<name>`. |
+| E6 | Cursor on the variant's line in normal mode; then `<M-l>` | A hint at the line's end: "reroll or change <name>, or back to quote". The menu: **Reroll…**, **Change…**, **Every quote as <name>**, **Back to the catalog's quote**, **Remove quote--<name> from this site…**. |
+| E7 | **Every quote as <name>**; then look at another page with a quote; then the menu again, **Every quote plain** | Every `::: quote` with no `variant=`, on every page, draws the variant; then the catalog's again. |
+| E8 | **Back to the catalog's quote** | `variant=<name>` leaves the line and the quote draws as the catalog's. `testing/parts/quote--<name>/` is still there. Put `variant=<name>` back. |
+| E9 | **Reroll…**, **Make changes…**, Notes `darker`, **Reroll** | A take that keeps the name: every line with `variant=<name>` draws it. **Keep this take** writes it over `parts/quote--<name>/`; the line stays. |
+| E10 | **Reroll…**, **Make changes…**, Notes `drop the size setting`, **Reroll** | The take keeps `size`: the checks send back a take that drops it. If the draft fails instead, its message names `size`. |
+| E11 | On the variant's line, **Change…**, `with ivy growing over it`, Enter, then keep | A second variant, `quote--<other>`, drawn from the first: take 1 is the first variant. Both are offered by Jev from their words (E4). |
+| E12 | `<M-l>` on a kept part's line, such as `::: stamps` | **Reroll…** and **Change…**. **Change…** `in gold` makes `stamps--<name>`; **Reroll…** still redrafts `stamps` itself. |
+| E13 | On a new `::: quote : with a gold border` line, `<M-l>` on the `⇒ change quote` ghost text, **Change…** (filled in), Enter; then `<M-l>`, **Back to the catalog's quote** | The line goes back to `::: quote`; nothing new in `testing/parts/`. |
+| E14 | **Remove quote--<name> from this site…** on a variant's line | Its files move to `.rubric/logs/removed/`; lines that still ask for it get a note, and the quote draws as text until they change. |
+| E15 | In `rubric.md`, `::: theme blowfish`; on a `::: callout` with writing, **Change…** `with a torn edge` | Take 1 (`<M-p>`) is Blowfish's callout. Kept: the variant draws in Blowfish, and every other callout stays Blowfish's. Set the theme back after. |
+| E16 | `<M-l>` on a `::: tabs`, `::: map` or `::: video` line with writing in it | No menu: a part with a script, or one whose drawing fetches from another site, can't have variants. |
+| E17 | On a `::: map` line, add ` : with a torn paper edge`, pause | Ghost text `⇒ nothing map can set`. `<M-l>` leaves the line as it was. |
 
 ## Notes
 

@@ -228,12 +228,15 @@ export function serve(opts: { stub: boolean; drafter?: Drafter; mode?: Mode }): 
 
   // A `::: new:` line, or a line of the site's own part: what its drafts
   // are, and what the writer chose to do with them. Keep, cancel and use
-  // answer a `new:` line with the line to put in its place.
+  // answer a `new:` line with the line to put in its place; keep and cancel
+  // a new variant's line, and plain, the line too. `variant` on build starts
+  // a new variant of the line's part; `on` says whether everywhere turns its
+  // variant on for every line of the part or off.
   // `drafter` drafts this one alone, in place of the writer's default; it is
   // checked before anything starts.
   type DraftParams = {
-    uri: string; line: number; action?: "build" | "reroll" | "keep" | "cancel" | "stop" | "use" | "take" | "restore" | "remove";
-    change?: string; global?: boolean; step?: number; to?: number; part?: string; drafter?: { harness: HarnessName; model?: string | null; effort?: string | null };
+    uri: string; line: number; action?: "build" | "reroll" | "keep" | "cancel" | "stop" | "use" | "take" | "restore" | "remove" | "plain" | "everywhere";
+    change?: string; global?: boolean; variant?: boolean; on?: boolean; step?: number; to?: number; part?: string; drafter?: { harness: HarnessName; model?: string | null; effort?: string | null };
   };
   connection.onRequest("rubric/draft", async (params: DraftParams): Promise<object | null> => {
     const f = file(params.uri);
@@ -248,7 +251,7 @@ export function serve(opts: { stub: boolean; drafter?: Drafter; mode?: Mode }): 
     }
     const who = use ? { drafter: use } : {};
     switch (params.action) {
-      case "build": return (await workspace.build(f, params.line, who)) ?? null;
+      case "build": return (await workspace.build(f, params.line, { ...who, ...(params.variant === true ? { variant: true } : {}) })) ?? null;
       case "reroll": return (await workspace.build(f, params.line, { change: params.change ?? "", ...who })) ?? null;
       case "keep": return workspace.keep(f, params.line, params.global === true);
       case "cancel": return workspace.cancel(f, params.line);
@@ -257,6 +260,8 @@ export function serve(opts: { stub: boolean; drafter?: Drafter; mode?: Mode }): 
       case "restore": return (await workspace.restore(f, params.line)) ?? null;
       case "use": return typeof params.part === "string" ? workspace.use(f, params.line, params.part) : { error: "no part named" };
       case "remove": return workspace.remove(f, params.line);
+      case "plain": return workspace.plain(f, params.line);
+      case "everywhere": return workspace.everywhere(f, params.line, params.on !== false);
       default: return (await workspace.look(f, params.line)) ?? null;
     }
   });

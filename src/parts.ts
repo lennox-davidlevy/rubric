@@ -15,8 +15,8 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { copyFile, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
-import { parse, stringify } from "yaml";
-import { CatalogError, missingSettings, parseCatalog, parseOwnPart, writeWhole, type Catalog, type Part } from "./core/index.ts";
+import { parse, parseDocument, stringify } from "yaml";
+import { CatalogError, missingSettings, parseCatalog, parseOwnPart, PLAIN, splitVariant, writeWhole, type Catalog, type Part } from "./core/index.ts";
 
 export type DraftStatus = "drafting" | "ready" | "failed";
 
@@ -38,6 +38,9 @@ export interface DraftState {
   // Another take of the site's own part of this name, which keeps the name;
   // `words` is then the part's description.
   of?: string;
+  // A new variant of the part of this name (core/variant.ts); `words` is
+  // then the change, which stays on the line after its ":" while it drafts.
+  variant?: string;
   // The site's part as it was kept, the first take of it: keeping it
   // changes nothing.
   original?: true;
@@ -67,12 +70,16 @@ export interface DraftState {
 
 // What a draft is for, which its takes share: a `new:` line's words, or the
 // site's own part it redrafts. Words never start with a NUL.
-export function draftKey(d: Pick<DraftState, "words" | "of">): string {
-  return d.of !== undefined ? ownKey(d.of) : d.words;
+export function draftKey(d: Pick<DraftState, "words" | "of" | "variant">): string {
+  return d.variant !== undefined ? variantKey(d.variant, d.words) : d.of !== undefined ? ownKey(d.of) : d.words;
 }
 
 export function ownKey(name: string): string {
   return `\0${name}`;
+}
+
+export function variantKey(of: string, words: string): string {
+  return `\0${of}\0${words}`;
 }
 
 // The takes for a line, oldest first: every finished draft for it, which the
@@ -128,11 +135,11 @@ export function changeable(shared: Catalog, name: string, themeDir?: string): bo
 }
 
 // The site's parts and its finished drafts, checked against the catalog. One
-// that does not parse is left out and said why. A site's part with a name
-// from `shared`, the catalog as catalog.yaml has it, is the site's own
-// drawing of that part, and takes its place while it has every setting the
-// catalog's has; one that has fallen behind is left out, and the catalog's
-// is drawn.
+// that does not parse is left out and said why. A site's part named
+// `<part>--<name>` is a variant of that part (core/variant.ts), which must
+// take every setting the part does; it is never the catalog's own name.
+// `shared` is the catalog as catalog.yaml has it; `themeDir`, when given, is
+// where its drawings are read from.
 export function readOwn(root: string, catalog: Catalog, shared: Catalog = catalog, themeDir?: string): { own: Record<string, Own>; problems: string[] } {
   const own: Record<string, Own> = {};
   const problems: string[] = [];
@@ -141,12 +148,18 @@ export function readOwn(root: string, catalog: Catalog, shared: Catalog = catalo
     if (!existsSync(file)) return;
     try {
       const { name, part } = parseOwnPart(readFileSync(file, "utf8"), catalog);
-      if (Object.hasOwn(own, name)) throw new CatalogError(`${name} is already a part`);
-      if (Object.hasOwn(catalog.parts, name)) {
-        if (origin !== "site" || !changeable(shared, name, themeDir)) throw new CatalogError(`${name} is already a part`);
-        const behind = missingSettings(shared.parts[name]!, part);
-        if (behind.length) throw new CatalogError(`the catalog's ${name} has ${behind.join(", ")}, which this copy lacks, so the catalog's is drawn`);
-        own[name] = { part: { ...part, origin, changed: true }, dir };
+      if (Object.hasOwn(own, name) || Object.hasOwn(catalog.parts, name)) throw new CatalogError(`${name} is already a part`);
+      const v = splitVariant(name);
+      if (v) {
+        // Held to catalog.yaml's settings, not a skin's additions: a variant
+        // is the site's, whatever the theme.
+        const base = Object.hasOwn(catalog.parts, v.of) && changeable(shared, v.of, themeDir) ? shared.parts[v.of]
+          : own[v.of]?.part.origin === "site" && own[v.of]!.part.variant === undefined ? own[v.of]!.part : undefined;
+        if (!base) throw new CatalogError(`${v.of} is not a part that can have variants`);
+        if (v.name === PLAIN) throw new CatalogError(`${PLAIN} is ${v.of} with no variant`);
+        const behind = missingSettings(base, part);
+        if (behind.length) throw new CatalogError(`${v.of} has ${behind.join(", ")}, which this variant lacks, so lines asking for it show as text`);
+        own[name] = { part: { ...part, origin, variant: v.of }, dir };
         return;
       }
       own[name] = { part: { ...part, origin }, dir };
@@ -154,16 +167,19 @@ export function readOwn(root: string, catalog: Catalog, shared: Catalog = catalo
       problems.push(`${relative(root, file)}: ${(err as Error).message}`);
     }
   };
+  // In order, so a part comes before its variants.
   for (const name of folders(join(root, "parts"))) add(join(root, "parts", name), "site");
   // Only the take on screen for each line: takes of the same words may share
-  // a name. Another take of a site's part, or of a catalog part the site is
-  // changing, is drawn in its place.
+  // a name. Another take of a site's part is drawn in its place; a new
+  // variant's, only on its line; a line's part as it was, as itself.
   const drafts = readDrafts(root);
   for (const key of new Set(drafts.map(draftKey))) {
     const shown = shownTake(drafts, key);
     if (!shown) continue;
-    if (shown.of !== undefined) {
-      if (shown.name !== shown.of || !(Object.hasOwn(own, shown.of) || changeable(shared, shown.of, themeDir))) continue;
+    if (shown.variant !== undefined) {
+      if (!shown.original) add(join(root, DRAFTS, shown.id), "draft");
+    } else if (shown.of !== undefined) {
+      if (shown.name !== shown.of || !Object.hasOwn(own, shown.of)) continue;
       const kept = own[shown.of];
       delete own[shown.of];
       add(join(root, DRAFTS, shown.id), "site");
@@ -250,15 +266,29 @@ export async function keepLocal(root: string, dir: string, name: string): Promis
 }
 
 // Another take of the site's part `name` replaces its files in parts/<name>/.
-// `fresh` is for a catalog part the site had no drawing of: its folder is made.
-export async function keepTake(root: string, dir: string, name: string, fresh = false): Promise<void> {
+export async function keepTake(root: string, dir: string, name: string): Promise<void> {
   const target = join(root, "parts", name);
-  if (fresh && !existsSync(target)) return keepLocal(root, dir, name);
   if (!existsSync(target)) throw new Error(`parts/${name} is not there any more`);
   const tmp = join(root, ".rubric/tmp");
   for (const f of PART_FILES) {
     if (existsSync(join(dir, f))) await writeWhole(join(target, f), await readFile(join(dir, f), "utf8"), tmp);
     else await rm(join(target, f), { force: true });
+  }
+}
+
+// Makes the variant `name` of the part `of` the one drawn for every line of
+// it that sets none, or, with no name, none of them: `everywhere: true` in
+// its part.yaml, and in no other variant's of the part.
+export async function setEverywhere(root: string, of: string, name?: string): Promise<void> {
+  const tmp = join(root, ".rubric/tmp");
+  for (const folder of variantsOf(root, of)) {
+    const file = join(root, "parts", folder, "part.yaml");
+    const doc = parseDocument(await readFile(file, "utf8"));
+    const on = folder === name;
+    if (on === (doc.get("everywhere") === true)) continue;
+    if (on) doc.set("everywhere", true);
+    else doc.delete("everywhere");
+    await writeWhole(file, doc.toString(), tmp);
   }
 }
 
@@ -281,6 +311,11 @@ export function catalogFiles(themeDir: string, name: string, skin?: string): { y
 // Where a site's part goes when the writer removes it, or puts it in the
 // catalog: kept in the record, never deleted outright.
 export const REMOVED = ".rubric/logs/removed";
+
+// The site's variants of the part `of`, by their folders' names.
+export function variantsOf(root: string, of: string): string[] {
+  return folders(join(root, "parts")).filter((f) => splitVariant(f)?.of === of);
+}
 
 export async function putAway(root: string, name: string): Promise<string> {
   const to = join(root, REMOVED, `${name}-${new Date().toISOString().replace(/[:.]/g, "-")}`);

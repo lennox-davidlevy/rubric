@@ -106,12 +106,13 @@ function M.hint(bufnr)
   end
   local row = vim.api.nvim_win_get_cursor(0)[1] - 1
   local o = M.own_at(bufnr, row)
-  -- A catalog part the site has not changed: the key changes it, which is
-  -- not worth a word on every line that places one.
+  -- A catalog part: the key changes it into a variant, which is not worth
+  -- a word on every line that places one.
   if o and not o.takes and not o.catalog then
-    local hint = o.changed and ("  %s reroll %s, or back to the catalog's") or ("  %s reroll, keep or remove %s")
+    local hint = o.variant and ("  %s reroll or change %s, or back to %s"):format(accept_key, o.variant, o.part)
+      or ("  %s reroll, change or remove %s"):format(accept_key, o.part)
     pcall(vim.api.nvim_buf_set_extmark, bufnr, own_ns, row, 0, {
-      virt_text = { { hint:format(accept_key, o.part), "RubricStarterHint" } },
+      virt_text = { { hint, "RubricStarterHint" } },
       virt_text_pos = "eol",
     })
   end

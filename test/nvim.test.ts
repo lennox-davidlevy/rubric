@@ -798,22 +798,30 @@ test.skipIf(!nvim)("Neovim: words nothing fits become a new part, drafted, then 
     expect(Number(expr("RubricTest.menus"))).toBe(menusBefore);
     expect(expr("RubricTest.line(10)")).toBe("::: callout");
 
-    // A catalog part's line: Change… asks what to change and drafts a take
-    // of it for this site, under its name; Keep keeps it for this site
-    // without asking where; going back to the catalog's takes it away.
+    // A catalog part's line: Change… asks what to change and drafts a new
+    // variant for those words, which stay after the line's ":" meanwhile;
+    // Keep makes the line ask for it; going back to the catalog's drops it
+    // from the line, and the variant stays for other lines.
     expr("RubricTest.answer('change', 'a torn edge')");
     keys(":call cursor(10, 1)<CR><M-l>");
     expect(await until(() => note(10) === "draft-ready")).toBe(true);
-    expect(expr("RubricTest.line(10)")).toBe("::: callout");
+    expect(expr("RubricTest.line(10)")).toBe("::: callout : a torn edge");
     expr("RubricTest.answer('keep')");
     keys(":call cursor(10, 1)<CR><M-l>");
-    expect(await until(() => existsSync(join(site, "parts/callout/part.html")))).toBe(true);
-    expect(readFileSync(join(site, "parts/callout/part.html"), "utf8")).toContain("a torn edge");
+    expect(await until(() => expr("RubricTest.line(10)") === "::: callout variant=torn-edge")).toBe(true);
+    expect(readFileSync(join(site, "parts/callout--torn-edge/part.html"), "utf8")).toContain("a torn edge");
     expect(await until(() => note(10) === "")).toBe(true);
-    expr("RubricTest.answer('remove')");
+    expr("RubricTest.answer('plain')");
     keys(":call cursor(10, 1)<CR><M-l>");
-    expect(await until(() => !existsSync(join(site, "parts/callout")))).toBe(true);
-    expect(expr("RubricTest.line(10)")).toBe("::: callout");
+    expect(await until(() => expr("RubricTest.line(10)") === "::: callout")).toBe(true);
+    expect(existsSync(join(site, "parts/callout--torn-edge"))).toBe(true);
+    // Removing it, from a line that asks for it.
+    keys(":call setline(10, '::: callout variant=torn-edge')<CR>");
+    expect(await until(() => expr("(require('rubric.starters').own_at(vim.api.nvim_get_current_buf(), 9) or {}).variant or ''") === "torn-edge")).toBe(true);
+    expr("RubricTest.answer('remove', true)");
+    keys(":call cursor(10, 1)<CR><M-l>");
+    expect(await until(() => !existsSync(join(site, "parts/callout--torn-edge")))).toBe(true);
+    keys(":call setline(10, '::: callout')<CR>");
     // Words after ":" that set nothing it has: the ghost offers a change, and
     // accepting it opens the part's menu and leaves the line as it was.
     const menusThen = Number(expr("RubricTest.menus"));

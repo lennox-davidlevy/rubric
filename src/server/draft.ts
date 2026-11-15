@@ -11,8 +11,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parse } from "yaml";
-import { missingSettings, NAME, parseOwnPart, writeWhole, type Part } from "../core/index.ts";
-import { catalogFiles, draftKey, drawingProblems, DRAFTS, hugoFiles, readDrafts, type DraftState } from "../parts.ts";
+import { missingSettings, NAME, parseOwnPart, PLAIN, splitVariant, writeWhole, type Part } from "../core/index.ts";
+import { catalogFiles, draftKey, drawingProblems, DRAFTS, hugoFiles, readDrafts, variantKey, type DraftState } from "../parts.ts";
 import type { Site } from "../site.ts";
 import { lint } from "../theme.ts";
 import { FILE_LINE, type Drafter, type Mode, type RunStats, type Session } from "./harness.ts";
@@ -95,10 +95,14 @@ export interface DraftRequest {
   inside: string;
   // Reroll: what to change about the last draft, and where it is. With no
   // change, a different take.
-  previous?: { dir: string; change: string };
+  // `original` when it is the part as the line draws it now, not a take.
+  previous?: { dir: string; change: string; original?: boolean };
   // Another take of the site's own part of this name, which keeps it; the
   // words are its description, and `previous` the take it starts from.
   of?: string;
+  // A new variant of the part of this name; the words are the change, and
+  // `previous` the drawing it starts from.
+  variant?: string;
   // The drafter for this draft alone, in place of the writer's default.
   use?: Drafter;
   // The take it starts from's conversation, to go on with.
@@ -167,14 +171,16 @@ export function brief(site: Site, req: DraftRequest, mode: Mode = "tools"): stri
 
   // Names a new part can't have, as the checks hold it to: the catalog's
   // parts and the site's, and other lines' drafts.
+  const key = req.variant !== undefined ? variantKey(req.variant, req.words) : req.words;
   const taken = [...new Set([
     ...Object.entries(catalog.parts).filter(([, p]) => p.origin !== "draft").map(([n]) => n),
-    ...readDrafts(site.root).filter((d) => d.status === "ready" && d.name !== undefined && draftKey(d) !== req.words).map((d) => d.name!),
+    ...Object.entries(site.own).filter(([, p]) => p.part.origin === "site").map(([n]) => n),
+    ...readDrafts(site.root).filter((d) => d.status === "ready" && d.name !== undefined && draftKey(d) !== key).map((d) => d.name!),
   ])];
-  // A catalog part the site is changing, rather than a part of its own.
-  const shared = req.of !== undefined && Object.hasOwn(site.shared.parts, req.of);
-  const asked = shared
-    ? `The writer wants this site's own version of the catalog's part **${req.of}**, which every page with it on this site will draw. What it is:`
+  const variant = req.variant;
+  const base = variant !== undefined && Object.hasOwn(catalog.parts, variant) ? catalog.parts[variant]! : undefined;
+  const asked = variant !== undefined
+    ? `The writer wants a variant of the part **${variant}** (${base?.description ?? "a part of the site"}): a drawing of its own, drawn only on the lines that ask for it, beside the part as it is. The change they asked for:`
     : req.of
       ? `The writer has a part of their own, **${req.of}**, and wants another take of it. What it is:`
       : "The writer asked for a part the catalog does not have:";
@@ -186,7 +192,9 @@ export function brief(site: Site, req: DraftRequest, mode: Mode = "tools"): stri
     const text = readText(join(prev.dir, f));
     return text === undefined ? "" : `${f}:\n${fence(f.split(".")[1]!, text.trim())}`;
   }).filter(Boolean).join("\n") : "";
-  const again = prev
+  const again = prev?.original && variant !== undefined
+    ? `## The part as it is\n\n${fast ? "Its files are below. Make the change" : "Its files are already in this folder, as they are below. Make the change with edits to them"}, and leave everything the change doesn't need as it is.\n\n${previousFiles}\n`
+    : prev
     ? `## This is another take\n\n${prev.change
       ? `The writer looked at the last take and asked for this change: "${prev.change}". ${fast ? "Its files are below. Make the change" : "Its files are already in this folder, as they are below. Make the change with edits to them"}, and leave everything the change doesn't need as it is.`
       : `The writer looked at the last take and wants a different one: another way to draw the same thing. ${fast ? "Its files are below; write your own take in place of them." : "Its files are in this folder, as they are below; write your own take over them."}`}\n\n${previousFiles}\n`
@@ -195,8 +203,10 @@ export function brief(site: Site, req: DraftRequest, mode: Mode = "tools"): stri
   // before the draft started, so a draft is never asked whether the catalog
   // has the part, and nothing but the writer stops one.
   const catalogSection = prev ? "" : "## The catalog's parts\n\nThe writer asked for a new part, so draft one. These are the parts the catalog has; make it plainly different from them:";
-  const naming = req.of
-    ? `\`name\`: \`${req.of}\`, as it is now. Pages already use it by that name. Keep every setting and every value it has, since lines already set them; add one if the change needs it.${shared ? " Keep the description unless the change makes it untrue." : ""}`
+  const naming = variant !== undefined
+    ? `\`name\`: \`${variant}--\` and a word or two for what is new (\`${variant}--torn-edge\`), lowercase letters, digits and hyphens; not \`${variant}--${PLAIN}\`${taken.some((n) => n.startsWith(`${variant}--`)) ? `, and none of these, which are taken: ${taken.filter((n) => n.startsWith(`${variant}--`)).join(", ")}` : ""}. A line places it as \`::: ${variant} variant=torn-edge\`. Keep every setting and every value the part has, since lines already set them; add one if the change needs it. No setting named \`variant\`.`
+    : req.of
+    ? `\`name\`: \`${req.of}\`, as it is now. Pages already use it by that name. Keep every setting and every value it has, since lines already set them; add one if the change needs it.`
     : prev
       ? "`name`: as it is, unless the change asks for another; lowercase letters, digits and hyphens, and not a name the catalog has."
       // A fast draft isn't shown the catalog's parts, only what they are called.
@@ -205,7 +215,9 @@ export function brief(site: Site, req: DraftRequest, mode: Mode = "tools"): stri
 ${req.inside.trim() ? `\nWhat they have already written inside its block, which the part should draw well:\n\n${fence("markdown", req.inside.trim())}\n` : ""}`;
   const files = `1. **part.yaml**: \`name:\` and the part's entry${prev ? "" : ", as in the examples below"}.
    - ${naming}
-   - \`description\`: one plain sentence saying what the part is, in words a writer would use. A small model reads it to decide when to pick this part, so say what it is and nothing a writer would not say.
+   - ${variant !== undefined
+    ? "`description`: what this variant is, in a few words a writer would use for it (`with a torn paper edge`). A small model reads it to decide when a line asks for this variant."
+    : "`description`: one plain sentence saying what the part is, in words a writer would use. A small model reads it to decide when to pick this part, so say what it is and nothing a writer would not say."}
    - \`children: true\` if the block holds Markdown the part draws (most do). \`empty: true\` instead for a part that takes nothing inside.
    - \`settings\`: for a real variation the writer might ask for. When the words name a quantity, a speed, a direction, a size or a style ("a ring of moons", "a slow scroll"), offer it as a setting (\`count\`, \`pace\`); one or two, not more. Each \`choice\` has a \`default\` and at least two \`values\`, each a few words saying what it does. Value and setting names are lowercase with hyphens. None named ${Object.keys(catalog.look).join(", ")}: every part already has those.
    - \`body\`: a short starter written into an empty block, so the writer sees what the part expects. It has exactly the structure the drawing reads: if part.html draws each \`###\` as a step, the starter has the \`###\`s. It never commits to content (\`### When: What happened\`, not \`### 2024\`).
@@ -294,7 +306,7 @@ Reply with one sentence: what you made, or what you changed. Nothing else; the f
 // Checks a draft: its entry, its CSS against the slots, and that Hugo draws
 // it in the site's theme with each value of each setting. Returns the part's
 // name, or what is wrong.
-export async function checkDraft(site: Site, dir: string, words?: string, of?: string): Promise<{ name?: string; problems: string[] }> {
+export async function checkDraft(site: Site, dir: string, words?: string, of?: string, variant?: string): Promise<{ name?: string; problems: string[] }> {
   const problems: string[] = [];
   const text = await readFile(join(dir, "part.yaml"), "utf8").catch(() => undefined);
   if (text === undefined) return { problems: ["there is no part.yaml"] };
@@ -306,7 +318,17 @@ export async function checkDraft(site: Site, dir: string, words?: string, of?: s
   } catch (err) {
     return { problems: [`part.yaml: ${(err as Error).message}`] };
   }
-  if (of !== undefined) {
+  if (variant !== undefined) {
+    // A new variant: named for its part, and taking every setting it does.
+    const v = splitVariant(name);
+    const others = readDrafts(site.root).some((d) => d.name === name && d.status === "ready" && words !== undefined && draftKey(d) !== variantKey(variant, words));
+    if (v?.of !== variant) problems.push(`part.yaml: the name must be ${variant}-- and a word or two for the variant, such as ${variant}--torn-edge`);
+    else if (v.name === PLAIN) problems.push(`part.yaml: ${name} is ${variant} with no variant; choose another name`);
+    else if (site.own[name]?.part.origin === "site" || existsSync(join(site.root, "parts", name)) || others) problems.push(`part.yaml: ${name} is already a variant; choose another name`);
+    const was = keptPart(site, variant);
+    const missing = was ? missingSettings(was, parsed.part) : [];
+    if (missing.length) problems.push(`part.yaml: ${missing.join(", ")} must stay, since lines of ${variant} already use ${missing.length === 1 ? "it" : "them"}`);
+  } else if (of !== undefined) {
     // Another take of a site's part keeps its name: pages use it.
     if (name !== of) problems.push(`part.yaml: the name must stay ${of}, which pages already use`);
     // Against the part as pages use it, and the catalog's too: a site's copy
@@ -324,6 +346,7 @@ export async function checkDraft(site: Site, dir: string, words?: string, of?: s
     // though it isn't in the catalog now.
     const elsewhere = readDrafts(site.root).some((d) => d.name === name && d.status === "ready" && draftKey(d) !== words);
     if ((taken && !same) || elsewhere) problems.push(`part.yaml: ${name} is already a part; choose another name`);
+    else if (splitVariant(name)) problems.push(`part.yaml: "--" in a name is for a part's variants; choose another name`);
   }
   if (!NAME.test(name)) problems.push(`part.yaml: ${name} is not a name`);
 
@@ -455,7 +478,7 @@ export async function runDraft(site: Site, dir: string, state: DraftState, req: 
   }
 
   async function attempts(): Promise<DraftState> {
-  log(req.of ? `another take of ${req.of}${state.by ? ` with ${state.by}` : ""}` : `drafting "${req.words}"${state.by ? ` with ${state.by}` : ""}`);
+  log(req.variant !== undefined ? `a variant of ${req.variant}: "${req.words}"${state.by ? ` with ${state.by}` : ""}` : req.of ? `another take of ${req.of}${state.by ? ` with ${state.by}` : ""}` : `drafting "${req.words}"${state.by ? ` with ${state.by}` : ""}`);
   // Another take starts from the last one's files, in the folder itself,
   // so a change is a few edits rather than the whole part written again.
   const before: Record<string, string> = {};
@@ -507,7 +530,7 @@ export async function runDraft(site: Site, dir: string, state: DraftState, req: 
     }
     log("checking the draft, and building it with Hugo");
     const { name, problems } = sent
-      ? await checkDraft(site, dir, req.words, req.of)
+      ? await checkDraft(site, dir, req.words, req.of, req.variant)
       : { name: undefined, problems: ["the reply had no files in it: each file comes after a line naming it, `=== part.yaml`, `=== part.html` or `=== part.css`"] };
     measured.refused = (measured.refused ?? 0) + (problems.length > 0 ? 1 : 0);
     if (problems.length === 0) return done({ status: "ready", name: name! });
@@ -544,12 +567,12 @@ function draftWords(dir: string | undefined): string | undefined {
 }
 
 // A new draft's folder and first state.
-export async function newDraft(root: string, words: string, by?: string, of?: string): Promise<{ dir: string; state: DraftState }> {
-  const slug = (of ?? words).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32) || "part";
+export async function newDraft(root: string, words: string, by?: string, of?: string, variant?: string): Promise<{ dir: string; state: DraftState }> {
+  const slug = (of ?? (variant !== undefined ? `${variant}-${words}` : words)).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32) || "part";
   const id = `${slug}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const dir = join(root, DRAFTS, id);
   await mkdir(dir, { recursive: true });
-  const state: DraftState = { id, words, status: "drafting", started: Date.now(), ...(by ? { by } : {}), ...(of !== undefined ? { of } : {}) };
+  const state: DraftState = { id, words, status: "drafting", started: Date.now(), ...(by ? { by } : {}), ...(of !== undefined ? { of } : {}), ...(variant !== undefined ? { variant } : {}) };
   return { dir, state };
 }
 

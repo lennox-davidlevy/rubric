@@ -9,10 +9,10 @@ import { appendFile, copyFile, mkdir, readFile, readdir, rename, rm, unlink, wri
 import { join } from "node:path";
 import {
   applyRefine, atPlace, Cache, frontMatterProblem, liveContent, settingsOf, formatPlain, frame, FRAME_PAGE, framePage, parsePlain, preprocess, refineWords, scan, lines as splitLines,
-  formatThemeLine, PIECES, THEME, THRESHOLDS, writeWhole, type Piece,
+  formatThemeLine, PIECES, THEME, THRESHOLDS, writeWhole, type Piece, drawnForm, PLAIN, VARIANT, type DrawAs,
   type Catalog, type Diagnostic, type Directive, type Entry, type PageKind, type Place, type Refined, type Resolution, type Resolve, type ThemeChoice,
 } from "../core/index.ts";
-import { catalogFiles, changeable, DRAFT_INDEX, DRAFT_LOGS, draftKey, DRAFTS, keepLocal, keepTake, makeGlobal, ownKey, putAway, readDrafts, shownTake, takesFor, writeHugoTree, type DraftState } from "../parts.ts";
+import { catalogFiles, changeable, DRAFT_INDEX, DRAFT_LOGS, draftKey, DRAFTS, keepLocal, keepTake, makeGlobal, ownKey, putAway, readDrafts, setEverywhere, shownTake, takesFor, variantKey, variantsOf, writeHugoTree, type DraftState } from "../parts.ts";
 import { openSite, pageKind, pagePath, type Site } from "../site.ts";
 import { LOG, newDraft, NOT_MOUNTED, runDraft, saveState, type Harness } from "./draft.ts";
 import { brief as shortDrafter, type Drafter, type HarnessName, type Mode } from "./harness.ts";
@@ -29,7 +29,7 @@ export interface Note extends Omit<Diagnostic, "code"> {
   code: string;
   severity: Severity;
   // For the editor to draw: a `new:` line's draft, where it is.
-  data?: { status: string; name?: string; by?: string; started?: number; shown?: string; take?: number; takes?: number; earlier?: number; close?: number; of?: string };
+  data?: { status: string; name?: string; by?: string; started?: number; shown?: string; take?: number; takes?: number; earlier?: number; close?: number; of?: string; variant?: true };
 }
 
 export interface Ghost {
@@ -85,10 +85,15 @@ export interface DraftView {
   // how many other blocks on the site's pages use it.
   of?: string;
   uses?: { blocks: number; pages: number };
-  // `of` is the catalog's part, which the site has no drawing of yet
-  // (`catalog`), or the site's own drawing of it (`changed`).
+  // `of` is the catalog's part (`catalog`), which changes only into a
+  // variant; or a variant of a part: the part, the variant's own name,
+  // whether every line of the part that sets none draws it, and whether the
+  // part is the catalog's.
   catalog?: true;
-  changed?: true;
+  variant?: { of: string; name: string; everywhere?: true; catalog?: true };
+  // The takes are of a new variant of this part, for the words after the
+  // line's ":", which stay there until it is kept or the writer goes back.
+  newVariant?: string;
   // Words after ":" on that line, the change a reroll asks for, and the
   // column of the ":", where the line is cut once the reroll starts.
   change?: { words: string; colon: number };
@@ -149,7 +154,8 @@ export interface OwnLine {
   part: string;
   takes?: number;
   catalog?: true;
-  changed?: true;
+  // The variant of the part the line draws, by its own name.
+  variant?: string;
 }
 
 interface Doc {
@@ -560,6 +566,8 @@ export class Workspace {
     if (!first || refineWords(first.refine.words) === "") return [];
     const part = first.plain.part;
     const words = refineWords(first.refine.words);
+    // The words are a variant's change, being drafted.
+    if (this.#draftsFor(variantKey(part, words)).length > 0) return [];
     const key = this.#rkey(part, words);
     const same = () => {
       const c = current();
@@ -643,13 +651,13 @@ export class Workspace {
   #earlier(words: string): string[] {
     const index = this.#index();
     return [...index.entries()].filter(([id, e]) =>
-      e.of === undefined && e.words === words && e.status === "ready" && e.outcome === "cancelled" && !this.#drafts.has(id) && existsSync(join(this.site.root, DRAFT_LOGS, id, "part.yaml")),
+      e.of === undefined && e.variant === undefined && e.words === words && e.status === "ready" && e.outcome === "cancelled" && !this.#drafts.has(id) && existsSync(join(this.site.root, DRAFT_LOGS, id, "part.yaml")),
     ).map(([id]) => id);
   }
 
   // Each draft's last line in the record, read again only when it changed.
-  #indexCache: { mtime: number; entries: Map<string, { words?: string; status?: string; outcome?: string; of?: string }> } | undefined;
-  #index(): Map<string, { words?: string; status?: string; outcome?: string; of?: string }> {
+  #indexCache: { mtime: number; entries: Map<string, { words?: string; status?: string; outcome?: string; of?: string; variant?: string }> } | undefined;
+  #index(): Map<string, { words?: string; status?: string; outcome?: string; of?: string; variant?: string }> {
     const file = join(this.site.root, DRAFT_INDEX);
     let mtime: number;
     try {
@@ -658,7 +666,7 @@ export class Workspace {
       return new Map();
     }
     if (this.#indexCache?.mtime === mtime) return this.#indexCache.entries;
-    const entries = new Map<string, { words?: string; status?: string; outcome?: string; of?: string }>();
+    const entries = new Map<string, { words?: string; status?: string; outcome?: string; of?: string; variant?: string }>();
     for (const line of readFileSync(file, "utf8").split("\n")) {
       try {
         const e = JSON.parse(line) as { id?: string; words?: string; status?: string; outcome?: string; of?: string };
@@ -677,38 +685,68 @@ export class Workspace {
 
   // A line drafts are for: a `new:` line, by its words, or a line placing
   // one of the site's own parts, whose takes keep its name.
-  #draftLine(file: string, line: number): { doc: Doc; d: Directive; key: string; words: string; of?: string } | undefined {
+  #draftLine(file: string, line: number): { doc: Doc; d: Directive; key: string; words: string; of?: string; variant?: string } | undefined {
     const at = this.#newLine(file, line);
     if (at) return { ...at, key: at.d.words!, words: at.d.words! };
     const doc = this.#docs.get(file);
     const d = doc && this.#directiveAt(doc, line);
-    const of = doc && d && this.#ownPart(doc, d);
-    return of ? { doc: doc!, d: d!, key: ownKey(of), words: this.site.catalog.parts[of]!.description, of } : undefined;
+    const own = doc && d ? this.#lineDrafts(doc, d) : undefined;
+    return own ? { doc: doc!, d: d!, ...own } : undefined;
   }
 
-  // The part a line places in its plain form, if the site has its own
-  // drawing of it or can have one: the site's own parts, and the catalog's
-  // parts in the writing. By its name alone: a take on screen may lack a
-  // setting the line sets, and the line must stay the part's, to keep, cycle
-  // or go back.
+  // What the drafts on a placed line are for: a new variant of its part,
+  // while takes of one are drafting or on screen for the words after its
+  // ":"; else other takes of the part the line draws. `of` is that part.
+  #lineDrafts(doc: Doc, d: Directive): { key: string; words: string; of: string; variant?: string } | undefined {
+    const of = this.#ownPart(doc, d);
+    if (of === undefined) return undefined;
+    const words = d.refine ? refineWords(d.refine.words) : "";
+    const base = d.plain!.part;
+    if (words !== "" && this.#draftsFor(variantKey(base, words)).length > 0) return { key: variantKey(base, words), words, of, variant: base };
+    return { key: ownKey(of), words: this.site.own[of]?.part.description ?? this.site.catalog.parts[of]?.description ?? of, of };
+  }
+
+  // The part a line draws, if the site has it or can make a variant of it:
+  // the site's own parts and their variants, and the catalog's parts in the
+  // writing. By its name alone: a take on screen may lack a setting the line
+  // sets, and the line must stay the part's, to keep, cycle or go back.
   #ownPart(doc: Doc, d: Directive): string | undefined {
-    const name = d.plain?.part;
-    return doc.page !== "site" && name && (this.#isOwn(name) || changeable(this.site.shared, name, this.site.themeDir)) ? name : undefined;
+    const form = d.plain;
+    if (doc.page === "site" || !form) return undefined;
+    const name = drawnForm(form, this.site.catalog).part;
+    if (name !== form.part) return this.#isOwn(name) ? name : undefined;
+    return this.#isOwn(name) || changeable(this.site.shared, name, this.site.themeDir) ? name : undefined;
   }
 
+  // The site's own part, or a variant of a part, kept in parts/.
   #isOwn(name: string): boolean {
-    return Object.hasOwn(this.site.catalog.parts, name) && this.site.catalog.parts[name]!.origin === "site";
+    return this.site.own[name]?.part.origin === "site";
   }
 
-  // A part of the site's own, not its drawing of a catalog part: Jev knows
-  // nothing of it, so words after its ":" are a reroll's change.
+  // What the line's part is, for the menu: the catalog's, or a variant.
+  #kind(of: string): Pick<DraftView, "catalog" | "variant"> {
+    if (!this.#isOwn(of)) return { catalog: true };
+    const own = this.site.own[of]!.part;
+    if (own.variant === undefined) return {};
+    return { variant: { of: own.variant, name: of.slice(own.variant.length + 2), ...(own.everywhere ? { everywhere: true as const } : {}), ...(this.#isOwn(own.variant) ? {} : { catalog: true as const }) } };
+  }
+
+  // The line as it reads with its part's variant set to `value`, and the
+  // words after its ":" dropped unless `keepWords`.
+  #withVariant(doc: Doc, d: Directive, value: string, keepWords = false): string {
+    const text = splitLines(doc.text)[d.line] ?? "";
+    const form = d.plain!;
+    const def = this.site.catalog.parts[form.part]?.settings[VARIANT];
+    const settings = form.settings.filter((s) => s.key !== VARIANT).map((s) => ({ key: s.key, value: s.value }));
+    if (value !== (def?.type === "choice" ? def.default : PLAIN)) settings.push({ key: VARIANT, value });
+    const words = keepWords && d.refine ? ` ${text.slice(d.refine.colon)}` : "";
+    return `${opener(text)} ${formatPlain({ part: form.part, settings })}${words}`;
+  }
+
+  // A part of the site's own: Jev knows nothing of it, so words after its
+  // ":" are a reroll's change.
   #ownOnly(name: string): boolean {
-    return this.#isOwn(name) && !this.site.catalog.parts[name]!.changed;
-  }
-
-  // Whether `name` is the catalog's part, as the site draws it or not.
-  #shared(name: string): boolean {
-    return Object.hasOwn(this.site.shared.parts, name);
+    return this.#isOwn(name);
   }
 
   // How many blocks on the site's pages place `name`, besides the one at
@@ -719,7 +757,7 @@ export class Workspace {
     const files = (await readdir(this.site.pages, { recursive: true }).catch(() => [] as string[])).filter((f) => f.endsWith(".md")).map((f) => join(this.site.pages, f));
     for (const f of files) {
       const text = this.#docs.get(f)?.text ?? (await readFile(f, "utf8").catch(() => ""));
-      const n = scan(text, this.site.catalog).directives.filter((d) => d.plain?.part === name && !(f === file && d.line === line)).length;
+      const n = scan(text, this.site.catalog).directives.filter((d) => d.plain && drawnForm(d.plain, this.site.catalog).part === name && !(f === file && d.line === line)).length;
       blocks += n;
       if (n > 0) pages++;
     }
@@ -729,9 +767,11 @@ export class Workspace {
   // The site's part as it is kept, as the first of its takes, so the writer
   // can go back to it from the others; the catalog's, when the site has no
   // drawing of its own.
-  async #original(name: string, words: string): Promise<void> {
-    if (takesFor(this.#drafts.values(), ownKey(name)).length > 0) return;
-    const { dir, state } = await newDraft(this.site.root, words, undefined, name);
+  // For a new variant (`variant`, the part it is of), the first take is the
+  // line's part as drawn now, `name`, which the line then draws as itself.
+  async #original(key: string, name: string, words: string, variant?: string): Promise<void> {
+    if (takesFor(this.#drafts.values(), key).length > 0) return;
+    const { dir, state } = await newDraft(this.site.root, words, undefined, variant === undefined ? name : undefined, variant);
     if (existsSync(join(this.site.root, "parts", name))) {
       for (const f of ["part.yaml", "part.html", "part.css"]) {
         const from = join(this.site.root, "parts", name, f);
@@ -744,6 +784,11 @@ export class Workspace {
       for (const [f, text] of [["part.yaml", files.yaml], ["part.html", files.html], ["part.css", files.css]] as const) await writeFile(join(dir, f), text + "\n");
     }
     const at = state.started - 1;
+    // Which variant every line draws is the site's to say, never a take's.
+    if (variant !== undefined) {
+      const yaml = join(dir, "part.yaml");
+      await writeFile(yaml, (await readFile(yaml, "utf8")).replace(/^everywhere:.*\n?/m, ""));
+    }
     const kept: DraftState = { ...state, status: "ready", name, original: true, started: at, finished: at };
     await saveState(this.site.root)(kept);
     this.#drafts.set(kept.id, kept);
@@ -759,8 +804,8 @@ export class Workspace {
     const shown = this.#shown(key);
     return {
       words,
-      ...(at.of !== undefined ? { of: at.of } : {}),
-      ...(at.of !== undefined && this.#shared(at.of) ? (existsSync(join(this.site.root, "parts", at.of)) ? { changed: true as const } : { catalog: true as const }) : {}),
+      ...(at.of !== undefined ? { of: at.of, ...this.#kind(at.of) } : {}),
+      ...(at.variant !== undefined ? { newVariant: at.variant } : {}),
       ...(this.#drafter ? { drafter: this.#drafter().short } : {}),
       ...(at.of !== undefined && at.d.refine && refineWords(at.d.refine.words) !== "" ? { change: { words: refineWords(at.d.refine.words), colon: at.d.refine.colon } } : {}),
       // A ready line names the take on screen, which is the one Keep keeps.
@@ -796,7 +841,7 @@ export class Workspace {
       .filter(([name, p]) => p >= THRESHOLDS.near && Object.hasOwn(parts, name) && parts[name]!.origin !== "draft")
       .sort((a, b) => b[1] - a[1])
       .slice(0, THRESHOLDS.nearMost)
-      .map(([name]) => ({ name, description: parts[name]!.description, own: (parts[name]!.origin === "site" && !parts[name]!.changed) || parts[name]!.drafted === true }));
+      .map(([name]) => ({ name, description: parts[name]!.description, own: parts[name]!.origin === "site" || parts[name]!.drafted === true }));
     return [...near.filter((n) => n.own), ...near.filter((n) => !n.own)];
   }
 
@@ -825,7 +870,7 @@ export class Workspace {
       await Promise.race([this.#ask(at.doc.page, at.d.words), new Promise((r) => setTimeout(r, NEAR_WAIT_MS))]);
     }
     const view = this.draft(file, line);
-    return view?.of !== undefined && !view.catalog && !view.changed ? { ...view, uses: await this.#uses(view.of, file, line) } : view;
+    return view?.of !== undefined && !view.catalog && view.newVariant === undefined ? { ...view, uses: await this.#uses(view.of, file, line) } : view;
   }
 
   // Moves the preview to the next take (step 1) or the one before (-1),
@@ -876,10 +921,24 @@ export class Workspace {
   // change ("" for another take); the draft shown stays until the new one is
   // ready.
   // `drafter` drafts this one alone, in place of the writer's default.
-  async build(file: string, line: number, opts: { change?: string; drafter?: Drafter } = {}): Promise<DraftView | undefined> {
+  // `variant` starts a new variant of the line's part, for the words after
+  // its ":", which it starts from as its change.
+  async build(file: string, line: number, opts: { change?: string; drafter?: Drafter; variant?: boolean } = {}): Promise<DraftView | undefined> {
     const at = this.#draftLine(file, line);
     if (!at || !this.#harness) return this.draft(file, line);
-    const { words, key, of } = at;
+    let { words, key, variant } = at;
+    const { of } = at;
+    let change = opts.change;
+    if (opts.variant && variant === undefined) {
+      const asked = at.d.refine ? refineWords(at.d.refine.words) : "";
+      if (of === undefined || asked === "") return this.draft(file, line);
+      variant = at.d.plain!.part;
+      words = asked;
+      key = variantKey(variant, asked);
+      change ??= asked;
+    }
+    // A catalog part changes only into a variant of it.
+    if (variant === undefined && of !== undefined && !this.#isOwn(of)) return this.draft(file, line);
     const runKey = key;
     if (words.trim() === "") return this.draft(file, line);
     // One already starting or running: say where it is, once it has started.
@@ -904,10 +963,10 @@ export class Workspace {
     let previous: DraftState | undefined;
     try {
       // Another take of a site's part starts from the take on screen, the
-      // part as kept at first.
-      if (of !== undefined) await this.#original(of, words);
-      previous = opts.change !== undefined || of !== undefined ? this.#shown(key) : undefined;
-      made = await newDraft(this.site.root, words, this.#drafter?.(opts.drafter).full, of);
+      // part as kept at first; a new variant, from the line's part as drawn.
+      if (of !== undefined) await this.#original(key, of, words, variant);
+      previous = change !== undefined || of !== undefined ? this.#shown(key) : undefined;
+      made = await newDraft(this.site.root, words, this.#drafter?.(opts.drafter).full, variant === undefined ? of : undefined, variant);
     } catch (err) {
       this.#running.delete(runKey);
       started();
@@ -935,8 +994,8 @@ export class Workspace {
       try {
         end = await runDraft(site, dir, state, {
           words, inside,
-          ...(previous ? { previous: { dir: join(this.site.root, DRAFTS, previous.id), change: opts.change ?? "" } } : {}),
-          ...(of !== undefined ? { of } : {}),
+          ...(previous ? { previous: { dir: join(this.site.root, DRAFTS, previous.id), change: change ?? "", ...(previous.original ? { original: true } : {}) } } : {}),
+          ...(variant !== undefined ? { variant } : of !== undefined ? { of } : {}),
           ...(previous?.session ? { resume: previous.session } : {}),
           ...(opts.drafter ? { use: opts.drafter } : {}),
           mode,
@@ -974,7 +1033,8 @@ export class Workspace {
   // with `global`, the catalog's, for every theme. The line becomes the part.
   async keep(file: string, line: number, global: boolean): Promise<DraftDone> {
     const own = this.#draftLine(file, line);
-    if (own?.of !== undefined) return this.#keepOwn(own.key, own.of, global);
+    if (own?.variant !== undefined) return this.#keepVariant(file, line, global);
+    if (own?.of !== undefined) return this.#isOwn(own.of) ? this.#keepOwn(own.key, own.of, global) : { error: "there is no take to keep on this line" };
     const at = this.#newLine(file, line);
     const shown = at && this.#shown(at.d.words!);
     if (!at || !shown?.name) return { error: "there is no draft to keep on this line" };
@@ -1005,6 +1065,58 @@ export class Workspace {
     return { name, settings };
   }
 
+  // Keeps the take of a new variant on screen in parts/<part>--<name>/, and
+  // the line asks for it; the words after its ":" have done their job. The
+  // line's part as it was, on screen, is going back.
+  async #keepVariant(file: string, line: number, global: boolean): Promise<DraftDone> {
+    if (global) return { error: "a variant is this site's own" };
+    const at = this.#draftLine(file, line)!;
+    const shown = this.#shown(at.key);
+    if (!shown?.name || shown.original) return this.cancel(file, line);
+    try {
+      const everywhere = this.#everywhereOf(at.variant!);
+      await keepLocal(this.site.root, join(this.site.root, DRAFTS, shown.id), shown.name);
+      await setEverywhere(this.site.root, at.variant!, everywhere);
+    } catch (err) {
+      return { error: (err as Error).message };
+    }
+    await this.#stop(at.key, "dropped");
+    for (const d of this.#draftsFor(at.key)) await this.#forget(d.id, d.id === shown.id ? "kept as a variant" : d.original ? "kept as it was" : "another take was kept");
+    await this.#reopen();
+    const now = this.#draftLine(file, line);
+    const d = now?.d ?? at.d;
+    return { replace: this.#withVariant(now?.doc ?? at.doc, d, shown.name.slice(at.variant!.length + 2)), part: this.#kept(at.variant!) };
+  }
+
+  // The variant of `of` every line of it draws, if one is: kept as it is
+  // through a take or a new variant, whatever the take's part.yaml says.
+  #everywhereOf(of: string): string | undefined {
+    return Object.entries(this.site.own).find(([, o]) => o.part.origin === "site" && o.part.variant === of && o.part.everywhere)?.[0];
+  }
+
+  // The line's part with no variant (`plain`), keeping the words after its ":".
+  plain(file: string, line: number): DraftDone {
+    const doc = this.#docs.get(file);
+    const d = doc && this.#directiveAt(doc, line);
+    if (!doc || !d?.plain) return { error: "this line places no part" };
+    return { replace: this.#withVariant(doc, d, PLAIN, true) };
+  }
+
+  // The line's variant drawn for every line of its part that sets none, or,
+  // with `on` false, none of them.
+  async everywhere(file: string, line: number, on: boolean): Promise<DraftDone> {
+    const at = this.#draftLine(file, line);
+    const of = at?.of !== undefined && at.variant === undefined ? this.site.own[at.of]?.part.variant : undefined;
+    if (of === undefined) return { error: "this line is not a variant" };
+    try {
+      await setEverywhere(this.site.root, of, on ? at!.of : undefined);
+    } catch (err) {
+      return { error: (err as Error).message };
+    }
+    await this.#reopen();
+    return {};
+  }
+
   // Keeps the take of a site's part on screen, under the same name, so every
   // page with it changes; or, with `global`, puts it in the catalog for every
   // theme, and the site's copy goes to the record. The line stays.
@@ -1012,17 +1124,20 @@ export class Workspace {
     const shown = this.#shown(key);
     const dir = shown ? join(this.site.root, DRAFTS, shown.id) : join(this.site.root, "parts", of);
     let version: number | undefined;
-    // The site's drawing of a catalog part is for this site: the catalog
-    // already has the part.
-    const shared = this.#shared(of);
-    if (global && shared) return { error: `${of} is the catalog's already; this drawing is for this site` };
+    // A variant is this site's: the catalog has its part already.
+    if (global && this.site.own[of]?.part.variant !== undefined) return { error: "a variant is this site's own" };
     try {
       if (global) {
         version = await makeGlobal(this.site.themeDir, dir, of);
         await putAway(this.site.root, of).catch((err: Error) => {
           throw new Error(`${of} is in the catalog now, version ${version}, but parts/${of} could not be moved out of the site, so both have it; move it yourself: ${err.message}`);
         });
-      } else if (shown && !shown.original) await keepTake(this.site.root, dir, of, shared);
+      } else if (shown && !shown.original) {
+        const variant = this.site.own[of]?.part.variant;
+        const everywhere = variant !== undefined ? this.#everywhereOf(variant) : undefined;
+        await keepTake(this.site.root, dir, of);
+        if (variant !== undefined) await setEverywhere(this.site.root, variant, everywhere);
+      }
     } catch (err) {
       return { error: (err as Error).message };
     }
@@ -1039,11 +1154,13 @@ export class Workspace {
   // and say the part is unknown.
   async remove(file: string, line: number): Promise<DraftDone> {
     const at = this.#draftLine(file, line);
-    if (at?.of === undefined || (this.#shared(at.of) && !existsSync(join(this.site.root, "parts", at.of)))) return { error: "this line is not one of the site's own parts" };
+    if (at?.of === undefined || at.variant !== undefined || !this.#isOwn(at.of)) return { error: "this line is not one of the site's own parts" };
     await this.#stop(at.key, "the part was removed");
     let removed: string;
     try {
       removed = await putAway(this.site.root, at.of);
+      // Its variants go with it: they are drawings of it.
+      for (const v of variantsOf(this.site.root, at.of)) await putAway(this.site.root, v);
     } catch (err) {
       return { error: (err as Error).message };
     }
@@ -1056,6 +1173,15 @@ export class Workspace {
   // the line goes back to words.
   async cancel(file: string, line: number): Promise<DraftDone> {
     const own = this.#draftLine(file, line);
+    // A new variant: back to the line's part as it was, without the words.
+    if (own?.variant !== undefined) {
+      await this.#stop(own.key, "cancelled");
+      for (const d of this.#draftsFor(own.key)) await this.#forget(d.id, d.original ? "kept as it was" : "cancelled");
+      await this.#reopen();
+      for (const f of this.#docs.keys()) this.#drawSoon(f);
+      const text = splitLines(own.doc.text)[line] ?? "";
+      return { replace: own.d.refine ? text.slice(0, own.d.refine.colon).trimEnd() : text };
+    }
     // Another take of a site's part: back to the part as it was kept.
     if (own?.of !== undefined) {
       await this.#stop(own.key, "cancelled");
@@ -1142,7 +1268,7 @@ export class Workspace {
     }
     if (!state) return;
     const line = {
-      id, words: state.words, ...(state.of !== undefined ? { of: state.of } : {}), by: state.by, status: state.status, name: state.name, message: state.message, outcome,
+      id, words: state.words, ...(state.of !== undefined ? { of: state.of } : {}), ...(state.variant !== undefined ? { variant: state.variant } : {}), by: state.by, status: state.status, name: state.name, message: state.message, outcome,
       started: new Date(state.started).toISOString(),
       seconds: state.finished ? Math.round((state.finished - state.started) / 1000) : undefined,
       // What it took, to study the tools and the brief by.
@@ -1201,11 +1327,13 @@ export class Workspace {
       else if (latest.status === "ready") notes.push({ ...here, code: "draft-ready", severity: "information", message: `${latest.name} drafted, in the preview: the accept key keeps, rerolls or cancels${sets}${near}` });
       else notes.push({ ...here, code: "draft-failed", severity: "warning", message: `draft failed: ${latest.message ?? "no reason given"}. The accept key retries${showing}` });
     }
-    // A site's own part being redrafted: where its takes are.
+    // A site's own part being redrafted, or a new variant of a part: where
+    // its takes are.
     for (const d of scan(doc.text, this.site.catalog).directives) {
-      const of = this.#ownPart(doc, d);
-      if (of === undefined) continue;
-      const key = ownKey(of);
+      const own = this.#lineDrafts(doc, d);
+      if (own === undefined) continue;
+      const { key, variant } = own;
+      const of = variant ?? own.of;
       const newest = this.#draftsFor(key)[0];
       if (!newest) continue;
       const shown = this.#shown(key);
@@ -1213,14 +1341,15 @@ export class Workspace {
       const here = {
         line: d.line, start: 0, end: src[d.line]!.length,
         data: {
-          status: latest.status, name: of, of, ...(latest.by ? { by: latest.by } : {}), started: latest.started,
+          status: latest.status, name: variant !== undefined ? latest.name ?? of : of, of, ...(variant !== undefined ? { variant: true as const } : {}), ...(latest.by ? { by: latest.by } : {}), started: latest.started,
           ...(shown && shown !== latest ? { shown: shown.original ? "the kept one" : `take ${this.#takes(key).take}` } : {}),
           ...this.#takes(key), ...(d.close === undefined ? {} : { close: d.close }),
         },
       };
-      if (latest.status === "drafting") notes.push({ ...here, code: "drafting", severity: "information", message: `drafting a take of ${of}` });
-      else if (latest.status === "ready") notes.push({ ...here, code: "draft-ready", severity: "information", message: `${shown?.original ? `${of} as kept` : `a take of ${of}`}, in the preview: the accept key keeps, rerolls or goes back` });
-      else notes.push({ ...here, code: "draft-failed", severity: "warning", message: `take of ${of} failed: ${latest.message ?? "no reason given"}. The accept key retries or goes back` });
+      const what = variant !== undefined ? `a variant of ${of}` : `a take of ${of}`;
+      if (latest.status === "drafting") notes.push({ ...here, code: "drafting", severity: "information", message: `drafting ${what}` });
+      else if (latest.status === "ready") notes.push({ ...here, code: "draft-ready", severity: "information", message: `${shown?.original ? `${own.of} as ${variant !== undefined ? "it is" : "kept"}` : what}, in the preview: the accept key keeps, rerolls or goes back` });
+      else notes.push({ ...here, code: "draft-failed", severity: "warning", message: `${what} failed: ${latest.message ?? "no reason given"}. The accept key retries or goes back` });
     }
     return notes;
   }
@@ -1569,13 +1698,22 @@ export class Workspace {
   #ownLines(doc: Doc): OwnLine[] {
     const src = splitLines(doc.text);
     return scan(doc.text, this.site.catalog).directives.flatMap((d) => {
-      const part = this.#ownPart(doc, d);
-      if (part === undefined) return [];
-      const { takes } = this.#takes(ownKey(part));
-      const shared = this.#shared(part) ? (existsSync(join(this.site.root, "parts", part)) ? { changed: true as const } : { catalog: true as const }) : {};
-      return [{ line: d.line, opener: src[d.line]!, part, ...(takes ? { takes } : {}), ...shared }];
+      const own = this.#lineDrafts(doc, d);
+      if (own === undefined) return [];
+      const { takes } = this.#takes(own.key);
+      // By the part the line names, which the editor finds it by.
+      const variant = this.site.own[own.of]?.part.variant;
+      return [{ line: d.line, opener: src[d.line]!, part: d.plain!.part, ...(takes ? { takes } : {}), ...(this.#isOwn(own.of) ? {} : { catalog: true as const }), ...(variant !== undefined ? { variant: own.of.slice(variant.length + 2) } : {}) }];
     });
   }
+
+  // A line with a new variant's take on screen, for the words after its
+  // ":", draws that take; the line's part as it was draws as itself.
+  #drawAs: DrawAs = (d, form) => {
+    const words = d.refine ? refineWords(d.refine.words) : "";
+    const shown = words ? this.#shown(variantKey(form.part, words)) : undefined;
+    return shown?.name && !shown.original ? { ...form, part: shown.name, settings: form.settings.filter((s) => s.key !== VARIANT) } : undefined;
+  };
 
   // The cache's lookup, with the pick the writer has moved to in its place,
   // and nothing for words whose draft was cancelled.
@@ -1594,7 +1732,7 @@ export class Workspace {
 
   async #write(rel: string, page: PageKind, text: string, chosen?: Doc["chosen"], cancelled?: Set<string>) {
     if (page === "site") return this.#writeFrame(text, chosen);
-    const out = preprocess(text, this.site.catalog, this.#resolve(page, chosen, cancelled));
+    const out = preprocess(text, this.site.catalog, this.#resolve(page, chosen, cancelled), "writing", this.#drawAs);
     // Half-typed front matter is never handed to Hugo; the page it last read
     // stays until the front matter parses again.
     const broken = frontMatterProblem(text);
@@ -1764,6 +1902,7 @@ export class Workspace {
     const notes: Note[] = [];
     for (const d of scan(doc.text, this.site.catalog).directives) {
       if (!d.plain || !d.refine || refineWords(d.refine.words) === "" || this.#ownOnly(d.plain.part)) continue;
+      if (this.#draftsFor(variantKey(d.plain.part, refineWords(d.refine.words))).length > 0) continue;
       const at = { line: d.line, start: d.refine.start, end: src[d.line]!.length };
       const part = d.plain.part;
       const hit = this.#cache.getRefine(this.site.catalog, part, d.refine.words);

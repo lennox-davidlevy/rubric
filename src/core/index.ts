@@ -11,3 +11,4 @@ export * from "./frame.ts";
 export * from "./frontmatter.ts";
 export * from "./live.ts";
 export * from "./theme-line.ts";
+export * from "./variant.ts";

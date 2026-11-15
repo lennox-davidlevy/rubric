@@ -1,6 +1,6 @@
 # Live test: picks by Jev, and drafts by both tools
 
-Run on 2026-11-13. What it found is in `docs/lsp.md`, and its fixes are on `main`. The rows still to run moved to [TESTING.md](TESTING.md).
+Run on 2026-11-13, and D15 to D18 on 2026-11-14. What it found is in `docs/lsp.md`, and its fixes are on `main`. Section E, changing a catalog part, was replaced by variants before the rest of it ran: [TESTING.md](TESTING.md).
 
 ## Set up
 
@@ -90,6 +90,10 @@ Once each, with whichever tool is set.
 | D12 | After the session: `jq -r '[.started[11:16], .drafter.harness, .drafter.model, .mode, .seconds, .status, .outcome] \| @tsv' testing/.rubric/logs/drafts.jsonl \| tail -n 20` | One line a draft: the tool, model, mode, seconds and what became of it. Every one from B and C says `fast`. |
 | D13 | With no drafter chosen (`:Rubric harness`, the setup's choice), open a `new:` line's menu | It reads "Draft (opus, low)": Opus at low effort is the built-in drafter. |
 | D14 | `:Rubric model`, **sonnet**, **low**; then `:LspRestart`; open a `new:` line's menu | Still "Draft (sonnet, low)" after the restart. Set it back when done. |
+| D15 | `::: steps` on a new line, `:::` under it; cursor on the `::: steps` line, then on the empty line inside | The starter shows dimmed on the opening line only; inside the block, where you type, it is gone. `<M-l>` inside still fills it in. |
+| D16 | A kept part that splits by `###` (the recipe card), placed inside a slide of the kept carousel or a step of `::: steps` | The inner part draws whole inside its slide or step; its own `###` headings don't become slides or steps. |
+| D17 | Two recipe cards placed straight in the kept carousel, or two parts straight in `::: steps`, with no `###` around them | Each part is a slide or step of its own. `steps` draws no empty heading; the kept carousel was drafted before this and draws an empty one per slide until it is rerolled. A `::: fold` holding a part straight in it stays one closed section. |
+| D18 | `::: new: a row of postage stamps with perforated edges, each holding a word`, **Draft**, then `<M-l>`, **Cancel** | The line is your words again, with no ghost text and nothing drawn: the page shows the words as text. Change a word: the kept part is offered again. `::: new:` with the same words still offers the cancelled takes back. |
 
 ## E. Changing a catalog part for the site
 

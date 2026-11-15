@@ -231,7 +231,7 @@ local function takes_list(client, bufnr, row, view, back)
   end
   local items = {}
   for i, t in ipairs(view.list or {}) do
-    local what = t.original and "as kept" or ("take %d"):format(i)
+    local what = t.original and (view.newVariant and "as it was" or "as kept") or ("take %d"):format(i)
     local rest = (t.by and ("  " .. t.by) or "") .. (t.change and ("  “" .. t.change .. "”") or "")
     local now = i == view.take and "  (now)" or ""
     table.insert(items, {
@@ -377,18 +377,20 @@ function M.act(client, bufnr, row)
   end)
 end
 
--- The accept key on a line placing one of the site's own parts, a part a
--- `new:` line made and the writer kept: another take of it (which keeps its
--- name, so every page with it changes once kept), going back to it as it
--- was, putting it in the catalog for every theme, or taking it away. On a
--- catalog part's line: changing it for this site (`view.catalog`), which
--- makes it the site's own drawing of the part (`view.changed`), taken away
--- by going back to the catalog's.
+-- The accept key on a line placing a part the site has or can change: one
+-- of the site's own parts (another take of it, which keeps its name, so every
+-- page with it changes once kept; putting it in the catalog for every theme;
+-- or taking it away), a catalog part, or a variant of either. Change… on any
+-- of them drafts a new variant, `<part>--<name>`, for the words after the
+-- line's ":", which stay on the line while it drafts (`view.newVariant`);
+-- kept, the line asks for it with `variant=`. A variant's line can make it
+-- every line's of its part, or go back to the part.
 -- `fill` fills in the block's starter, when it is empty.
 function M.act_own(client, bufnr, row, fill)
   local text = vim.api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1]
-  -- Words after a lone ":" are the change a reroll asks for, as the server
-  -- reads them (a quoted value may hold a ":"); set from its answer below.
+  -- Words after a lone ":" are the change a reroll or Change… asks for, as
+  -- the server reads them (a quoted value may hold a ":"); set from its
+  -- answer below.
   local refine, colon
   local function done(r)
     if not r then
@@ -396,6 +398,10 @@ function M.act_own(client, bufnr, row, fill)
     end
     if r.error then
       vim.notify("rubric: " .. r.error, vim.log.levels.WARN)
+      return
+    end
+    if r.replace then
+      replace(bufnr, row, text, r)
       return
     end
     local at = find(bufnr, row, text) or (colon and find(bufnr, row, (text:sub(1, colon):gsub("%s+$", ""))))
@@ -419,17 +425,29 @@ function M.act_own(client, bufnr, row, fill)
     request(client, bufnr, at, params, done)
   end
   -- The words after ":" were the change, whatever it became: they go from
-  -- the line as the reroll starts.
-  local function reroll(change, d)
+  -- the line as the reroll starts. A new variant's stay: they are its line's.
+  local function reroll(change, d, keep_words)
     local at = find(bufnr, row, text)
     if not at then
       vim.notify("rubric: the line changed: press the key again", vim.log.levels.WARN)
       return
     end
-    if refine then
+    if refine and not keep_words then
       vim.api.nvim_buf_set_lines(bufnr, at, at + 1, false, { (text:sub(1, colon):gsub("%s+$", "")) })
     end
     M.build(client, bufnr, at, { action = "reroll", change = change, drafter = d })
+  end
+  -- A new variant for `words`: they go after the line's ":", in place of any
+  -- there, and the draft starts from them.
+  local function new_variant(words)
+    local at = find(bufnr, row, text)
+    if not at then
+      vim.notify("rubric: the line changed: press the key again", vim.log.levels.WARN)
+      return
+    end
+    local lead = refine and (text:sub(1, colon):gsub("%s+$", "")) or (text:gsub("%s+$", ""))
+    vim.api.nvim_buf_set_lines(bufnr, at, at + 1, false, { ("%s : %s"):format(lead, words) })
+    M.build(client, bufnr, at, { variant = true })
   end
   request(client, bufnr, row, {}, function(view)
     if not view or not view.of then
@@ -439,8 +457,10 @@ function M.act_own(client, bufnr, row, fill)
       refine, colon = view.change.words, view.change.colon
     end
     local name, status = view.of, view.status
-    -- The catalog's part or the site's drawing of it: kept for this site only.
-    local shared = view.catalog or view.changed
+    local variant = view.variant
+    local base = view.newVariant
+    -- The catalog's part, or a variant: kept for this site only.
+    local shared = view.catalog or variant
     local items = {}
     local function add(label, value)
       table.insert(items, { label = label, value = value })
@@ -448,7 +468,7 @@ function M.act_own(client, bufnr, row, fill)
     if fill then
       add("Fill starter", "fill")
     end
-    -- The first take is the part as it was kept.
+    -- The first take is the part as it was kept, or as the line drew it.
     local original = (view.take or 1) == 1
     if status == "drafting" then
       add("Wait", "wait")
@@ -461,13 +481,26 @@ function M.act_own(client, bufnr, row, fill)
     if (view.takes or 0) > 1 then
       add(("Takes (%d)"):format(view.takes), "takes")
     end
-    if view.catalog and status == nil then
+    if base then
+      if status ~= "drafting" then
+        add(status == "failed" and "Retry…" or "Reroll…", "reroll")
+      end
+    elseif status == nil then
+      if not view.catalog then
+        add("Reroll…", "reroll")
+      end
       add("Change…", "change")
     elseif status ~= "drafting" then
       add(status == "failed" and "Retry…" or "Reroll…", "reroll")
     end
-    if status == nil and view.changed then
-      add(("Back to the catalog's %s"):format(name), "remove")
+    if status == nil and variant then
+      if variant.everywhere then
+        add(("Every %s plain"):format(variant.of), "nowhere")
+      else
+        add(("Every %s as %s"):format(variant.of, variant.name), "everywhere")
+      end
+      add(variant.catalog and ("Back to the catalog's %s"):format(variant.of) or ("Back to %s"):format(variant.of), "plain")
+      add(("Remove %s from this site…"):format(name), "remove")
     elseif status == nil and not shared then
       add(("Add %s to every theme"):format(name), "global")
       add(("Remove %s from this site…"):format(name), "remove")
@@ -476,29 +509,32 @@ function M.act_own(client, bufnr, row, fill)
       add("Log", "log")
     end
     if status ~= nil then
-      add(view.catalog and ("Back to the catalog's %s"):format(name) or ("Back to %s as kept"):format(name), "cancel")
+      add(view.catalog and ("Back to the catalog's %s"):format(name) or base and ("Back to %s"):format(name) or ("Back to %s as kept"):format(name), "cancel")
     end
-    local kept = view.catalog and ("the catalog's %s"):format(name) or ("%s as kept"):format(name)
-    local prompt = status == "drafting" and ("Drafting a take of %s"):format(name)
-      or status == "failed" and ("Take of %s failed: %s"):format(name, view.message or "no reason given")
-      or status == "ready" and (original and kept or ("Take %d of %s, in the preview"):format(view.take, name))
+    local kept = base and ("%s as it was"):format(name) or view.catalog and ("the catalog's %s"):format(name) or ("%s as kept"):format(name)
+    local what = base and ("a variant of %s"):format(base) or ("a take of %s"):format(name)
+    local prompt = status == "drafting" and ("Drafting %s"):format(what)
+      or status == "failed" and ("%s failed: %s"):format(what:gsub("^%l", string.upper), view.message or "no reason given")
+      or status == "ready" and (original and kept or ("Take %d of %s, in the preview"):format(view.take, base and view.name or name))
       or view.catalog and ("%s, catalog part"):format(name)
-      or view.changed and ("%s, changed for this site"):format(name)
+      or variant and ("%s, variant of %s"):format(variant.name, variant.of)
       or ("%s, site part"):format(name)
     choose(items, prompt, function(v)
       if v == "fill" then
         fill()
-      elseif v == "keep" and shared then
+      elseif v == "keep" and (shared or base) then
         answer({ action = "keep", global = false })
       elseif v == "change" then
         -- What to change, then the draft starts with the default drafter.
-        vim.ui.input({ prompt = ("Change %s: "):format(name), default = refine or "" }, function(notes)
-          if notes and notes ~= "" then
-            reroll(notes)
+        vim.ui.input({ prompt = ("Change %s: "):format(variant and variant.of or name), default = refine or "" }, function(words)
+          if words and words ~= "" then
+            new_variant(words)
           end
         end)
-      elseif v == "remove" and view.changed then
-        answer({ action = "remove" })
+      elseif v == "plain" then
+        answer({ action = "plain" })
+      elseif v == "everywhere" or v == "nowhere" then
+        answer({ action = "everywhere", on = v == "everywhere" })
       elseif v == "keep" then
         choose({
           { label = "This site", value = false },
@@ -523,8 +559,11 @@ function M.act_own(client, bufnr, row, fill)
           end
         end)
       elseif v == "reroll" then
-        -- The words after ":" are the notes it starts with.
-        reroll_menu(client, bufnr, name, view.drafter, refine, reroll)
+        -- The words after ":" are the notes it starts with, unless they are
+        -- the new variant's own.
+        reroll_menu(client, bufnr, base and view.name or name, view.drafter, not base and refine or nil, function(change, d)
+          reroll(change, d, base ~= nil)
+        end)
       elseif v == "takes" then
         takes_list(client, bufnr, row, view, function()
           M.act_own(client, bufnr, row, fill)
@@ -1168,15 +1207,18 @@ local function looks(d)
   local takes = type(data.takes) == "number" and data.takes > 1
       and (" · take %d of %d · %s %s other takes"):format(data.take, data.takes, prev_key, next_key)
     or ""
-  -- Another take of the site's own part.
+  -- Another take of the site's own part, or a new variant of a part.
   if type(data.of) == "string" then
+    local what = data.variant and ("a variant of %s"):format(data.of) or ("another take of %s"):format(data.of)
     if d.code == "drafting" then
-      return SPIN[frame], ("drafting another take of %s%s · %s stop or go back"):format(data.of, clock(data.started), accept_key), "info", true
+      return SPIN[frame], ("drafting %s%s · %s stop or go back"):format(what, clock(data.started), accept_key), "info", true
     elseif d.code == "draft-ready" then
-      local which = data.take == 1 and ("%s as it was kept"):format(data.of) or ("take %d of %s"):format(data.take or 1, data.of)
+      local which = data.take == 1 and ("%s as it was%s"):format(data.of, data.variant and "" or " kept")
+        or data.variant and ("take %d, %s"):format(data.take or 1, data.name or data.of)
+        or ("take %d of %s"):format(data.take or 1, data.of)
       return "◆", ("%s%s · %s keep, reroll, go back"):format(which, takes:gsub("^ · take %d+ of %d+", ""), accept_key), "ok"
     elseif d.code == "draft-failed" then
-      return "✗", ("another take of %s failed%s · %s try again or go back"):format(data.of, takes, accept_key), "warn"
+      return "✗", ("%s failed%s · %s try again or go back"):format(what, takes, accept_key), "warn"
     end
     return nil
   end
