@@ -5,11 +5,13 @@
 //
 //   bun scripts/live-repro.ts [blocks] [msPerKey]
 //
-// Needs `bun run play` (Hugo on 1415, or RUBRIC_PORT). Restores the page afterwards.
+// Opening the page starts testing/'s process, whose Hugo serves it on the port
+// in testing/.rubric/serve.json. Restores the page afterwards.
 
 import { copyFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { readServing } from "../src/server/site-process.ts";
 
 const repo = join(import.meta.dir, "..");
 const site = join(repo, "testing");
@@ -42,7 +44,7 @@ const type = async (s: string) => {
 // browser asking. A race that needs two builds in one second is rarely caught
 // by sampling, so the header itself is checked.
 const served = async () => {
-  const res = await fetch(`http://localhost:${process.env.RUBRIC_PORT ?? 1415}/posts/walk/`);
+  const res = await fetch(`http://127.0.0.1:${readServing(site)?.port ?? 1415}/posts/walk/`);
   const text = (await res.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
   return { text, stale: !/no-store/.test(res.headers.get("cache-control") ?? "") };
 };

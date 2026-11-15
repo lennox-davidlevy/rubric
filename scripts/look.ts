@@ -7,6 +7,7 @@
 // by side.
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { hugoPath } from "../src/hugo.ts";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
@@ -121,7 +122,7 @@ export const PREVIEW = { width: 1280, height: 800, out: "800x500" };
 export async function previews(catalog: string, themes: string[]): Promise<string[]> {
   const site = join(catalog, "page");
   const built = mkdtempSync(join(tmpdir(), "rubric-previews-"));
-  const build = Bun.spawnSync(["hugo", "-s", site, "-d", built, "--quiet"], { stdout: "pipe", stderr: "pipe" });
+  const build = Bun.spawnSync([hugoPath() ?? "hugo", "-s", site, "-d", built, "--quiet"], { stdout: "pipe", stderr: "pipe" });
   if (build.exitCode !== 0) {
     rmSync(built, { recursive: true, force: true });
     throw new Error(`hugo failed: ${build.stderr.toString() || build.stdout.toString()}`);
@@ -156,7 +157,7 @@ export async function look(catalog: string, themes: string[]): Promise<Problem[]
   const out: Problem[] = [];
   const site = join(catalog, "page");
   const built = mkdtempSync(join(tmpdir(), "rubric-look-"));
-  const build = Bun.spawnSync(["hugo", "-s", site, "-d", built, "--quiet"], { stdout: "pipe", stderr: "pipe" });
+  const build = Bun.spawnSync([hugoPath() ?? "hugo", "-s", site, "-d", built, "--quiet"], { stdout: "pipe", stderr: "pipe" });
   if (build.exitCode !== 0) {
     rmSync(built, { recursive: true, force: true });
     return [{ where: "catalog page", level: "error", message: `hugo failed: ${(build.stderr.toString() + build.stdout.toString()).trim().split("\n").filter((l) => /ERROR/.test(l)).join("\n") || "see hugo's output"}` }];

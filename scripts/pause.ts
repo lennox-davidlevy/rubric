@@ -1,5 +1,5 @@
 // Replays the writer's real typing from testing/.rubric/keys.jsonl, written by
-// the language server while `bun run play` runs, and compares ways of
+// the language server while `rubric calls` runs, and compares ways of
 // choosing the pause before a words line is asked: how many calls to Jev
 // each makes, how many of them were half-typed words, and how long a
 // finished line waits after its last key.
@@ -17,7 +17,7 @@ type Edit = { t: number; line: number; words: string; pause: number };
 const file = process.argv[2] ?? join(import.meta.dir, "../testing/.rubric/keys.jsonl");
 const edits: Edit[] = (await Bun.file(file).text()).trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
 if (edits.length < 2) {
-  console.log(`only ${edits.length} edits in ${file}; type some ::: lines with \`bun run play\` running first`);
+  console.log(`only ${edits.length} edits in ${file}; type some ::: lines with \`rubric calls\` running first`);
   process.exit(0);
 }
 

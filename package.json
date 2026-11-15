@@ -2,10 +2,12 @@
   "name": "rubric",
   "private": true,
   "type": "module",
+  "bin": {
+    "rubric": "src/cli.ts"
+  },
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc --noEmit",
-    "play": "bun scripts/play.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "vscode-languageserver": "11.0.0",

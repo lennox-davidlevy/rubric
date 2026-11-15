@@ -4,6 +4,8 @@
 // site on the universal catalog, with the stub resolver.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { siteArgs } from "./testing-site.ts";
+import { hugoPath } from "../src/hugo.ts";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,7 +15,7 @@ import { Workspace, type Note } from "../src/server/workspace.ts";
 import { openSite, type Site } from "../src/site.ts";
 
 const repo = join(import.meta.dir, "..");
-const hugo = Bun.which("hugo");
+const hugo = hugoPath();
 let dir: string;
 let site: Site;
 let ws: Workspace;
@@ -172,7 +174,7 @@ test.skipIf(!hugo)("Hugo draws the theme the frame page names, before hugo.toml'
     writeFileSync(join(s, "content/posts/p.md"), "---\ntitle: P\n---\n\nWords.\n");
     const build = (theme?: object) => {
       writeFileSync(join(s, "content/rubric-frame/index.md"), JSON.stringify({ title: "frame", build: { render: "never", list: "never" }, frame: [], ...(theme ? { theme } : {}) }));
-      const r = Bun.spawnSync([hugo!, "--quiet", "-s", s, "-d", join(s, "public")]);
+      const r = Bun.spawnSync([hugo!, "--quiet", ...siteArgs(s), "-d", join(s, "public")]);
       expect(r.stderr.toString()).toBe("");
       return readFileSync(join(s, "public/posts/p/index.html"), "utf8");
     };
