@@ -324,6 +324,50 @@ describe("a draft", () => {
     expect(existsSync(join(dir, DRAFT_LOGS, entry.id, "brief.md"))).toBe(true);
   });
 
+  test("after cancel, nothing is offered or drawn for the words until they change", async () => {
+    // Words Jev would place: before any draft, the page draws the pick.
+    await write(`${front}::: a quote said by my aunt\nShe said it.\n:::\n`);
+    expect(await ws.ghost(page(), 4)).not.toEqual([]);
+    expect(content()).toContain("{{< quote");
+
+    await write(`${front}::: new: a quote said by my aunt\nShe said it.\n:::\n`);
+    await ws.build(page(), 4);
+    await ws.drafted();
+    const done = await ws.cancel(page(), 4);
+    await write(`${front}${done.replace}\nShe said it.\n:::\n`);
+    expect(await ws.ghost(page(), 4)).toEqual([]);
+    expect(content()).not.toMatch(/\{\{< (?!rubric-line)/);
+    expect(codes(4)).toEqual([]);
+
+    // Reworded, the line is asked and drawn again, and so are the same words typed back.
+    await write(`${front}::: a quote said by my uncle\nShe said it.\n:::\n`);
+    expect(await ws.ghost(page(), 4)).not.toEqual([]);
+    await write(`${front}::: a quote said by my aunt\nShe said it.\n:::\n`);
+    expect(await ws.ghost(page(), 4)).not.toEqual([]);
+    await ws.settle();
+    expect(content()).toContain("{{< quote");
+  });
+
+  test("after cancel, words nothing fits lose their note until they change", async () => {
+    await write(`${front}::: a wobbly orbit of moons\n:::\n`);
+    await ws.ghost(page(), 4);
+    await ws.settle();
+    expect(codes(4)).toContain("nothing-fits");
+
+    await write(`${front}::: new: a wobbly orbit of moons\n:::\n`);
+    await ws.build(page(), 4);
+    await ws.drafted();
+    const done = await ws.cancel(page(), 4);
+    await write(`${front}${done.replace}\n:::\n`);
+    expect(codes(4)).toEqual([]);
+    expect(ws.hover(page(), 4)).toBeUndefined();
+
+    await write(`${front}::: a wobbly orbit of comets\n:::\n`);
+    await ws.ghost(page(), 4);
+    await ws.settle();
+    expect(codes(4)).toContain("nothing-fits");
+  });
+
   test("takes cancelled before come back for the same words, instead of drafting again", async () => {
     await write(`${front}::: new: folded cranes\n:::\n`);
     await ws.build(page(), 4);

@@ -161,6 +161,9 @@ interface Doc {
   // The pick the writer has moved to with the next-pick key, drawn in place
   // of the first until they accept it, change the line or stop looking.
   chosen?: { words: string; plain: string };
+  // Words whose `new:` line the writer cancelled: nothing is offered or
+  // drawn for them until no line holds them any more.
+  cancelled?: Set<string>;
 }
 
 export interface Options {
@@ -384,6 +387,10 @@ export class Workspace {
     if (doc.chosen && !scan(text, this.site.catalog).directives.some((d) => d.kind === "words" && d.words === doc.chosen!.words)) {
       doc.chosen = undefined;
     }
+    if (doc.cancelled?.size) {
+      const held = new Set(scan(text, this.site.catalog).directives.flatMap((d) => (d.words === undefined ? [] : [d.words])));
+      for (const w of doc.cancelled) if (!held.has(w)) doc.cancelled.delete(w);
+    }
     this.#timeEdit(file, doc);
     this.#drawSoon(file);
     // Half-typed words are not worth an answer: the line being edited waits
@@ -504,7 +511,7 @@ export class Workspace {
       return d?.kind === "words" ? d.words : undefined;
     };
     const asked = words();
-    if (!doc || asked === undefined) return [];
+    if (!doc || asked === undefined || doc.cancelled?.has(asked)) return [];
 
     const key = this.#key(doc.page, asked);
     const lookup = () => this.#cache.get(this.site.catalog, doc.page, asked);
@@ -1062,6 +1069,7 @@ export class Workspace {
     const words = at.d.words!;
     await this.#stop(words, "cancelled");
     for (const d of this.#draftsFor(words)) await this.#forget(d.id, "cancelled");
+    (at.doc.cancelled ??= new Set()).add(words);
     await this.#reopen();
     return { replace: `${opener(splitLines(at.doc.text)[line] ?? "")} ${words}` };
   }
@@ -1345,7 +1353,7 @@ export class Workspace {
       return out.join("\n");
     }
 
-    if (d.kind !== "words" || d.words === undefined) return undefined;
+    if (d.kind !== "words" || d.words === undefined || doc.cancelled?.has(d.words)) return undefined;
     const hit = this.#cache.get(this.site.catalog, doc.page, d.words);
     if (!hit) {
       const error = this.#errors.get(this.#key(doc.page, d.words));
@@ -1509,7 +1517,7 @@ export class Workspace {
     // The text drawn, which the starters are read against: the writer may
     // type on while it's written.
     const text = doc.text;
-    const { entries, diagnostics } = await this.#write(doc.rel, doc.page, text, doc.chosen);
+    const { entries, diagnostics } = await this.#write(doc.rel, doc.page, text, doc.chosen, doc.cancelled);
     this.#sendStarters(file, { ...doc, text }, entries);
     this.#publish(file, [
       ...diagnostics.map((d): Note => ({ ...d, severity: d.code === "other-skin" || d.code === "theme-unpicked" ? "information" : "warning" })),
@@ -1524,7 +1532,7 @@ export class Workspace {
   // The empty blocks of a page whose parts have a starter.
   starters(file: string): Starter[] {
     const doc = this.#docs.get(file);
-    return doc ? this.#startersOf(doc, preprocess(doc.text, this.site.catalog, this.#resolve(doc.page, doc.chosen)).entries) : [];
+    return doc ? this.#startersOf(doc, preprocess(doc.text, this.site.catalog, this.#resolve(doc.page, doc.chosen, doc.cancelled)).entries) : [];
   }
 
   #startersOf(doc: Doc, entries: Entry[]): Starter[] {
@@ -1569,8 +1577,9 @@ export class Workspace {
     });
   }
 
-  // The cache's lookup, with the pick the writer has moved to in its place.
-  #resolve(page: PageKind, chosen: Doc["chosen"]): Resolve {
+  // The cache's lookup, with the pick the writer has moved to in its place,
+  // and nothing for words whose draft was cancelled.
+  #resolve(page: PageKind, chosen: Doc["chosen"], cancelled?: Set<string>): Resolve {
     const cached = this.#cache.resolver(this.site.catalog, page);
     return (words, kind) => {
       // A `new:` line draws its finished draft, while the writer looks at it.
@@ -1578,13 +1587,14 @@ export class Workspace {
         const name = this.#peek?.words === words ? this.#peek.part : this.#shown(words)?.name;
         return name && Object.hasOwn(this.site.catalog.parts, name) ? parsePlain(name) : undefined;
       }
+      if (cancelled?.has(words)) return undefined;
       return chosen?.words === words ? parsePlain(chosen.plain) : cached(words);
     };
   }
 
-  async #write(rel: string, page: PageKind, text: string, chosen?: Doc["chosen"]) {
+  async #write(rel: string, page: PageKind, text: string, chosen?: Doc["chosen"], cancelled?: Set<string>) {
     if (page === "site") return this.#writeFrame(text, chosen);
-    const out = preprocess(text, this.site.catalog, this.#resolve(page, chosen));
+    const out = preprocess(text, this.site.catalog, this.#resolve(page, chosen, cancelled));
     // Half-typed front matter is never handed to Hugo; the page it last read
     // stays until the front matter parses again.
     const broken = frontMatterProblem(text);
@@ -1774,7 +1784,7 @@ export class Workspace {
     const src = splitLines(doc.text);
     const notes: Note[] = [];
     for (const e of entries) {
-      if (e.kind !== "words" || e.words === undefined) continue;
+      if (e.kind !== "words" || e.words === undefined || doc.cancelled?.has(e.words)) continue;
       const at = { line: e.line, start: 0, end: src[e.line]!.length };
       const error = this.#errors.get(this.#key(doc.page, e.words));
       const hit = this.#cache.get(this.site.catalog, doc.page, e.words);
