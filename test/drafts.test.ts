@@ -324,6 +324,50 @@ describe("a draft", () => {
     expect(existsSync(join(dir, DRAFT_LOGS, entry.id, "brief.md"))).toBe(true);
   });
 
+  test("after cancel, nothing is offered or drawn for the words until they change", async () => {
+    // Words Jev would place: before any draft, the page draws the pick.
+    await write(`${front}::: a quote said by my aunt\nShe said it.\n:::\n`);
+    expect(await ws.ghost(page(), 4)).not.toEqual([]);
+    expect(content()).toContain("{{< quote");
+
+    await write(`${front}::: new: a quote said by my aunt\nShe said it.\n:::\n`);
+    await ws.build(page(), 4);
+    await ws.drafted();
+    const done = await ws.cancel(page(), 4);
+    await write(`${front}${done.replace}\nShe said it.\n:::\n`);
+    expect(await ws.ghost(page(), 4)).toEqual([]);
+    expect(content()).not.toMatch(/\{\{< (?!rubric-line)/);
+    expect(codes(4)).toEqual([]);
+
+    // Reworded, the line is asked and drawn again, and so are the same words typed back.
+    await write(`${front}::: a quote said by my uncle\nShe said it.\n:::\n`);
+    expect(await ws.ghost(page(), 4)).not.toEqual([]);
+    await write(`${front}::: a quote said by my aunt\nShe said it.\n:::\n`);
+    expect(await ws.ghost(page(), 4)).not.toEqual([]);
+    await ws.settle();
+    expect(content()).toContain("{{< quote");
+  });
+
+  test("after cancel, words nothing fits lose their note until they change", async () => {
+    await write(`${front}::: a wobbly orbit of moons\n:::\n`);
+    await ws.ghost(page(), 4);
+    await ws.settle();
+    expect(codes(4)).toContain("nothing-fits");
+
+    await write(`${front}::: new: a wobbly orbit of moons\n:::\n`);
+    await ws.build(page(), 4);
+    await ws.drafted();
+    const done = await ws.cancel(page(), 4);
+    await write(`${front}${done.replace}\n:::\n`);
+    expect(codes(4)).toEqual([]);
+    expect(ws.hover(page(), 4)).toBeUndefined();
+
+    await write(`${front}::: a wobbly orbit of comets\n:::\n`);
+    await ws.ghost(page(), 4);
+    await ws.settle();
+    expect(codes(4)).toContain("nothing-fits");
+  });
+
   test("takes cancelled before come back for the same words, instead of drafting again", async () => {
     await write(`${front}::: new: folded cranes\n:::\n`);
     await ws.build(page(), 4);
@@ -789,10 +833,11 @@ describe("another take of the site's own part", () => {
   });
 });
 
-describe("changing a catalog part for the site", () => {
-  const drawn = () => readFileSync(join(dir, HUGO_TREE, "layouts/_partials/parts/quote.html"), "utf8");
+describe("variants", () => {
   const catalogQuote = () => readFileSync(join(catalogDir, "layouts/_partials/parts/quote.html"), "utf8");
   const quotes = `${front}::: quote size=large\nSaid.\n:::\n\n::: quote\nWritten.\n:::\n`;
+  const torn = quotes.replace("::: quote size=large", "::: quote size=large : a torn paper edge");
+  const yaml = (name: string) => readFileSync(join(dir, "parts", name, "part.yaml"), "utf8");
 
   beforeAll(async () => {
     await write(quotes);
@@ -802,11 +847,11 @@ describe("changing a catalog part for the site", () => {
   // part itself: the ghost offers it, and accepting opens the part's menu.
   // A part that can't be changed says only that nothing was set.
   test("words that set nothing offer a change, on a part that can have one", async () => {
-    const torn = "::: quote : with a torn edge";
-    await write(`${front}${torn}\nSaid.\n:::\n\n::: map : with a torn edge\nParis\n:::\n`);
+    const line = "::: quote : with a torn edge";
+    await write(`${front}${line}\nSaid.\n:::\n\n::: map : with a torn edge\nParis\n:::\n`);
     await ws.settle();
     const [g] = await ws.ghost(page(), 4);
-    expect(g).toMatchObject({ change: true, replace: torn });
+    expect(g).toMatchObject({ change: true, replace: line });
     expect(g?.text).toContain("quote");
     const [m] = await ws.ghost(page(), 8);
     expect(m?.change).toBeUndefined();
@@ -823,66 +868,226 @@ describe("changing a catalog part for the site", () => {
     await write(quotes);
   });
 
-  test("a take starts from the catalog's part, keeps its name and settings, and is drawn for every block", async () => {
+  test("a catalog part is never redrafted in place: only a variant of it starts", async () => {
+    expect(await ws.build(page(), 4, { change: "a torn paper edge" })).toMatchObject({ of: "quote", catalog: true });
+    expect(ws.draft(page(), 4)?.status).toBeUndefined();
+    // A variant needs the words of its change on the line.
+    await ws.build(page(), 4, { variant: true });
+    expect(ws.draft(page(), 4)?.status).toBeUndefined();
+  });
+
+  test("a new variant drafts for the words after the \":\", drawn on its line alone, with the line's part as take 1", async () => {
     const was = catalogQuote();
-    await ws.build(page(), 4, { change: "a torn paper edge" });
+    await write(torn);
+    await ws.build(page(), 4, { variant: true });
     await ws.drafted();
-    expect(ws.draft(page(), 4)).toMatchObject({ status: "ready", of: "quote", catalog: true, take: 2, takes: 2 });
-    expect(drawn()).toContain(`data-change="a torn paper edge"`);
-    expect(ws.site.catalog.parts.quote?.settings).toHaveProperty("size");
-    expect(content().match(/\{\{< quote/g)).toHaveLength(2);
-    // Take 1 is the catalog's, to go back to.
+    expect(ws.draft(page(), 4)).toMatchObject({ status: "ready", of: "quote", catalog: true, newVariant: "quote", name: "quote--torn-paper", take: 2, takes: 2 });
+    expect(content()).toContain(`{{< quote--torn-paper size="large" >}}`);
+    expect(content()).toContain("{{< quote >}}");
+    expect(readFileSync(join(dir, HUGO_TREE, "layouts/_partials/parts/quote--torn-paper.html"), "utf8")).toContain(`data-change="a torn paper edge"`);
+    // Its words are the change, not a question: no offer while it drafts.
+    expect(await ws.ghost(page(), 4)).toEqual([]);
+    expect(codes(4)).toEqual(["draft-ready"]);
+    expect(codes(8)).toEqual([]);
+    // Take 1 is the line as it was.
     expect(await ws.take(page(), 4, -1)).toMatchObject({ take: 1 });
-    expect(drawn().trim()).toBe(was.trim());
+    expect(content()).toContain(`{{< quote size="large" >}}`);
     await ws.take(page(), 4, 1);
+    expect(content()).toContain(`{{< quote--torn-paper size="large" >}}`);
     expect(catalogQuote()).toBe(was);
   });
 
-  test("kept for this site only: parts/quote/ takes the catalog's place, and the catalog is untouched", async () => {
+  test("kept: parts/quote--torn-paper/, the line asks for it, the other line is still the catalog's, and Jev can pick it", async () => {
     const version = ws.site.catalog.version;
     expect((await ws.keep(page(), 4, true)).error).toBeDefined();
     const done = await ws.keep(page(), 4, false);
     expect(done.error).toBeUndefined();
-    expect(readFileSync(join(dir, "parts/quote/part.html"), "utf8")).toContain(`data-change="a torn paper edge"`);
-    expect(ws.site.catalog.parts.quote).toMatchObject({ origin: "site", changed: true });
+    expect(done.replace).toBe("::: quote size=large variant=torn-paper");
+    await write(torn.replace("::: quote size=large : a torn paper edge", done.replace!));
+    expect(yaml("quote--torn-paper")).toContain("description: a torn paper edge");
     expect(ws.site.catalog.version).toBe(version);
     expect(ws.site.ownProblems).toEqual([]);
-    expect(ws.ownLines(page()).map((o) => [o.line, o.changed])).toEqual([[4, true], [8, true]]);
-    expect(await ws.look(page(), 4)).toMatchObject({ of: "quote", changed: true });
+    const variant = ws.site.catalog.parts.quote!.settings.variant;
+    expect(variant?.type === "choice" && Object.keys(variant.values)).toEqual(["plain", "torn-paper"]);
+    expect(content()).toContain(`{{< quote--torn-paper size="large" >}}`);
+    expect(content()).toContain("{{< quote >}}");
+    expect(codes(4)).toEqual([]);
+    expect(draftsOnDisk().filter((d) => d.startsWith("quote"))).toEqual([]);
+    expect(ws.ownLines(page()).map((o) => [o.line, o.part, o.variant, o.catalog])).toEqual([[4, "quote", "torn-paper", undefined], [8, "quote", undefined, true]]);
+    expect(await ws.look(page(), 4)).toMatchObject({ of: "quote--torn-paper", variant: { of: "quote", name: "torn-paper", catalog: true } });
+    // The second pass picks it from words, as any setting.
+    await write(quotes.replace("::: quote\nWritten.", "::: quote : torn-paper\nWritten."));
+    expect((await ws.ghost(page(), 8))[0]?.replace).toBe("::: quote variant=torn-paper");
+    await write(torn.replace("::: quote size=large : a torn paper edge", done.replace!));
   });
 
-  test("words after its \":\" are the notes a change starts with", async () => {
-    await write(quotes.replace("::: quote size=large", "::: quote : centered"));
-    expect(ws.draft(page(), 4)?.change?.words).toBe("centered");
+  test("everywhere: every line of the part that sets none draws the variant; plain on a line draws the part", async () => {
+    const lines = torn.replace("::: quote size=large : a torn paper edge", "::: quote size=large variant=torn-paper");
+    expect(await ws.everywhere(page(), 4, true)).toEqual({});
+    expect(yaml("quote--torn-paper")).toContain("everywhere: true");
+    await write(lines);
+    expect(content()).not.toContain("{{< quote >}}");
+    expect(content()).toContain("{{< quote--torn-paper >}}");
+    expect(ws.ownLines(page())[1]?.variant).toBe("torn-paper");
+    expect(await ws.look(page(), 8)).toMatchObject({ variant: { everywhere: true } });
+    // Back to the part on one line, with the words after its ":" kept.
+    await write(lines.replace("::: quote\nWritten.", "::: quote : larger\nWritten."));
+    const plain = ws.plain(page(), 8);
+    expect(plain.replace).toBe("::: quote variant=plain : larger");
+    await write(lines.replace("::: quote\nWritten.", "::: quote variant=plain\nWritten."));
+    expect(content()).toContain("{{< quote >}}");
+    expect(await ws.everywhere(page(), 4, false)).toEqual({});
+    expect(yaml("quote--torn-paper")).not.toContain("everywhere");
+    await write(lines);
+    expect(content()).toContain("{{< quote >}}");
+    // On a variant's line, back to the part drops the setting; the variant stays.
+    expect(ws.plain(page(), 4).replace).toBe("::: quote size=large");
+    expect(existsSync(join(dir, "parts/quote--torn-paper"))).toBe(true);
+  });
+
+  test("a variant rerolls under its own name, and keeping a take writes over it", async () => {
+    await write(`${front}::: quote variant=torn-paper\nSaid.\n:::\n`);
+    await ws.build(page(), 4, { change: "darker" });
+    await ws.drafted();
+    expect(ws.draft(page(), 4)).toMatchObject({ status: "ready", of: "quote--torn-paper", name: "quote--torn-paper", take: 2 });
+    expect(ws.draft(page(), 4)?.newVariant).toBeUndefined();
+    expect((await ws.keep(page(), 4, false)).error).toBeUndefined();
+    expect(readFileSync(join(dir, "parts/quote--torn-paper/part.html"), "utf8")).toContain(`data-change="darker"`);
+    expect(ws.site.catalog.parts.quote?.settings.variant).toBeDefined();
+  });
+
+  test("removing a variant puts its files in the record, and lines that ask for it say so", async () => {
+    const done = await ws.remove(page(), 4);
+    expect(done.error).toBeUndefined();
+    expect(existsSync(join(dir, "parts/quote--torn-paper"))).toBe(false);
+    expect(existsSync(join(dir, done.removed!, "part.yaml"))).toBe(true);
+    expect(ws.site.catalog.parts.quote?.settings.variant).toBeUndefined();
+    await ws.settle();
+    expect(content()).not.toContain("quote--torn-paper");
+    expect(codes(4).length).toBeGreaterThan(0);
     await write(quotes);
   });
 
-  test("back to the catalog's: the site's drawing goes to the record and the catalog's is drawn", async () => {
-    const done = await ws.remove(page(), 4);
-    expect(done.error).toBeUndefined();
-    expect(existsSync(join(dir, "parts/quote"))).toBe(false);
-    expect(ws.site.catalog.parts.quote?.changed).toBeUndefined();
-    expect(existsSync(join(dir, HUGO_TREE, "layouts/_partials/parts/quote.html"))).toBe(false);
-    expect(await ws.look(page(), 4)).toMatchObject({ of: "quote", catalog: true });
-  });
-
-  test("going back from a take before keeping leaves nothing in parts/", async () => {
-    await ws.build(page(), 4, { change: "smaller" });
+  test("going back from a new variant before keeping: the line loses its words, and parts/ is untouched", async () => {
+    await write(`${front}::: quote : smaller\nSaid.\n:::\n`);
+    await ws.build(page(), 4, { variant: true });
     await ws.drafted();
-    await ws.cancel(page(), 4);
-    expect(existsSync(join(dir, "parts/quote"))).toBe(false);
-    expect(ws.site.catalog.parts.quote?.origin).toBeUndefined();
+    expect(ws.draft(page(), 4)?.status).toBe("ready");
+    expect(await ws.cancel(page(), 4)).toEqual({ replace: "::: quote" });
+    expect(readdirSync(join(dir, "parts")).filter((n) => n.startsWith("quote"))).toEqual([]);
+    expect(draftsOnDisk().filter((d) => d.startsWith("quote"))).toEqual([]);
+    await write(quotes);
   });
 
-  test("a site's copy that lacks a setting the catalog's has is left out, and says which", async () => {
+  test("a site's own part has variants too; Reroll still redrafts the part itself, and removing it takes its variants", async () => {
+    await write(`${front}::: new: garden gnomes\n:::\n`);
+    await ws.build(page(), 4);
+    await ws.drafted();
+    await ws.keep(page(), 4, false);
+    await write(`${front}::: garden-gnomes : with hats\n:::\n`);
+    await ws.build(page(), 4, { variant: true });
+    await ws.drafted();
+    expect(ws.draft(page(), 4)).toMatchObject({ status: "ready", newVariant: "garden-gnomes", name: "garden-gnomes--hats" });
+    const done = await ws.keep(page(), 4, false);
+    expect(done.replace).toBe("::: garden-gnomes variant=hats");
+    await write(`${front}${done.replace}\n:::\n\n::: garden-gnomes\n:::\n`);
+    expect(content()).toContain("{{< garden-gnomes--hats >}}");
+    expect(content()).toContain("{{< garden-gnomes >}}");
+    expect(await ws.look(page(), 4)).toMatchObject({ variant: { of: "garden-gnomes", name: "hats" } });
+    expect((await ws.look(page(), 4))?.variant?.catalog).toBeUndefined();
+    // Neither goes to the catalog for every theme.
+    expect((await ws.keep(page(), 4, true)).error).toBeDefined();
+    expect((await ws.remove(page(), 7)).error).toBeUndefined();
+    expect(existsSync(join(dir, "parts/garden-gnomes"))).toBe(false);
+    expect(existsSync(join(dir, "parts/garden-gnomes--hats"))).toBe(false);
+    expect(ws.site.ownProblems).toEqual([]);
+    await write(quotes);
+  });
+
+  test("a variant made from the one every line draws is not every line's too; variant=plain stays fine once none is left", async () => {
+    await write(`${front}::: quote : a torn paper edge\nSaid.\n:::\n`);
+    await ws.build(page(), 4, { variant: true });
+    await ws.drafted();
+    const first = await ws.keep(page(), 4, false);
+    await write(`${front}${first.replace}\nSaid.\n:::\n\n::: quote\nWritten.\n:::\n`);
+    expect(await ws.everywhere(page(), 4, true)).toEqual({});
+    // The second line draws the first variant; a change there starts from it.
+    await write(`${front}${first.replace}\nSaid.\n:::\n\n::: quote : with ivy\nWritten.\n:::\n`);
+    await ws.build(page(), 8, { variant: true });
+    await ws.drafted();
+    const second = await ws.keep(page(), 8, false);
+    expect(second.replace).toBe("::: quote variant=ivy");
+    expect(yaml("quote--torn-paper")).toContain("everywhere: true");
+    expect(yaml("quote--ivy")).not.toContain("everywhere");
+    // A take of the default keeps it the default, whatever its part.yaml says.
+    await write(`${front}${first.replace}\nSaid.\n:::\n\n::: quote variant=plain\nWritten.\n:::\n`);
+    await ws.build(page(), 4, { change: "darker" });
+    await ws.drafted();
+    writeFileSync(join(dir, DRAFTS, ws.draft(page(), 4)!.log!.split("/").at(-2)!, "part.yaml"), yaml("quote--torn-paper").replace(/^everywhere:.*\n?/m, ""));
+    expect((await ws.keep(page(), 4, false)).error).toBeUndefined();
+    expect(yaml("quote--torn-paper")).toContain("everywhere: true");
+    // Removing a variant puts its line back to the part, which still draws;
+    // with every variant gone, a line that says plain is still the part.
+    expect((await ws.remove(page(), 4)).replace).toBe("::: quote");
+    await write(`${front}::: quote variant=ivy : darker\nSaid.\n:::\n\n::: quote variant=plain\nWritten.\n:::\n`);
+    expect((await ws.remove(page(), 4)).replace).toBe("::: quote : darker");
+    await write(`${front}::: quote variant=plain\nWritten.\n:::\n`);
+    expect(ws.site.catalog.parts.quote?.settings.variant).toBeUndefined();
+    expect(codes(4)).toEqual([]);
+    expect(content()).toContain("{{< quote >}}");
+    await write(quotes);
+  });
+
+  test("a site part with a catalog part's name, or a variant that lacks a setting its part has, is left out, and says why", async () => {
     const { catalogFiles, readOwn } = await import("../src/parts.ts");
     const root = join(tmp, "behind-site");
     const files = catalogFiles(catalogDir, "quote")!;
-    mkdirSync(join(root, "parts/quote"), { recursive: true });
-    writeFileSync(join(root, "parts/quote/part.yaml"), files.yaml.replace(/^  cite:\n    type: text\n?/m, ""));
-    const { own, problems } = readOwn(root, ws.site.catalog, ws.site.shared);
-    expect(own.quote).toBeUndefined();
-    expect(problems.join()).toContain("has cite");
+    for (const [name, text] of [["quote", files.yaml], ["quote--behind", files.yaml.replace(/^name: .*$/m, "name: quote--behind").replace(/^  cite:\n    type: text\n?/m, "")], ["map--torn", catalogFiles(catalogDir, "map")!.yaml.replace(/^name: .*$/m, "name: map--torn")]] as const) {
+      mkdirSync(join(root, "parts", name), { recursive: true });
+      writeFileSync(join(root, "parts", name, "part.yaml"), text);
+    }
+    const { own, problems } = readOwn(root, ws.site.catalog, ws.site.shared, catalogDir);
+    expect(Object.keys(own)).toEqual([]);
+    expect(problems.find((p) => p.includes("parts/quote/"))).toContain("already a part");
+    expect(problems.find((p) => p.includes("quote--behind"))).toContain("cite");
+    expect(problems.find((p) => p.includes("map--torn"))).toBeDefined();
+  });
+
+  test("a variant's take is held to its part's name and settings", async () => {
+    const { catalogFiles } = await import("../src/parts.ts");
+    const files = catalogFiles(catalogDir, "quote")!;
+    const take = join(tmp, "variant-take");
+    mkdirSync(take, { recursive: true });
+    const check = async (yaml: string, name: string) => {
+      writeFileSync(join(take, "part.yaml"), yaml);
+      writeFileSync(join(take, "part.html"), files.html.replace("part part-quote", `part part-${name}`));
+      writeFileSync(join(take, "part.css"), `.part-${name} { color: var(--ink); }\n`);
+      return (await checkDraft(ws.site, take, "torn", undefined, "quote")).problems.join();
+    };
+    expect(await check(files.yaml.replace(/^name: .*$/m, "name: callout--torn"), "callout--torn")).toContain("quote--");
+    expect(await check(files.yaml.replace(/^name: .*$/m, "name: quote--plain"), "quote--plain")).toContain("no variant");
+    expect(await check(files.yaml.replace(/^name: .*$/m, "name: quote--torn").replace(/^  cite:\n    type: text\n?/m, ""), "quote--torn")).toContain("cite");
+    // A new part's name never has "--", which is for variants.
+    writeFileSync(join(take, "part.yaml"), "name: kites--tails\ndescription: Kites.\nchildren: true\n");
+    expect((await checkDraft(ws.site, take, "kites")).problems.join()).toContain("--");
+    // A reroll of a kept variant keeps its part's settings and its own, each
+    // refused for its own reason.
+    const kept = join(dir, "parts/quote--edgy");
+    mkdirSync(kept, { recursive: true });
+    writeFileSync(join(kept, "part.yaml"), files.yaml.replace(/^name: .*$/m, "name: quote--edgy").replace(/^settings:\n/m, "settings:\n  edge:\n    type: choice\n    default: torn\n    values:\n      torn: a torn edge\n      cut: a cut edge\n"));
+    writeFileSync(join(kept, "part.html"), files.html.replace("part part-quote", "part part-quote--edgy"));
+    writeFileSync(join(kept, "part.css"), ".part-quote--edgy { color: var(--ink); }\n");
+    await ws.reload(await openSite(dir));
+    expect(ws.site.own["quote--edgy"]?.part.variant).toBe("quote");
+    writeFileSync(join(take, "part.yaml"), files.yaml.replace(/^name: .*$/m, "name: quote--edgy").replace(/^  size:\n(    .*\n|      .*\n)*/m, ""));
+    writeFileSync(join(take, "part.html"), files.html.replace("part part-quote", "part part-quote--edgy"));
+    writeFileSync(join(take, "part.css"), ".part-quote--edgy { color: var(--ink); }\n");
+    const problems = (await checkDraft(ws.site, take, undefined, "quote--edgy")).problems.filter((p) => p.includes("must stay"));
+    expect(problems).toHaveLength(2);
+    expect(problems.find((p) => p.includes("size"))).not.toContain("edge");
+    expect(problems.find((p) => p.includes("edge"))).not.toContain("size");
+    rmSync(kept, { recursive: true });
+    await ws.reload(await openSite(dir));
   });
 
   test("a part with a script, or whose drawing fetches from another site, can't be changed: no take of it could pass the checks", async () => {
@@ -899,24 +1104,6 @@ describe("changing a catalog part for the site", () => {
     const skinned = readFileSync(join(catalogDir, "layouts/_partials/skins/blowfish/parts/callout.html"), "utf8").trim();
     expect(catalogFiles(catalogDir, "callout", "blowfish")!.html).toBe(skinned);
     expect(catalogFiles(catalogDir, "callout", "paper")!.html).not.toBe(skinned);
-  });
-
-  test("a take of a site's copy that has fallen behind is held to the catalog's settings too", async () => {
-    const { catalogFiles } = await import("../src/parts.ts");
-    const files = catalogFiles(catalogDir, "quote")!;
-    const behind = files.yaml.replace(/^  cite:\n    type: text\n?/m, "");
-    const take = join(tmp, "behind-take");
-    for (const d of [join(dir, "parts/quote"), take]) {
-      mkdirSync(d, { recursive: true });
-      writeFileSync(join(d, "part.yaml"), behind);
-      writeFileSync(join(d, "part.html"), files.html);
-      writeFileSync(join(d, "part.css"), files.css);
-    }
-    try {
-      expect((await checkDraft(ws.site, take, undefined, "quote")).problems.join()).toContain("cite");
-    } finally {
-      rmSync(join(dir, "parts/quote"), { recursive: true, force: true });
-    }
   });
 });
 

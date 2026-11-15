@@ -3,6 +3,7 @@
 // double quotes. Plain form is the source of truth; words resolve to it.
 
 import { NAME, settingsOf, type Catalog } from "./catalog.ts";
+import { PLAIN, VARIANT } from "./variant.ts";
 import type { Diagnostic } from "./diagnostic.ts";
 
 export interface Span {
@@ -89,6 +90,8 @@ export function validatePlain(form: PlainForm, catalog: Catalog, line: number, d
   const seen = new Set<string>();
   for (const s of form.settings) {
     const def = Object.hasOwn(defs, s.key) ? defs[s.key] : undefined;
+    // The part with no variant, which a line may say whether it has any.
+    if (!def && s.key === VARIANT && s.value === PLAIN) continue;
     if (!def) {
       const skin = catalog.elsewhere.settings[form.part]?.[s.key];
       out.push(skin

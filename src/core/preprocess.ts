@@ -7,8 +7,9 @@
 import type { Catalog, Place } from "./catalog.ts";
 import type { Diagnostic } from "./diagnostic.ts";
 import { aloneShortcode, closeShortcode, formatPlain, openShortcode, validatePlain, type PlainForm } from "./plain.ts";
-import { scan, type Kind } from "./scan.ts";
+import { scan, type Directive, type Kind } from "./scan.ts";
 import { formatThemeLine, type ThemeChoice } from "./theme-line.ts";
+import { drawnForm } from "./variant.ts";
 
 // Why a directive was left as text. "unresolved" is a words line with no
 // answer yet; the others carry a diagnostic.
@@ -38,9 +39,13 @@ export interface Output {
 // For a `new` line, the draft made for it, if there is one yet.
 export type Resolve = (words: string, kind?: "words" | "new") => PlainForm | undefined;
 
+// What draws a placed line in place of its part, when something else does:
+// in the server, the take on screen of a variant being drafted for it.
+export type DrawAs = (d: Directive, form: PlainForm) => PlainForm | undefined;
+
 // `place` is where the text is: a page ("writing") or rubric.md ("site"). A
 // part chosen in the other place is left as text, with a diagnostic.
-export function preprocess(text: string, catalog: Catalog, resolve: Resolve = () => undefined, place: Place = "writing"): Output {
+export function preprocess(text: string, catalog: Catalog, resolve: Resolve = () => undefined, place: Place = "writing", drawAs: DrawAs = () => undefined): Output {
   const { directives, strayClosers } = scan(text, catalog);
   const raw = text.split("\n");
   const out = [...raw];
@@ -142,14 +147,16 @@ export function preprocess(text: string, catalog: Catalog, resolve: Resolve = ()
       diagnostics.push({ ...whole(d.line), code: "no-children", message: `a directive cannot go inside a ${parentForm!.part}` });
     } else {
       entry.placed = true;
+      // Drawn by the variant the line asks for, under its own name.
+      const drawn = drawAs(d, form) ?? drawnForm(form, catalog);
       if (empty) {
         // Words that picked such a part had a block: what's in it stays
         // as writing, after the part, and its closer goes.
-        set(d.line, aloneShortcode(form));
+        set(d.line, aloneShortcode(drawn));
         if (d.close !== undefined) set(d.close, "");
       } else {
-        set(d.line, openShortcode(form));
-        set(d.close!, closeShortcode(form));
+        set(d.line, openShortcode(drawn));
+        set(d.close!, closeShortcode(drawn));
       }
     }
   }

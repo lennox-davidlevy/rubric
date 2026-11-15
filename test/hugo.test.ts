@@ -288,13 +288,13 @@ test.skipIf(!hugo)("an embed's link shows the page's title, description and pict
 });
 
 
-// A site's own drawing of a catalog part: in a theme whose skin draws the
-// part its own way, the site's drawing, its added setting and its CSS are
-// what Hugo uses, while a part it did not change is drawn as before.
-test.skipIf(!hugo)("the site's own drawing of a catalog part comes before the skin's, with the settings it adds", async () => {
-  const { catalogFiles, writeHugoTree } = await import("../src/parts.ts");
-  const { parseOwnPart, loadCatalog } = await import("../src/core/index.ts");
-  const site = mkdtempSync(join(tmpdir(), "rubric-hugo-changed-"));
+// A variant of a catalog part: drawn by its own name, with the setting it
+// adds and its CSS, beside the part itself, which the skin still draws its
+// own way.
+test.skipIf(!hugo)("a variant is drawn by its own name beside its part, which the skin still draws", async () => {
+  const { catalogFiles, readOwn, writeHugoTree } = await import("../src/parts.ts");
+  const { loadCatalog } = await import("../src/core/index.ts");
+  const site = mkdtempSync(join(tmpdir(), "rubric-hugo-variant-"));
   try {
     writeFileSync(
       join(site, "hugo.toml"),
@@ -303,25 +303,28 @@ test.skipIf(!hugo)("the site's own drawing of a catalog part comes before the sk
         .replace(/^theme = "(?!universal).*"$/m, `theme = "blowfish"`),
     );
     const files = catalogFiles(join(root, "catalogs/universal"), "callout")!;
-    const dir = join(site, "parts/callout");
+    const dir = join(site, "parts/callout--torn");
     mkdirSync(dir, { recursive: true });
-    const yaml = files.yaml.replace(/^settings:\n/m, "settings:\n  edge:\n    type: choice\n    default: plain\n    values:\n      plain: a straight edge\n      torn: a torn edge\n");
+    const yaml = files.yaml.replace(/^name: .*$/m, "name: callout--torn").replace(/^settings:\n/m, "settings:\n  edge:\n    type: choice\n    default: plain\n    values:\n      plain: a straight edge\n      torn: a torn edge\n");
     writeFileSync(join(dir, "part.yaml"), yaml);
-    writeFileSync(join(dir, "part.html"), `<aside class="part part-callout site-drawn edge-{{ .s.edge }} kind-{{ .s.kind }}">{{ .inner }}</aside>\n`);
-    writeFileSync(join(dir, "part.css"), `.part-callout.site-drawn { outline: 1px dashed var(--rule); }\n`);
+    writeFileSync(join(dir, "part.html"), `<aside class="part part-callout--torn edge-{{ .s.edge }} kind-{{ .s.kind }}">{{ .inner }}</aside>\n`);
+    writeFileSync(join(dir, "part.css"), `.part-callout--torn { outline: 1px dashed var(--rule); }\n`);
     const catalog = await loadCatalog(join(root, "catalogs/universal/catalog.yaml"));
-    await writeHugoTree(site, { callout: { part: parseOwnPart(yaml, catalog).part, dir } });
+    const { own, problems } = readOwn(site, catalog);
+    expect(problems).toEqual([]);
+    await writeHugoTree(site, own);
     mkdirSync(join(site, "content/posts"), { recursive: true });
-    writeFileSync(join(site, "content/posts/p.md"), `---\ntitle: P\n---\n\n{{< callout kind="tip" edge="torn" >}}\nHello.\n{{< /callout >}}\n\n{{< quote >}}\nSaid.\n{{< /quote >}}\n`);
+    writeFileSync(join(site, "content/posts/p.md"), `---\ntitle: P\n---\n\n{{< callout--torn kind="tip" edge="torn" >}}\nHello.\n{{< /callout--torn >}}\n\n{{< callout kind="tip" >}}\nPlain.\n{{< /callout >}}\n`);
     const build = Bun.spawnSync([hugo!, "--quiet", "-s", site, "-d", join(site, "public")]);
     expect(build.stderr.toString()).toBe("");
     expect(build.exitCode).toBe(0);
     const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");
-    expect(html).toContain(`class="part part-callout site-drawn edge-torn kind-tip"`);
-    expect(html).not.toContain("has-icon");
-    expect(html).toContain(`class="part part-quote`);
+    expect(html).toContain(`class="part part-callout--torn edge-torn kind-tip"`);
+    // The part itself is the skin's drawing still, with no label of the catalog's.
+    expect(html).toContain(`class="part part-callout kind-tip"`);
+    expect(html).not.toContain("part-callout-label");
     const sheet = /href="\/(css\/[^"]+\.css)"/.exec(html)![1]!;
-    expect(readFileSync(join(site, "public", sheet), "utf8")).toMatch(/\.part-callout\.site-drawn\s*\{\s*outline/);
+    expect(readFileSync(join(site, "public", sheet), "utf8")).toMatch(/\.part-callout--torn\s*\{\s*outline/);
   } finally {
     rmSync(site, { recursive: true, force: true });
   }

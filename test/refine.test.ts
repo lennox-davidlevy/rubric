@@ -102,26 +102,29 @@ describe("in the editor", () => {
 
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-  // A site's own drawing of a catalog part has the catalog's settings, which
-  // Jev knows, unlike a part of the site's own.
-  test("on a catalog part the site has changed, the words are still asked", async () => {
+  // A variant is a value of its part's `variant` setting, which Jev knows
+  // like any other: words after the part's ":" can pick it.
+  test("words after a catalog part's \":\" can pick one of the site's variants of it", async () => {
     const { catalogFiles } = await import("../src/parts.ts");
     const files = catalogFiles(join(repo, "catalogs/universal"), "quote")!;
-    mkdirSync(join(dir, "parts/quote"), { recursive: true });
-    writeFileSync(join(dir, "parts/quote/part.yaml"), files.yaml);
-    writeFileSync(join(dir, "parts/quote/part.html"), files.html);
+    mkdirSync(join(dir, "parts/quote--torn-edge"), { recursive: true });
+    writeFileSync(join(dir, "parts/quote--torn-edge/part.yaml"), files.yaml.replace(/^name: .*$/m, "name: quote--torn-edge").replace(/^description: .*$/m, "description: with a torn paper edge"));
+    writeFileSync(join(dir, "parts/quote--torn-edge/part.html"), files.html.replace("part part-quote", "part part-quote--torn-edge"));
     const site = await openSite(dir);
-    expect(site.catalog.parts.quote?.changed).toBe(true);
-    const changed = new Workspace(site, await Cache.load(site.cache), stubResolver(atPlace(site.catalog, "writing"), 5), () => {}, {
+    expect(site.ownProblems).toEqual([]);
+    const variant = site.catalog.parts.quote?.settings.variant;
+    expect(variant?.type === "choice" && variant.default).toBe("plain");
+    expect(variant?.type === "choice" && Object.keys(variant.values)).toEqual(["plain", "torn-edge"]);
+    const ws = new Workspace(site, await Cache.load(site.cache), stubResolver(atPlace(site.catalog, "writing"), 5), () => {}, {
       idleMs: 5, waitMs: 1000, drawMs: 5, refiner: stubRefiner(site.catalog, 5),
     });
     try {
-      const file = join(dir, "pages/posts/changed.md");
-      await changed.open(file, `${head}::: quote : with a soft shadow\nSaid.\n:::\n`);
-      await changed.settle();
-      expect((await changed.ghost(file, 3))[0]?.replace).toBe("::: quote shadow=soft");
+      const file = join(dir, "pages/posts/variant.md");
+      await ws.open(file, `${head}::: quote size=large : torn-edge with a soft shadow\nSaid.\n:::\n`);
+      await ws.settle();
+      expect((await ws.ghost(file, 3))[0]?.replace).toBe("::: quote size=large variant=torn-edge shadow=soft");
     } finally {
-      changed.dispose();
+      ws.dispose();
       rmSync(join(dir, "parts"), { recursive: true, force: true });
     }
   });
@@ -174,6 +177,18 @@ describe("in the editor", () => {
     expect(n!.message).toBe(
       "this asks for more than video's settings can say. video offers width prose, wide, full; shadow none, soft, deep; border none, outlined; corners theme, square, round; text normal, smaller, bigger",
     );
+  });
+
+  test("words that set nothing still get ghost text when Jev is unsure of a setting but sure they ask for more", async () => {
+    const line = "::: video : unsure, with sparkles";
+    await ws.change(page(), `${head}${line}\nhttps://youtu.be/x\n:::\n`);
+    await ws.settle();
+    const ghost = await ws.ghost(page(), 3);
+    expect(ghost).toHaveLength(1);
+    expect(ghost[0]!.replace).toBe(line);
+    await ws.change(page(), `${head}::: video : unsure\nhttps://youtu.be/x\n:::\n`);
+    await ws.settle();
+    expect(await ws.ghost(page(), 3)).toEqual([]);
   });
 
   test("the note says what was taken when some of it fit", async () => {

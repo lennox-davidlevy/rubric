@@ -646,11 +646,17 @@ function M.setup(opts)
           act_new()
           return true
         end
-        -- An empty block of a catalog part the site hasn't changed: its
+        -- An empty block of a catalog part: its
         -- starter at once, as before; Change… once it has writing.
         local o = own_line()
         local row = vim.api.nvim_win_get_cursor(0)[1] - 1
-        if o and not (o.catalog and not o.takes and starters.at(event.buf, row)) then
+        if o and o.fixed and not starters.at(event.buf, row) then
+          vim.schedule(function()
+            starters.say(event.buf, row, ("%s has no variants"):format(o.part))
+          end)
+          return true
+        end
+        if o and not o.fixed and not (o.catalog and not o.takes and starters.at(event.buf, row)) then
           act_own()
           return true
         end
@@ -761,7 +767,7 @@ function M.setup(opts)
         if vim.lsp.inline_completion.get() then
           return
         end
-        -- A catalog part the site hasn't changed is changed from normal mode:
+        -- A catalog part changes into a variant from normal mode:
         -- here the key fills its starter or asks now, as on any line.
         local o = own_line()
         if o and not (o.catalog and not o.takes) then
