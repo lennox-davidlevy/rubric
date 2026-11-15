@@ -1,0 +1,39 @@
+# After Making Software's type: a book serif for the writing and Departure
+# Mono, a small pixel monospace, for every label, the trail, the site's name
+# and the captions. Its serif, Arizona, is not free, so Source Serif 4 stands
+# in. Departure Mono 1.500 by Helena Zhang (departuremono.com), SIL OFL,
+# vendored whole from its release.
+description: Source Serif 4 for the writing, Departure Mono for every label and caption
+
+faces:
+  - { family: Source Serif 4, file: source-serif-4-normal.woff2, style: normal, weight: [200, 900] }
+  - { family: Source Serif 4, file: source-serif-4-italic.woff2, style: italic, weight: [200, 900] }
+  - { family: Departure Mono, file: departure-mono-normal.woff2, style: normal, weight: 400 }
+preload: [source-serif-4-normal.woff2, departure-mono-normal.woff2]
+
+body: [Source Serif 4, Charter, Iowan Old Style, Georgia, serif]
+display: body
+mono: [Departure Mono, ui-monospace, SF Mono, Menlo, Consolas, monospace]
+ui: [Departure Mono, ui-monospace, SF Mono, Menlo, Consolas, monospace]
+
+weight:
+  body: 400
+  strong: 600
+  heading: 600
+  display: 400   # the title is set light and large, not bold
+
+leading:
+  body: 1.8      # its writing is loose: 25px lines on 14px type
+  heading: 1.5
+  display: 1.1
+
+tracking:
+  display: -0.025em
+  label: 0em      # the mono is wide enough already
+
+labels: uppercase
+numerals: lining
+quote: italic
+ornament: "╌╌╌╌"
+code: 0.8em
+links: always

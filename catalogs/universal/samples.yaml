@@ -87,6 +87,12 @@ sidenote:
   md: |
     A note in the margin, about the sentence beside it.
 
+glossary:
+  md: |
+    - **Canal**: a waterway dug by hand, for boats and for drainage.
+    - **Gasworks**: where coal was once turned into gas for the city's lamps.
+    - **Towpath**: the path beside a canal, where horses once pulled the boats.
+
 video:
   md: |
     https://www.youtube.com/watch?v=aqz-KE-bpKQ

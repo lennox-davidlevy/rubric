@@ -1,0 +1,8 @@
+{{- /* Schematic's post details, above the title in small mono capitals and
+     split by thin bars: the date, how long the post is in words, and the
+     author. The length is counted in words, as Making Software does. */ -}}
+<p class="part part-post-meta byline">
+<time datetime="{{ .page.Date.Format "2006-01-02" }}">{{ .page.Date.Format "Jan 2, 2006" }}</time>
+{{- if ne .s.shows "date" }} <span class="part-post-meta-bar" aria-hidden="true">|</span> {{ .page.WordCount }} words{{ end }}
+{{- if eq .s.shows "everything" }}{{ with .page.Params.author | default site.Params.author }} <span class="part-post-meta-bar" aria-hidden="true">|</span> {{ . }}{{ end }}{{ end }}
+</p>

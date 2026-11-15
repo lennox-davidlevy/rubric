@@ -1,0 +1,58 @@
+/* glossary: the terms the writing uses and what each means. Numbered, in two
+   columns where there is room; each term is marked in the writing where it
+   is first used, and its meaning shows in the margin beside it. */
+.part-glossary ul, .part-glossary ol {
+  display: grid;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: glossary;
+  font-size: var(--step--1);
+  line-height: 1.7;
+  color: var(--muted);
+}
+@media (min-width: 40rem) {
+  .flow > .part-glossary { grid-column: wide; }
+  .part-glossary ul, .part-glossary ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.part-glossary li { margin: 0; counter-increment: glossary; }
+.part-glossary li::before {
+  content: counter(glossary);
+  margin-right: 0.3em;
+  font-size: 0.7em;
+  vertical-align: super;
+  line-height: 0;
+  font-variant-numeric: lining-nums;
+}
+/* A loose list (blank lines between terms) is read like a tight one. */
+.part-glossary li > p { display: inline; margin: 0; }
+.part-glossary li :is(strong, a):first-child { color: var(--ink); font-weight: var(--weight-strong); }
+.part-glossary li a:first-child { text-decoration-style: dotted; }
+.part-glossary li:target { animation: glossary-found 2s ease-out; }
+@keyframes glossary-found { from { background: var(--accent-tint); } }
+
+/* A term in the writing, marked by the script: a dotted line and its number. */
+.glossary-term { color: inherit; text-decoration: underline dotted; text-decoration-color: var(--muted); text-underline-offset: 0.2em; cursor: help; }
+.flow a.glossary-term { color: inherit; }
+.glossary-term sup { margin-left: 0.1em; font-size: 0.6em; line-height: 0; }
+.glossary-term:hover, .glossary-term.is-shown { color: var(--accent); text-decoration-color: var(--accent); }
+.glossary-term:target { animation: glossary-found 2s ease-out; }
+
+/* Its meaning in the margin, level with the term, while the reader points at
+   it. Placed by the script; margin-left is how far from the writing. */
+.glossary-note {
+  position: absolute;
+  z-index: 5;
+  width: 15rem;
+  margin: 0 0 0 var(--space-4);
+  font-size: var(--step--1);
+  line-height: 1.5;
+  color: var(--muted);
+  pointer-events: none;
+}
+.glossary-note strong { color: var(--ink); font-weight: var(--weight-strong); }
+.glossary-note[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .part-glossary li:target, .glossary-term:target { animation: none; }
+}

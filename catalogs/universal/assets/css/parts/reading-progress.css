@@ -1,0 +1,56 @@
+/* reading-progress: how far down the page the reader is. Shown once its
+   script has measured the page; --read runs from 0 to 1. */
+.part-reading-progress { --read: 0; display: none; pointer-events: none; }
+.part-reading-progress[data-ready] { display: block; }
+.part-reading-progress-value { display: none; }
+
+/* A thin line across the top. */
+.part-reading-progress.style-bar {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 20;
+  height: 2px;
+}
+.part-reading-progress.style-bar .part-reading-progress-mark {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left;
+  transform: scaleX(var(--read));
+}
+
+/* A ruler down the side: a tick every few pixels, a longer one every tenth,
+   and the mark with the share read beside it. Only where there is room. */
+.part-reading-progress.style-ruler {
+  position: fixed;
+  top: 10svh;
+  bottom: 10svh;
+  right: var(--space-2);
+  z-index: 20;
+  width: var(--space-2);
+  background:
+    repeating-linear-gradient(to bottom, var(--muted) 0 1px, transparent 1px 10%) right top / 100% 100% no-repeat,
+    repeating-linear-gradient(to bottom, var(--rule) 0 1px, transparent 1px 10px) right top / 50% 100% no-repeat;
+}
+.part-reading-progress.style-ruler .part-reading-progress-mark {
+  position: absolute;
+  top: calc(var(--read) * 100%);
+  right: 0;
+  width: 100%;
+  border-top: var(--border) solid var(--accent);
+}
+.part-reading-progress.style-ruler .part-reading-progress-value {
+  display: block;
+  position: absolute;
+  right: calc(100% + var(--space-1));
+  top: 0;
+  translate: 0 -50%;
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  font-variant-numeric: tabular-nums lining-nums;
+  line-height: 1;
+  color: var(--accent);
+}
+@media (max-width: 63.99rem) {
+  .part-reading-progress.style-ruler[data-ready] { display: none; }
+}

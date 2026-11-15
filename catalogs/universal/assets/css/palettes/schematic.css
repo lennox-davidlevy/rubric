@@ -1,0 +1,48 @@
+/* schematic: a white sheet on an almost-white page, warm black ink and one cobalt blue.
+   Made by `bun scripts/theme.ts build` from themes/palettes/schematic.yaml.
+   Edit that file, not this one. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #fbfbfb;
+  --ink: #0c0a09;
+  --accent: #103dff;
+  --muted: #57534e;
+  --rule: #e5e5e5;
+  --tint: #f5f5f5;
+  --dark-paper: #111111;
+  --dark-ink: #ececec;
+  --dark-accent: #8aa0ff;
+  --raised: #ffffff;
+  --link: #0c0a09;
+  --heading: #0c0a09;
+  --code-paper: #f7f7f7;
+  --code-ink: #0c0a09;
+  --code-muted: #656463;
+  --code-accent: #0c0a09;
+  --positive: #047857;
+  --warning: #92400e;
+  --danger: #be123c;
+  --accent-tint: #eef1ff;
+  --positive-tint: #e7f1ee;
+  --warning-tint: #f3ece8;
+  --danger-tint: #f6e8ec;
+  --dark-link: #ececec;
+  --dark-heading: #ececec;
+  --band: #111111;
+  --band-ink: #ececec;
+  --dark-muted: #a8a29e;
+  --dark-rule: #2e2e2e;
+  --dark-tint: #202020;
+  --dark-raised: #181818;
+  --dark-accent-tint: #20222e;
+  --dark-positive: #84b8a9;
+  --dark-warning: #c49f88;
+  --dark-danger: #d78a9d;
+  --dark-positive-tint: #1f2523;
+  --dark-warning-tint: #26221f;
+  --dark-danger-tint: #292022;
+  --shadow-soft: 0 1px 2px rgb(12 10 9 / 0.036), 0 2px 8px rgb(12 10 9 / 0.03);
+  --shadow-deep: 0 2px 4px rgb(12 10 9 / 0.036), 0 16px 40px rgb(12 10 9 / 0.084);
+}
