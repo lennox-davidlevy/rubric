@@ -1,6 +1,19 @@
 {{- /* How far down the page the reader is: a bar across the top, or a ruler
-     of ticks down the side with the share read. Drawn by its script; with
-     none, nothing shows. */ -}}
-<div class="part part-reading-progress style-{{ .s.style }}" aria-hidden="true">
-<span class="part-reading-progress-mark"><span class="part-reading-progress-value">0.00</span></span>
+     of ticks down the side with the share read and the page's sections,
+     which a phone opens from a button. Drawn by its script; with none,
+     nothing shows. */ -}}
+{{- if eq .s.style "ruler" }}
+<nav class="part part-reading-progress style-ruler" aria-label="Sections">
+<button class="part-reading-progress-open" type="button" popovertarget="reading-progress-panel" aria-label="Sections"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4h12M10 8h6M7 12h9M12 16h4" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
+<div class="part-reading-progress-panel" id="reading-progress-panel" popover>
+<div class="part-reading-progress-ruler">
+<span class="part-reading-progress-mark" aria-hidden="true"><span class="part-reading-progress-value">0.00</span></span>
+<ol class="part-reading-progress-sections"></ol>
 </div>
+</div>
+</nav>
+{{- else }}
+<div class="part part-reading-progress style-{{ .s.style }}" aria-hidden="true">
+<span class="part-reading-progress-mark"></span>
+</div>
+{{- end }}

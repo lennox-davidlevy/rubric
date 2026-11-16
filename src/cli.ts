@@ -5,7 +5,7 @@
 //   rubric new <folder>        a new site: a title, one post, nothing else
 //   rubric build [site]        the finished site in public/, with the pinned Hugo
 //   rubric stop [site]         stops the site's process, Hugo with it
-//   rubric calls [site]        every call to Jev as it happens, and a sum at the end
+//   rubric watch [site]        every call to Jev as it happens, a row each, and a sum at the end
 //   rubric lsp [--stub] [--harness claude|opencode] [--model <model>] [--effort <level>] [--drafting fast|tools]
 //                              for editors: their stdio to the site's process,
 //                              started in the background when none is running
@@ -17,14 +17,14 @@
 import { realpathSync } from "node:fs";
 import { join } from "node:path";
 import { buildSite } from "./build.ts";
-import { calls } from "./calls.ts";
 import { newSite } from "./new-site.ts";
 import { HARNESSES, MODES, type Drafter, type HarnessName, type Mode } from "./server/harness.ts";
 import { bridge } from "./server/bridge.ts";
 import { alive, running, runSite } from "./server/site-process.ts";
 import { findSiteRoot, openSite } from "./site.ts";
+import { watch } from "./watch.ts";
 
-const USAGE = "usage: rubric [site] | new <folder> | build [site] | stop [site] | calls [site] | lsp [--stub]";
+const USAGE = "usage: rubric [site] | new <folder> | build [site] | stop [site] | watch [site] | lsp [--stub]";
 const [command, ...args] = process.argv.slice(2);
 
 // The site named, or the one the current folder is in.
@@ -81,8 +81,8 @@ if (command === "lsp") {
     process.exit(1);
   }
   console.log(built.public);
-} else if (command === "calls") {
-  calls(siteRoot(args[0]));
+} else if (command === "watch") {
+  watch(siteRoot(args[0]));
 } else if (command === "stop") {
   const root = siteRoot(args[0]);
   // Only a process that answers on the site's socket: a pid left by one that

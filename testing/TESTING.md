@@ -20,7 +20,7 @@ R5, R6 and R12 wait a minute or more. Only R13 makes a paid draft.
 | R1 | `nvim testing/pages/posts/walk.md` | Within a second or two, a notice `rubric: http://127.0.0.1:1415/`. Diagnostics and ghost text work as before. |
 | R2 | `:Rubric open` | The browser opens the page. Typing changes it and moving the cursor scrolls it, as before. |
 | R3 | In a second terminal, `nvim testing/pages/parts.md` | The same address in the notice. `pgrep -fa 'hugo server'` shows one Hugo for `testing/`. |
-| R4 | In a third terminal, from `testing/`: `rubric calls`. Type a new words line in either Neovim and pause. | The call prints there, as `bun run play` printed it. Ctrl-C prints the sum. |
+| R4 | In a third terminal, from `testing/`: `rubric watch`. Type a new words line in either Neovim and pause. | A row for the call, in columns. Ctrl-C prints the sum. |
 | R5 | Quit both Neovims and wait a minute. Then `pgrep -fa cli.ts` and `pgrep -fa 'hugo server'`. | Nothing for `testing/`, and the page no longer loads. |
 | R6 | From `testing/`: `rubric` | It prints the address and stays in front. Open and quit Neovim on a page: the page stays up. Ctrl-C stops it, Hugo too. |
 | R7 | With a Neovim open on `walk.md`, change `pages/posts/reservoir.md` in another editor (or `echo 'More.' >> testing/pages/posts/reservoir.md`) and save | http://127.0.0.1:1415/posts/reservoir/ shows the change. Put the file back with `git checkout testing/pages/posts/reservoir.md`. |
@@ -35,19 +35,21 @@ R5, R6 and R12 wait a minute or more. Only R13 makes a paid draft.
 
 ## S. Schematic, a theme after Making Software
 
-New theme `schematic`, two new parts for every theme (catalog version 11): `glossary` in the writing, `reading-progress` in rubric.md. Use `my-garden` from R9 (before the cleanup below).
+New theme `schematic`, two new parts for every theme (catalog version 12): `glossary` in the writing, `reading-progress` in rubric.md. Use `my-garden` from R9 (before the cleanup below).
 
 | # | Do this | Expect |
 |---|---|---|
 | S1 | In `my-garden`'s `rubric.md`: `::: theme`, `<M-l>`, find **schematic** in the list | Its picture: a white sheet on a pale page, mono capitals for the name and the trail. Choose it. |
-| S2 | Add `::: sidebar` with two `### 1. A chapter` headings and links under each, `::: breadcrumbs`, `::: post-meta shows=everything` and `::: reading-progress style=ruler` | The sidebar's headings in mono capitals, the sheet beside it on the left, the details above the title as `DATE \| N WORDS \| AUTHOR`, and ticks down the right edge with the share read in blue as you scroll. |
+| S2 | Add `::: sidebar` with two `### 1. A chapter` headings and links under each, `::: breadcrumbs`, `::: post-meta shows=everything` and `::: reading-progress style=ruler` | The sidebar's headings in mono capitals, the sheet beside it on the left, the details above the title as `DATE \| N WORDS \| AUTHOR`, and ticks down the right edge with the share read in blue as you scroll. Point at the ruler: each `##` heading's name beside a longer tick, the one being read darker; clicking one jumps to it. |
 | S3 | `::: a bar showing how far down the page I've read` in `rubric.md`, pause | Offers `reading-progress`. |
 | S4 | In `pages/posts/first.md`: a paragraph using the words "capacitor" and "amplitude", then `## Glossary` and `::: a glossary of the terms I use`, pause, `<M-l>` | Offers `glossary` and writes a starter list. Replace it with `- **Capacitor**: …` and `- **Amplitude**: …`. |
 | S5 | On the page, point at "capacitor" in the paragraph | Dotted underline with a small number. Its meaning shows in the right margin, outside the sheet, level with the line. Clicking it jumps to the glossary, which flashes; the term there links back. |
 | S6 | Add `---` between two paragraphs, a `::: figure width=wide`, a `::: gallery columns=two` and a `::: sidenote` | The break is `╌╌╌╌`, captions in mono capitals, the sidenote outside the sheet on a wide screen. The post ends with `╌╌ END ╌╌`. |
-| S7 | Narrow the browser to a phone (dev tools, 390px) | No sheet, the gallery swipes one picture at a time, the sidenote sits in the writing, no ruler. Nothing scrolls sideways. |
-| S8 | Switch the system to dark | Dark gray sheet on near-black, light ink, a lighter blue. |
-| S9 | `rubric build` in `my-garden`, open `public/posts/first/index.html` | Drawn in schematic, not Paper (build used to drop the theme line). |
+| S7 | Narrow the browser to a phone (dev tools, 390px) | No sheet; the gallery swipes one picture at a time, the next one's edge showing (with pictures in `static/images/`; restart with `rubric stop` if `static/` is new); the sidenote sits in the writing. Two buttons in the bottom corners, nothing scrolling sideways. |
+| S8 | Tap the right button, then a section; tap the left button, then outside the drawer | The page blurs and the ruler opens with every section named; choosing one closes it there. The sidebar opens as a drawer from the left and closes. |
+| S9 | Switch the system to dark | Dark gray sheet on near-black, light ink, a lighter blue. |
+| S10 | `rubric build` in `my-garden`, open `public/posts/first/index.html` straight from the file manager or `open` | Drawn in schematic as in the live page, glossary and ruler working: links are relative now, with no integrity checks a browser refuses from disk. `live-server public` works too. From disk, a link to another page opens its folder, not the page: Hugo's folder addresses need a server. |
+| S11 | `::: reading-progress style=bar` in `rubric.md`, with any theme | A faint line across the very top, filling in the accent as you scroll. |
 
 Afterwards: `rm -rf /tmp/my-garden`.
 

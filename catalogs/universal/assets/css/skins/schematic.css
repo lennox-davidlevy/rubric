@@ -154,15 +154,17 @@ pre, .part-code pre { border-radius: 0; }
 .part-figure > p:not(:has(img)) { font-size: calc(var(--step--1) * 0.85); color: var(--ink); text-align: center; }
 .part-gallery a { border-radius: 0; }
 .part-gallery img { aspect-ratio: auto; object-fit: contain; background: transparent; }
-/* On a phone, a gallery is a row to swipe through, one picture at a time. */
+/* On a phone, a gallery is a row to swipe through, one picture at a time,
+   with the edge of the next showing so the reader knows there is one. */
 @media (max-width: 47.99rem) {
   .part-gallery.layout-grid ul {
     display: flex;
     overflow-x: auto;
-    scroll-snap-type: x proximity;
+    scroll-snap-type: x mandatory;
     scrollbar-width: none;
   }
-  .part-gallery.layout-grid li { flex: 0 0 100%; scroll-snap-align: start; }
+  .part-gallery.layout-grid li { flex: 0 0 85%; scroll-snap-align: start; }
+  .part-gallery.layout-grid li:only-child { flex-basis: 100%; }
 }
 
 /* A note in the margin: the serif, small and gray, with no line, outside

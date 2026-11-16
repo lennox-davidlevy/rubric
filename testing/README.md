@@ -21,10 +21,10 @@ A live Rubric site for trying the editor by hand. It uses the universal catalog 
 2. To watch the calls to Jev, in another terminal, from `testing/`:
 
    ```sh
-   rubric calls
+   rubric watch
    ```
 
-   It prints every call: the line sent, each part's probability and fit with its settings' answers, and what the line became; a second-pass block for the words after a pin's colon; on Ctrl-C, a sum. The full request and response of each call are in `testing/.rubric/jev.jsonl`, which `rubric calls` empties when it starts. A line answered from the cache makes no call and prints nothing.
+   It prints a row for every call: when, what kind (a line, the words after a part's colon, the theme line), the words, what they became, Jev's fit and the time taken, with the other parts Jev weighed under a line; on Ctrl-C, a sum. The full request and response of each call are in `testing/.rubric/jev.jsonl`, which `rubric watch` empties when it starts. A line answered from the cache makes no call and prints nothing.
 
 Typing `::: ` on an empty line adds the closing `:::` below it, the way autopairs closes a bracket. Turn it off with `close = false` in the plugin's setup.
 

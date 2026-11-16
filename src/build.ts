@@ -7,7 +7,7 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { Cache, frame, FRAME_PAGE, framePage, preprocess } from "./core/index.ts";
-import { hugoSiteArgs } from "./hugo-config.ts";
+import { hugoSiteArgs, readConfig } from "./hugo-config.ts";
 import { ensureHugo } from "./hugo.ts";
 import { writeHugoTree } from "./parts.ts";
 import { pageKind, type Site } from "./site.ts";
@@ -50,6 +50,15 @@ export async function writeContent(site: Site, cache: Cache, say: Say = console.
   return files.length;
 }
 
+// Hugo's keys are any case; a hugo.toml that does not parse is Hugo's to report.
+function ownsRelativeURLs(root: string): boolean {
+  try {
+    return Object.keys(Bun.TOML.parse(readConfig(root))).some((k) => k.toLowerCase() === "relativeurls");
+  } catch {
+    return false;
+  }
+}
+
 // The whole site, ready to publish, in public/.
 export async function buildSite(site: Site, say: Say = console.log): Promise<{ public: string } | { error: string }> {
   const cache = await Cache.load(site.cache);
@@ -57,7 +66,15 @@ export async function buildSite(site: Site, say: Say = console.log): Promise<{ p
   const hugo = await ensureHugo();
   if ("error" in hugo) return hugo;
   const out = join(site.root, "public");
-  const proc = Bun.spawn([hugo.path, ...(await hugoSiteArgs(site.root)), "--minify", "--cleanDestinationDir", "-d", out], { stdout: "ignore", stderr: "pipe" });
+  // Links relative to each page, so public/ works wherever it is put: in a
+  // folder of a host, under a path, or opened from disk. The site's own
+  // hugo.toml decides when it says.
+  const relative = ownsRelativeURLs(site.root) ? {} : { HUGO_RELATIVEURLS: "true" };
+  const proc = Bun.spawn([hugo.path, ...(await hugoSiteArgs(site.root)), "--minify", "--cleanDestinationDir", "-d", out], {
+    stdout: "ignore",
+    stderr: "pipe",
+    env: { ...process.env, ...relative },
+  });
   const [stderr, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited]);
   const errors = stderr.split("\n").filter((l) => /ERROR/.test(l));
   if (code !== 0 || errors.length) return { error: `Hugo could not build it: ${(errors.join(" ") || stderr.trim() || `exit ${code}`).slice(0, 600)}` };

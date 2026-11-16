@@ -182,7 +182,7 @@ export interface Options {
   // between keys nine times in ten, never under minIdleMs.
   idleMs?: number;
   minIdleMs?: number;
-  // Each edit to a words line, for `rubric calls` to have logged, so the pause can
+  // Each edit to a words line, for `rubric watch` to have logged, so the pause can
   // be tuned on real typing (scripts/pause.ts).
   onEdit?: (edit: { t: number; line: number; words: string; pause: number }) => void;
   // How long a ghost text request waits for an answer before giving up.

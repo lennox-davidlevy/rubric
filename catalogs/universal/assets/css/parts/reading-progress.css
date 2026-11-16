@@ -1,15 +1,17 @@
 /* reading-progress: how far down the page the reader is. Shown once its
-   script has measured the page; --read runs from 0 to 1. */
-.part-reading-progress { --read: 0; display: none; pointer-events: none; }
+   script has measured the page; --read runs from 0 to 1, and each section's
+   --at is where the reader is when its heading reaches the top. */
+.part-reading-progress { --read: 0; --at: 0; display: none; }
 .part-reading-progress[data-ready] { display: block; }
-.part-reading-progress-value { display: none; }
 
-/* A thin line across the top. */
+/* A thin line across the top, on a faint track so it shows from the start. */
 .part-reading-progress.style-bar {
   position: fixed;
   inset: 0 0 auto;
   z-index: 20;
-  height: 2px;
+  height: 3px;
+  background: var(--rule);
+  pointer-events: none;
 }
 .part-reading-progress.style-bar .part-reading-progress-mark {
   display: block;
@@ -19,28 +21,42 @@
   transform: scaleX(var(--read));
 }
 
-/* A ruler down the side: a tick every few pixels, a longer one every tenth,
-   and the mark with the share read beside it. Only where there is room. */
-.part-reading-progress.style-ruler {
+/* The ruler: a tick every few pixels and a longer one every tenth, the mark
+   with the share read beside it, and a longer tick for each section with its
+   name, shown while the reader points at the ruler. */
+/* A popover by its markup, for the phone; drawn as a plain column first. */
+.part-reading-progress-panel {
+  display: block;
   position: fixed;
-  top: 10svh;
-  bottom: 10svh;
-  right: var(--space-2);
+  inset: 10svh var(--space-2) 10svh auto;
   z-index: 20;
+  width: var(--space-4);
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  background: none;
+  color: var(--muted);
+  pointer-events: none;
+}
+.part-reading-progress-ruler {
+  position: absolute;
+  inset: 0 0 0 auto;
   width: var(--space-2);
+  pointer-events: auto;
   background:
     repeating-linear-gradient(to bottom, var(--muted) 0 1px, transparent 1px 10%) right top / 100% 100% no-repeat,
     repeating-linear-gradient(to bottom, var(--rule) 0 1px, transparent 1px 10px) right top / 50% 100% no-repeat;
 }
-.part-reading-progress.style-ruler .part-reading-progress-mark {
+.style-ruler .part-reading-progress-mark {
   position: absolute;
   top: calc(var(--read) * 100%);
   right: 0;
   width: 100%;
   border-top: var(--border) solid var(--accent);
 }
-.part-reading-progress.style-ruler .part-reading-progress-value {
-  display: block;
+.part-reading-progress-value {
   position: absolute;
   right: calc(100% + var(--space-1));
   top: 0;
@@ -51,6 +67,79 @@
   line-height: 1;
   color: var(--accent);
 }
+.part-reading-progress-sections { margin: 0; padding: 0; list-style: none; }
+.part-reading-progress-sections li {
+  position: absolute;
+  top: calc(var(--at) * 100%);
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  translate: 0 -50%;
+}
+.part-reading-progress-sections li::after {
+  content: "";
+  width: calc(var(--space-2) * 1.5);
+  border-top: var(--border) solid var(--muted);
+}
+.part-reading-progress-sections a {
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  line-height: 1;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: none;
+  text-transform: var(--label-case);
+  letter-spacing: var(--tracking-label);
+  color: var(--muted);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms;
+}
+.part-reading-progress-sections [aria-current] a { color: var(--ink); }
+.part-reading-progress-sections a:hover { color: var(--accent); }
+.part-reading-progress-panel:is(:hover, :focus-within) .part-reading-progress-sections a { opacity: 1; pointer-events: auto; }
+/* The names cover the share read while they show. */
+.part-reading-progress-panel:is(:hover, :focus-within) .part-reading-progress-value { opacity: 0; }
+.part-reading-progress-open { display: none; }
+
+/* On a phone the ruler waits behind a button in the corner, and opens over
+   the page, blurred behind it, with every section named. */
 @media (max-width: 63.99rem) {
-  .part-reading-progress.style-ruler[data-ready] { display: none; }
+  .part-reading-progress-panel:not(:popover-open) { display: none; }
+  .part-reading-progress-panel:popover-open {
+    pointer-events: auto;
+    inset: 0 0 0 auto;
+    width: min(20rem, 85vw);
+    height: 100%;
+    padding: 10svh var(--space-2);
+    background: linear-gradient(to left, var(--paper), transparent);
+  }
+  .part-reading-progress-panel:popover-open .part-reading-progress-ruler { inset: 10svh var(--space-2) 10svh auto; }
+  .part-reading-progress-panel:popover-open .part-reading-progress-sections a { opacity: 1; pointer-events: auto; color: var(--ink); }
+  .part-reading-progress-panel:popover-open .part-reading-progress-value { opacity: 0; }
+  .part-reading-progress-panel::backdrop { backdrop-filter: blur(6px); }
+  .part-reading-progress-open {
+    position: fixed;
+    right: var(--space-3);
+    bottom: var(--space-3);
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: var(--border) solid var(--rule);
+    border-radius: var(--control-radius);
+    background: var(--raised);
+    color: var(--ink);
+  }
+  .part-reading-progress-open svg { width: 1.25rem; height: 1.25rem; }
+  /* Above the sidebar's button when that is in the same corner. */
+  body:has(.part-sidebar-open.side-right) .part-reading-progress-open { bottom: calc(var(--space-3) * 2 + 2.75rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .part-reading-progress-sections a { transition: none; }
 }

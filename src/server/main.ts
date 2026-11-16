@@ -96,7 +96,7 @@ export async function openSiteServer(root: string, opts: SiteServerOptions): Pro
     ? (directive, page) => stubResolver(forPage(page))(directive, page)
     : async (directive, page) => {
         const asked = await ask(forPage(page), directive, page);
-        // `rubric calls` creates .rubric/jev.jsonl and prints each call
+        // `rubric watch` creates .rubric/jev.jsonl and prints each call
         // from it. A log is appended a line at a time, not written whole;
         // nothing but that printer reads it.
         const log = join(root, ".rubric/jev.jsonl");
@@ -166,7 +166,7 @@ export async function openSiteServer(root: string, opts: SiteServerOptions): Pro
       // A words line being typed will be asked soon: have the
       // connection open by then.
       if (!opts.stub) warm();
-      // `rubric calls` creates .rubric/keys.jsonl: when each words line
+      // `rubric watch` creates .rubric/keys.jsonl: when each words line
       // was typed, for scripts/pause.ts to fit the pause to the writer.
       const keys = join(root, ".rubric/keys.jsonl");
       if (existsSync(keys)) void appendFile(keys, JSON.stringify(edit) + "\n").catch(() => {});

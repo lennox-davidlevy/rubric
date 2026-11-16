@@ -1,4 +1,7 @@
-<aside class="part part-sidebar side-{{ .s.side }}">
+{{- /* Beside the writing where the screen has room; on a phone, behind a
+     button in the corner, opening over the page. */ -}}
+<button class="part-sidebar-open side-{{ .s.side }}" type="button" popovertarget="sidebar-{{ .s.side }}" aria-label="Sidebar"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 4v12" stroke="currentColor" stroke-width="1.5"/></svg></button>
+<aside class="part part-sidebar side-{{ .s.side }}" id="sidebar-{{ .s.side }}" popover>
 <div class="stack">
 {{ .inner }}
 </div>

@@ -57,3 +57,23 @@ test.skipIf(!hugoPath())("a build draws the site in rubric.md's theme", async ()
   expect(html).toMatch(/terminal-[^"]*\.css/);
   expect(html).not.toMatch(/paper-[^"]*\.css/);
 });
+
+test.skipIf(!hugoPath())("a built page finds its styles and scripts from wherever public/ is opened", async () => {
+  const root = join(tmp, "portable");
+  newSite(root);
+  expect(await buildSite(await openSite(root), () => {})).toEqual({ public: join(root, "public") });
+  const html = readFileSync(join(root, "public/posts/first/index.html"), "utf8");
+  // Relative to the page, so it works under any path or from disk, where a
+  // browser also refuses a file that carries an integrity check.
+  expect(html).toMatch(/rel="?stylesheet"? href="?\.\.\/\.\.\/css\//);
+  expect(html).not.toMatch(/href="?\/css\//);
+  expect(html).not.toContain("integrity=");
+});
+
+test.skipIf(!hugoPath())("a site's own relativeURLs decides how a build links", async () => {
+  const root = join(tmp, "absolute");
+  newSite(root);
+  writeFileSync(join(root, "hugo.toml"), `relativeURLs = false\n${readFileSync(join(root, "hugo.toml"), "utf8")}`);
+  expect(await buildSite(await openSite(root), () => {})).toEqual({ public: join(root, "public") });
+  expect(readFileSync(join(root, "public/posts/first/index.html"), "utf8")).toMatch(/href="?\/css\//);
+});
