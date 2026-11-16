@@ -36,6 +36,21 @@
 @media (max-width: 47.99rem) {
   main.flow { padding-top: var(--space-2); }
 }
+/* The header and footer as wide as the sheet and over it, their edges
+   level with its wide pictures. */
+@media (min-width: 48rem) {
+  .part-header-inner, .part-footer-inner {
+    --sheet: min(100% - 2 * var(--space-3), var(--wide) + 2 * var(--space-4));
+    max-width: var(--sheet);
+    padding-inline: var(--space-4);
+  }
+}
+@media (min-width: 64rem) {
+  body:has(> .shell.has-left:not(.has-right)) :is(.part-header-inner, .part-footer-inner) {
+    margin-left: min((100% - var(--sheet)) / 2, max(var(--space-3), 100% - var(--sheet) - 16rem));
+    margin-right: auto;
+  }
+}
 /* Centered in the space beside a sidebar, as every theme centers its
    writing; moved left only as far as it takes to leave the right margin
    room for notes (16rem), and never closer to the sidebar than a gap. */

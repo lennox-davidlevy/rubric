@@ -50,6 +50,7 @@ New theme `schematic`, two new parts for every theme (catalog version 12): `glos
 | S9 | Switch the system to dark | Dark gray sheet on near-black, light ink, a lighter blue. |
 | S10 | `rubric build` in `my-garden`, open `public/posts/first/index.html` straight from the file manager or `open` | Drawn in schematic as in the live page, glossary and ruler working: links are relative now, with no integrity checks a browser refuses from disk. `live-server public` works too. From disk, a link to another page opens its folder, not the page: Hugo's folder addresses need a server. |
 | S11 | `::: reading-progress style=bar` in `rubric.md`, with any theme | A faint line across the very top, filling in the accent as you scroll. |
+| S12 | A wide screen (1920 or more) with the sidebar, in Schematic and then in Paper | The writing centered in the space right of the sidebar, the header and footer lined up over it; in Schematic the header spans the sheet. |
 
 Afterwards: `rm -rf /tmp/my-garden`.
 

@@ -5,7 +5,7 @@
 // page without reloading it; anything set up once is marked and skipped.
 // The feed's path is from the site's root, where this script's own folder
 // (js/parts/) is: the built site may sit under a path.
-const SITE = (document.currentScript?.src ?? location.href).replace(/js\/parts\/[^/]*$/, "");
+const searchSite = (document.currentScript?.src ?? location.href).replace(/js\/parts\/[^/]*$/, "");
 const searches = () => document.querySelectorAll(".part-search[data-feed]:not([data-ready])").forEach((form) => {
   form.dataset.ready = "";
   const input = form.querySelector("input[type=search]");
@@ -13,7 +13,7 @@ const searches = () => document.querySelectorAll(".part-search[data-feed]:not([d
   let items;
   const load = async () => {
     if (items) return items;
-    const xml = new DOMParser().parseFromString(await (await fetch(new URL(form.dataset.feed, SITE))).text(), "application/xml");
+    const xml = new DOMParser().parseFromString(await (await fetch(new URL(form.dataset.feed, searchSite))).text(), "application/xml");
     items = [...xml.querySelectorAll("item")].map((i) => ({
       title: i.querySelector("title")?.textContent ?? "",
       link: i.querySelector("link")?.textContent ?? "",
