@@ -25,7 +25,8 @@
    all round, and the page's paper around it. */
 @media (min-width: 48rem) {
   main.flow {
-    width: min(100% - 2 * var(--space-3), var(--wide) + 2 * var(--space-4));
+    --sheet: min(100% - 2 * var(--space-3), var(--wide) + 2 * var(--space-4));
+    width: var(--sheet);
     margin: var(--space-2) auto var(--space-5);
     padding-block: var(--space-3) var(--space-5);
     background: var(--raised);
@@ -35,10 +36,13 @@
 @media (max-width: 47.99rem) {
   main.flow { padding-top: var(--space-2); }
 }
-/* Beside a sidebar the sheet keeps to its left, leaving the right of the
-   screen for notes in the margin. */
+/* Centered in the space beside a sidebar, as every theme centers its
+   writing; moved left only as far as it takes to leave the right margin
+   room for notes (16rem), and never closer to the sidebar than a gap. */
 @media (min-width: 64rem) {
-  .shell.has-left:not(.has-right) main.flow { margin-left: var(--space-3); }
+  .shell.has-left:not(.has-right) main.flow {
+    margin-left: min((100% - var(--sheet)) / 2, max(var(--space-3), 100% - var(--sheet) - 16rem));
+  }
 }
 
 /* The title, centered and light, with the post's details above it, the

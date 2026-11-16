@@ -19,8 +19,8 @@ const env = { ...process.env, XDG_RUNTIME_DIR: runtime, RUBRIC_HUGO: fakeHugo, R
 const pids: number[] = [];
 
 beforeAll(() => {
-  // Waits like `hugo server` until it is stopped.
-  writeFileSync(fakeHugo, "#!/bin/sh\nexec sleep 600\n");
+  // Waits like `hugo server` until it is stopped, noting how it was asked.
+  writeFileSync(fakeHugo, `#!/bin/sh\necho "$@" >> ${JSON.stringify(join(tmp, "hugo-args"))}\nexec sleep 600\n`);
   chmodSync(fakeHugo, 0o755);
 });
 
@@ -83,6 +83,9 @@ test("two editors share one process; each gets the notes of the pages it has ope
   pids.push(serving.pid!);
   expect(alive(serving.pid)).toBe(true);
   expect(serving.stub).toBe(true);
+  // The preview's pages stay in memory, never in public/, where a build is.
+  expect(await until(() => existsSync(join(tmp, "hugo-args")))).toBe(true);
+  expect(readFileSync(join(tmp, "hugo-args"), "utf8")).toContain("--renderToMemory");
   const b = await editor(root);
   expect(readServing(root)!.pid).toBe(serving.pid);
 

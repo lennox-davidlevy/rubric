@@ -208,7 +208,9 @@ export async function runSite(root: string, opts: SiteOptions): Promise<RunningS
     problem = found.error;
     say(problem);
   } else {
-    hugo = spawn(found.path, ["server", ...(await hugoSiteArgs(root)), "--port", String(port), "--bind", "127.0.0.1"], {
+    // In memory: on disk it would write public/, over what `rubric build`
+    // made there, with pages that work only through this server.
+    hugo = spawn(found.path, ["server", ...(await hugoSiteArgs(root)), "--renderToMemory", "--port", String(port), "--bind", "127.0.0.1"], {
       cwd: root,
       // The page reaches the relay at the address Hugo writes into it.
       env: { ...process.env, HUGO_PARAMS_RUBRIC_RELAY: `http://127.0.0.1:${relayPort}` },
