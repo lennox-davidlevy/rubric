@@ -1,5 +1,5 @@
 name: universal
-version: 12
+version: 13
 
 # Every component a website needs, as contracts only: what each part is,
 # its settings and what it expects inside. Nothing here is drawn yet. Drawn
@@ -55,6 +55,8 @@ look:
 # already:        look values the part has by being itself; a line's "big"
 #                 picks a lead, and does not also ask for bigger text. Not
 #                 sent to Jev. The second pass can still ask for them.
+#                 On a choice, by value: a quote's `size=large` is already
+#                 bigger text, so "a big quote" asks for one, not both.
 #
 # Left out on purpose: inline pieces (a badge, an icon, a key, an
 # abbreviation), which sit inside a sentence and need their own syntax;
@@ -156,6 +158,7 @@ parts:
         values:
           normal: the same size as the prose
           large: noticeably larger than the prose, a pull quote
+        already: { large: { text: bigger } }
       align:
         type: choice
         default: left

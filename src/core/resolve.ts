@@ -4,7 +4,7 @@
 // the cache, and the API-error row in the client.
 
 import type { ChoiceResponse, NoulResponse, ScoreResponse } from "@typesafe-ai/sdk";
-import { settingsOf, type Catalog } from "./catalog.ts";
+import { settingsOf, type Catalog, type Setting } from "./catalog.ts";
 import { formatPlain } from "./plain.ts";
 import { BEYOND, fitsId, lookId, lookSaidId, PART, saidId, settingId, THRESHOLDS, toldId } from "./questions.ts";
 
@@ -112,6 +112,7 @@ function candidate(answers: Answers, catalog: Catalog, part: string, probability
 
   // The look, asked once for the line, applies to whichever part it is.
   if (catalog.parts[part]!.place === "writing") {
+    const given = lookGiven(settingsOf(catalog, part), Object.fromEntries(settings.map((s) => [s.key, s.value])));
     for (const [name, def] of Object.entries(catalog.look)) {
       if (def.type !== "choice" || !answers[lookId(name)]) continue;
       const said = noul(answers, lookSaidId(name));
@@ -119,6 +120,8 @@ function candidate(answers: Answers, catalog: Catalog, part: string, probability
       const [best, p] = top(choiceAnswer(answers, lookId(name)).probabilities as Record<string, number>);
       // The line's "big" is what picked a part that is already big.
       if (catalog.parts[part]!.already?.[name] === best) continue;
+      // Nor for what a setting's value already gives: a large quote is bigger.
+      if (given[name] === best) continue;
       if (said <= THRESHOLDS.yes) {
         unsettled.push(name);
         continue;
@@ -166,6 +169,9 @@ export function resolveRefine(answers: Answers, catalog: Catalog, part: string):
     if (value === undefined) unsettled.push(name);
     else settings[name] = value;
   }
+  for (const [look, value] of Object.entries(lookGiven(settingsOf(catalog, part), settings))) {
+    if (settings[look] === value) delete settings[look];
+  }
   return { settings, unsettled, beyond: noul(answers, BEYOND) };
 }
 
@@ -211,4 +217,15 @@ function scoreAnswer(answers: Answers, id: string): ScoreResponse {
   const a = answers[id];
   if (a?.type !== "score") throw new AnswerError(`missing score answer ${id}`);
   return a;
+}
+
+// The look values that settings' chosen values already give (`already` on a
+// choice): a quote set large is already bigger.
+function lookGiven(defs: Record<string, Setting>, chosen: Record<string, string>): Record<string, string> {
+  const given: Record<string, string> = {};
+  for (const [name, value] of Object.entries(chosen)) {
+    const def = defs[name];
+    if (def?.type === "choice") Object.assign(given, def.already?.[value]);
+  }
+  return given;
 }

@@ -941,7 +941,11 @@ describe("variants", () => {
     expect(ws.site.catalog.parts.quote?.settings.variant).toBeUndefined();
     await ws.settle();
     expect(content()).not.toContain("quote--torn-paper");
-    expect(codes(4).length).toBeGreaterThan(0);
+    // Every line still asking for it draws as the part, with a note.
+    await write(`${front}::: quote variant=torn-paper\nSaid.\n:::\n\n::: quote variant=torn-paper\nWritten.\n:::\n`);
+    expect(content().match(/\{\{< quote >\}\}/g)).toHaveLength(2);
+    expect(codes(4)).toEqual(["gone-variant"]);
+    expect(codes(8)).toEqual(["gone-variant"]);
     await write(quotes);
   });
 
@@ -1006,6 +1010,11 @@ describe("variants", () => {
     // Removing a variant puts its line back to the part, which still draws;
     // with every variant gone, a line that says plain is still the part.
     expect((await ws.remove(page(), 4)).replace).toBe("::: quote");
+    // Another line still asking for it draws as the part, beside the variant left.
+    await write(`${front}::: quote variant=torn-paper\nSaid.\n:::\n\n::: quote variant=ivy\nWritten.\n:::\n`);
+    expect(codes(4)).toEqual(["gone-variant"]);
+    expect(content()).toContain("{{< quote >}}");
+    expect(content()).toContain("{{< quote--ivy >}}");
     await write(`${front}::: quote variant=ivy : darker\nSaid.\n:::\n\n::: quote variant=plain\nWritten.\n:::\n`);
     expect((await ws.remove(page(), 4)).replace).toBe("::: quote : darker");
     await write(`${front}::: quote variant=plain\nWritten.\n:::\n`);

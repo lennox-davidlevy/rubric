@@ -15,7 +15,7 @@ import { PLAIN, VARIANT } from "./variant.ts";
 // without it. `site` names a key under [params.rubric] in hugo.toml that
 // gives it for every page, so a form's address is set once.
 export type Setting =
-  | { type: "choice"; default: string; values: Record<string, string>; question?: string }
+  | { type: "choice"; default: string; values: Record<string, string>; question?: string; already?: Record<string, Record<string, string>> }
   | { type: "level"; default: string; levels: Record<string, string>; question?: string }
   | { type: "flag"; default?: boolean; true?: string; false?: string; question?: string }
   | { type: "text"; default?: string; needed?: string; site?: string }
@@ -320,8 +320,17 @@ function setting(raw: unknown, at: string): Setting {
         throw new CatalogError(`${at}.default must be one of ${names.join(", ")}`);
       }
       const def = String(s.default);
+      // Look values a choice's value already gives: a large quote is already
+      // bigger, so the line that says "big" does not also ask for bigger text.
+      const already = s.already === undefined ? {} : {
+        already: Object.fromEntries(Object.entries(record(s.already, `${at}.already`)).map(([v, looks]) => {
+          if (!names.includes(v)) throw new CatalogError(`${at}.already.${v} is not one of ${names.join(", ")}`);
+          return [v, Object.fromEntries(Object.entries(record(looks, `${at}.already.${v}`)).map(([k, l]) => [k, string(l, `${at}.already.${v}.${k}`)]))];
+        })),
+      };
+      if (s.type === "level" && s.already !== undefined) throw new CatalogError(`${at}.already is for a choice`);
       return s.type === "choice"
-        ? { type: "choice", default: def, values: values as Record<string, string>, ...question }
+        ? { type: "choice", default: def, values: values as Record<string, string>, ...question, ...already }
         : { type: "level", default: def, levels: values as Record<string, string>, ...question };
     }
     case "flag": {

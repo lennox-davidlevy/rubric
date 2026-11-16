@@ -113,6 +113,30 @@ describe("a part that already has a look", () => {
   });
 });
 
+describe("a setting's value that already gives a look", () => {
+  const big = (size: Record<string, number>): Answers => ({
+    part: { type: "choice", choice: "quote", probabilities: { quote: 1 } },
+    "fits:quote": { type: "noul", noul: 0.95 },
+    "said:quote:size": { type: "noul", noul: 0.9 },
+    "setting:quote:size": { type: "choice", choice: "x", probabilities: size },
+    "said:quote:align": { type: "noul", noul: 0.05 },
+    "look-said:text": { type: "noul", noul: 0.9 },
+    "look:text": { type: "choice", choice: "bigger", probabilities: { normal: 0, smaller: 0, bigger: 1 } },
+  } as unknown as Answers);
+  const plain = (a: Answers) => {
+    const r = resolve(a, atPlace(inPaper, "writing"));
+    return r.outcome === "placed" ? r.candidates[0]?.plain : undefined;
+  };
+
+  test("a big quote is large, without bigger text too", () => {
+    expect(plain(big({ normal: 0, large: 1 }))).toBe("quote size=large");
+  });
+
+  test("a quote of the usual size still takes bigger text", () => {
+    expect(plain(big({ normal: 1, large: 0 }))).toBe("quote text=bigger");
+  });
+});
+
 describe("the look settings", () => {
   const noul = (n: number) => ({ type: "noul", noul: n }) as const;
   const choice = (probabilities: Record<string, number>) => {

@@ -9,6 +9,7 @@
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { fromPkg } from "./pkg.ts";
 
 export const HUGO_VERSION = "0.169.0";
 const RELEASES = `https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}`;
@@ -23,10 +24,10 @@ export const ASSETS: Record<string, Asset> = {
   // From the release's hugo_0.169.0_checksums.txt.
   "linux-x64": { file: `hugo_${HUGO_VERSION}_linux-amd64.tar.gz`, sha256: "2d2f0bfe357d8cb4cec02f6bb28a3bff34978c8dda44b618029c5eb9d66765a7" },
   "linux-arm64": { file: `hugo_${HUGO_VERSION}_linux-arm64.tar.gz`, sha256: "ddadaaccbf437e3d39c33140b80c2180c4f46d027d16b7716c1282ea2e14e00c" },
-  // macOS gets only an installer package (.pkg) from this release, no
-  // archive: not downloaded until unpacking one is built.
-  "darwin-x64": { file: `hugo_${HUGO_VERSION}_darwin-universal.pkg`, sha256: "" },
-  "darwin-arm64": { file: `hugo_${HUGO_VERSION}_darwin-universal.pkg`, sha256: "" },
+  // macOS gets only an installer package (.pkg), one for both chips, which
+  // is unpacked here (pkg.ts), never installed.
+  "darwin-x64": { file: `hugo_${HUGO_VERSION}_darwin-universal.pkg`, sha256: "9b1170c439b5444e31d4731dd0071fc2b380b8d58050e6cdae80e3e179b4bf52" },
+  "darwin-arm64": { file: `hugo_${HUGO_VERSION}_darwin-universal.pkg`, sha256: "9b1170c439b5444e31d4731dd0071fc2b380b8d58050e6cdae80e3e179b4bf52" },
 };
 
 export interface HugoOptions {
@@ -103,9 +104,14 @@ export async function ensureHugo(o: HugoOptions = {}): Promise<{ path: string } 
     rmSync(work, { recursive: true, force: true });
     mkdirSync(work, { recursive: true });
     try {
-      writeFileSync(join(work, asset.file), new Uint8Array(body));
-      const tar = Bun.spawnSync(["tar", "-xzf", join(work, asset.file), "-C", work, "hugo"], { stdout: "ignore", stderr: "pipe" });
-      if (tar.exitCode !== 0 || !existsSync(join(work, "hugo"))) return { error: `Hugo ${HUGO_VERSION} not downloaded: the archive has no hugo in it` };
+      if (asset.file.endsWith(".pkg")) {
+        const hugo = fromPkg(new Uint8Array(body), "hugo");
+        if (hugo) writeFileSync(join(work, "hugo"), hugo);
+      } else {
+        writeFileSync(join(work, asset.file), new Uint8Array(body));
+        Bun.spawnSync(["tar", "-xzf", join(work, asset.file), "-C", work, "hugo"], { stdout: "ignore", stderr: "pipe" });
+      }
+      if (!existsSync(join(work, "hugo"))) return { error: `Hugo ${HUGO_VERSION} not downloaded: the archive has no hugo in it` };
       chmodSync(join(work, "hugo"), 0o755);
       renameSync(join(work, "hugo"), dest);
     } finally {

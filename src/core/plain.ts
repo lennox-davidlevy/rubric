@@ -92,6 +92,16 @@ export function validatePlain(form: PlainForm, catalog: Catalog, line: number, d
     const def = Object.hasOwn(defs, s.key) ? defs[s.key] : undefined;
     // The part with no variant, which a line may say whether it has any.
     if (!def && s.key === VARIANT && s.value === PLAIN) continue;
+    if (seen.has(s.key)) {
+      out.push({ line, ...s.keySpan, code: "duplicate-setting", message: `${s.key} is given more than once` });
+      continue;
+    }
+    seen.add(s.key);
+    // A variant the site doesn't have, as once one is removed: the part draws.
+    if (s.key === VARIANT && (!def || (def.type === "choice" && !Object.hasOwn(def.values, s.value)))) {
+      out.push({ line, ...s.valueSpan, code: "gone-variant", message: `this site has no ${form.part} variant "${s.value}"; drawn as ${form.part}` });
+      continue;
+    }
     if (!def) {
       const skin = catalog.elsewhere.settings[form.part]?.[s.key];
       out.push(skin
@@ -99,11 +109,6 @@ export function validatePlain(form: PlainForm, catalog: Catalog, line: number, d
         : { line, ...s.keySpan, code: "unknown-setting", message: `${form.part} has no setting "${s.key}"` });
       continue;
     }
-    if (seen.has(s.key)) {
-      out.push({ line, ...s.keySpan, code: "duplicate-setting", message: `${s.key} is given more than once` });
-      continue;
-    }
-    seen.add(s.key);
 
     const allowed =
       def.type === "choice" ? Object.keys(def.values)

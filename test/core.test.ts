@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CatalogError, formatPlain, loadCatalog, parseCatalog, parsePlain, preprocess, scan } from "../src/core/index.ts";
+import { CatalogError, formatPlain, loadCatalog, parseCatalog, parsePlain, preprocess, scan, withOwn } from "../src/core/index.ts";
 
 const sliceYaml = readFileSync(join(import.meta.dir, "../catalogs/slice/catalog.yaml"), "utf8");
 const slice = parseCatalog(sliceYaml);
@@ -123,5 +123,23 @@ describe("scan", () => {
     expect(kind("::: quote from the book")).toBe("words");
     expect(kind("::: a raise")).toBe("words");
     expect(kind("::: callout")).toBe("plain");
+  });
+});
+
+describe("a variant the site no longer has", () => {
+  const base = parseCatalog(readFileSync(join(import.meta.dir, "../catalogs/universal/catalog.yaml"), "utf8"));
+  const quote = base.parts.quote!;
+  const withIvy = withOwn(base, { "quote--ivy": { ...quote, variant: "quote", origin: "site", everywhere: true, description: "ivy" } });
+
+  test("draws as the part itself, even beside a variant every line draws", () => {
+    const out = preprocess("::: quote variant=torn\nSaid.\n:::\n", withIvy);
+    expect(out.content).toContain("{{< quote >}}");
+    expect(out.diagnostics.map((d) => d.code)).toEqual(["gone-variant"]);
+  });
+
+  test("given twice beside a real one, is a mistake and does not draw", () => {
+    const out = preprocess("::: quote variant=ivy variant=torn\nSaid.\n:::\n", withIvy);
+    expect(out.diagnostics.map((d) => d.code)).toEqual(["duplicate-setting"]);
+    expect(out.content).not.toContain("{{<");
   });
 });

@@ -61,6 +61,14 @@ describe("reading the answers", () => {
     expect(resolveRefine(quiet, catalog, "video").settings).toEqual({});
   });
 
+  test("words asking for a large quote do not also ask for bigger text", () => {
+    const answers = {
+      ...lookUntold("quote"), "told:quote:align": noul(0.05), "told:quote:size": noul(0.9), "setting:quote:size": choice({ normal: 0.05, large: 0.95 }),
+      "told:quote:text": noul(0.9), "setting:quote:text": choice({ normal: 0.05, smaller: 0.0, bigger: 0.95 }), beyond: noul(0.1),
+    } as unknown as Answers;
+    expect(resolveRefine(answers, catalog, "quote").settings).toEqual({ size: "large" });
+  });
+
   test("spoken to with no clear value is unsettled", () => {
     const answers = { ...lookUntold("pricing"), "told:pricing:featured": noul(0.9), "setting:pricing:featured": choice({ none: 0.1, last: 0.45, middle: 0.45 }), beyond: noul(0.8) } as unknown as Answers;
     expect(resolveRefine(answers, catalog, "pricing")).toEqual({ settings: {}, unsettled: ["featured"], beyond: 0.8 });

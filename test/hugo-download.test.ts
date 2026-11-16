@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { deflateSync } from "node:zlib";
 import { ensureHugo, HUGO_VERSION, hugoPath, type HugoOptions } from "../src/hugo.ts";
 
 const tmp = mkdtempSync(join(tmpdir(), "rubric-hugo-"));
@@ -20,6 +21,34 @@ let fetched = 0;
 let archive: Uint8Array;
 let sha256: string;
 const FILE = "hugo_test.tar.gz";
+const PKG = "hugo_test.pkg";
+let pkg: Uint8Array;
+
+// A macOS installer package as the release makes one: a xar archive whose
+// Payload is a gzip'd odc cpio holding ./hugo beside other files.
+function makePkg(files: Record<string, Uint8Array>): Uint8Array {
+  const octal = (n: number, w: number) => n.toString(8).padStart(w, "0");
+  const entry = (name: string, body: Uint8Array, mode: number) => {
+    const head = "070707" + octal(0, 6) + octal(0, 6) + octal(mode, 6) + octal(0, 6) + octal(0, 6) + octal(1, 6) + octal(0, 6) + octal(0, 11) + octal(name.length + 1, 6) + octal(body.length, 11);
+    return Buffer.concat([Buffer.from(head + name + "\0", "latin1"), body]);
+  };
+  const cpio = Buffer.concat([
+    ...Object.entries(files).map(([n, b]) => entry(n, b, 0o100755)),
+    entry("TRAILER!!!", new Uint8Array(), 0),
+  ]);
+  const payload = Bun.gzipSync(cpio);
+  const bom = deflateSync(Buffer.from("bom"));
+  const toc = `<?xml version="1.0"?><xar><toc><file id="1"><data><length>${bom.length}</length><offset>0</offset><encoding style="application/x-gzip"/></data><name>Bom</name></file><file id="2"><data><length>${payload.length}</length><encoding style="application/octet-stream"/><offset>${bom.length}</offset></data><ea><offset>0</offset><length>1</length><name>com.apple.provenance</name></ea><name>Payload</name></file></toc></xar>`;
+  const z = deflateSync(Buffer.from(toc));
+  const header = Buffer.alloc(28);
+  header.write("xar!", 0, "latin1");
+  header.writeUInt16BE(28, 4);
+  header.writeUInt16BE(1, 6);
+  header.writeBigUInt64BE(BigInt(z.length), 8);
+  header.writeBigUInt64BE(BigInt(toc.length), 16);
+  header.writeUInt32BE(1, 24);
+  return new Uint8Array(Buffer.concat([header, z, bom, payload]));
+}
 
 beforeAll(() => {
   const src = join(tmp, "release");
@@ -28,6 +57,7 @@ beforeAll(() => {
   expect(Bun.spawnSync(["tar", "-czf", join(tmp, FILE), "-C", src, "hugo", "LICENSE"]).exitCode).toBe(0);
   archive = new Uint8Array(readFileSync(join(tmp, FILE)));
   sha256 = new Bun.CryptoHasher("sha256").update(archive).digest("hex");
+  pkg = makePkg({ "./._hugo": new Uint8Array([1, 2, 3]), "./hugo": new Uint8Array(readFileSync(join(src, "hugo"))) });
   server = Bun.serve({
     port: 0,
     hostname: "127.0.0.1",
@@ -35,7 +65,8 @@ beforeAll(() => {
       fetched++;
       // Slow enough that two callers overlap.
       await Bun.sleep(50);
-      return new URL(req.url).pathname === `/${FILE}` ? new Response(archive) : new Response("no", { status: 404 });
+      const path = new URL(req.url).pathname;
+      return path === `/${FILE}` ? new Response(archive) : path === `/${PKG}` ? new Response(pkg) : new Response("no", { status: 404 });
     },
   });
 });
@@ -88,6 +119,25 @@ describe("the pinned Hugo", () => {
     expect(await ensureHugo(o)).toEqual(got);
     expect(hugoPath(o)).toBe((got as { path: string }).path);
     expect(fetched - before).toBe(1);
+  });
+
+  test("macOS's installer package is unpacked for its hugo alone, never installed", async () => {
+    const o = fresh({ assets: { here: { file: PKG, sha256: new Bun.CryptoHasher("sha256").update(pkg).digest("hex") } } });
+    const got = await ensureHugo(o);
+    expect(got).toEqual({ path: join(o.cacheDir!, HUGO_VERSION, "hugo") });
+    expect(Bun.spawnSync([(got as { path: string }).path, "version"]).stdout.toString()).toContain(HUGO_VERSION);
+  });
+
+  test("a package with no hugo in it is an error, and nothing is kept", async () => {
+    const empty = makePkg({ "./README": new Uint8Array([1]) });
+    const o = fresh({ assets: { here: { file: PKG, sha256: new Bun.CryptoHasher("sha256").update(empty).digest("hex") } } });
+    pkg = empty;
+    try {
+      expect(await ensureHugo(o)).toMatchObject({ error: expect.stringContaining("no hugo") });
+      expect(hugoPath(o)).toBeUndefined();
+    } finally {
+      pkg = makePkg({ "./hugo": new Uint8Array(readFileSync(join(tmp, "release", "hugo"))) });
+    }
   });
 
   test("two at once fetch it once", async () => {

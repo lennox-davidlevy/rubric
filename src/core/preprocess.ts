@@ -9,7 +9,7 @@ import type { Diagnostic } from "./diagnostic.ts";
 import { aloneShortcode, closeShortcode, formatPlain, openShortcode, validatePlain, type PlainForm } from "./plain.ts";
 import { scan, type Directive, type Kind } from "./scan.ts";
 import { formatThemeLine, type ThemeChoice } from "./theme-line.ts";
-import { drawnForm } from "./variant.ts";
+import { drawnForm, PLAIN, VARIANT } from "./variant.ts";
 
 // Why a directive was left as text. "unresolved" is a words line with no
 // answer yet; the others carry a diagnostic.
@@ -97,10 +97,16 @@ export function preprocess(text: string, catalog: Catalog, resolve: Resolve = ()
     // Settings another skin adds are kept in the pin but left out of the
     // page, with a note; the part still draws. A part another skin adds
     // does not draw at all.
-    const notes = problems.filter((p) => p.code === "other-skin");
+    // A variant the site no longer has draws as its part, with a note too.
+    const notes = problems.filter((p) => p.code === "other-skin" || p.code === "gone-variant");
     if (form && notes.length > 0 && notes.length === problems.length && Object.hasOwn(catalog.parts, form.part)) {
       const elsewhere = catalog.elsewhere.settings[form.part] ?? {};
-      form = { ...form, settings: form.settings.filter((s) => !Object.hasOwn(elsewhere, s.key)) };
+      const gone = notes.some((p) => p.code === "gone-variant");
+      // The part itself, even when another variant is every line's default.
+      form = {
+        ...form,
+        settings: form.settings.filter((s) => !Object.hasOwn(elsewhere, s.key)).map((s) => (gone && s.key === VARIANT ? { ...s, value: PLAIN } : s)),
+      };
       diagnostics.push(...notes);
       problems = [];
     }
