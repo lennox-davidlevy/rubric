@@ -4,7 +4,7 @@ From the session of 2026-11-16 that built [app-slice.md](app-slice.md) on branch
 
 ## How the session ran the window
 
-The first run opened the window on David's display (`:0`). i3 tiled it into the focused workspace, beside the browser there, so the screenshot caught the browser. When that window was killed, **David's X server crashed** (Xorg SIGSEGV in `nvidia_drv.so`, 16:32:39; Brave crashed in `libGLX_nvidia.so` at the same moment). The timing points at the app's Vulkan window on the NVIDIA driver going away. It was not proven: it happened once, and nothing was run on `:0` again to find out.
+The first run opened the window on David's display (`:0`). i3 tiled it into the focused workspace, beside the browser there, so the screenshot caught the browser. When that window was killed, **David's X server crashed** (Xorg SIGSEGV in `nvidia_drv.so`, 16:32:39; Brave crashed in `libGLX_nvidia.so` at the same moment). The timing points at the app's Vulkan window on the NVIDIA driver going away. It was not proven: it happened once, and nothing was run on `:0` again to find out. **Xorg crashed again at 17:15:45, as the app's window opened.** David agreed to the window measure on the real display with each window moved to workspace `6:Slack`; the first release launch started at 17:15:45, David saw it open on `6:Slack`, and Xorg died that second (the same SIGSEGV in the NVIDIA driver, Chromium and Sunshine going down with it). The second launch found the restarted X server closed to it and exited, so exactly one launch reached the display. (The session at first said the run never started, going by a rejected tool call; the files the run left showed otherwise.) Both crashes came with the app's window on the NVIDIA display: one as it closed, one as it opened. The first was the task 1 build, which had **no web view**, so Rune's own window (wgpu on Vulkan, NVIDIA's driver) is implicated, not WebKit.
 
 After that, every check ran on a display of the session's own: Xvfb `:77`, Vulkan limited to Mesa's software driver (lavapipe, `VK_ICD_FILENAMES`), WebKit on software GL, and later a private i3 on that display (its own config and socket), so the NVIDIA driver and David's screen were never touched again. Timings that involve drawing (the first frame) are from llvmpipe there, so they are not the real display's; see task 5.
 
@@ -94,15 +94,18 @@ What is Linux-only today:
 - The session's way of looking at the window: Xvfb, a private i3, `xdotool`, `maim`, software Vulkan.
 - Not checked: whether Rubric's own site process (its socket under `$XDG_RUNTIME_DIR`) runs as is on macOS.
 
-## The verdict: go, on three conditions
+## The verdict: no-go on Linux with NVIDIA until the crash is explained; everything else says go
 
-The slice asked whether Rune can be the shell, the window and the editor, with the page in a system web view beside it. Everything the slice built works on X11, and the numbers it could take are far inside the budgets. **Go**, with three things to see before it is final:
+The slice asked whether Rune can be the shell, the window and the editor, with the page in a system web view beside it. Everything the slice built works, and the numbers it could take are far inside the budgets. But **on David's machine the app's window crashed the X server twice**, taking the whole desktop down, once as the window closed and once as it opened; the first time with no web view in the app at all. An app that can take the desktop down cannot ship, whatever its speed, so as it stands the answer is **no-go**, on Linux with the NVIDIA driver at least.
 
-1. **The real display.** A14 (the app at least as immediate as Neovim) and the first frame under 150 ms on the NVIDIA screen; llvmpipe gave 160 ms.
-2. **The crash.** If closing the window on the NVIDIA display crashes Xorg again, that is a no for Rune on Linux with this driver until Rune or the driver changes; it could not be told apart from chance after one time.
-3. **The Mac attach.** On Linux the web view sat in Rune's window at the first attempt, but the Mac is the other half of the shell, and Wayland is a gap on Linux either way.
+What would turn it into a go:
 
-Why go:
+1. **The crash, explained.** The two core dumps are in `coredumpctl` (Xorg, 16:32:39 and 17:15:45). Next steps, cheapest first, none run yet: the same window on `:0` drawing with wgpu's OpenGL backend instead of Vulkan (whether Rune lets an app choose it on Linux is unchecked), and Rune's `hello` example alone, to see whether any Rune window does it or only this app; then a report to Rune with the dumps. Every run on the real display only by David, with work saved.
+2. **The real display**, once it doesn't crash: A14 (the app at least as immediate as Neovim) and the first frame under 150 ms on the GPU (160 ms in software).
+3. **The Mac attach.** The Mac is the other half of the shell, and Wayland is a gap on Linux either way. A Mac where all of this holds would make Rune a go there even while the Linux crash stands.
+
+What the slice shows apart from the crash:
+
 
 - **Speed.** A keystroke costs 0.1 to 0.2 ms of CPU in a 3,800-word styled post, against 4 ms allowed; the whole-post Markdown pass is 7 µs; idle is 0%. Nothing in the editor waits on the web view, which has a thread and a GTK loop of its own.
 - **The web view fits.** Approach A worked first time; the page follows the pane through drags, snaps and resizes, and focus comes back to the editor after a click in the page (under i3 on Xvfb).

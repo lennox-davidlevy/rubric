@@ -41,7 +41,7 @@ Hugo for macOS (`.pkg` only in the release) is unpacked by Rubric now, tested he
 
 Step 9's first slice: the post on the left in Rune, the page on the right in a web view, one pick taken with Tab. The plan is [docs/app-slice.md](../docs/app-slice.md); the findings and numbers are in [docs/app-slice-findings.md](../docs/app-slice-findings.md). Start it from the repo with `cargo run --release --manifest-path app/Cargo.toml -- sites/app-slice/pages/posts/long.md`; the site's process starts with it, with the stub (no Jev calls). Do not open `sites/app-slice` in Neovim: its server is the live one, and a stub process and a live one refuse each other.
 
-Save your work before A1: the session's first window on this display was followed by an Xorg crash in the NVIDIA driver when it closed (the findings, "How the session ran the window").
+**Not on the NVIDIA display for now.** The app's window crashed Xorg twice there on 2026-11-16, once as it closed and once as it opened (the findings, "How the session ran the window"). Run section A only once the crash is explained, or on the Mac.
 
 | # | Do this | Expect |
 |---|---|---|
