@@ -35,6 +35,8 @@ body > :is(.part-header, .masthead) {
 @media (min-width: 48rem) {
   body { padding-left: 18.75rem; }
   body > :is(.part-header, .masthead) { position: fixed; inset: 0 auto 0 0; width: 18.75rem; overflow-y: auto; }
+  /* A column of its own: not moved for a sidebar part beside the writing. */
+  body > :is(.part-header, .masthead) { --beside-pad: 0px; --beside-margin: 0; }
 }
 
 .flow a:not([class]) { color: var(--link); }

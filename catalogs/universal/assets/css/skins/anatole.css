@@ -11,6 +11,8 @@
 @media (min-width: 60rem) {
   body { padding-left: 20rem; }
   body > .part-header { position: fixed; inset: 0 auto 0 0; width: 20rem; overflow-y: auto; border-right: var(--border) solid var(--rule); box-shadow: none; text-align: center; }
+  /* A column of its own: not moved for a sidebar part beside the writing. */
+  body > .part-header { --beside-pad: 0px; --beside-margin: 0; }
   body > .part-header .part-header-inner { display: flex; flex-direction: column; justify-content: center; min-height: 100%; }
   body > .part-header .part-header-title { font-size: var(--step-2); }
   body > .part-header .part-header-nav { margin: 0; }

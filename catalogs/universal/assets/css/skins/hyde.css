@@ -30,6 +30,8 @@ body > :is(.part-header, .masthead) {
 @media (min-width: 48rem) {
   body { padding-left: 18rem; }
   body > :is(.part-header, .masthead) { position: fixed; inset: 0 auto 0 0; width: 18rem; overflow-y: auto; }
+  /* A column of its own: not moved for a sidebar part beside the writing. */
+  body > :is(.part-header, .masthead) { --beside-pad: var(--space-3); --beside-margin: 0; }
 }
 
 /* Headings in the sans; only the site's name and a page's title are display. */

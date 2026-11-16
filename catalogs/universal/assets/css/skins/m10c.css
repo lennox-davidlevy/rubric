@@ -24,6 +24,8 @@ body > :is(.part-header, .masthead) {
 @media (min-width: 58.75rem) {
   body { padding-left: 20rem; }
   body > :is(.part-header, .masthead) { position: fixed; inset: 0 auto 0 0; width: 20rem; overflow-y: auto; }
+  /* A column of its own: not moved for a sidebar part beside the writing. */
+  body > :is(.part-header, .masthead) { --beside-pad: var(--space-3); --beside-margin: 0; }
 }
 
 /* Headings white, links the accent with no line until touched. */

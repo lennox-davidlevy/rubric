@@ -9,6 +9,8 @@
 @media (min-width: 56rem) {
   body { padding-left: 16rem; }
   body > .part-header { position: fixed; inset: 0 auto 0 0; width: 16rem; overflow-y: auto; }
+  /* A column of its own: not moved for a sidebar part beside the writing. */
+  body > .part-header { --beside-pad: 0px; --beside-margin: 0; }
   body > .part-header .part-header-inner { display: block; padding: var(--space-3); }
   body > .part-header .part-header-title { display: block; margin-bottom: var(--space-2); font-weight: var(--weight-strong); }
   body > .part-header .part-header-nav { margin: 0; }
