@@ -377,3 +377,6 @@ Bigger writing, in a thin line.
 ::: lead text=smaller
 A lead set smaller than a lead usually is.
 :::
+
+::: quote
+:::

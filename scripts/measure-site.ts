@@ -252,10 +252,10 @@ function pairing(r: Read, free: Map<string, { family: string }>, ours: Set<strin
     body, display: display.join() === body.join() ? "body" : display, mono, ui,
     weight: { body: r.writing.weight, strong: 700, heading: r.h2?.weight ?? r.title?.weight, display: r.title?.weight },
     leading: { body: round(r.writing.leading! / r.writing.size), heading: r.h2?.leading ? round(r.h2.leading / r.h2.size) : null, display: r.title?.leading ? round(r.title.leading / r.title.size) : null },
-    tracking: { display: em(r.title?.tracking, r.title?.size), label: em(r.small[0]?.value ? undefined : undefined, 1) },
+    tracking: { display: em(r.title?.tracking, r.title?.size), label: "0em" },
     labels: r.small.some((s) => s.value.transform === "uppercase") || r.nav?.transform === "uppercase" || (label !== undefined && label.uppercase > label.count / 2) ? "uppercase" : "none",
     quote: r.quote?.style === "italic" ? "italic" : "normal",
-    links: r.link && r.link.line.includes("underline") || r.link?.border !== "none" ? "always" : "hover",
+    links: !r.link || r.link.line.includes("underline") || r.link.border !== "none" ? "always" : "hover",
     code: ((c) => (c ? `${round(c.value.size / r.writing.size)}em` : null))(r.code.find((c) => c.value.size >= r.writing.size * 0.6)),
   };
 }
@@ -265,7 +265,7 @@ const em = (px: string | undefined, size: number | undefined) => (!px || px === 
 function scale(desk: Read, phone: Read) {
   const rem = 16;
   // The title sits on the top step, four above the writing.
-  const ratio = (r: Read) => (r.title && r.title.size > r.writing.size ? round((r.title.size / r.writing.size) ** (1 / 4)) : 1.2);
+  const ratio = (r: Read) => Math.max(1.05, r.title && r.title.size > r.writing.size ? round((r.title.size / r.writing.size) ** (1 / 4)) : 1.2);
   return {
     description: `measured from ${new URL(url!).hostname}`,
     screen: [phone.viewport, desk.viewport],
@@ -310,17 +310,30 @@ function paletteYaml(p: Pal): { text: string; filled: string[] } {
   for (let round = 0; round < 30; round++) {
     const problems = checkPalette(parsePalette("measured", v as never)).filter((x) => x.level === "error");
     if (!problems.length) break;
+    // The color being read is the one before " on ", but for a filled
+    // button ("paper on accent"), where it is the accent's ground. A dark
+    // one moves toward the dark ink, in the dark section.
     const named = new Set<string>();
-    for (const x of problems) for (const k of ["accent", "muted", "link"]) if (new RegExp(`\\b${k}\\b`).test(x.message)) named.add(k);
+    for (const x of problems) {
+      const m = /^([a-z-]+) on ([a-z-]+)/.exec(x.message);
+      if (!m) continue;
+      const fg = m[1] === "paper" && m[2] === "accent" ? "accent" : m[1] === "dark-paper" && m[2] === "dark-accent" ? "dark-accent" : m[1]!;
+      if (["accent", "muted", "link", "dark-accent", "dark-muted", "dark-link"].includes(fg)) named.add(fg);
+    }
     if (!named.size) break;
+    const dark = v.dark as Record<string, string>;
     for (const k of named) {
-      const c = (v[k] as string | undefined) ?? (k === "link" ? (v.ink as string) : undefined);
+      const isDark = k.startsWith("dark-");
+      const key = isDark ? k.slice(5) : k;
+      const holder = (isDark ? dark : v) as Record<string, unknown>;
+      const toward = isDark ? dark.ink! : ink;
+      const c = (holder[key] as string | undefined) ?? (key === "link" ? toward : key === "muted" ? undefined : undefined);
       if (!c) continue;
-      v[k] = toHex(mix(hex(ink), hex(c), 0.06));
+      holder[key] = toHex(mix(hex(toward), hex(c), 0.06));
       if (!deepened.includes(k)) deepened.push(k);
     }
   }
-  const said = [filled.length ? `filled in: ${filled.join(", ")}` : "nothing filled in", deepened.length ? `deepened to read as text: ${deepened.map((k) => `${k} (was ${p[k as keyof Pal]})`).join(", ")}` : ""].filter(Boolean).join("; ");
+  const said = [filled.length ? `filled in: ${filled.join(", ")}` : "nothing filled in", deepened.length ? `moved toward the ink to read as text: ${deepened.map((k) => (k.startsWith("dark-") ? k : `${k}${p[k as keyof Pal] ? ` (was ${p[k as keyof Pal]})` : ""}`)).join(", ")}` : ""].filter(Boolean).join("; ");
   return { text: `# Measured, not made: ${said}.\n${stringify(v)}`, filled };
 }
 

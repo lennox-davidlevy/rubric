@@ -575,13 +575,19 @@ export function lint(cat: Catalog, files: Record<string, string>, also: Iterable
   const slots = new Set(cat.slots);
   for (const [path, css] of Object.entries(files)) {
     const local = new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]!.slice(2)).concat([...also]));
-    const lines = css.split("\n");
+    // Comments are blanked whole, over as many lines as they run, keeping
+    // the line numbers: "a solid black band" in one is not a color.
+    // Strings are matched too, so a "/*" inside one starts no comment.
+    const lines = css.replace(/"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|\/\*[\s\S]*?\*\//g, (m) => (m.startsWith("/*") ? m.replace(/[^\n]/g, " ") : m)).split("\n");
     lines.forEach((line, i) => {
       const where = `${path}:${i + 1}`;
       const code = line.replace(/\/\*.*?\*\//g, "");
       for (const m of code.matchAll(/var\(--([a-z0-9-]+)/g)) {
         if (!slots.has(m[1]!) && !local.has(m[1]!)) out.push({ where, level: "error", message: `--${m[1]} is not a slot in catalog.yaml` });
       }
+      // Nothing fetched from elsewhere: pictures and fonts come with the
+      // catalog, and a drafted skin may not reach back to its site.
+      if (/\burl\(|@import\b/i.test(code)) out.push({ where, level: "error", message: `fetches from a url; the catalog brings its own files` });
       if (/#[0-9a-f]{3,8}\b|\b(rgba?|hsla?|oklch|oklab)\(|\b(white|black)\b(?!-)/i.test(code)) {
         out.push({ where, level: "error", message: `a literal color; use a slot` });
       }

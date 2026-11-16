@@ -132,4 +132,16 @@ describe("checks", () => {
       "a literal font; use a font slot",
     ]);
   });
+
+  test("words in a comment over several lines are not code; the line numbers still hold", () => {
+    const cat = { ...load(blog) };
+    const css = "/* A solid black band,\n   with white text. */\n.a { color: var(--ink); }\n.b { color: black; }";
+    expect(lint(cat, { "x.css": css }).map((p) => p.where)).toEqual(["x.css:4"]);
+  });
+
+  test("a /* inside a string starts no comment, and nothing is fetched from a url", () => {
+    const cat = { ...load(blog) };
+    const css = '.a::before { content: "/*"; }\n.b { color: black; }\n.c { background: url(https://example.com/a.png); }\n@import "x.css";\n/* end */';
+    expect(lint(cat, { "x.css": css }).map((p) => p.where)).toEqual(["x.css:2", "x.css:3", "x.css:4"]);
+  });
 });
