@@ -1,10 +1,6 @@
 # Live test: variants
 
-A change to a part is now a variant beside it, not a replacement of it. Branch `variants`. Earlier tables are in [TESTING-jev-and-drafts.md](TESTING-jev-and-drafts.md) (Jev's picks, drafts by both tools, around a draft), [TESTING-fast-drafts.md](TESTING-fast-drafts.md), [TESTING-new-parts.md](TESTING-new-parts.md) and [TESTING-full.md](TESTING-full.md).
-
-Write what you find in **Notes** at the bottom, by test number.
-
-Last updated: 2026-11-14.
+Run on 2026-11-15; what it found was fixed and is on `main` (PR #7). A change to a part is a variant beside it, not a replacement of it. Earlier tables are in [TESTING-jev-and-drafts.md](TESTING-jev-and-drafts.md) (Jev's picks, drafts by both tools, around a draft), [TESTING-fast-drafts.md](TESTING-fast-drafts.md), [TESTING-new-parts.md](TESTING-new-parts.md) and [TESTING-full.md](TESTING-full.md).
 
 ## Set up
 

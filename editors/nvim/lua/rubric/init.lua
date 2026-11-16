@@ -467,7 +467,18 @@ function M.setup(opts)
     -- Bun loads .env from the working directory; the repo's holds TYPESAFE_API_KEY.
     cmd_cwd = root,
     filetypes = { "markdown" },
-    root_markers = { "rubric.md" },
+    -- Only the site's own files: rubric.md and its pages. Connecting starts
+    -- the site's process and Hugo, which a README beside them must not.
+    root_dir = function(bufnr, on_dir)
+      local site = vim.fs.root(bufnr, "rubric.md")
+      if not site then
+        return
+      end
+      local file = vim.fs.normalize(vim.api.nvim_buf_get_name(bufnr))
+      if file == site .. "/rubric.md" or vim.startswith(file, site .. "/pages/") then
+        on_dir(site)
+      end
+    end,
     capabilities = opts.capabilities,
     handlers = {
       ["rubric/picks"] = picks_handler(opts.next),

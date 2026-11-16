@@ -31,6 +31,7 @@ R5, R6 and R12 wait a minute or more. Only R13 makes a paid draft.
 | R12 | Quit Neovim, then `rubric build` in `my-garden` | It prints `/tmp/my-garden/public`. `public/posts/first/index.html` holds the quote and the steps, drawn in the theme. No `rubric-frame` folder in `public/`. |
 | R13 | Optional, paid: a `::: new: …` line in `my-garden`, **Draft**, then **Keep**, **This site** | It drafts as in `testing/`. The part is in `/tmp/my-garden/parts/`. |
 | R14 | `rubric stop` in `testing/` while a Neovim is open on it | `stopped`. Neovim's Rubric client goes, and quitting and reopening Neovim starts the process again. |
+| R15 | With no Neovim on `testing/`: `nvim testing/TESTING.md` | No notice, and `pgrep -fa cli.ts` shows nothing for `testing/`. Only `rubric.md` and pages under `pages/` start it. |
 
 ## S. Schematic, a theme after Making Software
 

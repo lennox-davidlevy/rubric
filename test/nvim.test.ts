@@ -125,6 +125,16 @@ test.skipIf(!nvim)("Neovim: attach, diagnostics, completion, ghost text, accept,
       }
     })).toBe(true);
     expect(readFileSync(join(site, "content/posts/smoke.md"), "utf8").replace(/\{\{< rubric-line [^>]*>\}\}\n\n/g, "").split("\n")[1]).toBe(`{{< quote size="large" >}}`);
+
+    // Markdown in the site's folder that is neither rubric.md nor a page is
+    // not the site's: it never connects, so it never starts the process.
+    writeFileSync(join(site, "NOTES.md"), "Notes.\n");
+    keys(`:edit ${join(site, "NOTES.md")}<CR>`);
+    expect(await until(() => expr("vim.bo.filetype") === "markdown")).toBe(true);
+    await Bun.sleep(300);
+    expect(expr("RubricTest.attached()")).toBe("false");
+    keys(`:edit ${join(site, "rubric.md")}<CR>`);
+    expect(await until(() => expr("RubricTest.attached()") === "true")).toBe(true);
   } finally {
     keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);
