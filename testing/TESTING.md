@@ -4,7 +4,7 @@ What changed in the plan's "Before the app" list (docs/plan.md, under step 8), i
 
 Write what you find in **Notes** at the bottom, by test number.
 
-Last updated: 2026-11-16.
+Last updated: 2026-11-16 (section A, the app slice).
 
 ## Set up
 
@@ -36,6 +36,31 @@ Catalog version 13. L1 to L3 ask Jev (a cent or two); L4 and L5 make no calls.
 | L5 | `::: quote variant=nothing-like-it` on a quote with a variant left | The same warning; drawn as the plain quote. |
 
 Hugo for macOS (`.pkg` only in the release) is unpacked by Rubric now, tested here with a made package and against the real release; on a Mac with no Hugo, a first `rubric` should fetch it into `~/.cache/rubric/hugo/0.169.0/hugo`. Nothing to do on Linux.
+
+## A. The app slice (branch `app-slice`)
+
+Step 9's first slice: the post on the left in Rune, the page on the right in a web view, one pick taken with Tab. The plan is [docs/app-slice.md](../docs/app-slice.md); the findings and numbers are in [docs/app-slice-findings.md](../docs/app-slice-findings.md). Start it from the repo with `cargo run --release --manifest-path app/Cargo.toml -- sites/app-slice/pages/posts/long.md`; the site's process starts with it, with the stub (no Jev calls). Do not open `sites/app-slice` in Neovim: its server is the live one, and a stub process and a live one refuse each other.
+
+Save your work before A1: the session's first window on this display was followed by an Xorg crash in the NVIDIA driver when it closed (the findings, "How the session ran the window").
+
+| # | Do this | Expect |
+|---|---|---|
+| A1 | Start the app | Window with the post on the left, ready to type at once; the page on the right within a second. |
+| A2 | Type a paragraph fast | Letters appear with no lag; the page gains the paragraph in place. |
+| A3 | Hold a key down for five seconds mid-post | No stutter in the editor; the page catches up when the key is released. |
+| A4 | Move the caret from top to bottom | The page scrolls to follow. |
+| A5 | Drag the divider left, right, and to each edge | Both panes resize together; each edge snaps; dragging back restores both, and typing still goes to the writing. |
+| A6 | Resize the window | The page stays in its pane. |
+| A7 | Click a link in the page, then click in the editor and type | The page goes there; typing goes to the editor. |
+| A8 | On a new empty line type `::: a quote` | A closing `:::` appears below; a dimmed pick after the caret. |
+| A9 | Press Tab | The line becomes the part; the page draws it. |
+| A10 | After A9, undo once (Ctrl+Z) | The words come back. |
+| A11 | Press Tab on a plain line | Nothing changes; the caret stays in the editor. |
+| A12 | Ctrl+S, then `cat` the file | It holds what was typed. |
+| A13 | Quit, then `pgrep -fa 'rubric-app\|cli.ts lsp\|WebKitWebProcess'` | Nothing. (`rubric stop sites/app-slice` ends the site's process and Hugo, which otherwise stay a minute.) |
+| A14 | Type plain prose in Neovim on a post in `testing/`, and the same in the app | The app feels at least as immediate. This is the row that decides. |
+
+After A12, `git checkout sites/app-slice/pages/posts/long.md` restores the post (once the slice is committed).
 
 ## Notes
 

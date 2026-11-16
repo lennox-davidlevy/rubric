@@ -1,0 +1,244 @@
+//! The app's one piece of state, and what happens when the writing changes.
+
+use std::path::PathBuf;
+
+use rune::{Span, TextEdit, Tx};
+
+use serde_json::json;
+
+use crate::{ghost, markdown, position};
+
+pub struct State {
+    /// The Markdown file.
+    pub path: PathBuf,
+    pub edit: TextEdit,
+    /// LSP document version, starts at 1.
+    pub version: i32,
+    /// The text as last written, to know whether it is dirty.
+    pub saved: String,
+    /// 0.0 = page only, 1.0 = writing only; starts 0.5.
+    pub split: f32,
+    /// To notice caret moves after each drawn frame.
+    pub last_range: (usize, usize),
+    /// file:// of `path`.
+    pub uri: String,
+    /// The Markdown styles, made again on each change rather than in every view.
+    pub spans: Vec<Span>,
+    /// The last save's error, printed once.
+    pub problem: Option<String>,
+    /// The web view, once the window exists (task 2).
+    pub page: Option<crate::page::Page>,
+    /// The window's width in points, for the divider.
+    pub width: f32,
+    /// The page pane's last bounds sent, in physical pixels.
+    pub bounds: Option<(i32, i32, u32, u32)>,
+    /// The language server, once it answered initialize (task 3).
+    pub client: Option<crate::lsp::Client>,
+    /// Last line sent as rubric/cursor.
+    pub cursor_line: Option<u32>,
+    /// The page's address from rubric/serving, loaded once.
+    pub page_url: Option<String>,
+    /// The pick shown after the caret (task 4).
+    pub ghost: Option<crate::ghost::Ghost>,
+    /// The inlineCompletion asked last: its id, the document version and the line.
+    pub asked: Option<(i64, i32, u32)>,
+}
+
+impl State {
+    pub fn open(path: PathBuf, text: String) -> State {
+        let mut edit = TextEdit::new(text.clone());
+        edit.focused = true;
+        edit.set_caret(0);
+        let uri = file_uri(&path);
+        let spans = markdown::spans(&text, &theme());
+        State { path, edit, version: 1, saved: text, split: 0.5, last_range: (0, 0), uri, spans, problem: None, page: None, width: 0.0, bounds: None, client: None, cursor_line: None, page_url: None, ghost: None, asked: None }
+    }
+}
+
+pub fn theme() -> markdown::Theme {
+    let t = rune::tok::theme(false);
+    markdown::Theme { dim: t.text_secondary, accent: rune::tok::accent(0, false) }
+}
+
+/// The text changed: a new version, new styles, and the whole text to the server.
+pub fn changed(s: &mut State) {
+    s.version += 1;
+    s.ghost = None;
+    s.spans = markdown::spans(&s.edit.text, &theme());
+    if let Some(c) = &s.client {
+        c.notify("textDocument/didChange", json!({
+            "textDocument": { "uri": s.uri, "version": s.version },
+            "contentChanges": [{ "text": s.edit.text }],
+        }));
+    }
+    moved(s);
+    ask(s);
+}
+
+/// Run after each drawn frame (`App::on_frame_drawn`) and after each change: a caret that
+/// moved to another line tells the page, never twice for the same line.
+pub fn moved(s: &mut State) -> bool {
+    let range = s.edit.range();
+    if range == s.last_range {
+        return false;
+    }
+    s.last_range = range;
+    let line = position::line_char(&s.edit.text, s.edit.focus).0;
+    if s.cursor_line != Some(line)
+        && let Some(c) = &s.client
+    {
+        c.notify("rubric/cursor", json!({ "uri": s.uri, "line": line }));
+        s.cursor_line = Some(line);
+    }
+    // The caret left the pick's line, or the end of it.
+    if s.ghost.as_ref().is_some_and(|g| ghost::wants(&s.edit.text, s.edit.focus) != Some(g.line)) {
+        s.ghost = None;
+    }
+    ask(s);
+    true
+}
+
+/// On a `:::` line with the caret at its end, ask the server for its pick; not again for the
+/// same version and line while that question is unanswered.
+fn ask(s: &mut State) {
+    let Some(line) = ghost::wants(&s.edit.text, s.edit.focus) else { return };
+    if s.asked.is_some_and(|(_, v, l)| v == s.version && l == line) {
+        return;
+    }
+    let Some(c) = &s.client else { return };
+    let (l, character) = position::line_char(&s.edit.text, s.edit.focus);
+    let id = c.request("textDocument/inlineCompletion", json!({
+        "textDocument": { "uri": s.uri },
+        "position": { "line": l, "character": character },
+        "context": { "triggerKind": 2 },
+    }));
+    s.asked = Some((id, s.version, line));
+}
+
+/// The ghost to draw: set, and the caret still at the end of its line.
+pub fn showing(s: &State) -> Option<&ghost::Ghost> {
+    s.ghost.as_ref().filter(|g| g.version == s.version && ghost::wants(&s.edit.text, s.edit.focus) == Some(g.line))
+}
+
+/// The server answered initialize: open the document as it is now, and say where the caret is.
+pub fn connected(s: &mut State, client: crate::lsp::Client) {
+    client.notify("textDocument/didOpen", json!({
+        "textDocument": { "uri": s.uri, "languageId": "markdown", "version": s.version, "text": s.edit.text },
+    }));
+    let line = position::line_char(&s.edit.text, s.edit.focus).0;
+    client.notify("rubric/cursor", json!({ "uri": s.uri, "line": line }));
+    s.cursor_line = Some(line);
+    s.last_range = s.edit.range();
+    s.client = Some(client);
+    ask(s);
+}
+
+/// What the server sent that the slice acts on.
+pub fn incoming(s: &mut State, m: crate::lsp::Incoming) {
+    use crate::lsp::Incoming;
+    match m {
+        // Only the answer to the last question, for the version and line it was asked about.
+        Incoming::Response { id, result } => {
+            let Some((asked, version, line)) = s.asked else { return };
+            if id != asked {
+                return;
+            }
+            // Answered: a caret that leaves the line and comes back asks again.
+            s.asked = None;
+            if version != s.version || ghost::wants(&s.edit.text, s.edit.focus) != Some(line) {
+                return;
+            }
+            s.ghost = result.ok().and_then(|r| ghost::parse(&r, line, version));
+        }
+        Incoming::Notification { method, params } if method == "rubric/serving" => {
+            if let Some(url) = params.get("url").and_then(|u| u.as_str()) {
+                serving(s, url.to_string());
+            } else if let Some(p) = params.get("problem").and_then(|p| p.as_str()) {
+                eprintln!("page: {p}");
+            }
+        }
+        _ => {}
+    }
+}
+
+/// The page's address: loaded once, whenever both it and the web view are there.
+pub fn serving(s: &mut State, url: String) {
+    if s.page_url.as_deref() == Some(url.as_str()) {
+        return;
+    }
+    if let Some(page) = &s.page {
+        page.send(crate::page::PageCmd::Load(url.clone()));
+    }
+    s.page_url = Some(url);
+}
+
+/// The window is going: the document and the server close, then the web view.
+pub fn shut(s: &mut State) {
+    if let Some(c) = s.client.take() {
+        c.notify("textDocument/didClose", json!({ "textDocument": { "uri": s.uri } }));
+        c.stop();
+    }
+    if let Some(page) = s.page.take() {
+        page.close();
+    }
+}
+
+/// Tab: takes a pick showing whose pin acts; otherwise nothing. Always consumed.
+pub fn tab(s: &mut State, _tx: &mut Tx) {
+    let Some(g) = showing(s).filter(|g| g.pick.pin.as_ref().is_some_and(|p| p.acts)).cloned() else { return };
+    ghost::accept(&mut s.edit, &g);
+    changed(s);
+}
+
+/// Ctrl+S writes the file whole.
+pub fn save(s: &mut State) {
+    match markdown::save(&s.path, &s.edit.text) {
+        Ok(()) => s.saved = s.edit.text.clone(),
+        Err(e) => {
+            eprintln!("save failed: {e}");
+            s.problem = Some(e.to_string());
+        }
+    }
+}
+
+/// `file://` and the path, with the bytes a URI cannot hold escaped.
+pub fn file_uri(path: &std::path::Path) -> String {
+    let mut out = String::from("file://");
+    for b in path.to_string_lossy().bytes() {
+        if b.is_ascii_alphanumeric() || b"/-._~".contains(&b) {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
+/// The page pane moved or resized: `rect` in points, `scale` pixels per point.
+pub fn page_laid_out(s: &mut State, rect: [f32; 4], scale: f32) {
+    let px = |v: f32| (v * scale).round();
+    let b = if s.split >= 1.0 || rect[2] < 1.0 || rect[3] < 1.0 {
+        (0, 0, 0, 0)
+    } else {
+        (px(rect[0]) as i32, px(rect[1]) as i32, px(rect[2]) as u32, px(rect[3]) as u32)
+    };
+    if s.bounds == Some(b) {
+        return;
+    }
+    s.bounds = Some(b);
+    if let Some(page) = &s.page {
+        page.send(crate::page::PageCmd::Bounds { x: b.0, y: b.1, w: b.2, h: b.3 });
+    }
+}
+
+/// The web view exists: it takes the last bounds the pane had, and the page's address if the
+/// server gave it first.
+pub fn page_attached(s: &mut State, page: crate::page::Page) {
+    if let Some(b) = s.bounds {
+        page.send(crate::page::PageCmd::Bounds { x: b.0, y: b.1, w: b.2, h: b.3 });
+    }
+    if let Some(url) = &s.page_url {
+        page.send(crate::page::PageCmd::Load(url.clone()));
+    }
+    s.page = Some(page);
+}
