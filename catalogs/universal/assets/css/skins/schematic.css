@@ -1,0 +1,240 @@
+/* Schematic's layer, after Making Software (makingsoftware.com): what its
+   palette, pairing and scale cannot say. Written from looking at its pages,
+   not copied from them. The writing sits on a raised sheet on a pale page;
+   every label, trail, caption and the site's name is in small mono
+   capitals; headings are no bigger than the writing; terms are explained in
+   the margin. Slots only, like every part. */
+
+/* Small mono capitals: the voice of every label. Departure Mono has one
+   weight, so none of them is bold. */
+.part-header-title, .masthead-title,
+.part-header-nav, .masthead nav,
+.part-breadcrumbs ol, .byline, .part-post-meta,
+.part-sidebar :is(h2, h3, h4),
+.part-page-contents-label,
+.part-callout-label, .part-figure > p:not(:has(img)), .part-video > p:not(:has(iframe, video)),
+.part-pager a span, .tags, .part-tags, .part-footer, .site-footer,
+.part-buttons a, .part-table th, .part-reading-progress-value {
+  font-family: var(--font-ui);
+  font-weight: var(--weight-body);
+  letter-spacing: var(--tracking-label);
+  text-transform: var(--label-case);
+}
+
+/* The sheet: the writing on the raised ground, square-cornered, with room
+   all round, and the page's paper around it. */
+@media (min-width: 48rem) {
+  main.flow {
+    --sheet: min(100% - 2 * var(--space-3), var(--wide) + 2 * var(--space-4));
+    width: var(--sheet);
+    margin: var(--space-2) auto var(--space-5);
+    padding-block: var(--space-3) var(--space-5);
+    background: var(--raised);
+    border-radius: var(--radius);
+  }
+}
+@media (max-width: 47.99rem) {
+  main.flow { padding-top: var(--space-2); }
+}
+/* The header and footer as wide as the sheet and over it, their edges
+   level with its wide pictures. */
+@media (min-width: 48rem) {
+  .part-header-inner, .part-footer-inner {
+    --sheet: min(100% - 2 * var(--space-3), var(--wide) + 2 * var(--space-4));
+    max-width: var(--sheet);
+    padding-inline: var(--space-4);
+  }
+}
+@media (min-width: 64rem) {
+  body:has(> .shell.has-left:not(.has-right)) :is(.part-header-inner, .part-footer-inner) {
+    margin-left: min((100% - var(--sheet)) / 2, max(var(--space-3), 100% - var(--sheet) - 16rem));
+    margin-right: auto;
+  }
+}
+/* Centered in the space beside a sidebar, as every theme centers its
+   writing; moved left only as far as it takes to leave the right margin
+   room for notes (16rem), and never closer to the sidebar than a gap. */
+@media (min-width: 64rem) {
+  .shell.has-left:not(.has-right) main.flow {
+    margin-left: min((100% - var(--sheet)) / 2, max(var(--space-3), 100% - var(--sheet) - 16rem));
+  }
+}
+
+/* The title, centered and light, with the post's details above it, the
+   page's description under it and the ornament closing it. */
+.page-header { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.page-header h1 {
+  font-weight: var(--weight-display);
+  color: color-mix(in srgb, var(--heading) 85%, var(--raised));
+}
+.page-header .byline, .page-header .part-post-meta { order: -1; margin: 0 0 var(--space-3) !important; }
+.page-header::after {
+  content: var(--ornament);
+  margin-top: var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  line-height: 1;
+  color: var(--ink);
+}
+.byline, .part-post-meta {
+  font-size: calc(var(--step--1) * 0.85);
+  color: var(--ink);
+}
+.part-post-meta-bar { margin-inline: 0.4em; color: var(--muted); }
+
+/* The end of a post, marked the way its breaks are. */
+main.flow:has(> .page-header > :is(.byline, .part-post-meta))::after {
+  content: "╌╌ END ╌╌";
+  grid-column: prose;
+  margin-top: var(--space-5);
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  color: var(--ink);
+}
+
+/* The writing: justified, loose, and headings at its own size, set apart by
+   room rather than size. */
+.flow > p, .flow > ul > li, .flow > ol > li, .stack > p { text-align: justify; hyphens: auto; }
+.flow :is(h2, h3, h4):not(.catalog-part), .stack :is(h2, h3, h4) { font-size: var(--step-0); letter-spacing: 0; }
+.flow > * + :is(h2, h3, h4) { margin-top: calc(1lh + var(--space-4)); }
+.flow > :is(h2, h3, h4) + :is(h2, h3, h4) { margin-top: var(--space-2); }
+ul > li::marker { font-size: 0.7em; color: var(--ink); }
+/* A long address breaks anywhere, so a justified line is not stretched
+   around it. */
+.flow > p a, .stack > p a { overflow-wrap: anywhere; }
+
+/* Links in the ink with a dotted line, in the blue on hover. */
+.flow a:not([class]), .stack a:not([class]) {
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--muted);
+  text-underline-offset: 0.2em;
+}
+a:hover { text-decoration-style: dotted; }
+
+/* Code in the mono on a faint ground, square. */
+:not(pre) > code { padding: 0.15em 0.3em; border-radius: 0; background: var(--tint); }
+pre, .part-code pre { border-radius: 0; }
+
+/* A plain break in the writing is the ornament, not a line. */
+.flow > hr, .part-divider.style-line {
+  width: auto;
+  height: auto;
+  overflow: visible;
+  border: 0;
+  text-align: center;
+  line-height: 1;
+}
+.flow > hr::before, .part-divider.style-line::before, .part-divider.style-ornament::before {
+  content: var(--ornament);
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  color: var(--ink);
+}
+
+/* The header: the site's name in the blue, the links in the ink. */
+.part-header, .masthead { background: transparent; }
+.part-header-title, .masthead-title { color: var(--accent); font-size: var(--step-0); }
+.part-header-title:hover, .masthead-title:hover { color: var(--accent); opacity: 0.75; }
+.part-header-nav ul, .masthead nav { font-size: calc(var(--step--1) * 0.9); }
+.part-header-nav a, .masthead nav a { color: var(--ink); }
+.part-header-nav a:hover, .part-header-nav a[aria-current], .masthead nav a[aria-current] { color: var(--accent); }
+.part-header.sticky-stays {
+  border-bottom: 0;
+  background: color-mix(in srgb, var(--paper) 80%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+/* The trail above the title: small capitals, the pages above faint. */
+.part-breadcrumbs ol { font-size: calc(var(--step--1) * 0.85); color: var(--muted); }
+.flow .part-breadcrumbs a { text-decoration: none; }
+.part-breadcrumbs li[aria-current] { color: var(--ink); }
+
+/* The sidebar: on the page's own ground, no line; its headings in mono
+   capitals, its links in the serif with small round markers. */
+.part-sidebar { font-family: var(--font-body); font-size: var(--step--1); }
+.part-sidebar.side-left, .part-sidebar.side-right { border: 0; }
+.part-sidebar :is(h2, h3, h4) { font-size: calc(var(--step--1) * 0.9); color: var(--ink); }
+.part-sidebar .stack > * + :is(h2, h3, h4) { margin-top: var(--space-4); }
+.part-sidebar ul { padding-left: var(--space-3); list-style: disc; }
+.part-sidebar li + li { margin-top: 0.5em; }
+.part-sidebar a, .part-sidebar .stack a:not([class]) { color: var(--ink); text-decoration: none; }
+.part-sidebar a:hover { color: var(--accent); }
+
+/* The page's contents: the label in mono, the headings in the serif. */
+.part-page-contents { font-family: var(--font-body); }
+.part-page-contents-label { color: var(--ink); }
+
+/* Pictures: no corners, a faint line on hover, captions in mono capitals. */
+.part-figure img, .part-gallery img { border-radius: 0; }
+.part-figure img { border: var(--border) solid transparent; transition: border-color 300ms; }
+.part-figure img:hover { border-color: var(--rule); }
+.part-figure > p:not(:has(img)) { font-size: calc(var(--step--1) * 0.85); color: var(--ink); text-align: center; }
+.part-gallery a { border-radius: 0; }
+.part-gallery img { aspect-ratio: auto; object-fit: contain; background: transparent; }
+/* On a phone, a gallery is a row to swipe through, one picture at a time,
+   with the edge of the next showing so the reader knows there is one. */
+@media (max-width: 47.99rem) {
+  .part-gallery.layout-grid ul {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .part-gallery.layout-grid li { flex: 0 0 85%; scroll-snap-align: start; }
+  .part-gallery.layout-grid li:only-child { flex-basis: 100%; }
+}
+
+/* A note in the margin: the serif, small and gray, with no line, outside
+   the sheet where the screen has room for it, and in the writing where it
+   has not. */
+.part-sidenote, .flow > .part-sidenote > .stack { border-left: 0; padding-left: 0; }
+.part-sidenote { text-align: justify; }
+@media (min-width: 72rem) and (max-width: 87.99rem) {
+  .flow > .part-sidenote { grid-column: prose; height: auto; margin-block: calc(1lh + var(--space-2)); }
+  .flow > .part-sidenote > .stack { position: static; width: auto; }
+  .flow > .part-sidenote + * { margin-top: calc(1lh + var(--space-2)); }
+}
+@media (min-width: 88rem) {
+  .flow > .part-sidenote > .stack { left: calc(100% + var(--space-3)); width: 14rem; }
+}
+
+/* Notices on their tints, square, the label in mono capitals. */
+.part-callout { border-radius: 0; }
+.part-callout-label { font-size: calc(var(--step--1) * 0.85); }
+
+/* A quote: a thin rule in the ink beside it. */
+blockquote, .part-quote.align-left { border-left: var(--border) solid var(--ink); }
+
+/* Buttons: outlined mono capitals; the first filled in the ink. */
+.part-buttons a { min-height: 2.25rem; padding: 0.35em 1em; border-color: var(--ink); font-size: calc(var(--step--1) * 0.9); }
+.part-buttons a:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Steps: the numbers in mono, in a square, not a circle. */
+.part-steps > li::before { border-radius: var(--radius); font-weight: var(--weight-body); }
+
+/* Tables: mono capitals heading each column. */
+.part-table th { font-size: calc(var(--step--1) * 0.85); }
+
+/* The glossary: two columns of small justified writing under a rule; the
+   meaning of a term shows outside the sheet, in the page's margin. */
+/* The live preview puts a marker before each block, so each rule also
+   reaches past one. */
+.flow > :is(h2, h3):has(+ .part-glossary, + link[data-rubric-line] + .part-glossary) {
+  grid-column: wide;
+  padding-bottom: var(--space-1);
+  border-bottom: var(--border) solid var(--ink);
+}
+.flow > :is(h2, h3) + .part-glossary, .flow > :is(h2, h3) + link[data-rubric-line] + .part-glossary { margin-top: var(--space-4); }
+.part-glossary ul, .part-glossary ol { text-align: justify; color: color-mix(in srgb, var(--ink) 75%, var(--raised)); }
+.part-glossary li a:first-child { text-decoration-color: var(--muted); }
+.glossary-note { margin-left: calc((var(--wide) - var(--measure)) / 2 + var(--space-4) + var(--space-2)); text-align: justify; }
+
+/* After the writing: tags, the pager and the footer in mono capitals. */
+.part-pager a span { font-size: calc(var(--step--1) * 0.85); }
+.part-pager-earlier span::before { content: "‹ "; }
+.part-pager-later span::after { content: " ›"; }
+.tags a::before { content: none; }
+.part-footer, .site-footer { font-size: calc(var(--step--1) * 0.85); text-align: center; }
+.part-footer { border-top: 0; background: transparent; }

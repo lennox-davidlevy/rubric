@@ -23,11 +23,11 @@ Not in it: the drawer, Sites, menus, drafts, takes, themes, Parts, Appearance, P
 | Toolchain | Rust 1.99.1, edition 2024; `app/rust-toolchain.toml` names the channel only | What Rune's `rust-toolchain.toml` names; installed. Copying Rune's file whole would download a wasm target |
 | Package name | `rubric-app` | The process checks below look for it |
 | Web view | `wry`, attached as a child of Rune's window with `build_as_child` | The page is Hugo's HTML, so it needs a browser engine; Rune has no API for hosting a native view |
-| The server | The existing one, unchanged: `bun <repo>/src/cli.ts lsp --stub`, stdio, cwd the repo root | The app is a client, not a second copy |
+| The server | The existing one, unchanged: `bun <repo>/src/cli.ts lsp --stub`, stdio, cwd the repo root; it connects to the site's process, starting it when none runs | The app is a client, not a second copy |
 | Jev | Never called. The server always runs with `--stub` unless the app is started with `--live` | Live calls cost money and use the key; only David passes `--live` |
-| Hugo and the relay | Started by hand with `bun run play`, on ports of their own | Starting them from the app is step 8, not this slice |
-| The site | `sites/app-slice/`, a new copy of `sites/demo/` with a long post | David is live-testing `testing/` in Neovim at the same time; two servers must not write one site |
-| Ports | Hugo 1425, relay 1426 | 1415 and 1416 are David's |
+| Hugo and the relay | Started by the site's process (step 8), with the server | Nothing to start by hand |
+| The site | `sites/app-slice/`, made with `rubric new sites/app-slice`, with a long post | David is live-testing `testing/` in Neovim at the same time; the slice keeps to a site of its own |
+| Ports | The site's own pair, the first free from 1415 (`rubric/serving` gives the page's address; `.rubric/serve.json` both) | `testing/`'s process usually holds 1415 and 1416 |
 | Document sync | The whole text in every `didChange` | Rune's `on_change` gives no delta; a post is a few KB; the server reads the whole text anyway |
 | Ghost text | A separate dimmed text element drawn at the caret, shown only while the caret is at the end of the line | Rune's spans style existing bytes only; nothing can be inserted that is not in the buffer |
 | Accept key | Tab. With ghost text showing it accepts; with none it is consumed and does nothing | One key, as the plan says. Rune's key routing would otherwise move focus on Tab |
@@ -56,14 +56,14 @@ Read these before writing code. File and line numbers are from 2026-11-13.
   ```
   `rubric.pin` is carried out by the client. Neovim does two things on accept, as one undo step: it inserts `insertText` at `range` (which can carry a starter body after a newline, `workspace.ts:537-542`), then runs the pin, which replaces the whole line `line` with `text` and handles `drop`. Read `editors/nvim/lua/rubric/init.lua:481-505` and mirror both steps exactly.
 - The stub (`src/server/stub.ts:25-35`) gives `::: a quote` one pick with a pin. Words that name no part give one pick that offers a draft (`build: true`), which this slice shows and does not act on.
-- The client sends `rubric/cursor {uri, line}` (0-based line; the server forwards it to the relay, `main.ts:183-192`).
+- The client sends `rubric/cursor {uri, line}` (0-based line; the server hands it to the site's relay).
 - Notifications the server sends that the slice ignores without error: `rubric/picks`, `rubric/starters`, `rubric/drafted`, `rubric/alone`, `textDocument/publishDiagnostics`, and any `window/*` or `client/registerCapability` request (answer requests with `null`).
 
-**The preview** (`scripts/play.ts`, `catalogs/universal/assets/js/rubric-live.js`)
+**The preview** (`src/server/site-process.ts`, `catalogs/universal/assets/js/rubric-live.js`)
 
-- `RUBRIC_PORT=1425 RUBRIC_RELAY_PORT=1426 bun run play sites/app-slice` builds the site, runs `hugo server` on 1425 and the relay on 1426. It stops Hugo only on SIGINT (`scripts/play.ts:263`): stop it with `kill -INT`, never a plain `kill`, or Hugo is left running.
-- The server and the page find the relay at `relay` under `[params.rubric]` in the site's `hugo.toml`, default `http://127.0.0.1:1416`. So `sites/app-slice/hugo.toml` must set `relay = "http://127.0.0.1:1426"`.
-- The page listens to the relay. When a cursor event names another page it goes there by itself (`rubric-live.js:184-194`). The relay replays the last cursor to a page that connects later. So the web view loads `http://127.0.0.1:1425/` once, and the first `rubric/cursor` takes it to the post. The app maps no URLs.
+- The site's process runs `hugo server` and the relay on its pair of ports, and tells each client the page's address in `rubric/serving` (`{ url }`, or `{ problem }` when there is no page). It stops a minute after its last client leaves; `rubric stop sites/app-slice` stops it at once, Hugo with it.
+- The page finds the relay at the address Hugo writes into it (`HUGO_PARAMS_RUBRIC_RELAY`), so the site's `hugo.toml` sets nothing for it.
+- The page listens to the relay. When a cursor event names another page it goes there by itself (`rubric-live.js:184-194`). The relay replays the last cursor to a page that connects later. So the web view loads the address from `rubric/serving` once, and the first `rubric/cursor` takes it to the post. The app maps no URLs.
 
 **Rune** (source at the pinned rev; clone it to read, do not vendor it)
 
@@ -92,7 +92,7 @@ Read these before writing code. File and line numbers are from 2026-11-13.
 
 In order. Each ends with `cargo test` passing in `app/` and with every line under "The session checks" true. Lines under "David checks" are rows in the table at the end; the session does not claim them.
 
-Processes: record the PID of everything the session starts (the app, `play`, which it stops with `kill -INT`) and stop only those. After each task, `pgrep -fa 'rubric-app|hugo server|scripts/play.ts|cli.ts lsp|WebKitWebProcess|WebKitNetworkProcess'` must show none of the session's own. Never stop a process the session did not start.
+Processes: record the PID of everything the session starts (the app, and `sites/app-slice`'s process, which `rubric stop sites/app-slice` stops) and stop only those. After each task, `pgrep -fa 'rubric-app|hugo server|cli.ts|WebKitWebProcess|WebKitNetworkProcess'` must show none of the session's own. Never stop a process the session did not start.
 
 Builds: the first Rune build is long; run it in the background with a 30-minute limit. Set `[profile.dev.package."*"] opt-level = 2` in `app/Cargo.toml` so headless tests are fast, and keep documents in headless tests to a few lines. `cargo test` without `--ignored` finishes in under 30 seconds after the first build.
 
@@ -102,7 +102,7 @@ To look at the window: `maim` takes a screenshot; `xdotool` clicks and types in 
 
 **Goal.** `cargo run --manifest-path app/Cargo.toml -- sites/app-slice/pages/posts/long.md` opens a window with the post in an editor that types, selects, scrolls, undoes and saves.
 
-**Files.** `app/Cargo.toml`, `app/rust-toolchain.toml`, `app/src/main.rs`, `app/src/state.rs`, `app/src/editor.rs`, `app/src/markdown.rs`; `sites/app-slice/` (a copy of the tracked files of `sites/demo/` only, from `git ls-files sites/demo`, with `relay` set as above, `rubric.md` holding `::: theme paper`, and `pages/posts/long.md`: about 3,000 words of plain Markdown with headings, bold, a list, a blockquote, and no `:::` lines); `app/.gitignore` holding `target/`. The root `.gitignore` already covers the site's generated folders.
+**Files.** `app/Cargo.toml`, `app/rust-toolchain.toml`, `app/src/main.rs`, `app/src/state.rs`, `app/src/editor.rs`, `app/src/markdown.rs`; `sites/app-slice/` (made with `rubric new sites/app-slice`, then `rubric.md` holding `::: theme paper`, and `pages/posts/long.md`: about 3,000 words of plain Markdown with headings, bold, a list, a blockquote, and no `:::` lines); `app/.gitignore` holding `target/`. The root `.gitignore` already covers the site's generated folders.
 
 **Interfaces.**
 ```rust
@@ -138,7 +138,7 @@ The closer, in `editor.rs`: `pub fn closer(edit: &mut TextEdit)`, called after e
 
 ### Task 2: the page beside it
 
-**Goal.** The right pane is a web view showing `http://127.0.0.1:1425/`, and a divider between the panes drags.
+**Goal.** The right pane is a web view showing the site's page (the address in `rubric/serving`), and a divider between the panes drags.
 
 **Files.** `app/src/page.rs`, `app/src/split.rs`, `app/src/main.rs`, `app/Cargo.toml` (`wry`, `gtk`).
 
@@ -168,13 +168,13 @@ The view lays out two panes in a row by `state.split`, with a 6-point divider be
 
 **Focus.** A child X11 window tends to keep keyboard focus after a click in it. If typing does not return to the editor after a click there, set X input focus to the parent window id on a pointer press in the writing pane, and try again before recording it as a failure.
 
-**The session checks.** With `play` running on 1425: stderr shows `page loaded http://127.0.0.1:1425/…`; a screenshot shows the page in the right pane; after an `xdotool` drag of the divider, a second screenshot shows both panes at the new sizes and the page filling its pane; after a click in the page and a click in the editor, typed text lands in the editor.
+**The session checks.** With the site's process running: stderr shows `page loaded http://127.0.0.1:<port>/…`, the port from `sites/app-slice/.rubric/serve.json`; a screenshot shows the page in the right pane; after an `xdotool` drag of the divider, a second screenshot shows both panes at the new sizes and the page filling its pane; after a click in the page and a click in the editor, typed text lands in the editor.
 
 **David checks.** Rows 5, 6 and 7: how the page keeps up while dragging is judged by eye.
 
 **Tests.** `snap` at 0.05, 0.5 and 0.95. Headless: a drag of the divider by a known distance changes `state.split` by that distance over the window's width. The web view has no automated test; its checks are rows in the table below.
 
-**Not to touch.** `scripts/play.ts`, the catalog, anything in `src/`.
+**Not to touch.** The catalog, anything in `src/`.
 
 ### Task 3: the server
 
@@ -213,7 +213,7 @@ pub fn line_range(text: &str, line: u32) -> std::ops::Range<usize>; // bytes, wi
 
 On start, from a background thread so the first frame does not wait: `Client::start`, then `textDocument/didOpen` (`languageId: "markdown"`, version 1, the text as it is then), then `rubric/cursor` for the caret's line; the client is put into `State` through the handle. Changes made before it is there need no replay, since `didOpen` carries the text. On every change: `textDocument/didChange` with the new version and `contentChanges: [{ "text": <whole text> }]`. When the caret's line changes (noticed in `poll`): `rubric/cursor { uri, line }`, never twice for the same line. On quit: `didClose`, then `stop`, and the child must be gone.
 
-**The session checks.** With `play` running: after typing a sentence with `xdotool`, `sites/app-slice/content/posts/long.md` holds it within a second; `curl -N http://127.0.0.1:1426/events` shows a cursor event with the new line after the caret moves; `page loaded` shows the post's URL after the first cursor; after quitting, the server process the app started is gone.
+**The session checks.** After typing a sentence with `xdotool`, `sites/app-slice/content/posts/long.md` holds it within a second; `curl -N http://127.0.0.1:<relay>/events` (the relay port from `serve.json`) shows a cursor event with the new line after the caret moves; `page loaded` shows the post's URL after the first cursor; after quitting, the `rubric lsp` process the app started is gone, and `rubric stop sites/app-slice` leaves no process of the site's.
 
 **David checks.** Rows 2 and 4.
 
@@ -245,7 +245,7 @@ Drawing: while `state.ghost` is set and `wants` still gives its line, a text ele
 
 Keys, in the field's key handler: Tab with a ghost showing whose pin acts calls `accept` and sends the change as any edit. Tab is consumed in every case. A pick whose pin carries `build` or `change` is shown, and Tab on it does nothing (it opens a menu in Neovim, which this slice does not have).
 
-**The session checks.** With the stub server and `play` running: on a new empty line, typing `::: a quote` with `xdotool` leaves an opener and a closer in the text; a screenshot shows dimmed text after the caret; after Tab, the line in the editor is the part's plain form, and `content/posts/long.md` holds the part's shortcode in place of an unclosed block.
+**The session checks.** With the stub server: on a new empty line, typing `::: a quote` with `xdotool` leaves an opener and a closer in the text; a screenshot shows dimmed text after the caret; after Tab, the line in the editor is the part's plain form, and `content/posts/long.md` holds the part's shortcode in place of an unclosed block.
 
 **David checks.** Rows 8, 9, 10 and 11.
 
@@ -264,7 +264,7 @@ Keys, in the field's key handler: Tab with a ghost showing whose pin acts calls 
 | What | How | Budget |
 |---|---|---|
 | Process start to first frame of the real window | `RUNE_READY_DIR` (`ready_ms`, Rune's README, "Launching fast"), 10 runs, median | 150 ms |
-| Process start to the page showing | Time from the top of `main` to the first `page loaded`, 10 runs, median, with `play` already running | 1,000 ms |
+| Process start to the page showing | Time from the top of `main` to the first `page loaded`, 10 runs, median, with the site's process already running | 1,000 ms |
 | One typed character in the 3,000-word post, with spans on | As `crates/rune/examples/long_note.rs` does: headless, 60 keystrokes at the start, middle and end; CPU for the input and the frame that commits it; median and p95 | p95 4 ms |
 | `markdown::spans` over the 3,000-word post | 100 runs, median | 1 ms |
 | Idle CPU with the window open and nothing happening | `top`, 30 s | under 1% |
@@ -278,7 +278,7 @@ A missed budget is reported with its number. Spend at most an hour making one pa
 
 ## To try by hand
 
-For David, when the session is done. Start `RUBRIC_PORT=1425 RUBRIC_RELAY_PORT=1426 bun run play sites/app-slice` in one terminal, then `cargo run --release --manifest-path app/Cargo.toml -- sites/app-slice/pages/posts/long.md` in another.
+For David, when the session is done: `cargo run --release --manifest-path app/Cargo.toml -- sites/app-slice/pages/posts/long.md`. The site's process starts with it.
 
 | # | Do | Expect |
 |---|---|---|
@@ -304,7 +304,7 @@ Row 14 is the one that decides. Do not open `sites/app-slice` in Neovim: its ser
 - No commits. When a task is done and its tests pass, say so and give a one-sentence commit message.
 - No call to Jev, no drafts, no bench runs, no probes. Never pass `--live`. Never read `.env`.
 - Change nothing outside `app/`, `sites/app-slice/` and `docs/app-slice-findings.md`. No existing file is edited.
-- David is testing in Neovim on `testing/` with `bun run play` on 1415 and 1416. Do not use those ports, that site, or stop those processes.
+- David is testing in Neovim on `testing/`, whose process holds 1415 and 1416. Do not open that site or stop its process.
 - American English in code, comments and docs.
 - Anything the writer sees is one or two words that state the fact. The slice shows only the pick.
 - Stop and report, with the exact error, when a step fails for a reason outside the code (a missing package, a Rune build failure at the pinned rev, a display problem). Do not move the pin to another rev without saying so in the findings.

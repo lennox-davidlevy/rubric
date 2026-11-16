@@ -5,6 +5,7 @@
 // stub resolver and the stub harness.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { hugoPath } from "../src/hugo.ts";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,10 +16,10 @@ import type { Mode } from "../src/server/harness.ts";
 import { stubHarness, stubRefiner, stubResolver } from "../src/server/stub.ts";
 import { Workspace, type Note } from "../src/server/workspace.ts";
 import { openSite } from "../src/site.ts";
-import { copyTestingSite } from "./testing-site.ts";
+import { copyTestingSite, siteArgs } from "./testing-site.ts";
 
 const repo = join(import.meta.dir, "..");
-const hugo = Bun.which("hugo");
+const hugo = hugoPath();
 let tmp: string;
 let dir: string;
 let catalogDir: string;
@@ -43,7 +44,8 @@ beforeAll(async () => {
   cpSync(join(repo, "catalogs/universal"), catalogDir, { recursive: true, filter: (src) => !/\/universal\/(shots|previews)(\/|$)|\/page\/(public|resources)(\/|$)/.test(src) });
   dir = join(tmp, "site");
   copyTestingSite(dir);
-  writeFileSync(join(dir, "hugo.toml"), readFileSync(join(dir, "hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(tmp, "catalogs"))}`));
+  // Its own copy of the catalog, which keeping a part for every theme writes.
+  writeFileSync(join(dir, "hugo.toml"), `theme = "universal"\nthemesDir = ${JSON.stringify(join(tmp, "catalogs"))}\n${readFileSync(join(dir, "hugo.toml"), "utf8")}`);
   ws = await workspace();
 });
 
@@ -211,7 +213,7 @@ describe("a draft", () => {
 
   test.skipIf(!hugo)("Hugo draws the page with the draft in it", () => {
     const out = join(tmp, "public");
-    const r = Bun.spawnSync([hugo!, "--quiet", "-s", dir, "-d", out], { stderr: "pipe" });
+    const r = Bun.spawnSync([hugo!, "--quiet", ...siteArgs(dir), "-d", out], { stderr: "pipe" });
     expect(r.stderr.toString()).toBe("");
     const html = readFileSync(join(out, "posts/new/index.html"), "utf8");
     expect(html).toMatch(/class="part part-moon-orbit[ "]/);
@@ -552,31 +554,6 @@ describe("the checks", () => {
     expect(problems).toHaveLength(1);
     expect(problems[0]).toContain("--reach");
   });
-});
-
-test("a site whose hugo.toml doesn't mount .rubric/hugo/ says so, and offers no new part", async () => {
-  const blog = join(tmp, "blog");
-  cpSync(join(repo, "sites/blog"), blog, { recursive: true, filter: (src) => !/\/(content|\.rubric|public)(\/|$)/.test(src) });
-  writeFileSync(join(blog, "hugo.toml"), readFileSync(join(blog, "hugo.toml"), "utf8")
-    .replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(tmp, "catalogs"))}`)
-    .replace(/^theme = .*$/m, `theme = "universal"`));
-  const site = await openSite(blog);
-  expect(site.ownMounted).toBe(false);
-  const seen = new Map<string, Note[]>();
-  const other = new Workspace(site, new Cache(), stubResolver(atPlace(site.catalog, "writing"), 5), (f, n) => seen.set(f, n), {
-    idleMs: 5, waitMs: 1000, drawMs: 5, harness: stubHarness(site.catalog, 5),
-  });
-  const file = join(blog, "pages/posts/new.md");
-  const text = `${front}::: a wobbly orbit of moons\n:::\n\n::: new: moon orbit\n:::\n`;
-  writeFileSync(file, text);
-  await other.open(file, text);
-  await other.settle();
-  expect(await other.ghost(file, 4)).toEqual([]);
-  expect(seen.get(file)!.filter((n) => n.line === 7).map((n) => [n.code, n.severity])).toEqual([["new-part", "warning"]]);
-  await other.build(file, 7);
-  await other.drafted();
-  expect(other.draft(file, 7)?.status).toBe("failed");
-  other.dispose();
 });
 
 describe("in a hurry", () => {

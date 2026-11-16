@@ -500,3 +500,10 @@ geekdoc:
   pairing: metropolis-arimo
   scale: geekdoc
   skin: geekdoc
+
+schematic:
+  description: a white sheet on an almost-white page, a book serif with small pixel-mono labels, one cobalt blue, and terms explained in the margin; after Making Software
+  palette: schematic
+  pairing: serif-departure
+  scale: schematic
+  skin: schematic

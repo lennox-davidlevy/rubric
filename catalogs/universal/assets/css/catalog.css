@@ -22,3 +22,13 @@
 .flow > :is(.part-header, .part-footer, .part-banner) { grid-column: wide; }
 .flow > .part-page-contents { display: block; position: static; padding: 0; }
 .flow > .part-sidebar { padding: 0; border: 0; }
+/* At any width, never a drawer: no button, the column as it is. */
+.flow > .part-sidebar-open { display: none; }
+.flow > .part-sidebar:not(:popover-open) { display: block; }
+
+/* The reading progress as a sample: drawn in the column at the share 0.4,
+   not stuck to the edge of the screen. */
+.flow > .part-reading-progress { position: relative; inset: auto; --read: 0.4; }
+.flow > .part-reading-progress.style-ruler { display: block; height: 8rem; }
+.flow > .part-reading-progress .part-reading-progress-open { display: none; }
+.flow > .part-reading-progress .part-reading-progress-panel:not(:popover-open) { display: block; position: absolute; inset: 0 0 0 auto; }

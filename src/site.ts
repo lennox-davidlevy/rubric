@@ -7,6 +7,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { parse } from "yaml";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { loadCatalog, parseSkin, withOwn, withSkin, type Catalog, type PageKind, type Skin } from "./core/index.ts";
+import { readConfig, siteThemeDir } from "./hugo-config.ts";
 import { readOwn, type Own } from "./parts.ts";
 
 export interface Site {
@@ -34,19 +35,12 @@ export interface Site {
   // The catalog as catalog.yaml has it, without the skin's additions or the
   // site's parts: what a site's own drawing of a catalog part starts from.
   shared: Catalog;
-  // Whether hugo.toml mounts .rubric/hugo/, so Hugo can draw them.
-  ownMounted: boolean;
 }
 
 // `theme` is the one rubric.md names, which comes before hugo.toml's.
 export async function openSite(root: string, theme?: string): Promise<Site> {
-  // The slice has one catalog, read from the theme the site's hugo.toml names.
-  const config = await readFile(join(root, "hugo.toml"), "utf8");
-  // Hugo's theme is the catalog; Rubric's theme is a look inside it.
-  const catalogName = /^theme\s*=\s*"([^"]+)"/m.exec(config)?.[1];
-  const themesDir = /^themesDir\s*=\s*"([^"]+)"/m.exec(config)?.[1] ?? "themes";
-  if (!catalogName) throw new Error(`${root}/hugo.toml names no theme`);
-  const themeDir = resolve(root, themesDir, catalogName);
+  const config = readConfig(root);
+  const themeDir = siteThemeDir(root, config);
   const params = rubricParams(config);
   const skin = await skinned(themeDir, theme ?? (typeof params.theme === "string" ? params.theme : "paper"));
   const { own, problems } = readOwn(root, skin.catalog, skin.shared, themeDir);
@@ -62,7 +56,6 @@ export async function openSite(root: string, theme?: string): Promise<Site> {
     params,
     own,
     ownProblems: problems,
-    ownMounted: /^\s*source\s*=\s*"\.rubric\/hugo\/layouts"/m.test(config),
   };
 }
 

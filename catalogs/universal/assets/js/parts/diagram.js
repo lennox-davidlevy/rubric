@@ -7,13 +7,19 @@
 const INTEGRITY = "sha384-rbtjAdnIQE/aQJGEgXrVUlMibdfTSa4PQju4HDhN3sR2PmaKFzhEafuePsl9H/9I";
 // Runs again on "rubric:drawn", when the live preview puts new parts in the
 // page without reloading it; anything set up once is marked and skipped.
+// Mermaid's path is from the site's root, which is where this script's own
+// folder (js/parts/) is: the built site may sit under a path, or on disk.
+const diagramSite = (document.currentScript?.src ?? location.href).replace(/js\/parts\/[^/]*$/, "");
 let mermaidReady;
 let drawn = 0;
 const loadMermaid = (src) => (mermaidReady ??= new Promise((resolve, reject) => {
   const script = document.createElement("script");
-  script.src = src;
-  script.integrity = INTEGRITY;
-  script.crossOrigin = "anonymous";
+  script.src = new URL(src, diagramSite).href;
+  // A browser cannot check a file opened from disk, and would refuse it.
+  if (location.protocol !== "file:") {
+    script.integrity = INTEGRITY;
+    script.crossOrigin = "anonymous";
+  }
   script.onload = () => {
     const mermaid = window.mermaid;
     const slot = (name) => getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim();

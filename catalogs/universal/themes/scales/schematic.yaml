@@ -1,0 +1,18 @@
+# After Making Software's sizes: small writing with loose lines in a column
+# of 576px, pictures out to 784px, a light 36px title, and headings no
+# bigger than the writing. Its 14px is set a step up here, since Source
+# Serif is smaller on the line than its Arizona, and 16px reads on a phone.
+description: 16px writing in a 36rem column, headings at the writing's size, square corners
+
+screen: [360, 1240]
+body: [16, 16]
+ratio: [1.2, 1.25]
+steps: [-1, 4]
+
+space: [0.5, 1, 1.5, [2, 3], [3, 5]]
+
+measure: 36rem
+wide: 49rem
+radius: 2px
+border: 1px
+controls: 2px

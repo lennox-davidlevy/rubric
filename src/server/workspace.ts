@@ -6,7 +6,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { appendFile, copyFile, mkdir, readFile, readdir, rename, rm, unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import {
   applyRefine, atPlace, Cache, frontMatterProblem, liveContent, settingsOf, formatPlain, frame, FRAME_PAGE, framePage, parsePlain, preprocess, refineWords, scan, lines as splitLines,
   formatThemeLine, PIECES, THEME, THRESHOLDS, writeWhole, type Piece, drawnForm, PLAIN, VARIANT, type DrawAs,
@@ -14,7 +14,7 @@ import {
 } from "../core/index.ts";
 import { catalogFiles, changeable, DRAFT_INDEX, DRAFT_LOGS, draftKey, DRAFTS, keepLocal, keepTake, makeGlobal, ownKey, putAway, readDrafts, setEverywhere, shownTake, takesFor, variantKey, variantsOf, writeHugoTree, type DraftState } from "../parts.ts";
 import { openSite, pageKind, pagePath, type Site } from "../site.ts";
-import { LOG, newDraft, NOT_MOUNTED, runDraft, saveState, type Harness } from "./draft.ts";
+import { LOG, newDraft, runDraft, saveState, type Harness } from "./draft.ts";
 import { brief as shortDrafter, type Drafter, type HarnessName, type Mode } from "./harness.ts";
 import { themeList, type ThemeList, type ThemeRanker } from "./themes.ts";
 import { fileExists, isSiteAddress, pictures } from "./files.ts";
@@ -182,7 +182,7 @@ export interface Options {
   // between keys nine times in ten, never under minIdleMs.
   idleMs?: number;
   minIdleMs?: number;
-  // Each edit to a words line, for `bun run play` to log, so the pause can
+  // Each edit to a words line, for `rubric watch` to have logged, so the pause can
   // be tuned on real typing (scripts/pause.ts).
   onEdit?: (edit: { t: number; line: number; words: string; pause: number }) => void;
   // How long a ghost text request waits for an answer before giving up.
@@ -295,6 +295,21 @@ export class Workspace {
     }
     const rubric = join(this.site.root, "rubric.md");
     if (mine(rubric)) await this.#write("rubric.md", "site", await readFile(rubric, "utf8").catch(() => ""));
+  }
+
+  // A page saved by an editor with no server, or changed on disk some other
+  // way: drawn again from disk, unless an editor holds it open. A page gone
+  // takes its content with it.
+  async fromDisk(file: string): Promise<void> {
+    const rubric = join(this.site.root, "rubric.md");
+    const rel = file === rubric ? "rubric.md" : relative(this.site.pages, file);
+    if (rel.startsWith("..") || !rel.endsWith(".md") || this.#docs.has(file) || (await this.#openElsewhere()).has(file)) return;
+    const text = await readFile(file, "utf8").catch(() => undefined);
+    if (text !== undefined) {
+      await this.#write(rel, rel === "rubric.md" ? "site" : pageKind(rel), text);
+    } else if (rel !== "rubric.md") {
+      await rm(join(this.site.content, rel), { force: true });
+    }
   }
 
   // Each Neovim runs its own server, and each draws every page it doesn't
@@ -537,7 +552,7 @@ export class Workspace {
     // Nothing in the catalog fits: offer to draft a part for the words. Only
     // in a page, and only with a harness to draft it.
     if (hit.outcome === "nothing-fits") {
-      if (doc.page === "site" || !this.#harness || !this.site.ownMounted) return [];
+      if (doc.page === "site" || !this.#harness) return [];
       return [{ text: `${sep}draft a new part`, line, character: end, replace: `${lead} new: ${asked}`, build: true }];
     }
     // An empty block gets the part's starter body with the pin, so the writer
@@ -592,7 +607,7 @@ export class Workspace {
     // opens its menu; nothing is drafted until Change… is chosen.
     if (Object.keys(hit.settings).length === 0 && (hit.unsettled.length === 0 || hit.beyond > THRESHOLDS.yes)) {
       const sep = lineText.endsWith(" ") ? "" : " ";
-      const drafts = this.#harness && this.site.ownMounted && this.#ownPart(now.doc, now.d);
+      const drafts = this.#harness && this.#ownPart(now.doc, now.d);
       return [drafts
         ? { text: `${sep}⇒ change ${part}`, line, character: lineText.length, replace: lineText, change: true }
         : { text: `${sep}⇒ nothing ${part} can set`, line, character: lineText.length, replace: lineText }];
@@ -1329,7 +1344,6 @@ export class Workspace {
         ? `. Similar in the catalog: ${part}` : "";
       if (words === "") notes.push({ ...here, code: "new-part", severity: "information", message: "new: needs words after it" });
       else if (!this.#harness) notes.push({ ...here, code: "new-part", severity: "information", message: "new part: no harness to draft it" });
-      else if (!this.site.ownMounted) notes.push({ ...here, code: "new-part", severity: "warning", message: NOT_MOUNTED });
       else if (!latest) notes.push({ ...here, code: "new-part", severity: "information", message: `new part: the accept key drafts it${near}` });
       else if (latest.status === "drafting") notes.push({ ...here, code: "drafting", severity: "information", message: `drafting${showing}${near}` });
       else if (latest.status === "ready") notes.push({ ...here, code: "draft-ready", severity: "information", message: `${latest.name} drafted, in the preview: the accept key keeps, rerolls or cancels${sets}${near}` });

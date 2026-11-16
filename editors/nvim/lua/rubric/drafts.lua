@@ -763,16 +763,14 @@ function M.drafting(setup)
   return mode
 end
 
--- A server starts with the mode and the drafter the setup had when Neovim
--- opened, so each one is told the kept ones as it attaches: after a
--- restart, or in another site, the labels and the drafts agree.
--- `started` is the drafter the server's command line names: when the kept
--- one is still that, nothing is sent, so no tool is asked for its models.
-function M.sync(client, bufnr, setup, started, defaults, draft_setup)
+-- The site's process may have been started by another Neovim, with
+-- another setup, so each tells it the kept mode and drafter as it attaches:
+-- the labels and the drafts agree. The server checks a drafter only when it
+-- is not the one it has.
+function M.sync(client, bufnr, setup, _, defaults, draft_setup)
   client:request("rubric/drafting", { mode = M.drafting(setup) }, function() end, bufnr)
   local d = M.drafter(defaults, draft_setup)
-  local same = d and started and d.harness == started.harness and d.model == started.model and d.effort == started.effort
-  if d and not same then
+  if d then
     client:request("rubric/setDrafter", { harness = d.harness, model = d.model, effort = d.effort }, function() end, bufnr)
   end
 end

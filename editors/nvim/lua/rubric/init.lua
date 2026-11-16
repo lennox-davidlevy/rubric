@@ -442,6 +442,9 @@ local function send_cursor(bufnr, client_id)
   })
 end
 
+-- What each client's site process said about its page: `url`, or `problem`.
+local serving = {}
+
 -- The repository root, from where this file sits.
 local function repo_root()
   local here = debug.getinfo(1, "S").source:sub(2)
@@ -464,7 +467,18 @@ function M.setup(opts)
     -- Bun loads .env from the working directory; the repo's holds TYPESAFE_API_KEY.
     cmd_cwd = root,
     filetypes = { "markdown" },
-    root_markers = { "rubric.md" },
+    -- Only the site's own files: rubric.md and its pages. Connecting starts
+    -- the site's process and Hugo, which a README beside them must not.
+    root_dir = function(bufnr, on_dir)
+      local site = vim.fs.root(bufnr, "rubric.md")
+      if not site then
+        return
+      end
+      local file = vim.fs.normalize(vim.api.nvim_buf_get_name(bufnr))
+      if file == site .. "/rubric.md" or vim.startswith(file, site .. "/pages/") then
+        on_dir(site)
+      end
+    end,
     capabilities = opts.capabilities,
     handlers = {
       ["rubric/picks"] = picks_handler(opts.next),
@@ -475,6 +489,19 @@ function M.setup(opts)
       -- A new part's draft finished, or failed.
       ["rubric/drafted"] = drafts.drafted,
       ["rubric/starters"] = starters.handler,
+      -- Where the site's page is, or why there is none: said once a session.
+      ["rubric/serving"] = function(_, params, ctx)
+        local was = serving[ctx.client_id]
+        serving[ctx.client_id] = params
+        if was and was.url == params.url and was.problem == params.problem then
+          return
+        end
+        if params.url then
+          vim.notify("rubric: " .. params.url, vim.log.levels.INFO)
+        elseif params.problem then
+          vim.notify("rubric: " .. params.problem, vim.log.levels.WARN)
+        end
+      end,
     },
   })
   vim.lsp.enable("rubric")
@@ -515,12 +542,12 @@ function M.setup(opts)
     end
   end
 
-  -- :Rubric theme opens the theme list for rubric.md's theme line. :Rubric
-  -- harness chooses the tool that drafts new parts, its model, how hard it
+  -- :Rubric theme opens the theme list for rubric.md's theme line, and
+  -- :Rubric open the page in the browser. :Rubric harness chooses the tool that drafts new parts, its model, how hard it
   -- thinks and whether it uses tools; :Rubric model another model for that
   -- tool, and :Rubric tooluse tools or none; all last across sessions.
   -- :Rubric log follows what the draft on the cursor's line is doing.
-  local commands = { "theme", "harness", "model", "tooluse", "log" }
+  local commands = { "theme", "open", "harness", "model", "tooluse", "log" }
   vim.api.nvim_create_user_command("Rubric", function(cmd)
     if not vim.tbl_contains(commands, cmd.args) then
       vim.notify("rubric: :Rubric " .. table.concat(commands, ", :Rubric "), vim.log.levels.INFO)
@@ -540,6 +567,13 @@ function M.setup(opts)
       drafts.choose_tooluse(client, bufnr)
     elseif cmd.args == "log" then
       drafts.log(client, bufnr, vim.api.nvim_win_get_cursor(0)[1] - 1)
+    elseif cmd.args == "open" then
+      local at = serving[client.id]
+      if at and at.url then
+        vim.ui.open(at.url)
+      else
+        vim.notify("rubric: " .. (at and at.problem or "no page yet"), vim.log.levels.WARN)
+      end
     else
       themes.command(bufnr, client, open_blocks)
     end
@@ -552,7 +586,7 @@ function M.setup(opts)
         return vim.startswith(c, lead)
       end, options)
     end,
-    desc = "Rubric: open the theme list, choose what drafts new parts, or follow a draft's log",
+    desc = "Rubric: open the theme list or the page, choose what drafts new parts, or follow a draft's log",
   })
 
   vim.api.nvim_create_autocmd("LspAttach", {

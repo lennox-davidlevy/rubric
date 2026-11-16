@@ -276,10 +276,23 @@ sup a[role="doc-noteref"], .footnote-ref {
    when the frame has them, on a screen wide enough. */
 .shell { display: grid; grid-template-columns: minmax(0, 1fr); }
 .shell > main { min-width: 0; }
+/* --side is the column a sidebar takes. Beside one, the writing is centered
+   in the space left, and the site's header and footer line up over it. */
+:root { --side: 15rem; }
 @media (min-width: 64rem) {
-  .shell.has-left { grid-template-columns: 15rem minmax(0, 1fr); }
-  .shell.has-right { grid-template-columns: minmax(0, 1fr) 15rem; }
-  .shell.has-left.has-right { grid-template-columns: 15rem minmax(0, 1fr) 15rem; }
+  .shell.has-left { grid-template-columns: var(--side) minmax(0, 1fr); }
+  .shell.has-right { grid-template-columns: minmax(0, 1fr) var(--side); }
+  .shell.has-left.has-right { grid-template-columns: var(--side) minmax(0, 1fr) var(--side); }
+  body:has(> .shell.has-left:not(.has-right)) :is(.part-header, .part-footer):not(main *) { padding-left: var(--side); }
+  body:has(> .shell.has-right:not(.has-left)) :is(.part-header, .part-footer):not(main *) { padding-right: var(--side); }
+  body:has(> .shell.has-left:not(.has-right)) :is(.masthead, .site-footer) {
+    margin-left: calc(var(--side) + max(0px, (100% - var(--side) - var(--measure) - 2 * var(--space-3)) / 2));
+    margin-right: auto;
+  }
+  body:has(> .shell.has-right:not(.has-left)) :is(.masthead, .site-footer) {
+    margin-left: auto;
+    margin-right: calc(var(--side) + max(0px, (100% - var(--side) - var(--measure) - 2 * var(--space-3)) / 2));
+  }
 }
 
 /* Dark, when the frame's theme-switch is set to it: the palette's own dark

@@ -51,12 +51,14 @@
 {{- /* Named for the theme and a short hash of the parts: a page with many
      parts would otherwise outgrow a file name. */}}
 {{- $name := printf "css/%s-%s-%s-%s.css" $palette $pairing $scale (delimit $bundle "-" | md5 | strings.Truncate 8 "") }}
+{{- /* Fingerprinted for caching, with no integrity check: the files are the
+     site's own, and a browser cannot check one opened from disk. */}}
 {{- with $css | resources.Concat $name | minify | fingerprint }}
-<link rel="stylesheet" href="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}">
+<link rel="stylesheet" href="{{ .RelPermalink }}">
 {{- end }}
 {{- range $js }}
 {{- with . | minify | fingerprint }}
-<script src="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}" defer></script>
+<script src="{{ .RelPermalink }}" defer></script>
 {{- end }}
 {{- end }}
 {{- with site.Home.OutputFormats.Get "rss" }}
@@ -71,7 +73,7 @@
 {{- end }}
 <meta name="rubric-relay" content="{{ site.Params.rubric.relay | default "http://127.0.0.1:1416" }}">
 {{- with resources.Get "js/rubric-live.js" | fingerprint }}
-<script src="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}"></script>
+<script src="{{ .RelPermalink }}"></script>
 {{- end }}
 {{- end }}
 {{- if partial "rubric/frame-has.html" (dict "page" . "part" "theme-switch") }}

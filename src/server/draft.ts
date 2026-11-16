@@ -7,9 +7,11 @@
 // later with a check and no rewrite.
 
 import { createHash } from "node:crypto";
+import { hugoSiteArgs, readConfig } from "../hugo-config.ts";
+import { hugoPath } from "../hugo.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { parse } from "yaml";
 import { missingSettings, NAME, parseOwnPart, PLAIN, splitVariant, writeWhole, type Part } from "../core/index.ts";
 import { catalogFiles, draftKey, drawingProblems, DRAFTS, hugoFiles, readDrafts, variantKey, type DraftState } from "../parts.ts";
@@ -44,8 +46,6 @@ export function draftLog(dir: string, started: number): { log: (line: string) =>
   };
   return { log, flush: () => queue };
 }
-
-export const NOT_MOUNTED = "this site's hugo.toml does not mount .rubric/hugo/, where its own parts and drafts are drawn from; copy the [[module.mounts]] in testing/hugo.toml";
 
 export const PROMPT = "Read brief.md in this folder and do what it asks. Write only the files it names, in this folder.";
 
@@ -398,15 +398,25 @@ function keptPart(site: Site, name: string): Part | undefined {
   return Object.hasOwn(site.shared.parts, name) ? site.shared.parts[name] : undefined;
 }
 
+// A TOML file without the top-level keys named: those before its first
+// table, so [params.rubric]'s own `theme` stays.
+function withoutTopLevel(toml: string, keys: string[]): string {
+  const lines = toml.split("\n");
+  const tables = lines.findIndex((l) => /^\s*\[/.test(l));
+  const top = tables < 0 ? lines.length : tables;
+  return lines.filter((l, i) => i >= top || !keys.some((k) => new RegExp(`^\\s*${k}\\s*=`).test(l))).join("\n");
+}
+
 // Builds a page with the part on it, once for each value of each setting, in
 // a throwaway copy of the site's config, and reads what Hugo says.
 async function hugoCheck(site: Site, dir: string, name: string, part: ReturnType<typeof parseOwnPart>["part"]): Promise<string[]> {
-  const hugo = Bun.which("hugo");
+  const hugo = hugoPath();
   if (!hugo) return [];
   const tmp = join(site.root, ".rubric/tmp", `check-${name}-${Date.now()}`);
   try {
-    const config = readFileSync(join(site.root, "hugo.toml"), "utf8")
-      .replace(/^themesDir\s*=.*$/m, `themesDir = ${JSON.stringify(join(site.themeDir, ".."))}`);
+    // The site's settings, with the catalog it is drawn from named outright,
+    // since the copy is elsewhere.
+    const config = `theme = ${JSON.stringify(basename(site.themeDir))}\nthemesDir = ${JSON.stringify(dirname(site.themeDir))}\n${withoutTopLevel(readConfig(site.root), ["theme", "themesDir"])}`;
     await mkdir(join(tmp, "content"), { recursive: true });
     await writeFile(join(tmp, "hugo.toml"), config);
     // The site's own parts and this draft, as the server would mount them.
@@ -425,7 +435,7 @@ async function hugoCheck(site: Site, dir: string, name: string, part: ReturnType
     const front = JSON.stringify({ title: "Check", rubric: { theme: site.theme } });
     await writeFile(join(tmp, "content/check.md"), `${front}\n\nBefore.\n\n${blocks.join("\n\n")}\n\nAfter.\n`);
     // Not --quiet, which hides Hugo's errors too.
-    const r = await runHugo([hugo, "-s", tmp, "-d", join(tmp, "public")]);
+    const r = await runHugo([hugo, ...(await hugoSiteArgs(tmp)), "-d", join(tmp, "public")]);
     const errors = r.stderr.split("\n").filter((l) => /ERROR/.test(l));
     if (r.code !== 0 || errors.length) return [`Hugo could not draw it: ${(errors.join(" ") || r.stderr.trim() || `exit ${r.code}`).replaceAll(tmp, "").slice(0, 600)}`];
     const page = await readFile(join(tmp, "public/check/index.html"), "utf8").catch(() => "");
@@ -440,11 +450,6 @@ async function hugoCheck(site: Site, dir: string, name: string, part: ReturnType
 // more try with the reasons when they fail. `save` is called with each new
 // state. The folder is the draft's; the caller made it.
 export async function runDraft(site: Site, dir: string, state: DraftState, req: DraftRequest, harness: Harness, signal: AbortSignal, save: (s: DraftState) => Promise<void>): Promise<DraftState> {
-  if (!site.ownMounted) {
-    const next: DraftState = { ...state, status: "failed", message: NOT_MOUNTED, finished: Date.now() };
-    await save(next);
-    return next;
-  }
   const { log, flush } = draftLog(dir, state.started);
   // What the runs cost, added up; the drafter, the session and whether it
   // resumed, from the last run.

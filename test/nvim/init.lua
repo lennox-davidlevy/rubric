@@ -12,6 +12,27 @@ end
 
 RubricTest = {}
 
+-- What the plugin said, and what it would open in the browser.
+RubricTest.notices = {}
+local notify = vim.notify
+vim.notify = function(msg, ...)
+  table.insert(RubricTest.notices, msg)
+  return notify(msg, ...)
+end
+RubricTest.opened = ""
+vim.ui.open = function(url)
+  RubricTest.opened = url
+end
+
+function RubricTest.said(pattern)
+  for _, m in ipairs(RubricTest.notices) do
+    if m:match(pattern) then
+      return m
+    end
+  end
+  return ""
+end
+
 function RubricTest.attached()
   return client() ~= nil
 end

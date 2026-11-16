@@ -4,6 +4,8 @@
 // temporary copy of the blog site switched to it, with the stub resolver.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { siteArgs } from "./testing-site.ts";
+import { hugoPath } from "../src/hugo.ts";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,7 +15,7 @@ import { Workspace } from "../src/server/workspace.ts";
 import { openSite } from "../src/site.ts";
 
 const repo = join(import.meta.dir, "..");
-const hugo = Bun.which("hugo");
+const hugo = hugoPath();
 let catalog: Catalog;
 let dir: string;
 let ws: Workspace;
@@ -115,7 +117,7 @@ test.skipIf(!hugo)("Hugo draws a part that takes nothing inside from its one cal
       .replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(repo, "catalogs"))}`));
     mkdirSync(join(s, "content/posts"), { recursive: true });
     writeFileSync(join(s, "content/posts/p.md"), "---\ntitle: P\n---\n\nBefore.\n\n{{< divider style=\"ornament\" />}}\n\nAfter.\n");
-    const r = Bun.spawnSync([hugo!, "--quiet", "-s", s, "-d", join(s, "public")]);
+    const r = Bun.spawnSync([hugo!, "--quiet", ...siteArgs(s), "-d", join(s, "public")]);
     expect(r.stderr.toString()).toBe("");
     const html = readFileSync(join(s, "public/posts/p/index.html"), "utf8");
     const between = html.slice(html.indexOf("<p>Before.</p>"), html.indexOf("<p>After.</p>"));

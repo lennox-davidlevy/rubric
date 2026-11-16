@@ -2,18 +2,44 @@
 // over --listen so keys arrive the way a writer's do, with the stub resolver.
 // Skipped when nvim is not on the path.
 
-import { expect, test } from "bun:test";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { afterAll, expect, test } from "bun:test";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { hugoPath } from "../src/hugo.ts";
+import { alive, readServing } from "../src/server/site-process.ts";
 import { copyTestingSite } from "./testing-site.ts";
 
-// The editor's language server can still be writing as it exits, and put
-// back a folder just removed: remove it, wait, and remove it again.
+// Each editor's `rubric lsp` starts the site's process, which stops by itself
+// soon after the editor leaves. Hugo is a stand-in that only waits, and the
+// sockets live in a folder of the tests' own.
+// A draft's checks build with the real Hugo, when there is one.
+const shared = mkdtempSync(join(tmpdir(), "rubric-nvim-run-"));
+const realHugo = hugoPath();
+if (realHugo) {
+  writeFileSync(join(shared, "hugo"), `#!/bin/sh\n[ "$1" = server ] && exec sleep 600\nexec ${JSON.stringify(realHugo)} "$@"\n`);
+  chmodSync(join(shared, "hugo"), 0o755);
+}
+// Set for this file only: the test runner shares one process across files.
+const before = { RUBRIC_HUGO: process.env.RUBRIC_HUGO, RUBRIC_IDLE_MS: process.env.RUBRIC_IDLE_MS, XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR };
+Object.assign(process.env, { ...(realHugo ? { RUBRIC_HUGO: join(shared, "hugo") } : {}), RUBRIC_IDLE_MS: "200", XDG_RUNTIME_DIR: shared });
+afterAll(() => {
+  for (const [k, v] of Object.entries(before)) {
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+  rmSync(shared, { recursive: true, force: true });
+});
+
+// The site's process must be gone before its folder is: it writes there as
+// it stops. One still running after a while is a failure.
 async function gone(dir: string): Promise<void> {
+  const pids = readdirSync(dir).map((d) => readServing(join(dir, d))?.pid).filter((p): p is number => p !== undefined);
+  for (const end = Date.now() + 5000; pids.some(alive) && Date.now() < end; ) await Bun.sleep(25);
+  const left = pids.filter(alive);
+  for (const pid of left) process.kill(pid, "SIGTERM");
   rmSync(dir, { recursive: true, force: true });
-  await Bun.sleep(500);
-  rmSync(dir, { recursive: true, force: true });
+  expect(left).toEqual([]);
 }
 
 const repo = join(import.meta.dir, "..");
@@ -42,6 +68,13 @@ test.skipIf(!nvim)("Neovim: attach, diagnostics, completion, ghost text, accept,
   try {
     expect(await until(() => expr("RubricTest.attached()") === "true")).toBe(true);
     expect(await until(() => expr("RubricTest.codes()") === "nothing-fits,value-not-allowed")).toBe(true);
+
+    // The site's process serves the page: the address is said once, and
+    // :Rubric open opens it.
+    const serving = readServing(site)!;
+    expect(await until(() => expr("RubricTest.said('127%.0%.0%.1')") === `rubric: http://127.0.0.1:${serving.port}/`)).toBe(true);
+    keys(":Rubric open<CR>");
+    expect(await until(() => expr("RubricTest.opened") === `http://127.0.0.1:${serving.port}/`)).toBe(true);
 
     // Typing a new line: "::: " adds its closer below, and completion offers
     // the parts.
@@ -92,6 +125,16 @@ test.skipIf(!nvim)("Neovim: attach, diagnostics, completion, ghost text, accept,
       }
     })).toBe(true);
     expect(readFileSync(join(site, "content/posts/smoke.md"), "utf8").replace(/\{\{< rubric-line [^>]*>\}\}\n\n/g, "").split("\n")[1]).toBe(`{{< quote size="large" >}}`);
+
+    // Markdown in the site's folder that is neither rubric.md nor a page is
+    // not the site's: it never connects, so it never starts the process.
+    writeFileSync(join(site, "NOTES.md"), "Notes.\n");
+    keys(`:edit ${join(site, "NOTES.md")}<CR>`);
+    expect(await until(() => expr("vim.bo.filetype") === "markdown")).toBe(true);
+    await Bun.sleep(300);
+    expect(expr("RubricTest.attached()")).toBe("false");
+    keys(`:edit ${join(site, "rubric.md")}<CR>`);
+    expect(await until(() => expr("RubricTest.attached()") === "true")).toBe(true);
   } finally {
     keys("<Esc>:qa!<CR>");
     await Promise.race([editor.exited, Bun.sleep(2000)]);

@@ -1,52 +1,58 @@
-# Live test: variants
+# Live test: the `rubric` command
 
-A change to a part is now a variant beside it, not a replacement of it. Branch `variants`. Earlier tables are in [TESTING-jev-and-drafts.md](TESTING-jev-and-drafts.md) (Jev's picks, drafts by both tools, around a draft), [TESTING-fast-drafts.md](TESTING-fast-drafts.md), [TESTING-new-parts.md](TESTING-new-parts.md) and [TESTING-full.md](TESTING-full.md).
+One process per site now holds the language server, Hugo and the cursor relay. Opening a page starts it, and it stops a minute after the last Neovim closes. Nothing is started by hand, and `bun run play` is gone. Branch `rubric-command`. Earlier tables: [TESTING-variants.md](TESTING-variants.md), [TESTING-jev-and-drafts.md](TESTING-jev-and-drafts.md), [TESTING-full.md](TESTING-full.md).
 
 Write what you find in **Notes** at the bottom, by test number.
 
-Last updated: 2026-11-14.
+Last updated: 2026-11-15.
 
 ## Set up
 
-1. Quit every Neovim, stop `bun run play`, start it again from the repo root on branch `variants`.
-2. Open http://localhost:1415/posts/walk/ and `nvim testing/pages/posts/walk.md`. It has two `::: quote` blocks: `size=large align=center`, and `size=large` below it.
+1. Quit every Neovim. Stop the old `bun run play` with Ctrl-C. Check out `rubric-command`.
+2. `which rubric` prints `~/.bun/bin/rubric`.
 
-`<M-l>` opens a part's menu in **normal mode** only (Esc first); in insert mode it accepts the ghost text. E2, E9, E10, E11, E12 and E15 make paid drafts with whichever drafter is set; ask Claude before running them if unsure.
+R5, R6 and R12 wait a minute or more. Only R13 makes a paid draft.
 
-## E. Variants
-
-`<name>` is the name the drafter gives the variant, such as `torn-edge`.
+## R. The command
 
 | # | Do this | Expect |
 |---|---|---|
-| E1 | Normal mode, `<M-l>` on the `::: quote size=large` line | A menu with **Change…**, and no Reroll, Keep or Remove. |
-| E2 | **Change…**, `a torn paper edge`, Enter | The line reads `::: quote size=large : a torn paper edge` while it drafts, with no ghost text. Ready in about 20 s: only this quote draws the take; the other quote stays as it was. `<M-p>` shows the quote as it was; `<M-n>` goes back. |
-| E3 | `<M-l>`, **Keep this take** | The line becomes `::: quote size=large variant=<name>`. `testing/parts/quote--<name>/` has three files. The other quote is unchanged. `git status catalogs/` shows nothing changed. |
-| E4 | On the other quote's line, add ` : with a torn paper edge`, pause | Ghost text `⇒ variant=<name>`, Jev reading the variant's description. If it says `⇒ change quote` instead, note the words and the variant's description from its part.yaml. |
-| E5 | `::: a quote with a torn paper edge` on a new line, pause | Note whether the ghost text is `quote variant=<name>`. |
-| E6 | Cursor on the variant's line in normal mode; then `<M-l>` | A hint at the line's end: "reroll or change <name>, or back to quote". The menu: **Reroll…**, **Change…**, **Every quote as <name>**, **Back to the catalog's quote**, **Remove quote--<name> from this site…**. |
-| E7 | **Every quote as <name>**; then look at another page with a quote; then the menu again, **Every quote plain** | Every `::: quote` with no `variant=`, on every page, draws the variant; then the catalog's again. |
-| E8 | **Back to the catalog's quote** | `variant=<name>` leaves the line and the quote draws as the catalog's. `testing/parts/quote--<name>/` is still there. Put `variant=<name>` back. |
-| E9 | **Reroll…**, **Make changes…**, Notes `darker`, **Reroll** | A take that keeps the name: every line with `variant=<name>` draws it. **Keep this take** writes it over `parts/quote--<name>/`; the line stays. |
-| E10 | **Reroll…**, **Make changes…**, Notes `drop the size setting`, **Reroll** | The take keeps `size`: the checks send back a take that drops it. If the draft fails instead, its message names `size`. |
-| E11 | On the variant's line, **Change…**, `with ivy growing over it`, Enter, then keep | A second variant, `quote--<other>`, drawn from the first: take 1 is the first variant. Both are offered by Jev from their words (E4). |
-| E12 | `<M-l>` on a kept part's line, such as `::: stamps` | **Reroll…** and **Change…**. **Change…** `in gold` makes `stamps--<name>`; **Reroll…** still redrafts `stamps` itself. |
-| E13 | On a new `::: quote : with a gold border` line, `<M-l>` on the `⇒ change quote` ghost text, **Change…** (filled in), Enter; then `<M-l>`, **Back to the catalog's quote** | The line goes back to `::: quote`; nothing new in `testing/parts/`. |
-| E14 | **Remove quote--<name> from this site…** on a variant's line | Its files move to `.rubric/logs/removed/`; lines that still ask for it get a note, and the quote draws as text until they change. |
-| E15 | In `rubric.md`, `::: theme blowfish`; on a `::: callout` with writing, **Change…** `with a torn edge` | Take 1 (`<M-p>`) is Blowfish's callout. Kept: the variant draws in Blowfish, and every other callout stays Blowfish's. Set the theme back after. |
-| E16 | In `testing/pages/parts.md`, `<M-l>` on a `::: tabs`, `::: map` or `::: video` line with writing in it | No menu: a part with a script, or one whose drawing fetches from another site, can't have variants. |
-| E17 | On the `::: map zoom=street` line in `parts.md`, add ` : with a torn paper edge`, pause | Ghost text `⇒ nothing map can set`. `<M-l>` leaves the line as it was. |
+| R1 | `nvim testing/pages/posts/walk.md` | Within a second or two, a notice `rubric: http://127.0.0.1:1415/`. Diagnostics and ghost text work as before. |
+| R2 | `:Rubric open` | The browser opens the page. Typing changes it and moving the cursor scrolls it, as before. |
+| R3 | In a second terminal, `nvim testing/pages/parts.md` | The same address in the notice. `pgrep -fa 'hugo server'` shows one Hugo for `testing/`. |
+| R4 | In a third terminal, from `testing/`: `rubric watch`. Type a new words line in either Neovim and pause. | A row for the call, in columns. Ctrl-C prints the sum. |
+| R5 | Quit both Neovims and wait a minute. Then `pgrep -fa cli.ts` and `pgrep -fa 'hugo server'`. | Nothing for `testing/`, and the page no longer loads. |
+| R6 | From `testing/`: `rubric` | It prints the address and stays in front. Open and quit Neovim on a page: the page stays up. Ctrl-C stops it, Hugo too. |
+| R7 | With a Neovim open on `walk.md`, change `pages/posts/reservoir.md` in another editor (or `echo 'More.' >> testing/pages/posts/reservoir.md`) and save | http://127.0.0.1:1415/posts/reservoir/ shows the change. Put the file back with `git checkout testing/pages/posts/reservoir.md`. |
+| R8 | `:Rubric harness` in one Neovim, choose a drafter; open a `new:` line's menu in a second Neovim on the site | The second names the drafter just chosen: the drafter is the site's. |
+| R9 | `cd /tmp && rubric new my-garden`, then `cd my-garden && nvim rubric.md` | It prints the folder. The folder holds `rubric.md`, `hugo.toml` (a title only), `pages/` and `.gitignore`. A notice gives the address, likely 1417 with `testing/` still open. |
+| R10 | In `my-garden`'s `rubric.md`: `::: theme`, `<M-l>`, choose one. Then `::: header` with links inside, and `::: a footer with my name and the year`, pause, `<M-l>`. | The theme list, the header and the footer work as in `testing/`. |
+| R11 | `nvim pages/posts/first.md`: a sentence, `::: a quote from my grandmother`, then `::: the three things I learned, in order`, then ` : larger, and centered` on the quote | A quote, steps with their starter, then the quote's settings. |
+| R12 | Quit Neovim, then `rubric build` in `my-garden` | It prints `/tmp/my-garden/public`. `public/posts/first/index.html` holds the quote and the steps, drawn in the theme. No `rubric-frame` folder in `public/`. |
+| R13 | Optional, paid: a `::: new: …` line in `my-garden`, **Draft**, then **Keep**, **This site** | It drafts as in `testing/`. The part is in `/tmp/my-garden/parts/`. |
+| R14 | `rubric stop` in `testing/` while a Neovim is open on it | `stopped`. Neovim's Rubric client goes, and quitting and reopening Neovim starts the process again. |
+| R15 | With no Neovim on `testing/`: `nvim testing/TESTING.md` | No notice, and `pgrep -fa cli.ts` shows nothing for `testing/`. Only `rubric.md` and pages under `pages/` start it. |
 
-## F. Fixes from the first run (2026-11-15)
+## S. Schematic, a theme after Making Software
 
-Restart `bun run play` and Neovim first.
+New theme `schematic`, two new parts for every theme (catalog version 12): `glossary` in the writing, `reading-progress` in rubric.md. Use `my-garden` from R9 (before the cleanup below).
 
 | # | Do this | Expect |
 |---|---|---|
-| F1 | On a variant's line, such as `::: stamps variant=gold`, **Remove stamps--gold from this site…** | The line becomes `::: stamps` and draws the part. Other lines that still say `variant=gold` get a note. |
-| F2 | `<M-l>` in normal mode on the `::: tabs` or `::: map zoom=street` line in `parts.md` | Dim text at the line's end: "tabs has no variants". No menu; the cursor stays put. Moving the cursor clears it. |
-| F3 | On the `::: map zoom=street` line, add ` : with a torn paper edge`, pause | Ghost text `⇒ nothing map can set`. |
-| F4 | In `rubric.md`, change the theme name on `::: theme …` by typing over it (`ciw`, or backspace, then `bl`) | A completion menu with `blowfish` and `blog-awesome`. If none shows, note the exact keys. |
+| S1 | In `my-garden`'s `rubric.md`: `::: theme`, `<M-l>`, find **schematic** in the list | Its picture: a white sheet on a pale page, mono capitals for the name and the trail. Choose it. |
+| S2 | Add `::: sidebar` with two `### 1. A chapter` headings and links under each, `::: breadcrumbs`, `::: post-meta shows=everything` and `::: reading-progress style=ruler` | The sidebar's headings in mono capitals, the sheet beside it on the left, the details above the title as `DATE \| N WORDS \| AUTHOR`, and ticks down the right edge with the share read in blue as you scroll. Point at the ruler: each `##` heading's name beside a longer tick, the one being read darker; clicking one jumps to it. |
+| S3 | `::: a bar showing how far down the page I've read` in `rubric.md`, pause | Offers `reading-progress`. |
+| S4 | In `pages/posts/first.md`: a paragraph using the words "capacitor" and "amplitude", then `## Glossary` and `::: a glossary of the terms I use`, pause, `<M-l>` | Offers `glossary` and writes a starter list. Replace it with `- **Capacitor**: …` and `- **Amplitude**: …`. |
+| S5 | On the page, point at "capacitor" in the paragraph | Dotted underline with a small number. Its meaning shows in the right margin, outside the sheet, level with the line. Clicking it jumps to the glossary, which flashes; the term there links back. |
+| S6 | Add `---` between two paragraphs, a `::: figure width=wide`, a `::: gallery columns=two` and a `::: sidenote` | The break is `╌╌╌╌`, captions in mono capitals, the sidenote outside the sheet on a wide screen. The post ends with `╌╌ END ╌╌`. |
+| S7 | Narrow the browser to a phone (dev tools, 390px) | No sheet; the gallery swipes one picture at a time, the next one's edge showing (with pictures in `static/images/`; restart with `rubric stop` if `static/` is new); the sidenote sits in the writing. Two buttons in the bottom corners, nothing scrolling sideways. |
+| S8 | Tap the right button, then a section; tap the left button, then outside the drawer | The page blurs and the ruler opens with every section named; choosing one closes it there. The sidebar opens as a drawer from the left and closes. |
+| S9 | Switch the system to dark | Dark gray sheet on near-black, light ink, a lighter blue. |
+| S10 | `rubric build` in `my-garden`, open `public/posts/first/index.html` straight from the file manager or `open` | Drawn in schematic as in the live page, glossary and ruler working: links are relative now, with no integrity checks a browser refuses from disk. `live-server public` works too. From disk, a link to another page opens its folder, not the page: Hugo's folder addresses need a server. |
+| S11 | `::: reading-progress style=bar` in `rubric.md`, with any theme | A faint line across the very top, filling in the accent as you scroll. |
+| S12 | A wide screen (1920 or more) with the sidebar, in Schematic and then in Paper | The writing centered in the space right of the sidebar, the header and footer lined up over it; in Schematic the header spans the sheet. |
+
+Afterwards: `rm -rf /tmp/my-garden`.
 
 ## Notes
 

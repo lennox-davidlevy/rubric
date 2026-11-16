@@ -3,13 +3,15 @@
 // reject. Skipped when hugo is not on the path.
 
 import { expect, test } from "bun:test";
+import { siteArgs } from "./testing-site.ts";
+import { hugoPath } from "../src/hugo.ts";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fixtureNames, runFixture } from "./fixtures.ts";
 
 const root = join(import.meta.dir, "..");
-const hugo = Bun.which("hugo");
+const hugo = hugoPath();
 
 test.skipIf(!hugo)("every fixture builds in Hugo", () => {
   const site = mkdtempSync(join(tmpdir(), "rubric-hugo-"));
@@ -26,7 +28,7 @@ test.skipIf(!hugo)("every fixture builds in Hugo", () => {
       writeFileSync(join(site, "content/posts", `${name}.md`), runFixture(name).content);
     }
 
-    const build = Bun.spawnSync([hugo!, "--quiet", "-s", site, "-d", join(site, "public")]);
+    const build = Bun.spawnSync([hugo!, "--quiet", ...siteArgs(site), "-d", join(site, "public")]);
     expect(build.stderr.toString()).toBe("");
     expect(build.exitCode).toBe(0);
 
@@ -49,7 +51,7 @@ test.skipIf(!hugo)("a part or setting another skin brings is left out, not an er
   const site = mkdtempSync(join(tmpdir(), "rubric-hugo-skin-"));
   const build = (body: string) => {
     writeFileSync(join(site, "content/posts/p.md"), `---\ntitle: P\n---\n\n${body}\n`);
-    return Bun.spawnSync([hugo!, "--quiet", "-s", site, "-d", join(site, "public")]);
+    return Bun.spawnSync([hugo!, "--quiet", ...siteArgs(site), "-d", join(site, "public")]);
   };
   try {
     writeFileSync(
@@ -99,7 +101,7 @@ test.skipIf(!hugo)("a map, a PDF, a file tree and progress bars draw from their 
         "{{< progress >}}\n- Miles: 72%\n- Too many: 140%\n{{< /progress >}}",
       ].join("\n\n"),
     );
-    const build = Bun.spawnSync([hugo!, "--quiet", "-s", site, "-d", join(site, "public")]);
+    const build = Bun.spawnSync([hugo!, "--quiet", ...siteArgs(site), "-d", join(site, "public")]);
     expect(build.stderr.toString()).toBe("");
     const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");
     expect(html).toContain(`class="part part-map zoom-street"`);
@@ -133,7 +135,7 @@ test.skipIf(!hugo)("a part's pieces are split at its own headings, not those of 
         "{{< steps >}}\n### One\n\nFirst.\n\n{{< cards >}}\n### Card A\n\nA.\n\n### Card B\n\nB.\n{{< /cards >}}\n\n### Two\n\nSecond.\n{{< /steps >}}",
       ].join("\n"),
     );
-    const build = Bun.spawnSync([hugo!, "--quiet", "-s", site, "-d", join(site, "public")]);
+    const build = Bun.spawnSync([hugo!, "--quiet", ...siteArgs(site), "-d", join(site, "public")]);
     expect(build.stderr.toString()).toBe("");
     const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");
     const steps = html.slice(html.indexOf("part-steps"), html.lastIndexOf("</ol>"));
@@ -167,7 +169,7 @@ test.skipIf(!hugo)("parts placed straight in a block with no headings are its it
         "{{< fold >}}\n{{< quote >}}\nFolded.\n{{< /quote >}}\n{{< /fold >}}",
       ].join("\n\n"),
     );
-    const build = Bun.spawnSync([hugo!, "--quiet", "-s", site, "-d", join(site, "public")]);
+    const build = Bun.spawnSync([hugo!, "--quiet", ...siteArgs(site), "-d", join(site, "public")]);
     expect(build.stderr.toString()).toBe("");
     const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");
     const start = html.indexOf(`class="part part-steps"`);
@@ -200,7 +202,7 @@ test.skipIf(!hugo)("a frame part that draws nothing leaves no side column", () =
     writeFileSync(join(site, "content/rubric-frame/index.md"), JSON.stringify({ title: "f", build: { render: "never", list: "never" }, frame: [{ part: "page-contents", settings: {} }], theme: { name: "paper" } }));
     writeFileSync(join(site, "content/posts/plain.md"), "---\ntitle: Plain\n---\n\nOne paragraph.\n");
     writeFileSync(join(site, "content/posts/headed.md"), "---\ntitle: Headed\n---\n\n## One\n\nA.\n\n## Two\n\nB.\n");
-    const build = Bun.spawnSync([hugo!, "--quiet", "-s", site, "-d", join(site, "public")]);
+    const build = Bun.spawnSync([hugo!, "--quiet", ...siteArgs(site), "-d", join(site, "public")]);
     expect(build.stderr.toString()).toBe("");
     const shell = (p: string) => readFileSync(join(site, `public/posts/${p}/index.html`), "utf8").match(/class="shell[^"]*"/)?.[0];
     expect(shell("headed")).toContain("has-right");
@@ -264,7 +266,7 @@ test.skipIf(!hugo)("an embed's link shows the page's title, description and pict
         `{{< embed >}}\n${at}/gone\n{{< /embed >}}`,
       ].join("\n\n"),
     );
-    const build = Bun.spawn([hugo!, "--quiet", "-s", site, "-d", join(site, "public"), "--cacheDir", join(site, "cache")], { stderr: "pipe" });
+    const build = Bun.spawn([hugo!, "--quiet", ...siteArgs(site), "-d", join(site, "public"), "--cacheDir", join(site, "cache")], { stderr: "pipe" });
     await build.exited;
     expect(await new Response(build.stderr).text()).toBe("");
     const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");
@@ -315,7 +317,7 @@ test.skipIf(!hugo)("a variant is drawn by its own name beside its part, which th
     await writeHugoTree(site, own);
     mkdirSync(join(site, "content/posts"), { recursive: true });
     writeFileSync(join(site, "content/posts/p.md"), `---\ntitle: P\n---\n\n{{< callout--torn kind="tip" edge="torn" >}}\nHello.\n{{< /callout--torn >}}\n\n{{< callout kind="tip" >}}\nPlain.\n{{< /callout >}}\n`);
-    const build = Bun.spawnSync([hugo!, "--quiet", "-s", site, "-d", join(site, "public")]);
+    const build = Bun.spawnSync([hugo!, "--quiet", ...siteArgs(site), "-d", join(site, "public")]);
     expect(build.stderr.toString()).toBe("");
     expect(build.exitCode).toBe(0);
     const html = readFileSync(join(site, "public/posts/p/index.html"), "utf8");

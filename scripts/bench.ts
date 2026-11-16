@@ -22,6 +22,10 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { join, resolve } from "node:path";
 import { chromium } from "playwright-core";
 import { parse } from "yaml";
+import { writeContent } from "../src/build.ts";
+import { Cache } from "../src/core/index.ts";
+import { hugoSiteArgs } from "../src/hugo-config.ts";
+import { hugoPath } from "../src/hugo.ts";
 import { shown } from "../src/jev.ts";
 import { runDraft } from "../src/server/draft.ts";
 import { toolHarness } from "../src/server/harness.ts";
@@ -111,7 +115,7 @@ function siteFor(run: string, r: Result): string | undefined {
   mkdirSync(join(site, "static/images"), { recursive: true });
   cpSync(from, join(site, "parts", yaml.name), { recursive: true, filter: (src) => !/\.(log|md|json)$/.test(src) });
   cpSync(join(root, "testing/static/images/sample.jpg"), join(site, "static/images/sample.jpg"));
-  writeFileSync(join(site, "hugo.toml"), readFileSync(join(root, "testing/hugo.toml"), "utf8").replace(/^themesDir = .*$/m, `themesDir = ${JSON.stringify(join(root, "catalogs"))}`));
+  writeFileSync(join(site, "hugo.toml"), readFileSync(join(root, "testing/hugo.toml"), "utf8"));
   writeFileSync(join(site, "rubric.md"), "::: theme gruvbox-dark\n");
   // The part with its own starter inside, as the writer first sees it; a
   // starter's pictures are names of files that don't exist.
@@ -145,10 +149,11 @@ async function draw(run: string): Promise<void> {
         r.drawError = "no files to draw";
         continue;
       }
-      const wrote = Bun.spawnSync(["bun", join(root, "src/cli.ts"), "build", site], { cwd: root, stdout: "pipe", stderr: "pipe", timeout: 60_000 });
-      const built = Bun.spawnSync(["hugo", "-s", site, "-d", join(site, "public"), "--quiet"], { stdout: "pipe", stderr: "pipe", timeout: 60_000 });
-      if (wrote.exitCode !== 0 || built.exitCode !== 0) {
-        r.drawError = `could not build: ${(wrote.stderr.toString() + built.stderr.toString() + built.stdout.toString()).trim().split("\n").slice(-2).join(" ")}`;
+      const opened = await openSite(site);
+      const wrote = await writeContent(opened, await Cache.load(opened.cache), () => {}).then(() => "", (err: Error) => err.message);
+      const built = Bun.spawnSync([hugoPath() ?? "hugo", ...(await hugoSiteArgs(site)), "-d", join(site, "public"), "--quiet"], { stdout: "pipe", stderr: "pipe", timeout: 60_000 });
+      if (wrote !== "" || built.exitCode !== 0) {
+        r.drawError = `could not build: ${(wrote + built.stderr.toString() + built.stdout.toString()).trim().split("\n").slice(-2).join(" ")}`;
         continue;
       }
       const server = serve(join(site, "public"));

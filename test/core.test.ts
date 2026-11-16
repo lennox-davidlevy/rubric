@@ -54,8 +54,11 @@ describe("parseCatalog", () => {
 
   test("the universal catalog", async () => {
     const u = await loadCatalog(join(import.meta.dir, "../catalogs/universal/catalog.yaml"));
-    const where = Object.values(u.parts).map((p) => p.place);
-    expect([where.filter((p) => p === "writing").length, where.filter((p) => p === "site").length]).toEqual([39, 18]);
+    // A part with no place is in the writing; the frame's parts are the site's.
+    expect(u.parts.quote?.place).toBe("writing");
+    expect(u.parts.glossary?.place).toBe("writing");
+    expect(u.parts.header?.place).toBe("site");
+    expect(u.parts["reading-progress"]?.place).toBe("site");
   });
 
   test.each([

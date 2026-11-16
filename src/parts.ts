@@ -12,6 +12,7 @@
 // templates read that beside catalog.yaml.
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { hugoPath } from "./hugo.ts";
 import { copyFile, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -365,7 +366,7 @@ export async function makeGlobal(themeDir: string, dir: string, name: string): P
     }
     await rm(tmp, { recursive: true, force: true });
     const page = join(themeDir, "page");
-    const hugo = Bun.which("hugo");
+    const hugo = hugoPath();
     if (hugo && existsSync(page)) {
       const out = join(tmpdir(), `rubric-global-${name}-${Date.now()}`);
       try {

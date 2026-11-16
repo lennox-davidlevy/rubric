@@ -1,5 +1,5 @@
 name: universal
-version: 10
+version: 12
 
 # Every component a website needs, as contracts only: what each part is,
 # its settings and what it expects inside. Nothing here is drawn yet. Drawn
@@ -205,6 +205,14 @@ parts:
   sidenote:
     description: A note beside the writing, in the margin, about the sentence next to it.
     children: true
+
+  glossary:
+    description: A glossary, a list of the terms the writing uses, each with what it means.
+    children: true
+    script: true
+    body: |
+      - **A term**: what it means.
+      - **Another term**: what it means.
 
   figure:
     description: One picture or photo on its own, maybe with a caption.
@@ -678,6 +686,7 @@ parts:
     description: A column beside the writing on every page, with links or lists such as the site's sections, recent posts or tags.
     place: site
     children: true
+    script: true
     body: |
       ### A heading
 
@@ -702,6 +711,20 @@ parts:
     empty: true
     place: site
     children: false
+
+  reading-progress:
+    description: A mark at the edge of the screen showing how far down the page the reader has read.
+    empty: true
+    place: site
+    children: false
+    script: true
+    settings:
+      style:
+        type: choice
+        default: bar
+        values:
+          bar: a thin line across the top that grows as the reader goes down
+          ruler: a column of ticks down the side, with the share read and the page's sections beside them, opened from a button on a phone
 
   cover:
     description: A post's own picture across the top of the page, above its title.

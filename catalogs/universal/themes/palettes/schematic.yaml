@@ -1,0 +1,38 @@
+# After Making Software (makingsoftware.com), read from its pages on
+# 2026-11-15: an almost-white page with the writing on a white sheet, warm
+# near-black ink, and one strong cobalt for the site's name, marks and links
+# on hover. Its diagrams' green and red give the notices.
+description: a white sheet on an almost-white page, warm black ink and one cobalt blue
+
+scheme: light
+
+paper: "#fbfbfb"    # the page around the sheet
+raised: "#ffffff"   # the sheet the writing is on, and cards
+ink: "#0c0a09"      # stone-950, the writing
+heading: "#0c0a09"
+link: "#0c0a09"     # links stay in the ink, with a dotted line under them
+accent: "#103dff"   # its cobalt-600
+muted: "#57534e"    # stone-600: captions, notes, the trail above the title
+rule: "#e5e5e5"     # black at 10%
+tint: "#f5f5f5"     # black at 2.5% behind code, a step deeper to read as a box
+accent-tint: "#eef1ff"
+
+code-paper: "#f7f7f7"
+code-ink: "#0c0a09"
+
+positive: "#047857"  # its diagrams' green, deepened to read as text
+warning: "#92400e"
+danger: "#be123c"    # its diagrams' red, deepened
+
+dark:
+  paper: "#111111"
+  ink: "#ececec"
+  accent: "#8aa0ff"
+  raised: "#181818"
+  muted: "#a8a29e"
+  rule: "#2e2e2e"
+  tint: "#202020"
+
+# Barely any: a sheet lifted by its ground, not by a shadow.
+shadow:
+  strength: 0.6
