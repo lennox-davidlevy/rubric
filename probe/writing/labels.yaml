@@ -1,0 +1,57 @@
+# What a writer with taste would want Rubric to offer on each block of the
+# posts in posts/, written before any run. A block is named by the start of
+# its text. `want`: a part that should be offered there (any one of a list).
+# `ok`: offering it would be fine, but missing it is no loss. A block not
+# listed is plain writing: any offer on it is wrong.
+
+sourdough:
+  - { at: "I have tried to make sourdough", ok: [lead] }
+  - { at: "> \"Bread will tell you", want: [quote] }
+  - { at: "1. Mix the flour", want: [steps] }
+  - { at: "Be careful taking the lid", want: [callout] }
+  - { at: "![The loaf", want: [figure] }
+
+ridge-hike:
+  - { at: "We left the trailhead", ok: [lead] }
+  - { at: "The weather turns fast", ok: [callout, sidenote] }
+  - { at: "1. Day one", want: [timeline, steps] }
+  - { at: "![The valley", want: [gallery] }
+
+git-undo:
+  - { at: "Every week someone at work", ok: [lead] }
+  - { at: "Before anything else", want: [callout] }
+  - { at: "This cannot be undone", want: [callout] }
+  - { at: "Git remembers everywhere", ok: [sidenote] }
+  - { at: "- **HEAD**", want: [glossary] }
+
+grandmother:
+  - { at: "When my grandmother died", ok: [lead] }
+  - { at: "> I keep your letters", want: [quote] }
+  - { at: "Some things are not secrets", ok: [pull] }
+
+release-notes:
+  - { at: "Tally 2.4 is out today", ok: [lead] }
+  - { at: "Heads up", want: [callout] }
+  - { at: "We rewrote how Tally", ok: [stats] }
+  - { at: "\"Recurring expenses alone", want: [testimonial] }
+
+book-review:
+  - { at: "I picked up The Lighthouse Year", ok: [lead] }
+  - { at: "> The keeper's wife", want: [quote] }
+  - { at: "If you liked this", ok: [callout, sidenote] }
+
+garden-club:
+  - { at: "Hello everyone", ok: [lead] }
+  - { at: "A reminder that dues", want: [callout] }
+  - { at: "1. 1987", want: [timeline] }
+  - { at: "This year's numbers", want: [stats] }
+  - { at: "- November 4", ok: [timeline] }
+  - { at: "**Do I need to know", want: [fold] }
+  - { at: "**Where are the plots", want: [fold] }
+  - { at: "**Can kids come", want: [fold] }
+
+lisbon:
+  - { at: "Lisbon is hilly", ok: [lead] }
+  - { at: "Tram 28 is the famous one", ok: [callout] }
+  - { at: "| What | Cost", ok: [chart] }
+  - { at: "Watch for pickpockets", want: [callout] }

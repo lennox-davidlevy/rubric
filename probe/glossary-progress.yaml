@@ -1,0 +1,67 @@
+# The two parts Schematic brought to every theme (catalog version 12):
+# `glossary` in the writing and `reading-progress` in rubric.md. Each asked
+# in several ways, then the lines near them that should go elsewhere or
+# nowhere, to see whether the new parts take what they should not.
+
+# glossary: should pick it
+- directive: a glossary of the terms I use
+  want: glossary
+- directive: the jargon in this post, explained
+  want: glossary
+- directive: definitions of the technical words
+  want: glossary
+- directive: key terms and what they mean
+  want: glossary
+- directive: a list of words a beginner might not know, with meanings
+  want: glossary
+- directive: what each acronym stands for
+  want: glossary
+
+# near glossary: should not pick it
+- directive: frequently asked questions, each opening to its answer
+  want: fold
+- directive: a list of the sections on this page
+  want: contents
+- directive: a note explaining one tricky word, beside the paragraph
+  want: sidenote
+- directive: a table comparing the three cameras
+  want: table
+- directive: a list of my favorite books
+  want: nothing
+
+# reading-progress: should pick it (in rubric.md)
+- directive: a bar showing how far down the page I've read
+  want: reading-progress
+  place: site
+- directive: a reading progress indicator
+  want: reading-progress
+  place: site
+- directive: show how much of the post is left
+  want: reading-progress
+  place: site
+- directive: a thin line across the top that fills as you scroll
+  want: reading-progress
+  place: site
+- directive: "ticks down the side, with the sections, that show where I am"
+  want: reading-progress style=ruler
+  place: site
+
+# near reading-progress: should not pick it
+- directive: a menu of the post's sections in the margin
+  want: page-contents
+  place: site
+- directive: links to the next and previous posts
+  want: pager
+  place: site
+- directive: a trail of where this page sits in the site
+  want: breadcrumbs
+  place: site
+- directive: the date and how long the post takes to read
+  want: post-meta
+  place: site
+- directive: a progress bar for my fundraising goal
+  want: nothing
+  place: site
+- directive: a button to jump back to the top
+  want: nothing
+  place: site

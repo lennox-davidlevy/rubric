@@ -196,3 +196,15 @@ export async function shown(png: Uint8Array, thing: string, key = process.env.TY
   if (typeof noul !== "number") throw new Error("could not read Jev's answer: no noul for the picture");
   return Math.round(noul * 100) / 100;
 }
+
+// Any questions about any state, answered as they come: for probes trying
+// questions before they join questions.ts. A failure is thrown.
+export async function askRaw(
+  state: unknown, questions: Record<string, Question>, key = process.env.TYPESAFE_API_KEY,
+): Promise<{ answers: Answers; request: Request; response: unknown; model: string; ms: number }> {
+  const request: Request = { model: MODEL, state, questions };
+  if (!key) throw new Error("could not reach Jev: TYPESAFE_API_KEY is not set");
+  const res = await call(request, key);
+  if (!res.ok) throw new Error(res.message);
+  return { answers: res.answers, request, response: res.body, model: res.model, ms: res.ms };
+}

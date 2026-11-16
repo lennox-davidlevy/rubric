@@ -9,6 +9,8 @@ node_modules/
 sites/*/content/
 testing/content/
 probe/runs/
+probe/writing/runs/
+probe/writing/fresh/runs/
 .rubric/
 catalogs/*/shots/
 .cache
@@ -23,3 +25,4 @@ testing/static/images/*
 # is the fixture the tests copy; anything new stays local.
 testing/parts/*
 testing/pages/posts/moms-blog.md
+measure/

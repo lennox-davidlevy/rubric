@@ -1,0 +1,38 @@
+# The held-out posts, labeled before their run and run with no change to the
+# wording tried on posts/ (2026-11-16). Messier writing, with traps: a joke
+# "note to self", lists of tips and of thanks that are plain lists, numbers
+# in passing, a quoted text message.
+
+outage:
+  - { at: "On Tuesday afternoon", ok: [lead] }
+  - { at: "1. 2:10 pm", want: [timeline] }
+  - { at: "Nothing you saved before", want: [callout] }
+  - { at: "> sorry, I know", want: [quote] }
+  - { at: "If you think you lost", ok: [callout] }
+
+marathon:
+  - { at: "This week was the first", ok: [lead] }
+  - { at: "Note to self", ok: [sidenote, callout] }
+  - { at: "Total for the week", ok: [stats] }
+
+ramen-shop:
+  - { at: "There is always a line", ok: [lead] }
+  - { at: "1. The tonkotsu", ok: [steps] }
+  - { at: "It's cash only", want: [callout] }
+  - { at: "Two bowls, a beer", ok: [stats] }
+
+toddler-sleep:
+  - { at: "For eleven months", ok: [lead] }
+  - { at: "I want to say first", want: [callout] }
+  - { at: "1. Bath", want: [steps] }
+  - { at: "- **Sleep regression**", want: [glossary] }
+
+library-volunteers:
+  - { at: "The Eastside branch", ok: [lead] }
+  - { at: "Last winter, forty", ok: [stats] }
+  - { at: "You don't need any experience", ok: [callout] }
+  - { at: "Every volunteer has to pass", want: [callout] }
+  - { at: "\"I signed up because", want: [testimonial] }
+
+moving-house:
+  - { at: "We moved last weekend", ok: [lead] }
