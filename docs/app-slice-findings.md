@@ -8,6 +8,53 @@ The first run opened the window on David's display (`:0`). i3 tiled it into the 
 
 After that, every check ran on a display of the session's own: Xvfb `:77`, Vulkan limited to Mesa's software driver (lavapipe, `VK_ICD_FILENAMES`), WebKit on software GL, and later a private i3 on that display (its own config and socket), so the NVIDIA driver and David's screen were never touched again. Timings that involve drawing (the first frame) are from llvmpipe there, so they are not the real display's; see task 5.
 
+## The Xorg crash
+
+**What it is.** Seven Xorg crashes on this machine come from NVIDIA's X driver (`nvidia_drv.so`). Six end the same way, in Xorg's signal handler (`OsSigHandler`) entered from `nvidia_drv.so + 0x4daa34`. The seventh (18:42:27) was cut short in the dump, with the main thread inside the driver (`nvidia_drv.so + 0x4d9935`, in a DRM call). The one fuller trace (2026-11-07 09:14:06) shows the fault itself: Xorg's `FreePixmap`, called from NVIDIA's X driver. A pixmap is the off-screen buffer a GPU-drawn window presents through, so a window being made, moved or destroyed is where it would show.
+
+| When | Xorg | What was happening |
+|---|---|---|
+| 2026-11-07 08:34:28 | 21.1.18 | Chrome windows opening and closing (no Rune code in the project yet) |
+| 2026-11-07 09:14:06 | 21.1.18 | Chromium windows opening and closing |
+| 2026-11-07 09:14:34 | 21.1.18 | the same, 28 s later |
+| 2026-11-16 16:32:39 | 21.1.18 | the app's window closing (task 1 build, no web view) |
+| 2026-11-16 17:15:45 | 21.1.18 | the app's window opening and moving to `6:Slack` |
+| 2026-11-16 18:42:27 | 21.1.22 | the app on `:0` by the session's mistake (below), killed when its close did not land |
+| 2026-11-16 19:59:48 | 21.1.22 | David's run of the app: a clean close |
+
+Clients that went down with the server (Brave in `libGLX_nvidia.so`, Sunshine, Chromium) are consequences: a client dying because its server went away (`_XIOError`, then `exit`).
+
+So it is **a fault in this machine's NVIDIA driver**, which Chromium triggered too: a client should not be able to crash the X server. It is not a Rune defect. The app triggers it readily: every time its window appeared on or left this display (4 of 4).
+
+**The 18:42 crash was the session's mistake.** Testing `cycle-window.sh`, the session meant to run it on its private Xvfb. The reboot at 18:33 had emptied its scratchpad, so the file holding the Xvfb and software-rendering settings was gone, the command did not stop when it failed to load, and `DISPLAY` stayed `:0`: the app opened on David's display and Xorg crashed as it was killed. Since then every command the session runs on a display names it inline and first checks that it is a server the session started, and `run-nested.sh` carries its own settings.
+
+**The stack, and what was ruled out.**
+
+- **Xorg: ruled out.** `xorg-x11-server-Xorg` was 21.1.18-1.fc42 (installed 2025-08-23) under `xorg-x11-server-common` and `-Xvfb` at 21.1.22. David upgraded it to 21.1.22-1.fc42 and rebooted at 18:33 on 2026-11-16 (the running server's log reports 1.21.1.22). The crash happened again on 21.1.22 (18:42:27, and 19:59:48 on a clean close).
+- **picom: ruled out** (by David, with the 19:59:48 run).
+- **The NVIDIA driver 575.64.05 is what is left** (open kernel module, built 2025-07-18). The enabled repo (`rpmfusion-nonfree-nvidia-driver`, Fedora 42) has nothing newer: `dnf upgrade --assumeno 'akmod-nvidia*' 'xorg-x11-drv-nvidia*'` upgrades nothing. **580.159.03 exists for Fedora 42 in RPM Fusion's full nonfree updates repo: untested and not installed.** David is not changing the driver now.
+- The `dnf install` of the build packages at 16:23 that day (webkit2gtk and gtk3 devel, 106 packages) changed no Mesa, Vulkan, libglvnd, Xorg or NVIDIA package, so it is an unlikely cause.
+
+**The steps.** A cycle is: open the window, move it to `6:Slack`, keep it there three seconds, close it as i3 does (`app/scripts/cycle-window.sh`). One survival proves little, since Chromium opened and closed many windows on 2026-11-07 and crashed the server three times.
+
+| # | Step | Result |
+|---|---|---|
+| 1 | The app on Xorg 21.1.22 | crashed (19:59:48, a clean close; and 18:42:27) |
+| 2 | Five cycles of `vkcube`, then of Rune's `hello`, to tell any Vulkan window from Rune's | not run: no more app or GPU windows on `:0` for now |
+| 3 | The NVIDIA driver 580.159.03 | not tried |
+
+How step 2 would read, if it is run:
+
+| Result | Meaning |
+|---|---|
+| `vkcube` crashes | Any Vulkan window does it: the driver, not Rune. |
+| `vkcube` survives, `hello` crashes | Something Rune's window does triggers the driver bug: a report to Rune with the dumps. |
+| Only the app crashes | The trigger is in the app's own window setup. Only the second crash had the web view's X window inside Rune's, so that is the next suspect. |
+
+**Running the app by hand meanwhile: `app/scripts/run-nested.sh`.** It keeps the app's GPU work off the NVIDIA driver: Xephyr as one window on David's display (1600x1000, resizable, without glamor), a private i3 inside it, and the release app inside that, drawing in software (lavapipe through `VK_ICD_FILENAMES`, Mesa's software GL for WebKit). NVIDIA's X driver still handles Xephyr's one window, as it handles every window on the display, but Xephyr draws it with plain X images, no GPU. The app starts the site's process itself, as outside. Closing the Xephyr window, or Ctrl+C, stops all of it, and the site's process too when it was not running before. Checked inside the session's own Xvfb, never on `:0`: the page loads (`page loaded …/posts/long/` at 258 ms), typing reaches the page, the app maps lavapipe and no NVIDIA library, and closing the Xephyr window through an i3 leaves nothing running. Xephyr answers a window manager's close by destroying its window and running on, so the script watches the window, not the process.
+
+**OpenGL instead of Vulkan, not possible as Rune is.** On Linux Rune builds wgpu with the `vulkan` feature only (`crates/rune/Cargo.toml`), so wgpu's OpenGL backend is not in the binary, and `RUNE_GPU_BACKEND` chooses only between wgpu and Rune's Metal backend. Untried, and a code change: the app depending on wgpu 30 with `gles` (Cargo would turn it on for Rune too), and `WGPU_ADAPTER_NAME` naming the GL adapter, which Rune's adapter pick honors across all backends; whether Rune's renderer runs on GL is unknown.
+
 ## Task 1: the window and the editor
 
 - **Editing component.** Core `rune::text_input` (one multi-line field in a scroll viewport, as `long_note.rs`), not `rune_kit::TextArea`: it takes spans, scrolls a long note and needed nothing more.
@@ -94,15 +141,15 @@ What is Linux-only today:
 - The session's way of looking at the window: Xvfb, a private i3, `xdotool`, `maim`, software Vulkan.
 - Not checked: whether Rubric's own site process (its socket under `$XDG_RUNTIME_DIR`) runs as is on macOS.
 
-## The verdict: no-go on Linux with NVIDIA until the crash is explained; everything else says go
+## The verdict: go on what the slice measured; on this machine, held until the driver question is settled
 
-The slice asked whether Rune can be the shell, the window and the editor, with the page in a system web view beside it. Everything the slice built works, and the numbers it could take are far inside the budgets. But **on David's machine the app's window crashed the X server twice**, taking the whole desktop down, once as the window closed and once as it opened; the first time with no web view in the app at all. An app that can take the desktop down cannot ship, whatever its speed, so as it stands the answer is **no-go**, on Linux with the NVIDIA driver at least.
+The slice asked whether Rune can be the shell, the window and the editor, with the page in a system web view beside it. Everything the slice built works, and the numbers it could take are far inside the budgets. The two desktop crashes on this machine are **not a Rune defect**: they are a fault in this machine's Xorg and NVIDIA stack ("The Xorg crash" above), which Chromium set off three times before Rune was here. But the app sets it off readily (2 of 2), and an app that takes a writer's desktop down is not shippable whoever is at fault, so on Linux with NVIDIA it stays open until the driver question is settled.
 
-What would turn it into a go:
+What would make it a go without conditions:
 
-1. **The crash, explained.** The two core dumps are in `coredumpctl` (Xorg, 16:32:39 and 17:15:45). Next steps, cheapest first, none run yet: the same window on `:0` drawing with wgpu's OpenGL backend instead of Vulkan (whether Rune lets an app choose it on Linux is unchecked), and Rune's `hello` example alone, to see whether any Rune window does it or only this app; then a report to Rune with the dumps. Every run on the real display only by David, with work saved.
-2. **The real display**, once it doesn't crash: A14 (the app at least as immediate as Neovim) and the first frame under 150 ms on the GPU (160 ms in software).
-3. **The Mac attach.** The Mac is the other half of the shell, and Wayland is a gap on Linux either way. A Mac where all of this holds would make Rune a go there even while the Linux crash stands.
+1. **The driver question.** The X server is ruled out; the NVIDIA driver 575.64.05 is what is left. A newer driver (580.159.03) not crashing on the app's window, or `vkcube` crashing as readily as the app does, would settle that it is not Rune's to fix.
+2. **The real display**, once it holds: A14 (the app at least as immediate as Neovim) and the first frame under 150 ms on the GPU (160 ms in software).
+3. **The Mac attach.** The Mac is the other half of the shell, and Wayland is a gap on Linux either way. A Mac where all of this holds would make Rune a go there whatever the Linux crash turns out to be.
 
 What the slice shows apart from the crash:
 

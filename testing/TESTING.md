@@ -39,9 +39,9 @@ Hugo for macOS (`.pkg` only in the release) is unpacked by Rubric now, tested he
 
 ## A. The app slice (branch `app-slice`)
 
-Step 9's first slice: the post on the left in Rune, the page on the right in a web view, one pick taken with Tab. The plan is [docs/app-slice.md](../docs/app-slice.md); the findings and numbers are in [docs/app-slice-findings.md](../docs/app-slice-findings.md). Start it from the repo with `cargo run --release --manifest-path app/Cargo.toml -- sites/app-slice/pages/posts/long.md`; the site's process starts with it, with the stub (no Jev calls). Do not open `sites/app-slice` in Neovim: its server is the live one, and a stub process and a live one refuse each other.
+Step 9's first slice: the post on the left in Rune, the page on the right in a web view, one pick taken with Tab. The plan is [docs/app-slice.md](../docs/app-slice.md); the findings and numbers are in [docs/app-slice-findings.md](../docs/app-slice-findings.md). Start it with `app/scripts/run-nested.sh` (from anywhere): the app in a Xephyr window with an i3 of its own inside, drawing in software; the site's process starts with it, with the stub (no Jev calls): a pick comes only for a line that names a part (`::: a quote`, `::: a callout`), never from other words. The Xephyr window goes to workspace 6:Slack (`WORKSPACE=` names another, empty leaves it where it opens). The app takes the size the window has a second after it opens (tiled, floated or full screen in your i3); a later change of that size is not followed, so restart the script after one. Closing the Xephyr window, or Ctrl+C in its terminal, stops all of it. Do not open `sites/app-slice` in Neovim: its server is the live one, and a stub process and a live one refuse each other.
 
-**Not on the NVIDIA display for now.** The app's window crashed Xorg twice there on 2026-11-16, once as it closed and once as it opened (the findings, "How the session ran the window"). Run section A only once the crash is explained, or on the Mac.
+**Never straight on the NVIDIA display.** The app's window crashes Xorg there through a fault in NVIDIA's driver 575.64.05 (the findings, "The Xorg crash"); the nested run keeps its GPU work off the driver. Drawn in software, it is slower than it would be on the GPU, so A2, A3 and A14 judge the software path, not Rune's speed.
 
 | # | Do this | Expect |
 |---|---|---|
@@ -50,14 +50,14 @@ Step 9's first slice: the post on the left in Rune, the page on the right in a w
 | A3 | Hold a key down for five seconds mid-post | No stutter in the editor; the page catches up when the key is released. |
 | A4 | Move the caret from top to bottom | The page scrolls to follow. |
 | A5 | Drag the divider left, right, and to each edge | Both panes resize together; each edge snaps; dragging back restores both, and typing still goes to the writing. |
-| A6 | Resize the window | The page stays in its pane. |
+| A6 | Start it with the Xephyr window full screen in your i3, then again tiled beside another window | Both panes fill the window each time. (Resizing after it starts is a Xephyr gap; see above.) |
 | A7 | Click a link in the page, then click in the editor and type | The page goes there; typing goes to the editor. |
 | A8 | On a new empty line type `::: a quote` | A closing `:::` appears below; a dimmed pick after the caret. |
 | A9 | Press Tab | The line becomes the part; the page draws it. |
 | A10 | After A9, undo once (Ctrl+Z) | The words come back. |
 | A11 | Press Tab on a plain line | Nothing changes; the caret stays in the editor. |
 | A12 | Ctrl+S, then `cat` the file | It holds what was typed. |
-| A13 | Quit, then `pgrep -fa 'rubric-app\|cli.ts lsp\|WebKitWebProcess'` | Nothing. (`rubric stop sites/app-slice` ends the site's process and Hugo, which otherwise stay a minute.) |
+| A13 | Close the Xephyr window, then `pgrep -fa 'rubric-app\|Xephyr\|cli.ts\|hugo server\|WebKitWebProcess'` | Nothing, the site's process and Hugo included (unless the site's process was running before). |
 | A14 | Type plain prose in Neovim on a post in `testing/`, and the same in the app | The app feels at least as immediate. This is the row that decides. |
 
 After A12, `git checkout sites/app-slice/pages/posts/long.md` restores the post (once the slice is committed).
