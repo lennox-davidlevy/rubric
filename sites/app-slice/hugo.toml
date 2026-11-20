@@ -1,0 +1,4 @@
+baseURL = "/"
+title = "App Slice"
+
+[params]
