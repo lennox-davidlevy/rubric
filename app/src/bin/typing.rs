@@ -44,7 +44,7 @@ fn main() {
     let mut runs = Vec::new();
     for _ in 0..100 {
         let t = Instant::now();
-        let spans = rubric_app::markdown::spans(&text, &theme);
+        let spans = rubric_app::markdown::spans(&text, &theme, &[]);
         runs.push(t.elapsed().as_secs_f64() * 1000.0);
         std::hint::black_box(spans);
     }
@@ -75,4 +75,54 @@ fn main() {
         let (m, p, x) = stats(wall);
         println!("METRIC case={case} metric=wall_ms median={m:.4} p95={p:.4} max={x:.4} n={samples}");
     }
+
+    // Slice 2. Typing on a `new:` line, where the status line is drawn too.
+    let new = format!("{text}\n::: new: a tide clock");
+    let mut rt = runtime(&new, new.len());
+    let mut cpu = Vec::new();
+    for i in 0..samples {
+        let ch = ["a", "b", "c", " "][i % 4];
+        let c0 = rune::thread_cpu_ms();
+        rt.ime(Ime::Commit(ch.into()));
+        rt.frame(1.0 / 120.0);
+        cpu.push(rune::thread_cpu_ms() - c0);
+    }
+    assert!(rubric_app::draft::line(&rt.state).is_some(), "the status line shows");
+    let (m, p, x) = stats(cpu);
+    println!("METRIC case=type_new_line metric=cpu_ms median={m:.4} p95={p:.4} max={x:.4} n={samples}");
+
+    // The server's view arriving and the frame that draws the menu; then a key in the open
+    // menu and its frame.
+    use rubric_app::lsp::Incoming;
+    use rune::{Key, KeyEvent, Mods};
+    let (mut open, mut moved) = (Vec::new(), Vec::new());
+    for i in 0..samples {
+        let mut rt = runtime(&new, new.len());
+        let (client, sent) = rubric_app::lsp::Client::recording();
+        rt.update(|s, _| rubric_app::state::connected(s, client));
+        rt.frame(1.0 / 120.0);
+        while sent.try_recv().is_ok() {}
+        rt.key(KeyEvent { key: Key::Tab, mods: Mods::default() });
+        rt.frame(1.0 / 120.0);
+        let id = std::iter::from_fn(|| sent.try_recv().ok()).find(|m| m["method"] == "rubric/draft").expect("Tab asks")["id"].as_i64().unwrap();
+        let view = serde_json::json!({ "words": "a tide clock", "status": "ready", "name": "tide-clock" });
+        let c0 = rune::thread_cpu_ms();
+        rt.update(|s, _| rubric_app::state::incoming(s, Incoming::Response { id, result: Ok(view) }));
+        rt.frame(1.0 / 120.0);
+        open.push(rune::thread_cpu_ms() - c0);
+        assert!(rt.find("menu-content").is_some(), "the menu is drawn");
+        // The entrance settles before the key is timed.
+        let mut n = 0;
+        while n < 240 && rt.frame(1.0 / 120.0) {
+            n += 1;
+        }
+        let c0 = rune::thread_cpu_ms();
+        rt.key(KeyEvent { key: if i % 2 == 0 { Key::Down } else { Key::Up }, mods: Mods::default() });
+        rt.frame(1.0 / 120.0);
+        moved.push(rune::thread_cpu_ms() - c0);
+    }
+    let (m, p, x) = stats(open);
+    println!("METRIC case=menu_open metric=cpu_ms median={m:.4} p95={p:.4} max={x:.4} n={samples}");
+    let (m, p, x) = stats(moved);
+    println!("METRIC case=menu_key metric=cpu_ms median={m:.4} p95={p:.4} max={x:.4} n={samples}");
 }

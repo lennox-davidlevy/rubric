@@ -7,9 +7,11 @@
 # Usage, from anywhere: app/scripts/run-nested.sh [post.md]
 #   SIZE       the nested screen, WIDTHxHEIGHT (default 1600x1000); the window resizes with it.
 #   WORKSPACE  the host i3 workspace the window goes to (default 6:Slack; empty leaves it).
+#   LIVE=1     the real server in place of the stub: Jev picks, and a draft is a real one, which
+#              costs a few cents. It reads the key from the repo's .env, as Neovim's does.
 #
-# The app starts the site's process itself (the stub, through `rubric lsp`), as it does
-# outside. Closing the Xephyr window (the window manager's close, which Xephyr answers by
+# The app starts the site's process itself (the stub, through `rubric lsp`, unless LIVE=1),
+# as it does outside. Closing the Xephyr window (the window manager's close, which Xephyr answers by
 # destroying the window but not exiting), closing the app, or Ctrl+C stops everything this
 # started: the app, i3, Xephyr, and the site's process if it was not running before.
 set -u
@@ -18,6 +20,11 @@ repo=$(cd "$(dirname "$0")/../.." && pwd)
 post=${1:-$repo/sites/app-slice/pages/posts/long.md}
 size=${SIZE:-1600x1000}
 workspace=${WORKSPACE-6:Slack}
+live=()
+if [ "${LIVE:-}" = 1 ]; then
+  live=(--live)
+  echo "run-nested: LIVE: real picks and real drafts, which cost money" >&2
+fi
 lvp=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
 mesa_egl=/usr/share/glvnd/egl_vendor.d/50_mesa.json
 
@@ -125,7 +132,7 @@ wm=$!
 for _ in $(seq 100); do [ -S "$tmp/i3.sock" ] && break; sleep 0.05; done
 
 echo "run-nested: Xephyr on $nested, the app's output in $log" >&2
-"$repo/app/target/release/rubric-app" "$post" > "$log" 2>&1 &
+"$repo/app/target/release/rubric-app" "$post" "${live[@]}" > "$log" 2>&1 &
 app=$!
 
 # Until the Xephyr window closes, or Xephyr or the app ends.

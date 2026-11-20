@@ -4,7 +4,7 @@ What changed in the plan's "Before the app" list (docs/plan.md, under step 8), i
 
 Write what you find in **Notes** at the bottom, by test number.
 
-Last updated: 2026-11-16 (section A, the app slice).
+Last updated: 2026-11-19 (section B, the app's menu and a new part).
 
 ## Set up
 
@@ -61,6 +61,29 @@ Step 9's first slice: the post on the left in Rune, the page on the right in a w
 | A14 | Type plain prose in Neovim on a post in `testing/`, and the same in the app | The app feels at least as immediate. This is the row that decides. |
 
 After A12, `git checkout sites/app-slice/pages/posts/long.md` restores the post (once the slice is committed).
+
+## B. The app's menu and a new part (branch `app-slice-2`)
+
+The second slice: Tab on a `::: new: words` line opens a menu at the caret, which drafts the part, keeps it, rerolls it or cancels it; a line under the writing says where the draft is. The plan is [docs/app-slice-2.md](../docs/app-slice-2.md); what was found is under "Slice 2" in [docs/app-slice-findings.md](../docs/app-slice-findings.md). Start it as in A, with `app/scripts/run-nested.sh`. Drafts are the stub's (at once, no cost) unless a row says `LIVE=1`: "slow" in the words makes one take a second, "failing" makes it fail. In a menu: Up and Down move, Return or Tab chooses, Esc closes, any other key closes it and types.
+
+| # | Do this | Expect |
+|---|---|---|
+| B1 | On a new line at the end of the post type `::: new: a tide clock` | The line is gray. Under the writing: `+ Tab drafts a part`. |
+| B2 | Tab | A menu at the caret, inside the writing pane: New part, Draft (the stub), Cancel. |
+| B3 | Return on Draft | The line turns blue; under the writing `◆ tide-clock drafted …`; the page draws the part. |
+| B4 | Tab, Keep tide-clock, This site | The line becomes `::: tide-clock`; `✓ tide-clock kept` for four seconds; `ls sites/app-slice/parts` has it. Ctrl+Z brings `::: new: a tide clock` back. |
+| B5 | `::: new: a brass bell`, draft it, then Tab, Reroll…, Notes…, type `name it tide-two`, Return | A field in the menu's place takes the typing, not the post. Then `◆ tide-two drafted`, drawn in the page. |
+| B6 | Tab, Cancel on that draft | The line becomes `::: a brass bell` (no `new:`), as in Neovim; the draft leaves the page. |
+| B7 | `::: new: a failing thing`, draft it | The line turns orange; `✗ draft failed · Tab retries`; Tab offers Retry. |
+| B8 | Open a menu, then type a letter | The menu closes; the letter is in the writing. |
+| B9 | Drag the divider far left, put the caret on a `new:` line, Tab | All of the menu is inside the narrow writing pane; none of it is under the page. |
+| B10 | On a new line type `::: a brass gong`, wait for `→ draft a new part`, Tab | The line becomes `::: new: a brass gong` and its menu opens. |
+| B11 | Draft a part, then Tab, Keep, Every theme. **Then undo it** (the line under this table) | `✓ … kept for every theme · catalog version N`, one more than before; the line is the part's. |
+| B12 | Open and close a menu a few times, and choose Draft, while watching `top` | No stutter; the app's CPU falls back to nothing within a second. (In the nested window it draws in software, so a short burst is expected; this row matters on the native run.) |
+| B13 | `LIVE=1 app/scripts/run-nested.sh`, then `::: new: a tide clock`, Tab, Draft (a few cents) | The seconds count up under the writing; a real part in about 22 s, drawn in the page. |
+| B14 | `::: new: a quote from the keeper`, Tab | The menu starts with `Similar: quote`. Return on it lists the part; the page draws a quote on the line while it is looked at; Esc goes back to the first menu and the page to the line; Return on `quote` makes the line `::: quote`. |
+
+**After B4 and B11, undo what they wrote.** `git status` shows it. B4: `git clean -fd sites/app-slice/parts`. B11: `git checkout catalogs/universal`, then `git clean -n catalogs/universal` to see the part's new files and `git clean -fd catalogs/universal` to remove them. The post: `git checkout sites/app-slice/pages/posts/long.md` if it was saved.
 
 ## Notes
 

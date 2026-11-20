@@ -75,9 +75,45 @@ fn fence_mark(t: &str) -> Option<(u8, usize)> {
     (n >= 3).then_some((ch, n))
 }
 
+/// The notes field's keys: Esc goes back to the reroll menu, and Tab stays in the field.
+/// (Return is the field's submit.)
+pub fn notes_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
+    match ev.key {
+        Key::Escape => {
+            crate::draft::back(s);
+            tx.focus("editor", false);
+            true
+        }
+        Key::Tab => true,
+        _ => false,
+    }
+}
+
 /// The field's key handler, before focus navigation and the field's own editing. Tab is
 /// always consumed, so focus never leaves the writing.
 pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
+    // An open menu takes its keys first; any other key closes it and is the editor's.
+    if let Some(menu) = &mut s.menu {
+        use crate::menu::Taken;
+        let before = menu.active;
+        match crate::menu::key(menu, ev) {
+            Taken::Moved => {
+                if menu.active != before {
+                    crate::draft::looked(s);
+                }
+                return true;
+            }
+            Taken::Chose(id) => {
+                crate::draft::chose(s, &id, tx);
+                return true;
+            }
+            Taken::Closed => {
+                crate::draft::back(s);
+                return true;
+            }
+            Taken::Passed => crate::draft::close(s),
+        }
+    }
     if ev.key == Key::Tab {
         crate::state::tab(s, tx);
         return true;

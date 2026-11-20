@@ -88,6 +88,120 @@ fn the_stub_server_writes_the_page_and_offers_a_pick_with_a_pin() {
     wait_for("the server's process to end", || !alive(pid));
 }
 
+/// The next message `want` picks out, within 20 s.
+fn next<T>(rx: &mpsc::Receiver<Incoming>, what: &str, mut want: impl FnMut(&Incoming) -> Option<T>) -> T {
+    let end = Instant::now() + Duration::from_secs(20);
+    loop {
+        let m = rx.recv_timeout(end.saturating_duration_since(Instant::now())).unwrap_or_else(|_| panic!("timed out waiting for {what}"));
+        if let Some(t) = want(&m) {
+            return t;
+        }
+    }
+}
+
+#[test]
+#[ignore = "starts Bun, a site process and Hugo"]
+fn a_new_part_is_drafted_rerolled_kept_and_cancelled_with_the_stub() {
+    use rubric_app::draft::{self, Asked, View, What};
+
+    let site = std::env::temp_dir().join(format!("rubric-app-draft-{}", std::process::id()));
+    std::fs::create_dir_all(&site).unwrap();
+    let _cleanup = Cleanup(site.clone());
+    copy_site(&site);
+    let post = site.join("pages/posts/long.md");
+    let uri = rubric_app::state::file_uri(&post);
+    let text = std::fs::read_to_string(&post).unwrap();
+
+    let (tx, rx) = mpsc::channel::<Incoming>();
+    let client = Client::start(&repo(), &site, true, move |m| {
+        let _ = tx.send(m);
+    })
+    .expect("the server starts");
+    let pid = client.pid().unwrap();
+
+    let mut edit = rune::TextEdit::new(format!("{text}\n::: new: a tide clock\n:::\n\n::: new: a failing bell\n:::\n\n::: new: a brass bell\n:::\n\n::: new: a quote from the keeper\n:::\n"));
+    let mut version = 1;
+    client.notify("textDocument/didOpen", json!({ "textDocument": { "uri": uri, "languageId": "markdown", "version": version, "text": edit.text } }));
+    let line_of = |text: &str, l: &str| text.lines().position(|x| x == l).unwrap_or_else(|| panic!("no line {l:?}")) as u32;
+    let ask = |action: Option<&str>, line: u32, extra: serde_json::Value| {
+        let mut p = draft::params(action, &uri, line);
+        p.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        let id = client.request("rubric/draft", p);
+        next(&rx, "an answer to rubric/draft", |m| match m {
+            Incoming::Response { id: got, result } if *got == id => Some(result.clone().expect("no error")),
+            _ => None,
+        })
+    };
+    let drafted = |status: &str, words: &str| {
+        next(&rx, "rubric/drafted", |m| match m {
+            Incoming::Notification { method, params } if method == "rubric/drafted" && params["status"] == status && params["words"] == words => Some(params.clone()),
+            _ => None,
+        })
+    };
+
+    // The server's word for the line, before anything is drafted.
+    let clock = line_of(&edit.text, "::: new: a tide clock");
+    let view = View::parse(&ask(None, clock, json!({}))).expect("a view");
+    assert_eq!(view.words, "a tide clock");
+    assert!(draft::menu_for(&view).unwrap().rows.iter().any(|r| r.id == "build"));
+
+    // Drafted: the page's content draws it.
+    ask(Some("build"), clock, json!({}));
+    let ready = drafted("ready", "a tide clock");
+    let name = ready["name"].as_str().unwrap().to_string();
+    let written = site.join("content/posts/long.md");
+    wait_for("the draft in content/", || std::fs::read_to_string(&written).is_ok_and(|t| t.contains(&name)));
+    let view = View::parse(&ask(None, clock, json!({}))).unwrap();
+    assert_eq!((view.status.as_deref(), view.name.as_deref()), (Some("ready"), Some(name.as_str())));
+
+    // Rerolled with notes: another take, named as the notes say.
+    ask(Some("reroll"), clock, json!({ "change": "name it tide-two" }));
+    assert_eq!(drafted("ready", "a tide clock")["name"], "tide-two");
+
+    // Kept for the site: the line is the part's, and the site has the part.
+    let asked = Asked { line: clock, text: "::: new: a tide clock".into(), what: What::Act };
+    let kept = ask(Some("keep"), clock, json!({ "global": false }));
+    assert!(draft::replace(&mut edit, &asked, &kept), "{kept}");
+    assert!(edit.text.lines().nth(clock as usize).unwrap().contains("tide-two"), "{}", edit.text);
+    assert!(!edit.text.contains("new: a tide clock"));
+    assert_eq!(kept["part"]["name"], "tide-two");
+    assert!(site.join("parts/tide-two/part.yaml").is_file());
+    version += 1;
+    client.notify("textDocument/didChange", json!({ "textDocument": { "uri": uri, "version": version }, "contentChanges": [{ "text": edit.text }] }));
+
+    // A draft that fails: the line's menu offers another try.
+    let bell = line_of(&edit.text, "::: new: a failing bell");
+    ask(Some("build"), bell, json!({}));
+    drafted("failed", "a failing bell");
+    let view = View::parse(&ask(None, bell, json!({}))).unwrap();
+    assert_eq!(view.status.as_deref(), Some("failed"));
+    assert_eq!(draft::menu_for(&view).unwrap().rows[0].id, "build");
+
+    // A draft cancelled: the line keeps its words, without `new:`.
+    let brass = line_of(&edit.text, "::: new: a brass bell");
+    ask(Some("build"), brass, json!({}));
+    drafted("ready", "a brass bell");
+    let asked = Asked { line: brass, text: "::: new: a brass bell".into(), what: What::Act };
+    assert!(draft::replace(&mut edit, &asked, &ask(Some("cancel"), brass, json!({}))));
+    assert_eq!(edit.text.lines().nth(brass as usize), Some("::: a brass bell"));
+
+    // Words near a part the site has: the menu lists it, and using it puts it on the line.
+    let keeper = line_of(&edit.text, "::: new: a quote from the keeper");
+    let view = View::parse(&ask(None, keeper, json!({}))).unwrap();
+    assert!(view.near.iter().any(|n| n.name == "quote"), "{:?}", view.near);
+    assert_eq!(draft::menu_for(&view).unwrap().rows[0].id, "near");
+    client.notify("rubric/peek", json!({ "uri": uri, "line": keeper, "part": "quote" }));
+    let asked = Asked { line: keeper, text: "::: new: a quote from the keeper".into(), what: What::Act };
+    assert!(draft::replace(&mut edit, &asked, &ask(Some("use"), keeper, json!({ "part": "quote" }))));
+    assert_eq!(edit.text.lines().nth(keeper as usize), Some("::: quote"));
+
+    // The tracked site gained nothing.
+    assert!(!repo().join("sites/app-slice/parts").exists());
+
+    client.stop();
+    wait_for("the server's process to end", || !alive(pid));
+}
+
 struct Cleanup(PathBuf);
 
 impl Drop for Cleanup {

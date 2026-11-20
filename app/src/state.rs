@@ -6,7 +6,9 @@ use rune::{Span, TextEdit, Tx};
 
 use serde_json::json;
 
-use crate::{ghost, markdown, position};
+use std::collections::HashMap;
+
+use crate::{draft, ghost, markdown, position};
 
 pub struct State {
     /// The Markdown file.
@@ -42,6 +44,48 @@ pub struct State {
     pub ghost: Option<crate::ghost::Ghost>,
     /// The inlineCompletion asked last: its id, the document version and the line.
     pub asked: Option<(i64, i32, u32)>,
+    /// The window's height in points, for the menu's place.
+    pub height: f32,
+    /// The menu at the caret, and the view and line it is about.
+    pub menu: Option<crate::menu::Menu>,
+    pub view: Option<(draft::View, draft::Asked)>,
+    /// Where the menu's anchor was last laid out, for when the notes field has the focus and
+    /// the editor reports no caret.
+    pub menu_at: Option<[f32; 4]>,
+    /// A reroll's notes, while `menu` is the notes field.
+    pub notes: TextEdit,
+    /// Each `new:` line's status, from the server's diagnostics: line, status.
+    pub drafts: Vec<(u32, draft::Status)>,
+    /// Something that just happened, said at the bottom of the writing until the time in ms.
+    pub flash: Option<(char, String, draft::Tone, u64)>,
+    /// The time the status line counts from, in ms; set by what changes it and by the ticker.
+    pub now_ms: u64,
+    /// `rubric/draft` requests not answered yet.
+    pub pending: HashMap<i64, draft::Asked>,
+    /// When Tab asked for a line's menu, until the frame that draws it: the time is printed.
+    pub looked: std::cell::Cell<Option<std::time::Instant>>,
+    /// Wakes the app once a second while a draft runs or a flash shows.
+    pub ticker: Option<Ticker>,
+}
+
+/// The thread that ticks: parked until `wake`, at rest again when nothing needs the time.
+pub struct Ticker {
+    pub on: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    pub thread: std::thread::Thread,
+}
+
+impl Ticker {
+    pub fn rest(&self) {
+        self.on.store(false, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// Something on screen now changes with time.
+pub fn wake(s: &State) {
+    if let Some(t) = &s.ticker {
+        t.on.store(true, std::sync::atomic::Ordering::Relaxed);
+        t.thread.unpark();
+    }
 }
 
 impl State {
@@ -50,21 +94,34 @@ impl State {
         edit.focused = true;
         edit.set_caret(0);
         let uri = file_uri(&path);
-        let spans = markdown::spans(&text, &theme());
-        State { path, edit, version: 1, saved: text, split: 0.5, last_range: (0, 0), uri, spans, problem: None, page: None, width: 0.0, bounds: None, client: None, cursor_line: None, page_url: None, ghost: None, asked: None }
+        let spans = markdown::spans(&text, &theme(), &[]);
+        State {
+            path, edit, version: 1, saved: text, split: 0.5, last_range: (0, 0), uri, spans, problem: None, page: None, width: 0.0,
+            bounds: None, client: None, cursor_line: None, page_url: None, ghost: None, asked: None, height: 0.0, menu: None,
+            view: None, menu_at: None, notes: TextEdit::new(""), drafts: Vec::new(), flash: None, now_ms: draft::now_ms(),
+            pending: HashMap::new(), looked: std::cell::Cell::new(None), ticker: None,
+        }
     }
 }
 
 pub fn theme() -> markdown::Theme {
     let t = rune::tok::theme(false);
-    markdown::Theme { dim: t.text_secondary, accent: rune::tok::accent(0, false) }
+    markdown::Theme { dim: t.text_secondary, accent: rune::tok::accent(0, false), warn: rune::tok::accent(3, false) }
+}
+
+/// The Markdown styles for the text as it is, the `new:` lines by their drafts.
+pub fn spans(s: &State) -> Vec<Span> {
+    let tones: Vec<(u32, draft::Tone)> = s.drafts.iter().map(|(l, st)| (*l, st.tone())).collect();
+    markdown::spans(&s.edit.text, &theme(), &tones)
 }
 
 /// The text changed: a new version, new styles, and the whole text to the server.
 pub fn changed(s: &mut State) {
     s.version += 1;
     s.ghost = None;
-    s.spans = markdown::spans(&s.edit.text, &theme());
+    // Typing is not the menu's: it goes (a choice that changed the text closed it already).
+    draft::close(s);
+    s.spans = spans(s);
     if let Some(c) = &s.client {
         c.notify("textDocument/didChange", json!({
             "textDocument": { "uri": s.uri, "version": s.version },
@@ -83,6 +140,8 @@ pub fn moved(s: &mut State) -> bool {
         return false;
     }
     s.last_range = range;
+    // The caret went elsewhere: the menu was for where it was.
+    draft::close(s);
     let line = position::line_char(&s.edit.text, s.edit.focus).0;
     if s.cursor_line != Some(line)
         && let Some(c) = &s.client
@@ -139,6 +198,9 @@ pub fn incoming(s: &mut State, m: crate::lsp::Incoming) {
     match m {
         // Only the answer to the last question, for the version and line it was asked about.
         Incoming::Response { id, result } => {
+            if let Some(about) = s.pending.remove(&id) {
+                return draft::answered(s, about, result);
+            }
             let Some((asked, version, line)) = s.asked else { return };
             if id != asked {
                 return;
@@ -157,6 +219,8 @@ pub fn incoming(s: &mut State, m: crate::lsp::Incoming) {
                 eprintln!("page: {p}");
             }
         }
+        Incoming::Notification { method, params } if method == "textDocument/publishDiagnostics" => draft::diagnostics(s, &params),
+        Incoming::Notification { method, params } if method == "rubric/drafted" => draft::drafted(s, &params),
         _ => {}
     }
 }
@@ -183,11 +247,18 @@ pub fn shut(s: &mut State) {
     }
 }
 
-/// Tab: takes a pick showing whose pin acts; otherwise nothing. Always consumed.
+/// Tab: takes a pick showing whose pin acts, or the offer of a new part, which makes the line
+/// a `new:` line; on a `new:` line it asks for the line's menu. Otherwise nothing. Always
+/// consumed.
 pub fn tab(s: &mut State, _tx: &mut Tx) {
-    let Some(g) = showing(s).filter(|g| g.pick.pin.as_ref().is_some_and(|p| p.acts)).cloned() else { return };
-    ghost::accept(&mut s.edit, &g);
-    changed(s);
+    if let Some(g) = showing(s).filter(|g| g.pick.pin.as_ref().is_some_and(|p| p.acts || p.build)).cloned() {
+        ghost::accept(&mut s.edit, &g);
+        changed(s);
+        if g.pick.pin.is_some_and(|p| p.acts) {
+            return;
+        }
+    }
+    draft::tab(s);
 }
 
 /// Ctrl+S writes the file whole.
@@ -209,6 +280,27 @@ pub fn file_uri(path: &std::path::Path) -> String {
             out.push(b as char);
         } else {
             out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
+/// A URI with its `%XX` escapes turned back into bytes, to compare two spellings of one path.
+pub fn unescaped(uri: &str) -> Vec<u8> {
+    let b = uri.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        let hex = (b[i] == b'%').then(|| uri.get(i + 1..i + 3).and_then(|h| u8::from_str_radix(h, 16).ok())).flatten();
+        match hex {
+            Some(byte) => {
+                out.push(byte);
+                i += 3;
+            }
+            None => {
+                out.push(b[i]);
+                i += 1;
+            }
         }
     }
     out

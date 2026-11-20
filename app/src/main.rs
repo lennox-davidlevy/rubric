@@ -75,12 +75,34 @@ fn main() {
         None => eprintln!("server: no rubric.md above the file"),
     }
 
+    // The seconds of "drafting 12 s" and the end of a flash: a thread that wakes the app once
+    // a second while either shows, and is parked the rest of the time.
+    let ticks = app.handle();
+    let on = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let running = on.clone();
+    let ticker = std::thread::spawn(move || loop {
+        if !running.load(std::sync::atomic::Ordering::Relaxed) {
+            std::thread::park();
+            continue;
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        ticks.update_if(|s, _| rubric_app::draft::tick(s));
+    });
+    let thread = ticker.thread().clone();
+    app.handle().update(move |s, _| s.ticker = Some(state::Ticker { on, thread }));
+
     // A caret moved by keys or the pointer is no edit, and nothing reports it. `AppSpec::poll`
     // runs at the start of a frame, before its input, so a move was seen a frame late, and never
     // when the app then rested. After each drawn frame instead: a move goes to the state.
     let moves = app.handle();
     let handle = app.handle();
     app.on_frame_drawn(move |rt| {
+        // Tab to the menu on screen, for the measure in the findings.
+        if rt.state.menu.is_some()
+            && let Some(asked) = rt.state.looked.take()
+        {
+            eprintln!("menu drawn {:.1} ms", asked.elapsed().as_secs_f64() * 1000.0);
+        }
         if rt.state.edit.range() != rt.state.last_range {
             moves.update_if(|s, _| state::moved(s));
         }

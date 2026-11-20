@@ -5,6 +5,8 @@ use std::path::Path;
 
 use rune::{Color, Span};
 
+use crate::draft::Tone;
+
 /// The colors the spans use.
 #[derive(Clone, Copy, Debug)]
 pub struct Theme {
@@ -12,6 +14,8 @@ pub struct Theme {
     pub dim: Color,
     /// A `:::` line.
     pub accent: Color,
+    /// A `new:` line whose draft failed.
+    pub warn: Color,
 }
 
 /// The editor's text size, in points; headings are larger.
@@ -19,12 +23,13 @@ pub const BODY: f32 = 17.0;
 const HEADINGS: [f32; 3] = [28.0, 23.0, 19.0];
 
 /// Styles for the whole text: ATX headings, `**bold**`, `*italic*`, `:::` lines, and fenced
-/// code, inside which nothing else is styled. Runs over the whole text; no incremental pass.
-pub fn spans(text: &str, theme: &Theme) -> Vec<Span> {
+/// code, inside which nothing else is styled. A `::: new:` line is dim until `drafts` (line,
+/// tone) says where its draft is. Runs over the whole text; no incremental pass.
+pub fn spans(text: &str, theme: &Theme, drafts: &[(u32, Tone)]) -> Vec<Span> {
     let mut out = Vec::new();
     let mut fence: Option<(u8, usize)> = None;
     let mut start = 0;
-    for line in text.split('\n') {
+    for (n, line) in text.split('\n').enumerate() {
         let end = start + line.len();
         let lead = line.len() - line.trim_start_matches([' ', '\t']).len();
         let rest = &line[lead..];
@@ -38,7 +43,16 @@ pub fn spans(text: &str, theme: &Theme) -> Vec<Span> {
             fence = Some(f);
             out.push(Span::new(start, end).mono());
         } else if rest.starts_with(":::") {
-            out.push(Span::new(start, end).color(theme.accent));
+            let tone = if crate::draft::is_new_line(rest) {
+                drafts.iter().find(|(l, _)| *l as usize == n).map_or(Tone::Dim, |(_, t)| *t)
+            } else {
+                Tone::Accent
+            };
+            out.push(Span::new(start, end).color(match tone {
+                Tone::Dim => theme.dim,
+                Tone::Accent => theme.accent,
+                Tone::Warn => theme.warn,
+            }));
         } else if let Some(level) = heading_level(rest) {
             let size = HEADINGS.get(level - 1).copied().unwrap_or(BODY);
             let marks = start + lead + level;
@@ -130,7 +144,7 @@ pub fn save(path: &Path, text: &str) -> io::Result<()> {
 mod tests {
     use super::*;
 
-    const T: Theme = Theme { dim: Color { r: 0.5, g: 0.5, b: 0.5, a: 1.0 }, accent: Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 } };
+    const T: Theme = Theme { dim: Color { r: 0.5, g: 0.5, b: 0.5, a: 1.0 }, accent: Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 }, warn: Color { r: 1.0, g: 0.5, b: 0.0, a: 1.0 } };
 
     fn at<'a>(spans: &'a [Span], start: usize, end: usize) -> &'a Span {
         spans.iter().find(|s| s.start as usize == start && s.end as usize == end)
@@ -139,7 +153,7 @@ mod tests {
 
     #[test]
     fn a_heading_is_larger_with_its_marks_dimmed() {
-        let s = spans("## Title\nbody", &T);
+        let s = spans("## Title\nbody", &T, &[]);
         let marks = at(&s, 0, 2);
         assert_eq!(marks.color, Some(T.dim));
         let words = at(&s, 2, 8);
@@ -150,7 +164,7 @@ mod tests {
 
     #[test]
     fn bold_is_on_the_words_and_the_stars_are_dimmed() {
-        let s = spans("x **a** y", &T);
+        let s = spans("x **a** y", &T, &[]);
         assert_eq!(at(&s, 2, 4).color, Some(T.dim));
         assert!(at(&s, 4, 5).weight.is_some());
         assert_eq!(at(&s, 5, 7).color, Some(T.dim));
@@ -158,7 +172,7 @@ mod tests {
 
     #[test]
     fn italic_is_slanted_and_a_list_star_is_not() {
-        let s = spans("* item *word*", &T);
+        let s = spans("* item *word*", &T, &[]);
         assert!(at(&s, 8, 12).italic);
         assert!(!s.iter().any(|x| x.start == 0));
     }
@@ -166,7 +180,7 @@ mod tests {
     #[test]
     fn nothing_inside_a_code_fence_is_styled() {
         let text = "```\n# not a heading **no**\n```\n# yes";
-        let s = spans(text, &T);
+        let s = spans(text, &T, &[]);
         let inner = text.find("# not").unwrap();
         let inside: Vec<_> = s.iter().filter(|x| (x.start as usize) >= inner && (x.end as usize) <= inner + 22).collect();
         assert!(inside.iter().all(|x| x.mono && x.size.is_none() && x.weight.is_none()), "{inside:?}");
@@ -176,14 +190,25 @@ mod tests {
 
     #[test]
     fn a_directive_line_takes_the_accent() {
-        let s = spans("text\n::: a quote\n:::", &T);
+        let s = spans("text\n::: a quote\n:::", &T, &[]);
         assert_eq!(at(&s, 5, 16).color, Some(T.accent));
+    }
+
+    #[test]
+    fn a_new_line_is_dim_until_its_draft_says_otherwise() {
+        let text = "::: new: a clock\n:::\n::: new: a bell\n:::";
+        let s = spans(text, &T, &[(2, Tone::Warn)]);
+        assert_eq!(at(&s, 0, 16).color, Some(T.dim));
+        assert_eq!(at(&s, 21, 36).color, Some(T.warn));
+        assert_eq!(at(&s, 17, 20).color, Some(T.accent), "a closer keeps the accent");
+        let s = spans(text, &T, &[(0, Tone::Accent)]);
+        assert_eq!(at(&s, 0, 16).color, Some(T.accent));
     }
 
     #[test]
     fn offsets_are_bytes_after_multibyte_characters() {
         let text = "café 🙂\n**b**";
-        let s = spans(text, &T);
+        let s = spans(text, &T, &[]);
         let b = text.find("b**").unwrap();
         assert_eq!(&text[b..b + 1], "b");
         assert!(at(&s, b, b + 1).weight.is_some());

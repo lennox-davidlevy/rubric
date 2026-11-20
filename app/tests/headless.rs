@@ -180,11 +180,15 @@ fn tab_takes_the_pick_and_sends_the_change() {
 }
 
 #[test]
-fn tab_on_a_pick_that_opens_a_menu_changes_nothing() {
-    let (mut rt, _sent) = with_ghost("::: some words\n:::", 0, serde_json::json!({ "line": 0, "text": "::: new: some words", "build": true }));
+fn tab_on_the_offer_of_a_new_part_makes_the_line_and_asks_for_its_menu() {
+    let (mut rt, sent) = with_ghost("::: some words\n:::", 0, serde_json::json!({ "line": 0, "text": "::: new: some words", "build": true }));
     assert!(rt.find("ghost").is_some(), "shown");
+    while sent.try_recv().is_ok() {}
     press(&mut rt, Key::Tab);
-    assert_eq!(rt.state.edit.text, "::: some words\n:::");
+    assert_eq!(rt.state.edit.text, "::: new: some words\n:::");
+    let look = drafts(&sent);
+    assert_eq!(look.len(), 1);
+    assert_eq!((look[0]["params"]["line"].as_u64(), look[0]["params"].get("action")), (Some(0), None));
 }
 
 #[test]
@@ -242,4 +246,315 @@ fn an_answer_after_the_caret_left_the_line_is_dropped() {
     let result = serde_json::json!([{ "insertText": " quote", "range": { "start": { "line": 1, "character": 11 } } }]);
     rubric_app::state::incoming(&mut rt.state, rubric_app::lsp::Incoming::Response { id, result: Ok(result) });
     assert!(rt.state.ghost.is_none());
+}
+
+// The `new:` line's menu.
+
+use rubric_app::lsp::Incoming;
+use serde_json::{Value, json};
+
+fn drafts(sent: &std::sync::mpsc::Receiver<Value>) -> Vec<Value> {
+    std::iter::from_fn(|| sent.try_recv().ok()).filter(|m| m["method"] == "rubric/draft").collect()
+}
+
+fn peeks(sent: &std::sync::mpsc::Receiver<Value>) -> Vec<Value> {
+    std::iter::from_fn(|| sent.try_recv().ok()).filter(|m| m["method"] == "rubric/peek").map(|m| m["params"]["part"].clone()).collect()
+}
+
+/// The caret at the end of `line` of `text`, a server connected, and nothing sent yet read.
+fn on_line(text: &str, line: u32) -> (Runtime<State>, std::sync::mpsc::Receiver<Value>) {
+    let mut rt = runtime(text, rubric_app::position::line_range(text, line).end);
+    let (client, sent) = rubric_app::lsp::Client::recording();
+    rubric_app::state::connected(&mut rt.state, client);
+    rubric_app::state::moved(&mut rt.state);
+    while sent.try_recv().is_ok() {}
+    (rt, sent)
+}
+
+/// Tab, then the server's view for the line: the menu is open.
+fn with_menu(text: &str, line: u32, view: Value) -> (Runtime<State>, std::sync::mpsc::Receiver<Value>) {
+    let (mut rt, sent) = on_line(text, line);
+    press(&mut rt, Key::Tab);
+    let look = drafts(&sent);
+    assert_eq!(look.len(), 1, "Tab asks for the line's view");
+    assert!(look[0]["params"].get("action").is_none());
+    answer(&mut rt, &look[0], view);
+    (rt, sent)
+}
+
+fn answer(rt: &mut Runtime<State>, request: &Value, result: Value) {
+    tell(rt, Incoming::Response { id: request["id"].as_i64().unwrap(), result: Ok(result) });
+    rt.frame(1.0 / 60.0);
+}
+
+/// A message from the server, as the app takes it: in an update, so the view runs again.
+fn tell(rt: &mut Runtime<State>, m: Incoming) {
+    rt.update(|s, _| rubric_app::state::incoming(s, m));
+    rt.frame(1.0 / 60.0);
+}
+
+/// The caret put elsewhere, and what the app's `on_frame_drawn` does about it.
+fn caret_to(rt: &mut Runtime<State>, byte: usize) {
+    rt.update(|s, _| s.edit.set_caret(byte));
+    rt.frame(1.0 / 60.0);
+    rt.update_if(|s, _| rubric_app::state::moved(s));
+    rt.frame(1.0 / 60.0);
+}
+
+fn rows(rt: &Runtime<State>) -> Vec<String> {
+    rt.state.menu.as_ref().map(|m| m.rows.iter().map(|r| r.id.clone()).collect()).unwrap_or_default()
+}
+
+const NEW: &str = "before\n::: new: a tide clock\n:::\nafter";
+
+#[test]
+fn tab_on_a_new_line_opens_its_menu_and_return_drafts() {
+    let (mut rt, sent) = with_menu(NEW, 1, json!({ "words": "a tide clock", "drafter": "the stub" }));
+    assert_eq!(rows(&rt), ["build", "cancel"]);
+    assert!(rt.find("menu-content").is_some(), "the menu is drawn");
+    assert!(editor_focused(&rt), "the editor keeps the focus");
+    press(&mut rt, Key::Enter);
+    let built = drafts(&sent);
+    assert_eq!(built.len(), 1);
+    assert_eq!((built[0]["params"]["action"].as_str(), built[0]["params"]["line"].as_u64()), (Some("build"), Some(1)));
+    assert!(rt.state.menu.is_none());
+    assert_eq!(rt.state.edit.text, NEW, "Return went to the menu, not the text");
+}
+
+#[test]
+fn the_menu_is_drawn_inside_the_writing_pane() {
+    let (mut rt, _sent) = with_menu(NEW, 1, json!({ "words": "a tide clock" }));
+    rt.frame(1.0 / 60.0);
+    let menu = rt.elements().into_iter().find(|e| e.key.as_deref() == Some("menu-content")).expect("drawn");
+    let divider = rt.find("divider").unwrap().0;
+    assert!(menu.rect[0] >= 0.0 && menu.rect[0] + menu.rect[2] <= divider, "{:?} left of the divider at {divider}", menu.rect);
+}
+
+#[test]
+fn down_moves_in_the_menu_and_leaves_the_caret_where_it_was() {
+    let (mut rt, sent) = with_menu(NEW, 1, json!({ "words": "a tide clock" }));
+    let caret = rt.state.edit.range();
+    press(&mut rt, Key::Down);
+    assert_eq!(rt.state.edit.range(), caret);
+    assert_eq!(rt.state.menu.as_ref().unwrap().active, 1);
+    press(&mut rt, Key::Enter);
+    assert_eq!(drafts(&sent)[0]["params"]["action"], "cancel");
+}
+
+#[test]
+fn a_press_on_a_row_chooses_it_and_typing_stays_in_the_writing() {
+    let (mut rt, sent) = with_menu(NEW, 1, json!({ "words": "a tide clock" }));
+    for _ in 0..30 {
+        rt.frame(1.0 / 60.0);
+    }
+    let (x, y) = rt.find("menu-option-cancel").expect("the row is drawn");
+    rt.pointer_move(x, y);
+    rt.frame(1.0 / 60.0);
+    rt.pointer_down(x, y);
+    rt.frame(1.0 / 60.0);
+    rt.pointer_up(x, y);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(drafts(&sent)[0]["params"]["action"], "cancel");
+    assert!(rt.state.menu.is_none());
+    assert!(editor_focused(&rt));
+}
+
+#[test]
+fn a_typed_letter_closes_the_menu_and_lands_in_the_text() {
+    let (mut rt, sent) = with_menu(NEW, 1, json!({ "words": "a tide clock" }));
+    press(&mut rt, Key::Text("s".into()));
+    assert!(rt.state.menu.is_none());
+    assert!(rt.find("menu-content").is_none());
+    assert_eq!(rt.state.edit.text, "before\n::: new: a tide clocks\n:::\nafter");
+    assert!(drafts(&sent).is_empty(), "nothing was chosen");
+}
+
+#[test]
+fn esc_closes_the_menu_and_the_caret_leaving_the_line_does_too() {
+    let (mut rt, _sent) = with_menu(NEW, 1, json!({ "words": "a tide clock" }));
+    press(&mut rt, Key::Escape);
+    assert!(rt.state.menu.is_none());
+    assert_eq!(rt.state.edit.text, NEW);
+
+    let (mut rt, _sent) = with_menu(NEW, 1, json!({ "words": "a tide clock" }));
+    caret_to(&mut rt, 0);
+    assert!(rt.state.menu.is_none());
+}
+
+#[test]
+fn a_view_that_comes_after_the_caret_left_opens_nothing() {
+    let (mut rt, sent) = on_line(NEW, 1);
+    press(&mut rt, Key::Tab);
+    let look = drafts(&sent);
+    caret_to(&mut rt, 0);
+    answer(&mut rt, &look[0], json!({ "words": "a tide clock" }));
+    assert!(rt.state.menu.is_none());
+}
+
+#[test]
+fn keep_for_the_site_puts_the_answers_line_in_place_as_one_undo() {
+    let (mut rt, sent) = with_menu(NEW, 1, json!({ "words": "a tide clock", "status": "ready", "name": "tide-clock" }));
+    assert_eq!(rows(&rt), ["keep", "reroll", "cancel"]);
+    press(&mut rt, Key::Enter);
+    assert_eq!(rows(&rt), ["site", "all"]);
+    press(&mut rt, Key::Enter);
+    let keep = drafts(&sent);
+    assert_eq!((keep[0]["params"]["action"].as_str(), keep[0]["params"]["global"].as_bool()), (Some("keep"), Some(false)));
+    // A line typed above while the server worked: the answer follows the line down.
+    rt.state.edit.set_caret(0);
+    rt.ime(Ime::Commit("x\n".into()));
+    rt.frame(1.0 / 60.0);
+    let version = rt.state.version;
+    answer(&mut rt, &keep[0], json!({ "replace": "::: tide-clock", "part": { "name": "tide-clock", "settings": [] } }));
+    assert_eq!(rt.state.edit.text, "x\nbefore\n::: tide-clock\n:::\nafter");
+    assert_eq!(rt.state.version, version + 1, "the server is told");
+    assert!(rt.state.flash.as_ref().is_some_and(|f| f.1.contains("tide-clock")), "kept is said");
+    rt.state.edit.undo();
+    assert_eq!(rt.state.edit.text, "x\nbefore\n::: new: a tide clock\n:::\nafter");
+}
+
+#[test]
+fn every_theme_sends_global() {
+    let (mut rt, sent) = with_menu(NEW, 1, json!({ "words": "a tide clock", "status": "ready", "name": "tide-clock" }));
+    press(&mut rt, Key::Enter);
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Enter);
+    assert_eq!(drafts(&sent)[0]["params"]["global"], true);
+}
+
+#[test]
+fn an_answer_nothing_asked_for_is_ignored_and_an_error_is_said() {
+    let (mut rt, sent) = with_menu(NEW, 1, json!({ "words": "a tide clock", "status": "ready", "name": "tide-clock" }));
+    tell(&mut rt, Incoming::Response { id: 9999, result: Ok(json!({ "replace": "::: wrong" })) });
+    assert_eq!(rt.state.edit.text, NEW);
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Enter);
+    let cancel = drafts(&sent);
+    answer(&mut rt, &cancel[0], json!({ "error": "no draft here" }));
+    assert_eq!(rt.state.edit.text, NEW);
+    assert!(rt.state.flash.as_ref().is_some_and(|f| f.1.contains("no draft here")));
+}
+
+#[test]
+fn similar_parts_peek_each_row_and_choosing_uses_the_part() {
+    let near = json!([{ "name": "quote", "description": "A quote", "own": false }, { "name": "aside", "description": "An aside", "own": true }]);
+    let (mut rt, sent) = with_menu(NEW, 1, json!({ "words": "a tide clock", "near": near }));
+    assert_eq!(rows(&rt), ["near", "build", "cancel"]);
+    press(&mut rt, Key::Enter);
+    assert_eq!(rows(&rt), ["quote", "aside"]);
+    assert_eq!(peeks(&sent), [json!("quote")], "the first is drawn at once");
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Down);
+    assert_eq!(peeks(&sent), [json!("aside")], "one for the row moved to, none at the end");
+    press(&mut rt, Key::Escape);
+    assert_eq!(peeks(&sent), [Value::Null], "Esc ends the look");
+    assert_eq!(rows(&rt), ["near", "build", "cancel"], "and goes back to the first menu");
+    press(&mut rt, Key::Enter);
+    peeks(&sent);
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Enter);
+    let all: Vec<Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+    let used = all.iter().find(|m| m["method"] == "rubric/draft").expect("use is sent");
+    assert_eq!((used["params"]["action"].as_str(), used["params"]["part"].as_str()), (Some("use"), Some("aside")));
+}
+
+#[test]
+fn notes_typed_for_a_reroll_go_with_it_and_not_into_the_writing() {
+    let (mut rt, sent) = with_menu(NEW, 1, json!({ "words": "a tide clock", "status": "ready", "name": "tide-clock" }));
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Enter);
+    assert_eq!(rows(&rt), ["just", "notes"]);
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Enter);
+    rt.frame(1.0 / 60.0);
+    assert!(rt.elements().into_iter().any(|e| e.key.as_deref() == Some("notes") && e.focused), "the notes field has the focus");
+    rt.ime(Ime::Commit("name it tide-two".into()));
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.edit.text, NEW);
+    press(&mut rt, Key::Enter);
+    let reroll = drafts(&sent);
+    assert_eq!((reroll[0]["params"]["action"].as_str(), reroll[0]["params"]["change"].as_str()), (Some("reroll"), Some("name it tide-two")));
+    rt.frame(1.0 / 60.0);
+    assert!(editor_focused(&rt), "typing goes to the writing again");
+    assert!(rt.state.menu.is_none());
+}
+
+#[test]
+fn esc_in_the_notes_goes_back_to_the_reroll_menu_and_sends_nothing() {
+    let (mut rt, sent) = with_menu(NEW, 1, json!({ "words": "a tide clock", "status": "ready", "name": "tide-clock" }));
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Enter);
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Enter);
+    rt.frame(1.0 / 60.0);
+    rt.ime(Ime::Commit("words".into()));
+    press(&mut rt, Key::Escape);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rows(&rt), ["just", "notes"]);
+    assert!(editor_focused(&rt));
+    assert!(drafts(&sent).is_empty());
+    press(&mut rt, Key::Enter);
+    assert_eq!(drafts(&sent)[0]["params"]["change"], "", "a plain reroll after all");
+}
+
+// The line's status.
+
+fn diagnostics(rt: &mut Runtime<State>, list: Value) {
+    let uri = rt.state.uri.clone();
+    tell(rt, Incoming::Notification { method: "textDocument/publishDiagnostics".into(), params: json!({ "uri": uri, "diagnostics": list }) });
+}
+
+fn ready(line: u32) -> Value {
+    json!([{ "source": "rubric", "code": "draft-ready", "range": { "start": { "line": line, "character": 0 } }, "data": { "name": "tide-clock" } }])
+}
+
+#[test]
+fn the_status_shows_only_while_the_caret_is_on_a_new_line() {
+    let (mut rt, _sent) = on_line(NEW, 1);
+    rt.frame(1.0 / 60.0);
+    assert!(rt.find("status-words").is_some());
+    let before = rubric_app::draft::line(&rt.state).unwrap();
+    diagnostics(&mut rt, ready(1));
+    let after = rubric_app::draft::line(&rt.state).unwrap();
+    assert_ne!(before, after, "the server's word for the line changes what is said");
+    assert!(after.1.contains("tide-clock"));
+    caret_to(&mut rt, 0);
+    assert!(rt.find("status-words").is_none());
+}
+
+#[test]
+fn a_draft_finished_on_another_line_is_said_for_a_while() {
+    let (mut rt, _sent) = on_line(NEW, 0);
+    let drafted = json!({ "status": "ready", "name": "tide-clock", "words": "a tide clock" });
+    tell(&mut rt, Incoming::Notification { method: "rubric/drafted".into(), params: drafted.clone() });
+    let (_, said, _, until) = rt.state.flash.clone().expect("said");
+    assert!(said.contains("tide-clock"));
+    // It goes once its time has passed.
+    rt.state.flash.as_mut().unwrap().3 = 0;
+    rubric_app::draft::tick(&mut rt.state);
+    assert!(rt.state.flash.is_none() && until > 0);
+
+    // On the line itself, its own status says it.
+    let (mut rt, _sent) = on_line(NEW, 1);
+    tell(&mut rt, Incoming::Notification { method: "rubric/drafted".into(), params: drafted });
+    assert!(rt.state.flash.is_none());
+}
+
+#[test]
+fn diagnostics_reach_a_post_whose_path_the_server_escapes_differently() {
+    let mut s = State::open(PathBuf::from("/home/a/My Site (2)/it's+me.md"), NEW.to_string());
+    let (client, _sent) = rubric_app::lsp::Client::recording();
+    rubric_app::state::connected(&mut s, client);
+    // As Node's pathToFileURL writes it: the space escaped, the rest not.
+    let params = json!({ "uri": "file:///home/a/My%20Site%20(2)/it's+me.md", "diagnostics": ready(1) });
+    rubric_app::state::incoming(&mut s, Incoming::Notification { method: "textDocument/publishDiagnostics".into(), params });
+    assert_eq!(s.drafts.len(), 1);
+}
+
+#[test]
+fn diagnostics_for_another_document_change_nothing() {
+    let (mut rt, _sent) = on_line(NEW, 1);
+    tell(&mut rt, Incoming::Notification { method: "textDocument/publishDiagnostics".into(), params: json!({ "uri": "file:///other.md", "diagnostics": ready(1) }) });
+    assert!(rt.state.drafts.is_empty());
 }

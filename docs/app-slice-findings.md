@@ -173,3 +173,69 @@ The plan asked the findings for no recommendation; the brief for this session (`
 
 - `rubric <relative site>` (`src/cli.ts`) keeps the root relative; Hugo, run inside the site, resolves it again and fails (`failed to open dir ".../sites/app-slice/sites/app-slice"`). The socket's name is a hash of the root as given, so a relative and an absolute path also make two processes for one site. The session passed absolute paths.
 - The catalog is no longer found from `themesDir` in the site's `hugo.toml` (step 8 writes `.rubric/hugo.toml`, and the universal catalog is the default), so a copy of a site needs no rewriting; the slice plan predates that.
+- A post with no front matter stops Hugo. The first thing in its `content/` file is `{{< rubric-line 0 >}}`, and Hugo reads a file that starts with `{` as JSON front matter (`unmarshal failed: invalid character '{'`). Found in slice 2 with a three-line test post; the session used the sample post, which has front matter.
+
+## Slice 2: a menu and a new part
+
+The plan is [app-slice-2.md](app-slice-2.md), built 2026-11-19 on branch `app-slice-2`. Tab on a `::: new: words` line opens a menu at the caret; the menu drafts, keeps, rerolls (with notes) and cancels; a line under the writing says where the draft is. Every check ran with the stub: no Jev call, no real draft, and "Every theme" was never sent. Windows ran on the session's Xvfb `:77` with lavapipe and its own i3, on a copy of the site in a temporary folder.
+
+### The question: can Rune carry the app's menus?
+
+Yes for a list at the caret; with three things the app does itself.
+
+| What the menu needs | `rune_kit::PopupList` | Done instead |
+|---|---|---|
+| A list at the caret that takes no focus | Yes: anchored to a keyed element, `active` set from the app's state, so the editor keeps the caret and its key handler moves the row | An invisible 1-point element placed at the caret's rectangle (`Cx::caret`) is the anchor |
+| A row chosen by a press, lit under the pointer | Yes (`on_choose`, `on_active`) | |
+| To stay inside the writing pane | No: `anchored_fit` flips and clamps against the window, and the page is a native window over the right of it | `menu::place` chooses the side, the left edge and the width from the caret's and the pane's rectangles, and the anchor is put there. A caret's line scrolled out of the pane hangs the menu from the pane's nearest edge |
+| A title | No | A first row that cannot be chosen (`disabled`), which Rune draws at half strength. A long one ("Draft failed: the harness could not run (stub)") is cut at the menu's 300 points |
+| A line of text (a reroll's notes) | No | `popover::raised` and `popover::anchored` around a real `text_input` that takes the focus; Return gives it back to the editor |
+| To close on a press outside | Its scrim (`on_close`) was not used | The menu closes when the caret moves or the text changes. A press on the page or the divider leaves it open |
+
+What fought:
+
+- `Cx::caret("editor")` is none while another field has the focus, so the notes field had no caret to hang from. The anchor reports where it was laid out (`on_layout`), and that is used then.
+- Nothing ticks while the app rests, as found before. A parked thread wakes the app once a second while a draft runs or a line about something that just happened shows, and parks again.
+- In the headless `Runtime`, state changed outside `update` does not run the view again; the tests deliver the server's messages through `rt.update`.
+- `tx.focus("notes")` for a field the same change creates worked.
+
+### The status line
+
+One line under the writing, 28 points, for the line the caret is on: `+ Tab drafts a part`, `◐ drafting 3 s`, `◆ tide-clock drafted · settings pace · Tab keep, reroll, cancel`, `✗ draft failed · Tab retries`; and for 4 s, something that happened elsewhere or just now (`✓ tide-clock kept`, a draft finished on another line, the server's error). The `new:` line itself is gray with nothing drafted, blue while drafting and when ready, orange when failed.
+
+It works and it is far from the eye: the caret is mid-pane and the line is at the bottom. Under the line, as in Neovim, needs a line that is not in the text, which Rune lacks. David's rows B1 and B3 decide whether it is enough.
+
+### The numbers
+
+Release builds. The first three are headless (`app/src/bin/typing.rs`); the rest are the real window on Xvfb, drawn by llvmpipe.
+
+| Budget | Limit | Measured | |
+|---|---|---|---|
+| One typed character with the menu code in | p95 4 ms | p95 0.24 ms at the start, 0.24 ms in the middle, 0.13 ms at the end; 0.15 ms on a `new:` line with the status line drawn | met; the first slice had 0.13, 0.21 and 0.10 |
+| The view's answer to the frame that draws the menu | | median 1.47 ms, p95 1.51 ms | |
+| A key in the open menu to its frame | one frame | median 0.08 ms, p95 0.09 ms | met |
+| Tab to the menu drawn, stub, 12 times on one line | 50 ms | 5.3 to 7.1 ms after the first; the first 360 ms | met after the first |
+| Idle, 10 s each: just opened, caret in the writing, on a `new:` line, menu open, menu closed | under 1% CPU | 0.0 to 0.3% | met |
+| While a draft runs | under 1% CPU | not measurable as written: the stub's slowest draft takes 1 s. The second after a choice costs about 3 CPU-seconds on llvmpipe's 16 threads (the menu's exit drawn in software), then 0 to 1% a second while the ticker runs | see below |
+
+- **The first Tab on a line waits for the server**, not the app: `look` asks what the site has near the words and waits up to 700 ms for it (`NEAR_WAIT_MS`), 360 ms with the stub. Later Tabs on the line are answered from its cache. Neovim's menu waits the same.
+- **The burst after a choice** is every frame of the menu's exit rasterized on all cores. It says nothing about the GPU path; the native run should watch for it (row B12).
+
+### What differs from the plan
+
+- `menu::place` gives `Place { side, x, y, width }`, not `(Side, f32)`: the left edge and the line it hangs from are the app's to choose too.
+- The notes are `State::notes`, a `TextEdit` beside the menu, and `Kind::Notes` holds nothing: Rune's field needs a `&mut TextEdit` that is always there.
+- Tab on the offer of a new part (`→ draft a new part` after words nothing fits) makes the line a `new:` line and opens its menu, as Neovim's accept does. The first slice left that Tab doing nothing.
+- Esc closes a menu; only the list of similar parts and the notes go back to the menu before, as in Neovim.
+- Keys held with Shift or Alt are the editor's too (Shift+Down selects), not only Ctrl and Cmd.
+- The server's diagnostics name the post by a URI that escapes fewer characters than the app's (`(`, `)`, `'`, `+`, `@`, `,` stay as they are), so the two are compared unescaped. The review found it; without it a post under a path such as `~/Blog (old)/` got no status at all.
+
+### Not tried
+
+- A real draft (`LIVE=1`, David's row B13).
+- Similar parts in the window. The stub does say what is near (`::: new: a quote from the keeper` gives `quote`), and the look, the peek and `use` pass against the real stub server in `app/tests/server.rs`; the list on screen is David's row B14.
+- A keep or cancel answered while the notes field has the focus closes the field without handing the focus back to the editor (the review's guess, not reproduced); a click in the writing restores it.
+- "Every theme" (row B11): the request is tested headless; nothing sent it to a server.
+- A draft longer than a second: the seconds counting up past 1, Stop, and "Keep" on a draft still shown while another is made.
+- The menu on the real display, HiDPI, and a menu longer than the pane is tall.
+

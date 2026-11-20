@@ -21,6 +21,8 @@ pub struct Pin {
     pub text: String,
     /// False when the pin carries `build` or `change`, which open a menu in Neovim.
     pub acts: bool,
+    /// The offer of a new part: the line becomes a `new:` line, and its menu opens.
+    pub build: bool,
     /// The block's closer line, taken away with the empty lines inside it.
     pub drop: Option<u32>,
 }
@@ -60,6 +62,7 @@ pub fn parse(result: &Value, line: u32, version: i32) -> Option<Ghost> {
                 line: a.get("line")?.as_u64()? as u32,
                 text: a.get("text")?.as_str()?.to_string(),
                 acts: !flag("build") && !flag("change"),
+                build: flag("build"),
                 drop: a.get("drop").and_then(Value::as_u64).map(|n| n as u32),
             })
         });
@@ -133,11 +136,12 @@ mod tests {
         let g = parse(&item(" quote", 1, 11, json!({ "line": 1, "text": "::: quote" })), 1, 3).unwrap();
         assert_eq!(g.pick.show, " quote");
         assert_eq!(g.pick.at, (1, 11));
-        assert_eq!(g.pick.pin, Some(Pin { line: 1, text: "::: quote".into(), acts: true, drop: None }));
+        assert_eq!(g.pick.pin, Some(Pin { line: 1, text: "::: quote".into(), acts: true, build: false, drop: None }));
         assert_eq!(g.version, 3);
 
         let built = parse(&item(" draft a new part", 1, 11, json!({ "line": 1, "text": "::: new: x", "build": true })), 1, 3).unwrap();
-        assert!(!built.pick.pin.unwrap().acts);
+        let pin = built.pick.pin.unwrap();
+        assert!(!pin.acts && pin.build);
 
         let bare = parse(&json!([{ "insertText": " x", "range": { "start": { "line": 0, "character": 3 } } }]), 0, 1).unwrap();
         assert_eq!(bare.pick.pin, None);
@@ -147,7 +151,7 @@ mod tests {
     }
 
     fn ghost(show: &str, at: (u32, u32), line: u32, text: &str, drop: Option<u32>) -> Ghost {
-        Ghost { line, version: 1, pick: Pick { show: show.into(), at, pin: Some(Pin { line, text: text.into(), acts: true, drop }) } }
+        Ghost { line, version: 1, pick: Pick { show: show.into(), at, pin: Some(Pin { line, text: text.into(), acts: true, build: false, drop }) } }
     }
 
     fn at_end(text: &str, line: u32) -> TextEdit {
