@@ -177,7 +177,7 @@ The plan asked the findings for no recommendation; the brief for this session (`
 
 ## Slice 2: a menu and a new part
 
-The plan is [app-slice-2.md](app-slice-2.md), built 2026-11-19 on branch `app-slice-2`. Tab on a `::: new: words` line opens a menu at the caret; the menu drafts, keeps, rerolls (with notes) and cancels; a line under the writing says where the draft is. Every check ran with the stub: no Jev call, no real draft, and "Every theme" was never sent. Windows ran on the session's Xvfb `:77` with lavapipe and its own i3, on a copy of the site in a temporary folder.
+The plan is [app-slice-2.md](app-slice-2.md), built 2026-11-19 on branch `app-slice-2` and on `main` since 2026-11-20 (PR #9), after David ran section B of `testing/TESTING.md` in the nested window and had no notes. The next slice is [app-slice-3.md](app-slice-3.md). Tab on a `::: new: words` line opens a menu at the caret; the menu drafts, keeps, rerolls (with notes) and cancels; a line under the writing says where the draft is. Every check ran with the stub: no Jev call, no real draft, and "Every theme" was never sent. Windows ran on the session's Xvfb `:77` with lavapipe and its own i3, on a copy of the site in a temporary folder.
 
 ### The question: can Rune carry the app's menus?
 
