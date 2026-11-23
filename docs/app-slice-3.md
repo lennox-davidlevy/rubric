@@ -2,9 +2,11 @@
 
 Written 2026-11-20, after David ran slice 2 ([app-slice-2.md](app-slice-2.md), section B of `testing/TESTING.md`) in the nested window and said it looks good; slices 1 and 2 are on `main` (PR #9). It adds what slice 2 left out of the menus: the takes of a draft, the menu on a part's own line (another take, Change… into a variant, remove), and the drafter for one draft.
 
-It does not wait for the verdict on Rune, as slice 2 did not. That verdict needs a native run (section A, row A14), which crashes Xorg through the NVIDIA driver on David's Fedora machine; David changes OS after this slice (decided 2026-11-20), and the native run is the first thing done there. The risk taken: if the verdict is no, this slice's Rust is thrown away with the rest, and what stays is this plan's "What exists" and the menus' design.
+Updated 2026-11-22. David is on Omarchy now (Arch, Hyprland on Wayland, NVIDIA), where the app runs natively through XWayland with no crash, and the editor is instant there: a key to its frame in about 1 ms (the findings, "The native run on Omarchy"). That was the question the verdict on Rune waited on, so this slice goes ahead on Rune. The page lagging behind typing is the server's and Hugo's, noted in the plan under step 9, and not this slice's.
 
-So the session runs as slice 2's did: on this machine, windows only on its own Xvfb with lavapipe and its own i3, nothing on `:0`; David's rows run through `app/scripts/run-nested.sh`.
+How the session checks its work here: with the tests (the headless `Runtime`, and the stub server on a temp site). There is no private display on this machine (no Xvfb, Xephyr or i3) and the session opens no window on David's display unless he says it may; David looks at the window himself, with `app/target/release/rubric-app sites/app-slice/pages/posts/long.md`. The findings say plainly what no one saw. `app/scripts/run-nested.sh` is for the Fedora machine and does not run here.
+
+Rune's source, to read: `~/.cargo/git/checkouts/rune-*/0ca0756/` (cargo's checkout of the pinned rev); `reference/rune` is not on this machine.
 
 ## Decisions, made here (David may overrule any)
 
@@ -84,17 +86,13 @@ Tab on a part's line asks for the view and opens `M.act_own`'s menu from it. Rer
 
 ### Task 5: measure, and write it down
 
-`docs/app-slice-findings.md` gains "Slice 3": slice 2's budgets rerun (typing p95 4 ms, Tab to menu 50 ms, a menu key one frame, idle under 1%); what the menus needed that Rune lacked; what was not tried. `testing/TESTING.md` gains section C, one row a test, with the line that undoes what the rows write. `CLAUDE.md`'s State and `docs/plan.md`'s "Order of work" say where the app stands.
-
-## After this slice: the new machine
-
-Not this session's. On the new OS, before any more of the app: clone Rune into `reference/` (it is not in git) at the rev in `app/Cargo.toml`; `bun install`, `bun link`, `bun test`, `cargo test` in `app/`; then David runs `app/target/release/rubric-app sites/app-slice/pages/posts/long.md` natively for rows A1 to A14, B12 and this slice's rows, and the findings' verdict is written. The page's web view is X11 only (`app/src/page.rs`): Wayland needs XWayland, and on a Mac the page is not built (the findings, "The Mac").
+`docs/app-slice-findings.md` gains "Slice 3": slice 2's budgets rerun (typing p95 4 ms, Tab to menu 50 ms, a menu key one frame, idle under 1%); what the menus needed that Rune lacked; what was not tried. `testing/TESTING.md` gains section C, one row a test and few of them (David is not deep testing until the app is further along), started natively, with the line that undoes what the rows write. `CLAUDE.md`'s State and `docs/plan.md`'s "Order of work" say where the app stands.
 
 ## Rules for the session
 
 - No call to Jev, no real drafts, no bench runs, no probes. Never pass `--live` or set `LIVE`. Never read `.env`. Real drafts are David's rows.
 - Never send `keep` with `global: true`, nor `remove`, to a server whose site or catalog is not a copy in a temp folder.
-- Nothing on `:0`. Every display command names its display, and first checks that it is a server the session started.
+- No window on David's display unless he says so. Don't touch `testing/` or a site process the session did not start.
 - Change nothing outside `app/`, `docs/app-slice-findings.md`, `testing/TESTING.md`, `CLAUDE.md` and `docs/plan.md` (task 5). `sites/app-slice/` gains no `parts/`.
 - Do not commit. After each task, give the one-sentence commit message.
 - The reviewer once, when task 5 is done. Stop every process the session starts and check that it is gone.

@@ -9,6 +9,25 @@ use rubric_app::state::{self, State};
 static OPENED: OnceLock<(PathBuf, String)> = OnceLock::new();
 const SIZE: (f32, f32) = (1400.0, 900.0);
 
+/// On Linux the page attaches to an X11 window only, so under Wayland the app runs through
+/// XWayland: no `WAYLAND_DISPLAY` for the window, X11 for GTK. WebKit's DMABUF renderer draws
+/// a black page on NVIDIA's driver, so it is off unless the environment says otherwise.
+/// Called before any thread starts, which is what makes changing the environment sound.
+fn x11_session() {
+    // RUBRIC_WAYLAND=1 keeps the window on Wayland, with no page: to compare typing there.
+    if !cfg!(target_os = "linux") || std::env::var_os("DISPLAY").is_none() || std::env::var_os("RUBRIC_WAYLAND").is_some() {
+        return;
+    }
+    // SAFETY: the process has one thread here.
+    unsafe {
+        std::env::remove_var("WAYLAND_DISPLAY");
+        std::env::set_var("GDK_BACKEND", "x11");
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+    }
+}
+
 fn init() -> State {
     let (path, text) = OPENED.get().expect("opened before run").clone();
     let mut s = State::open(path, text);
@@ -53,6 +72,7 @@ fn main() {
         }
     };
     let live = args.iter().any(|a| a == "--live");
+    x11_session();
     let site = site_of(&path);
     let _ = OPENED.set((path, text));
 
@@ -108,6 +128,10 @@ fn main() {
         }
     })
     .on_window(move |window| {
+        // RUBRIC_NO_PAGE=1 leaves the page pane empty: to compare typing without the web view.
+        if std::env::var_os("RUBRIC_NO_PAGE").is_some() {
+            return;
+        }
         let Some(id) = x11_id(window) else {
             eprintln!("page: the web view attaches to an X11 window only, for now");
             return;

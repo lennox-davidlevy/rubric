@@ -369,6 +369,10 @@ Where each step stands, 2026-11-06: step 0 is built and merged to `main`. Step 1
 
    **The shell, on trial.** Chosen with David on 2026-11-13: [Rune](https://github.com/anomalyco/rune), a native GPU-rendered Rust framework, for the window and the editor, with the page in a system web view beside it. It is pre-release and has no way to host a web view, so it is tried first in vertical slices: [app-slice.md](app-slice.md) and [app-slice-2.md](app-slice-2.md), built and on `main`, with their numbers in [app-slice-findings.md](app-slice-findings.md), and [app-slice-3.md](app-slice-3.md), planned. The web view sits in Rune's window (X11 only so far) and Rune carries a menu at the caret; what is still open is the native run, which decides. If the web view cannot sit in Rune's window, the fallback is a system-webview shell with a browser editor, and the design does not change.
 
+   **What it has to reach first** (David, 2026-11-22): a real app that works on the Mac and on Linux, where all the writer needs beside it is a harness (Claude Code or OpenCode) and a Jev key. That comes before deep testing of any slice, and before polish. A model on the writer's own machine doing Jev's work would take the key away; it stays where it is, under Stretch.
+
+   **A faster page, to consider** (found 2026-11-22, not built). On the first native run the editor was instant (a key to its frame in about 1 ms) and the page lagged: it shows a change 150 to 600 ms after typing pauses, and nothing while typing goes on. The server waits 100 ms for a pause before it writes `content/` (`drawMs`), and Hugo's file watcher acts on a 500 ms tick that no flag changes; Hugo's rebuild itself is 2 to 3 ms. Neovim's preview has the same delay. It does not change how the app is built, so it waits its turn. The way thought best: when an edit only changes the words of a paragraph or heading already on the page, the server sends that text to the page at once through the relay, and Hugo's render replaces it when it comes; anything that changes the page's structure still waits for Hugo. Its cost is a second, small Markdown renderer for the words in between, which may show bold or a link slightly off for half a second. The lesser way: draw on the first key instead of after a pause, which saves the 100 ms and leaves Hugo's tick. The numbers are in [app-slice-findings.md](app-slice-findings.md), "The native run on Omarchy".
+
 ### Stretch
 
 After total functionality, decided 2026-11-06: build your own theme and catalog. Not before, because a draft is only as good as what it is judged against, and that is the catalog and the themes above. The slow path for parts moved out of this list to step 7 on 2026-11-10.
@@ -419,6 +423,6 @@ Not repos: the TypeSafe cookbooks for function calling and intent routing (docs.
 - Whether a part can be site-specific without joining the shared catalog, or whether everything new goes through the pool.
 - Whether Jev can fill a text setting (`cite`) by choosing among spans of the writer's own words, since it cannot write text. To try when the catalog goes deep.
 - Whether a hero replaces the page's own title, since both show today.
-- The Jev key for writers: their own, or a proxy that comes with the hosted version. The app (step 9) cannot ship for wide use until this is settled.
+- The Jev key for writers: their own, or a proxy that comes with the hosted version. For the app's first real version it is their own (David, 2026-11-22); wide use still waits on this.
 - Who drafts a new part in the app, for a writer with no Claude Code or OpenCode: a hosted drafter, or no drafting in its first version.
 - The app's shell and editing component, chosen by measuring the time to open and the time from a keystroke to the page.

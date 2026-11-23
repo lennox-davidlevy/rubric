@@ -41,6 +41,8 @@ Hugo for macOS (`.pkg` only in the release) is unpacked by Rubric now, tested he
 
 Step 9's first slice: the post on the left in Rune, the page on the right in a web view, one pick taken with Tab. The plan is [docs/app-slice.md](../docs/app-slice.md); the findings and numbers are in [docs/app-slice-findings.md](../docs/app-slice-findings.md). Start it with `app/scripts/run-nested.sh` (from anywhere): the app in a Xephyr window with an i3 of its own inside, drawing in software; the site's process starts with it, with the stub (no Jev calls): a pick comes only for a line that names a part (`::: a quote`, `::: a callout`), never from other words. The Xephyr window goes to workspace 6:Slack (`WORKSPACE=` names another, empty leaves it where it opens). The app takes the size the window has a second after it opens (tiled, floated or full screen in your i3); a later change of that size is not followed, so restart the script after one. Closing the Xephyr window, or Ctrl+C in its terminal, stops all of it. Do not open `sites/app-slice` in Neovim: its server is the live one, and a stub process and a live one refuse each other.
 
+**On Omarchy (Hyprland), run it natively:** `app/target/release/rubric-app sites/app-slice/pages/posts/long.md` from the repo, after `cargo build --release` in `app/`; it opens through XWayland, with the stub, and the rows below judge Rune itself. Close the window to stop it; the site's process stops a minute later. What follows is for the Fedora machine with Xorg.
+
 **Never straight on the NVIDIA display.** The app's window crashes Xorg there through a fault in NVIDIA's driver 575.64.05 (the findings, "The Xorg crash"); the nested run keeps its GPU work off the driver. Drawn in software, it is slower than it would be on the GPU, so A2, A3 and A14 judge the software path, not Rune's speed.
 
 | # | Do this | Expect |
@@ -86,4 +88,8 @@ The second slice: Tab on a `::: new: words` line opens a menu at the caret, whic
 **After B4 and B11, undo what they wrote.** `git status` shows it. B4: `git clean -fd sites/app-slice/parts`. B11: `git checkout catalogs/universal`, then `git clean -n catalogs/universal` to see the part's new files and `git clean -fd catalogs/universal` to remove them. The post: `git checkout sites/app-slice/pages/posts/long.md` if it was saved.
 
 ## Notes
+App starts well
+A2 - so there is a bit of a delay in the typing, and if we can get it instant or as close to that woudl be a priority.
+
+The rest is fine, i didnt complete it, but its too early to really test
 

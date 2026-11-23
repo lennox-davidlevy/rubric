@@ -7,11 +7,19 @@ date: 2026-11-16
 
 Three tellings of the same walk, each a little different in the memory of it.
 
+Hello world, there is not delay here. This is almost exactly perfect.
+
 ## The walk out of town
 
-We left before the light came up, when the streets were still wet from the night's rain and the bakery on the corner was the only window lit. The plan was simple: follow the old rail line out past the last houses, cross the river at the iron bridge, and keep going until the path ran out or our legs did. Neither of us had walked it before. We had a paper map, a thermos of coffee, and the kind of **stubborn optimism** that only works before breakfast.
+We left before the light came up, when the streets were still wet from the night's rain and the bakery on the corner was the only window lit. The plan was simple: follow the old rail line out past the last houses, cross the river at the iron bridge, and keep going until the path ran out or our legs did. Neither of us had walked it before. We had a paper map, a thermos of coffee, and the kind of **stubborn optimism** that only works before breakfast
+
+
+This is a test for what i want to do. I want this to be faster, if possible, but who knows if it can be. It is taking these words and rendering them into an app. if there was a way for this to be instant, that would be fantastic, but who knows if that is possible. this is what i am doing. so look at it and now i am done.
 
 The first mile was gravel and backyards. Dogs barked at us from behind fences, then lost interest. A man in a bathrobe watered his tomatoes and nodded as if people walked past his garden at six in the morning every day. Maybe they did. The rail line had been gone for forty years, but the town still used it as a kind of back hallway, a way to get from one end to the other without meeting anyone on the main road.
+
+This is what i want to know about, I want to know everything that can be known, i want to knwo everything i can every possibly know, i want to just fucking know shit. its what i want and that is 
+
 
 ## What the river was doing
 
