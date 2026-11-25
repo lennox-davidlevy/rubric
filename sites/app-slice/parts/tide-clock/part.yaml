@@ -1,0 +1,12 @@
+name: tide-clock
+description: A part made for "a tide clock" by the stub harness.
+children: true
+settings:
+  pace:
+    type: choice
+    default: slow
+    values:
+      slow: it moves slowly
+      fast: it moves quickly
+body: |
+  Something to put in it.

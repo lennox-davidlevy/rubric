@@ -239,3 +239,12 @@ Release builds. The first three are headless (`app/src/bin/typing.rs`); the rest
 - A draft longer than a second: the seconds counting up past 1, Stop, and "Keep" on a draft still shown while another is made.
 - The menu on the real display, HiDPI, and a menu longer than the pane is tall.
 
+## The native run on Omarchy (2026-11-22)
+
+David moved to Omarchy: Arch, Hyprland 0.56.2 on Wayland, the same RTX 5090 with NVIDIA's open driver 615.78.08, XWayland 24.1.14, WebKitGTK 2.54.1, Rust 1.100. No Xorg server draws the desktop, so the crash above has nothing to happen in.
+
+- **The window opens natively and nothing crashes.** David ran the release app on his desktop, through XWayland. The 75 tests and the two against the stub server pass here.
+- **The app runs as an X11 program.** The page attaches to an X11 window only, so under Wayland the app has to take XWayland: `main` drops `WAYLAND_DISPLAY` and sets `GDK_BACKEND=x11` before anything starts (`x11_session`).
+- **The page was black** until `WEBKIT_DISABLE_DMABUF_RENDERER=1`: WebKit's DMABUF renderer on NVIDIA's driver. The server and Hugo were serving the post the whole time. `main` sets it unless the environment already has it. It is set on every GPU, not only NVIDIA's; what it costs elsewhere is not measured.
+- **Typing is instant in the editor; the page is what lags** (David, row A2, 2026-11-22). Measured from Rune's frame log (`--features bench`, `RUNE_FRAME_LOG`), 394 typed characters on the 100 Hz monitor: a key to the frame handed to the driver is 0.84 ms at the median and 1.0 ms at p95. Without the page (`RUBRIC_NO_PAGE=1`) David feels no delay.
+- **Where the page's delay is**, measured with no window (an edit sent to the stub server, 24 times at random intervals): the server writes `content/` 102 ms after the edit (its draw pause, `drawMs` in `workspace.ts`, which starts again with every key), and Hugo says the page is rebuilt 40 to 500 ms after that, 383 ms on average. Hugo's own rebuild is 2 to 3 ms (`.rubric/logs/site.log`); the rest is its file watcher, which gathers changes and acts on a 500 ms tick, with no flag to change it. So the page shows a change 150 to 600 ms after typing pauses, and nothing while it goes on. This is the server's path, the same under Neovim; nothing in it is Rune's or the web view's.

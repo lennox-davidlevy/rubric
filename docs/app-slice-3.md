@@ -1,100 +1,168 @@
-# The app: slice 3, the rest of the draft menus
+# The app: slice 3, the designed menus
 
-Written 2026-11-20, after David ran slice 2 ([app-slice-2.md](app-slice-2.md), section B of `testing/TESTING.md`) in the nested window and said it looks good; slices 1 and 2 are on `main` (PR #9). It adds what slice 2 left out of the menus: the takes of a draft, the menu on a part's own line (another take, Change… into a variant, remove), and the drafter for one draft.
+Rewritten 2026-11-25. The first plan for this slice (2026-11-20) mirrored Neovim's menus entry for entry. Since then the menus were designed (below), and this slice builds those instead: the app's look, one panel that holds rows, controls and a field, the draft menus in it, and the menu on a placed part with its settings. Slices 1 and 2 are on `main` (PR #9); the branch is `slice-3`.
 
-It does not wait for the verdict on Rune, as slice 2 did not. That verdict needs a native run (section A, row A14), which crashes Xorg through the NVIDIA driver on David's Fedora machine; David changes OS after this slice (decided 2026-11-20), and the native run is the first thing done there. The risk taken: if the verdict is no, this slice's Rust is thrown away with the rest, and what stays is this plan's "What exists" and the menus' design.
+## The design
 
-So the session runs as slice 2's did: on this machine, windows only on its own Xvfb with lavapipe and its own i3, nothing on `:0`; David's rows run through `app/scripts/run-nested.sh`.
+`reference/rubric-design/` (ignored by git) holds the design as pulled on 2026-11-25: `RubricWindow.dc.html` (every screen, as one component with a `screen` value), `Rubric Overview.dc.html` (the screens side by side, the Menus table with Mac and Linux keys, motion, tokens) and `shots/` (each screen drawn at 1180 by 740, numbered as the Overview lists them). The live copy is the artifact https://claude.ai/artifact/SZkBTRdK4mhb9RVEi96JUJ. Read the screen's entry in `partsInEditor` (`RubricWindow.dc.html`, the `D[...]` table) before building it: the rows, their order, their keys and what is highlighted are there exactly.
+
+Where the design and this plan differ, the plan wins; each difference is in "Decisions".
+
+## How the session checks its work
+
+With the tests: the headless `Runtime`, and the stub server on a temp site. The session opens no window on David's display unless he says it may; he runs `app/target/release/rubric-app sites/app-slice/pages/posts/long.md` himself. The findings say plainly what no one saw. Rune's source is cargo's checkout, `~/.cargo/git/checkouts/rune-c9b805e9ed8a3730/0ca0756/`.
 
 ## Decisions, made here (David may overrule any)
 
 | Decision | Choice | Why |
 |---|---|---|
-| Branch | `app-slice-3`, from `main` | Slices 1 and 2 are merged |
-| When Tab asks about a part's line | On any `:::` line that is not a `new:` line and shows no pick that acts: one `rubric/draft` with no action; a menu only if the answer has `of` | Neovim knows a part's line from `rubric/starters`; the app does not read that yet, and one small request on an idle Tab costs nothing seen |
-| Takes | A list, as Neovim's: moving draws that take in the page, Return stays on it, Esc goes back to the one that was shown | No keys for next and previous take in this slice: Alt with a letter types a character on a Mac |
-| Change… and a reroll's notes | The one-line field slice 2 made for notes | One field, one behavior |
-| Remove | A second menu, "Keep" first and "Remove" second, its title saying how many blocks use the part | Neovim's, and the safe row is the first |
-| Draft with… | Tool, then model, then effort, each a menu from the server's lists; no list of recent drafters | Neovim keeps recents in a file of its own; the app has no settings file yet, and that is not this slice's to design |
-| The draft's log | Not in this slice | It needs a pane or a window; the status line says where the draft is |
-| Fill starter | Not in this slice | Starters are their own slice |
+| The look comes first | Task 1 is tokens, type and the bars | The menus are drawn in them; built unstyled they would be built twice |
+| Two kinds of theme | The app's own colors ("Appearance") are this slice's. The site's theme (Paper, Schematic, the skins; `::: theme` in `rubric.md`) is Rubric's own and is not touched here | David, 2026-11-25: Pathlight's way for the app, what Rubric has built for the site |
+| App themes | Pathlight's way (`pathlight/src/theme.ts`: `resolveRoles`, `derivePalette`, `loadThemes`), ported to Rust: OpenCode's theme format, Pathlight's 31 OpenCode themes copied with their notice (`pathlight/NOTICE.md`, MIT), the design's four (Paper, Ink, Sepia, Fjord) beside them, and the writer's own files from `$XDG_CONFIG_HOME/rubric/themes/` | David wants every one of them, easily changed |
+| Changing it | Ctrl+, (Cmd+, on the Mac) opens the list in a panel: moving draws the app in that theme, Return keeps it (written to `$XDG_CONFIG_HOME/rubric/app.json`), Esc goes back to the one before. Paper until one is kept; `RUBRIC_APP_THEME=<name>` for one run | Pathlight's picker; the design's Appearance window, with Markdown and the drafter in it, is a later slice |
+| Light or dark | A theme with both is drawn light unless `RUBRIC_APP_MODE=dark`; no following the system | Pathlight follows a terminal's background; following the desktop is new work, for the Appearance slice |
+| Fonts | Instrument Sans, Literata and JetBrains Mono, vendored in `app/fonts/` with their licenses, compiled in | Rune takes font bytes at build time; nothing is fetched at run time |
+| The title bar | A 40-point row the app draws under whatever frame the system gives: the post's title and "Saved" or nothing | Rune replaces the native bar on the Mac only; on Hyprland there is none to replace |
+| One panel, not `PopupList` | The app's own panel (`panel.rs`) in Rune's `popover::raised`, from `el`, `row`, `col`, `Segmented` and `text_input` | `PopupList` rows have one shape: no separators, headers, controls or fields |
+| Keeping a draft | "Keep" keeps for this site and asks nothing. A kept part's own menu has "Add to every site", which puts it in the catalog as Neovim's "Add name to every theme" does (`keep` with `global: true` on the part's line). Neovim is not changed in this slice | The menu is keep, reroll, cancel; the catalog is the writer's, and a part they want everywhere goes into it (David, 2026-11-25) |
+| Groups | Each part in the catalog gets a `group` (a label Jev is not sent, so no version bump); Insert part… with an empty field lists by group. With words the list is flat, in Jev's order from one call | The design draws groups. A second call to pick the group first would hide the right part whenever the group is wrong, and cannot be judged without a live probe: see "After this slice" |
+| Remove on a catalog part | Takes the part's line and its closer; the writing inside stays | David, 2026-11-25: words wrapped in a part and unwrapped again must not disappear |
+| A setting's change | The server rewrites the line (`rubric/part` with `set`) and answers it as `replace` | One place knows a line's syntax |
+| Words in the part's panel | Return puts ` : <words>` at the line's end with the caret after it; the pick shows as it does when typed | The second pass exists; no new request |
+| Keys | Ctrl on Linux, Cmd on the Mac: Enter keeps or drafts, R rerolls, `.` stops, Delete removes; Tab or a right-click opens the menu | The design's Menus table |
+| No picking key | The status line says so; the editor works as ever | Writing needs no key; the design's full-pane screen would stop it |
 
-Not in it either: lines of `rubric.md`, themes, hover, completion, other diagnostics, the drawer, Sites, Appearance, Publish, autosave, packaging. Do not build any of them, even partly.
+Not in this slice: problems (the underline and message for a mistake), an image setting's file row, the menu from a right-click in the page, the first-run screens, the drawer, Sites, Parts, the site's theme (its picker and builder), the Appearance window, Publish, autosave, packaging, the draft's log, starters, lines of `rubric.md`. Do not build any of them, even partly.
 
-## What exists, verified 2026-11-20
+## After this slice
 
-Line numbers are from `main` at `2493ab0`. Read each before relying on it.
+Owed, not optional (David, 2026-11-25: they are fundamental), and in the design already:
+
+- Problems: the underline, the label at the line's end, and the message with its one fix on the caret's line.
+- An image setting's row, with a file dropped on it or chosen.
+- The menu from a right-click on a part in the page.
+- First run: no drafting tool, and no picking key, each with its one action.
+
+To design, then build:
+
+- **The writer's parts in the catalog** (David, 2026-11-25: once someone uses the app the catalog is theirs, and a part they want everywhere is added to it). Owed around it: the part marked in the catalog as the writer's own, not shipped; a way to show or hide those; the same row and words in Neovim ("Every theme" reads as themes, and means every site); and, before the app is packaged, the writer's additions kept where an update of the shipped catalog does not replace them.
+- **The group first, then the rank within it**, as two questions to Jev. Wanted if it holds; only a live probe on real lines can say whether it hits or misses more than one question does (`scripts/probe.ts`, which costs money: ask first).
+
+## What exists, verified 2026-11-25
+
+**The app** (`app/src/`, 2,671 lines)
+
+- `menu.rs`: `Menu { title, rows, active, kind }`, `key` (Up, Down, Return or Tab, Esc; anything else passes to the editor) and `place` (under the caret's line or above it, inside the writing pane). `lib.rs:67-111` draws it as a `PopupList`, or for notes a `text_input` in `popover::raised`, anchored to an element at the caret.
+- `draft.rs`: `View::parse` (the fields slice 2 reads), `menu_for`, `chose`, `replace` (the answer's line in place, one undo step), `line` (the status line), `peek` (`rubric/peek`: the page draws a part on the line).
+- `state.rs`: `State`, `theme()` (three colors from Rune's own tokens), `tab`, `pending`, the ticker. `markdown.rs` makes the spans; headings already take a size and weight.
+
+**Rune** (from a read of the pinned rev; "untested" means nobody ran it here)
+
+- Provided: `popover::raised` and `popover::anchored` with any body; `Segmented` (`rune-kit/src/segmented.rs`); `Button`; `text_input` in a layer; `El::on_secondary_press` with the pointer's place (`rune/src/el/handlers.rs:271`); hover; springs (`El::motion`); `fill`, `radius`, `border`.
+- Fonts: `AppSpec.fonts` takes bytes at build time and `families` names the sans and the mono; `TextStyle.family` may be `Family::Named`. A span sets size, weight, color, italic, underline and mono, never a family. So the interface is the sans (Instrument Sans), the writing field is `Named("Literata")` on the element, and code is the mono. Untested: that a named family resolves to compiled-in bytes.
+- Untested: whether the editor's own right-click (its copy and spelling menu) comes before the app's handler; two popovers open side by side.
+- Not provided: a title bar on Linux; a row's rectangle for a line that is not the caret's (find out in task 1 whether the editor can report one).
 
 **The server**
 
-- `rubric/draft` takes `action`: `build`, `reroll`, `keep`, `cancel`, `stop`, `use`, `take`, `restore`, `remove`, `plain`, `everywhere`; and `change`, `global`, `variant`, `on`, `step`, `to`, `part`, `drafter: { harness, model?, effort? }` (`src/server/main.ts:307-336`). `drafter` counts only on `build` and `reroll`, and is checked first (`modelProblem`); a bad one answers `{ error }`.
-- `take` with `to: n` (from 1) or `step: 1 | -1` draws that take in the page and answers the view.
-- The view (`DraftView`, `src/server/workspace.ts:61` on) has, beyond what slice 2 reads: `take`, `takes`, `list: { at, by?, change?, original? }[]` (oldest first; `original` is the part as kept), `log`, `of` (the line is a part's own: its name), `uses: { blocks, pages }`, `catalog` (the part is the catalog's), `variant: { of, name, everywhere?, catalog? }`, `newVariant` (the takes are of a new variant of this part), `change: { words, colon }` (words after the line's `:` and the column of the `:`), `drafter`.
-- On a part's own line the notes are the same three codes, `drafting`, `draft-ready`, `draft-failed`, with `data.of`, `data.variant`, `data.take`, `data.takes`, `data.shown` (`workspace.ts:1352-1375`). Check that `draft::statuses` reads them on a line that is not a `new:` line before building on it.
-- `rubric/drafter` `{ harness?, model? }` answers `harness`, `model`, `effort`, `short`, `harnesses`, `models`, `suggested`, `efforts`, `error?`; `rubric/harnesses` answers each tool and its version, or none (`main.ts:343-367`). **Read `models` and `installed` in `src/server/harness.ts` before sending either to a real server:** they may run Claude Code or OpenCode to list models. If they do, the session sends them only from the recording client in headless tests, and the stub server test leaves them out.
-- A pick may carry `change: true` in its pin (`workspace.ts:51-53`): accepting leaves the line and opens the part's menu, where Change… starts with the words after `:`. `app/src/ghost.rs` has `build`; add `change` beside it.
-- The stub (`src/server/stub.ts:72-118`): another take of the site's own part keeps its name; a variant is named `<part>--<two words>`; "name it x" in a change renames the take; "no settings" drops the setting; "slow" and "failing" as before. With `--stub` the view's `drafter` reads "the stub, as …" when a drafter was sent (`main.ts:157-160`), so a test can see it arrive.
-
-**Neovim's flow**, to mirror (`editors/nvim/lua/rubric/drafts.lua`)
-
-- `takes_list` (`:228-254`): each row "take 2" (or "as kept", "as it was" for the original), when it was made, what drafted it, the change asked, "(now)" on the one shown.
-- `M.act_own` (`:389-577`) is the menu on a part's line. Its entries and when each shows are lines `:450-493`; its title, `:494-501`; what each sends, `:502-575`. Mirror it entry for entry, less "Fill starter" and "Log". In short: Wait and Stop while drafting; "Keep this take" on a take that is not the first; "Takes (N)"; "Reroll…" or "Retry…" (not on a catalog part with nothing drafted); "Change…"; for a variant, "Every quote as torn-edge" or "Every quote plain", "Back to quote", "Remove …"; for a site part, "Add name to every theme" and "Remove …"; "Back to …" when anything is drafted.
-- Change… (`new_variant`, `:441-449`): the line becomes `<line up to its ":"> : <words>`, then `build` with `variant: true`.
-- A reroll on a part's line cuts the words after `:` from the line as it starts, unless they are a new variant's (`reroll`, `:428-438`).
-- Which line gets the menu (`editors/nvim/lua/rubric/init.lua:676-693`): a part with `fixed` has no variants and gets a note, not a menu; find what the view answers for one and say the same in the status line.
-- `first_menu` and `reroll_menu` (`drafts.lua:1043-1104`): "Draft with…" chooses a drafter and comes back to the first menu, whose Draft row then names it; a reroll's "Make changes…" holds notes and a drafter.
-
-**The app** (`app/src/`): `draft.rs` (the view, the menus, `replace`, the status line), `menu.rs` (the menu and where it goes), `state.rs` (`tab`, `pending`, the ticker), `lib.rs` (the layer the menu is drawn in). The findings' "Slice 2" says what Rune's `PopupList` does and what the app does itself.
+- `rubric/draft` and its `DraftView` as the first plan listed them (`src/server/main.ts:311`, `src/server/workspace.ts:61-104`): `take`, `takes`, `list`, `of`, `uses`, `catalog`, `variant`, `newVariant`, `change`, `drafter`; actions `build`, `reroll`, `keep`, `cancel`, `stop`, `use`, `take`, `restore`, `remove`, `plain`, `everywhere`, with `variant`, `change`, `to`, `on`, `drafter`.
+- `rubric/drafter` and `rubric/harnesses` answer the tools, models and efforts (`main.ts:343-367`). **Read `models` and `installed` in `src/server/harness.ts` before sending either to a real server:** they may run Claude Code or OpenCode. The session sends them only from the recording client; the stub server test leaves them out.
+- `rubric/peek` draws a part on a line (`workspace.ts:870`); `#near` ranks the writer's parts for words (`workspace.ts:854`).
+- Missing, and task 4 adds them: a placed part's settings with their values, and the catalog as a list.
+- With no key Jev's calls answer "could not reach Jev: TYPESAFE_API_KEY is not set" (`src/jev.ts:93`).
 
 ## Tasks
 
-In order. Each ends with `cargo test` passing in `app/` (under 30 seconds without `--ignored`). Tests assert what was sent, what the text became and what is open, never a menu's wording beyond a row's id.
+In order. Each ends with `cargo test` passing in `app/` (under 30 seconds without `--ignored`), and task 4 with `bun test` and `bun run typecheck`. Tests assert what was sent, what the text became and what is open, never a row's wording beyond its id.
 
-### Task 1: takes
+### Task 1: the look
 
-**Files.** `app/src/draft.rs`, `app/src/menu.rs`, `app/src/state.rs`.
+**Files.** `app/src/theme.rs` (new), `app/themes/*.json`, `app/fonts/`, `app/src/lib.rs`, `app/src/state.rs`, `app/src/markdown.rs`, `app/src/main.rs`.
 
-The ready menu gains "Takes (N)" when `takes > 1`. It opens a list from `view.list`; moving sends `take` with `to`; Return closes on that take; Esc sends `take` with the one that was shown, then reopens the menu before.
+- `theme.rs`: parse an OpenCode theme file and resolve it for a mode, as Pathlight's `resolveRoles` does (hex with 3, 6 or 8 digits, a name in `defs`, another role, an ANSI number, `{dark, light}`; an unknown or circular name is an error). From the roles, the design's ten tokens: `bg`, `pane`, `pop`, `ink`, `ink2`, `ink3`, `line`, `hover`, `accent`, `fail`, a missing one blended from background and text as `derivePalette` does. Read Pathlight's file and its `tests/theme.test.ts` first and port the cases.
+- `app/themes/`: Pathlight's 31 OpenCode files unchanged, with the notice and license beside them, and the design's four written with the Overview's values. They are compiled in; files in `$XDG_CONFIG_HOME/rubric/themes/` are read at start, a later name replacing an earlier, a file that does not parse skipped.
+- Every color in the app comes from the tokens; `state::theme()` and the calls to `tok::theme` and `Kit::neutral` for color go.
+- Type, from the Overview's table: writing Literata 17/1.7, H1 30, H2 22, interface Instrument Sans 13, captions 12, the `:::` and Markdown markers in `ink3`.
+- The title row (40 points, a hairline under it): the post's first heading or its file name, then "Saved" when the text is as written.
+- The status line as the design's: 34 points, a hairline over it, a label in the state's color, one fact in `ink2`, and at most one action with its key. Its states are task 3's.
+- A `new:` line's edge (dotted, dashed, solid, by state) and its label at the line's right, if the editor can say where a line is; if it cannot, say so in the findings and leave both to the status line.
 
-**Tests.** `menu_for` has the row only with more than one take. Headless: moving sends one `take` a row with the row's number; Esc sends the first take's number and reopens the ready menu; the text never changes. Stub server test: build, reroll, then `take` with `to: 1` answers a view with `take: 1`.
+**Tests.** Each of the four themes resolves in its mode to the Overview's ten values (the values are the requirement); every bundled theme resolves in both modes; a circular name is refused; a role given as `{dark, light}` follows the mode; a writer's file replaces a bundled one of its name and a broken one is skipped. Headless: the title row shows "Saved" only when clean.
 
-### Task 2: the menu on a part's line
+### Task 2: the panel
 
-**Files.** `app/src/draft.rs`, `app/src/state.rs`, `app/src/ghost.rs`.
+**Files.** `app/src/panel.rs` (new; `menu.rs` goes when nothing uses it), `app/src/lib.rs`, `app/src/editor.rs`.
 
-Tab on a part's line asks for the view and opens `M.act_own`'s menu from it. Reroll, keep (this site only when the part is the catalog's or a variant), stop, cancel ("Back to …"), remove with its second menu, "Add name to every theme", `everywhere` on and off, `plain`. An answer with `replace` goes through `draft::replace`; `removed` and `version` show in the status line for 4 s. The status line reads the three codes on a part's line.
+A panel is a list of rows: `Item` (label, and any of a note, a chip, a key, a check, a "more" mark, a danger color), `Sep`, `Head` (a name and a note), `Seg` (a label and choices, one on), `Field` (with or without a label), `Title`, `Text`. Heights and widths are the design's (`I` 30, `S` 9, `H` 26, `G` 32, `F` 36).
 
-**Tests.** `own_menu` for each case in `drafts.lua:450-493`: a site part with nothing drafted, a catalog part, a variant (everywhere on and off), drafting, ready on the first take and on a later one, failed, a new variant. Headless: Tab on a plain part's line sends the look; an answer with no `of` opens nothing; Remove sends nothing until the second menu's Remove. Stub server test on a temp site: keep a part, reroll it on its own line, keep the take, remove it; the temp site's `parts/` follows.
+- Keys: Up and Down move over the rows that take the focus (`Item`, `Seg`, `Field`); Left and Right change a `Seg`; Return chooses an `Item` or submits a `Field`; a row's own key chooses it from anywhere in the panel; Esc goes back one panel, then closes; typing in a `Field` stays there; any other key closes the panel and is the editor's.
+- The pointer: over a row makes it the active one; a press chooses it, or the segment under it.
+- A second panel opens beside the first at its row; when the pane is too narrow for both it takes the first's place, with the first's name as a top row that goes back. A panel that does not fit under its line opens above it. Nothing is drawn right of the writing pane.
+- Opening and closing use the design's spring (fade, and scale from 0.98).
+- The panel's first use is the list of app themes (see Decisions), each row a name and, for the writer's own, a note: moving sets the app's theme, Return writes the choice, Esc sets the one before.
 
-### Task 3: Change…
+**Tests.** Headless: moving in the theme list changes the tokens the view draws with; Esc restores them and writes nothing; Return writes the name to a config folder the test owns, and a new `State` reads it. The key model row by row (which rows take the focus, a `Seg` at its ends, a row's key from another row, Esc with two panels). `place` for under, above, beside and replaced, each inside the pane. Headless: a press on a segment reports that segment; the editor keeps its text while a `Field` is typed in.
+
+### Task 3: the draft menus
 
 **Files.** `app/src/draft.rs`, `app/src/state.rs`.
 
-"Change…" opens the field, filled with the words after the line's `:` when there are any; Return rewrites the line as Neovim's `new_variant` does (one undo step) and sends `build` with `variant: true`. A pick with `change: true` opens the part's menu on Tab.
+The `new:` line's menus as panels, from the design's `menu`, `draft-running`, `draft-ready`, `takes`, `draft-failed`, `new-part` and `reroll-notes`:
 
-**Tests.** The line after Change… for a line with and without words after `:`; undo restores it. Stub server test: Change… on `::: quote` with "torn edge" gives a ready variant named `quote--torn-edge`, keep answers `::: quote variant=torn-edge` (check the exact line against the server, not this sentence), "Back to quote" puts the line back.
+- Not started: "Draft" with the drafter's chip, "Similar parts (N)" when there are any (the page draws the one looked at, as now), "Earlier takes (N)" when there are.
+- Drafting: "Stop". Ready: "Keep", "Reroll" with the chip, "Reroll with changes…" (a field, then "Reroll" with the chip), "Takes (N)" when N is 2 or more, "Cancel". Failed: the message as a title and a sentence, "Reroll", "Reroll with changes…", "Cancel".
+- Takes: a list from `view.list`; moving sends `take` with `to`; Return stays on that take; Esc sends the take that was shown and goes back.
+- The chip opens one panel: the tools (`rubric/harnesses`), the chosen tool's models (`rubric/drafter`), and effort as a `Seg`. What is chosen rides on the next `build` or `reroll` as `drafter` and names the chip; nothing is saved, and the next line starts from the default.
+- The status line: drafting with the seconds and "Stop", ready with "Keep", failed with the reason and "Reroll", kept and removed for 4 s with nothing to press.
 
-### Task 4: the drafter for one draft
+**Tests.** The rows' ids for each state of the view, "Takes" only from two. Headless with the recording client: moving in Takes sends one `take` a row; Esc sends the first shown; the drafter chosen rides on `build` and on `reroll` and not on the next line's; Esc in the drafter's panel sends nothing. Stub server test: build, reroll, `take` with `to: 1` answers `take: 1`; keep answers the part's line.
 
-**Files.** `app/src/draft.rs`, `app/src/state.rs`.
+### Task 4: what the server answers about parts
 
-"Draft with…" in the first menu and a drafter row beside Notes in the reroll's: tool, model, effort, from `rubric/harnesses` and `rubric/drafter`; then back to the menu, whose Draft or Reroll row names the choice and sends `drafter` with it. Nothing is saved.
+**Files.** `src/server/main.ts`, `src/server/workspace.ts`, a test beside the server's others, `docs/lsp.md`.
 
-**Tests.** Headless with the recording client only: the three lists ask what `pick_tool`, `pick_model` and `pick_effort` ask; the chosen drafter rides on `build` and on `reroll`; Esc at any list goes back one with nothing sent; the next draft on another line has no `drafter`.
+- `rubric/part` `{ uri, line }`: for a line that places a part, its name, whether it is the catalog's, the site's own or a variant (and of what), how many blocks use it, and its settings in the catalog's order, then the four look settings: each with its type, its values, its default and the line's value. With `set: { name, value }` it answers `{ replace }`, the line with that setting set (dropped when the value is the default); a name or value the part does not have answers `{ error }`. Nothing is written but the answer.
+- `rubric/parts` `{ uri, words? }`: the site's own parts, then the catalog's for the page's kind, each with its name and description; with words, in Jev's order with the ones under the `near` threshold left out. No words asks Jev nothing.
+- Names are the catalog's; the app makes them readable ("tide-table" reads "Tide table").
+- `catalogs/universal/catalog.yaml`: a `group` on each part for the writing, from a short list of groups (seven or so; propose the list and each part's group to David before writing them). It is not sent to Jev: check that in `src/core/questions.ts` and the fixtures before deciding the version stays. `rubric/parts` answers each part's group; a site's own part has none and is listed under "Own".
 
-### Task 5: measure, and write it down
+**Tests.** `bun test` with the stub resolver: a `::: quote size=large` line answers `size` with value `large` and `shadow` with its default; `set` to the default drops the setting and keeps the others in place; an unknown value is refused; `rubric/parts` with no words lists own parts first and calls no resolver.
 
-`docs/app-slice-findings.md` gains "Slice 3": slice 2's budgets rerun (typing p95 4 ms, Tab to menu 50 ms, a menu key one frame, idle under 1%); what the menus needed that Rune lacked; what was not tried. `testing/TESTING.md` gains section C, one row a test, with the line that undoes what the rows write. `CLAUDE.md`'s State and `docs/plan.md`'s "Order of work" say where the app stands.
+### Task 5: a placed part
 
-## After this slice: the new machine
+**Files.** `app/src/part.rs` (new), `app/src/draft.rs`, `app/src/state.rs`, `app/src/ghost.rs`.
 
-Not this session's. On the new OS, before any more of the app: clone Rune into `reference/` (it is not in git) at the rev in `app/Cargo.toml`; `bun install`, `bun link`, `bun test`, `cargo test` in `app/`; then David runs `app/target/release/rubric-app sites/app-slice/pages/posts/long.md` natively for rows A1 to A14, B12 and this slice's rows, and the findings' verdict is written. The page's web view is X11 only (`app/src/page.rs`): Wayland needs XWayland, and on a Mac the page is not built (the findings, "The Mac").
+Tab or a right-click on a part's line asks `rubric/part` and `rubric/draft` (no action) and opens the design's `part-menu`:
+
+- The part's settings, then "Look": a choice is a `Seg` (more than four values, a second panel of items), text a `Field`. A change sends `set` and puts the answer's line in place, one undo step each; the page follows as it does for typing.
+- The words field (see Decisions).
+- "Change…": a field and "Draft variant" with the chip; Return rewrites the line as Neovim's `new_variant` does (`editors/nvim/lua/rubric/drafts.lua:441-449`) and sends `build` with `variant: true`. A pick whose pin has `change: true` opens this panel on Tab.
+- While a variant drafts, "Stop" and "Back to <part>"; ready, the ready rows with "Back to <part>" for "Cancel".
+- "Takes (N)" and "Reroll" on a site's own part or a variant; "Add to every site" on a site's own part (not a variant: the server refuses one); "Every <part> as <name>" or "Every <part> plain", and "Back to <part>", on a variant.
+- Last: "Remove" on a catalog part (see Decisions), or "Remove…" on an own part or a variant, whose second panel is titled with the blocks that use it and reads "Keep", "Remove from this block", "Remove from site".
+
+**Tests.** The rows' ids for a catalog part, an own part, a variant with `everywhere` on and off, a variant drafting and ready. Headless: a segment sends `set` with its name and value and nothing else; Remove… sends nothing until the second panel's choice; "Remove" on a catalog part keeps the block's writing; undo after a setting restores the line. Stub server test on a temp site: Change… on `::: quote` with "torn edge" gives a ready variant, keep answers its line (check it against the server), "Back to quote" puts the line back; keep a part, reroll it on its own line, remove it, and the temp site's `parts/` follows.
+
+### Task 6: insert, and a line of words
+
+**Files.** `app/src/insert.rs` (new), `app/src/editor.rs`, `app/src/state.rs`.
+
+- Tab on an empty line, or a right-click on writing: "Insert part…", "New part…", then Cut, Copy and Paste (Cut and Copy dim with nothing selected). Find out first whether the editor's own right-click menu comes before the app's; if it does and cannot be turned off, say so and keep Tab.
+- "Insert part…": a field over a list. Empty, the list is `rubric/parts` under its groups, "Own" first; with words it is flat, and it is asked again 250 ms after the last key and the answer for older words is dropped. Moving draws that part on the caret's line (`rubric/peek`); Return writes `::: <name>` there; the last row, "Draft new part", writes `::: new: <words>` and starts the draft; Esc leaves the text and the page as they were.
+- "New part…": a field; Return writes `::: new: <words>` and opens task 3's menu.
+- On a `:::` line of words that is no part: the pick (Tab takes it, as now), "Similar parts (N)", "Draft new part" with the chip.
+
+**Tests.** Headless: typing in the field sends one `rubric/parts` after the pause, not one a key; an answer for older words changes nothing; moving sends `rubric/peek` with the row's part and Esc sends it with none; Return writes the line in one undo step; "Draft new part" writes the `new:` line and sends `build`. Stub server test: insert `quote` on an empty line and the server's text has it.
+
+### Task 7: measure, and write it down
+
+`docs/app-slice-findings.md` gains "Slice 3": slice 2's budgets rerun (typing p95 4 ms, Tab to menu 50 ms, a menu key one frame, idle under 1%), a segment's press to the line's change, what the panel needed that Rune lacked, each "untested" above answered, and what no one saw. `testing/TESTING.md` gains section C, one row a test and few of them, started natively, with the line that undoes what the rows write. `CLAUDE.md`'s State and `docs/plan.md`'s "Order of work" say where the app stands.
 
 ## Rules for the session
 
 - No call to Jev, no real drafts, no bench runs, no probes. Never pass `--live` or set `LIVE`. Never read `.env`. Real drafts are David's rows.
 - Never send `keep` with `global: true`, nor `remove`, to a server whose site or catalog is not a copy in a temp folder.
-- Nothing on `:0`. Every display command names its display, and first checks that it is a server the session started.
-- Change nothing outside `app/`, `docs/app-slice-findings.md`, `testing/TESTING.md`, `CLAUDE.md` and `docs/plan.md` (task 5). `sites/app-slice/` gains no `parts/`.
+- No window on David's display unless he says so. Don't touch `testing/` or a site process the session did not start.
+- Change nothing outside `app/`, the server files task 4 names, `docs/lsp.md`, `docs/app-slice-findings.md`, `testing/TESTING.md`, `CLAUDE.md` and `docs/plan.md`.
 - Do not commit. After each task, give the one-sentence commit message.
-- The reviewer once, when task 5 is done. Stop every process the session starts and check that it is gone.
+- The reviewer once, when task 7 is done. Stop every process the session starts and check that it is gone.
