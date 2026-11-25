@@ -8,6 +8,18 @@ Rewritten 2026-11-25. The first plan for this slice (2026-11-20) mirrored Neovim
 
 Where the design and this plan differ, the plan wins; each difference is in "Decisions".
 
+## Who builds it, and in how many sittings
+
+An Opus session builds from this plan; the session that wrote it reviews. The slice is three sittings, each a fresh session that reads this file, `docs/app-slice-findings.md` and the design's screens for its tasks, and nothing from an earlier conversation:
+
+| Sitting | Tasks | Ends with |
+|---|---|---|
+| 1 | 1 and 2: the look, the panel | The app themed, the theme list opening with Ctrl+, |
+| 2 | 3 and 4: the draft menus, the server's two requests | Every draft menu in the panel; `bun test` passing |
+| 3 | 5, 6 and 7: a placed part, insert, the write-up | Section C of `testing/TESTING.md` ready for David |
+
+A sitting stops at its end, says what it built, what it could not check and the commit message, and does not start the next. Where this plan says "find out", the answer goes in the findings before the code that depends on it. Where the plan and the code disagree (a line number, a field's name), the code is right: say so and go on. Where a decision is missing, take the smaller choice, write it under "Decisions the build made" at the end of this file, and go on; stop only for something that would change what the writer sees in a way the design does not show.
+
 ## How the session checks its work
 
 With the tests: the headless `Runtime`, and the stub server on a temp site. The session opens no window on David's display unless he says it may; he runs `app/target/release/rubric-app sites/app-slice/pages/posts/long.md` himself. The findings say plainly what no one saw. Rune's source is cargo's checkout, `~/.cargo/git/checkouts/rune-c9b805e9ed8a3730/0ca0756/`.
@@ -30,7 +42,7 @@ With the tests: the headless `Runtime`, and the stub server on a temp site. The 
 | A setting's change | The server rewrites the line (`rubric/part` with `set`) and answers it as `replace` | One place knows a line's syntax |
 | Words in the part's panel | Return puts ` : <words>` at the line's end with the caret after it; the pick shows as it does when typed | The second pass exists; no new request |
 | Keys | Ctrl on Linux, Cmd on the Mac: Enter keeps or drafts, R rerolls, `.` stops, Delete removes; Tab or a right-click opens the menu | The design's Menus table |
-| No picking key | The status line says so; the editor works as ever | Writing needs no key; the design's full-pane screen would stop it |
+| No Jev key | The status line says "No Jev key"; the editor works as ever | Writing needs no key. The design calls it a "picking key", which says nothing (David, 2026-11-25); connecting it belongs to the first run, below |
 
 Not in this slice: problems (the underline and message for a mistake), an image setting's file row, the menu from a right-click in the page, the first-run screens, the drawer, Sites, Parts, the site's theme (its picker and builder), the Appearance window, Publish, autosave, packaging, the draft's log, starters, lines of `rubric.md`. Do not build any of them, even partly.
 
@@ -41,12 +53,12 @@ Owed, not optional (David, 2026-11-25: they are fundamental), and in the design 
 - Problems: the underline, the label at the line's end, and the message with its one fix on the caret's line.
 - An image setting's row, with a file dropped on it or chosen.
 - The menu from a right-click on a part in the page.
-- First run: no drafting tool, and no picking key, each with its one action.
+- First run, as an introduction and not an error (David, 2026-11-25): what the Jev key adds, shown moving; how to get one; connecting it. The same for the drafting tool: Claude Code and OpenCode now, Codex next, Pi before release. It replaces the design's "No picking key" and "No drafting tool" screens and needs its own design round.
 
 To design, then build:
 
 - **The writer's parts in the catalog** (David, 2026-11-25: once someone uses the app the catalog is theirs, and a part they want everywhere is added to it). Owed around it: the part marked in the catalog as the writer's own, not shipped; a way to show or hide those; the same row and words in Neovim ("Every theme" reads as themes, and means every site); and, before the app is packaged, the writer's additions kept where an update of the shipped catalog does not replace them.
-- **The group first, then the rank within it**, as two questions to Jev. Wanted if it holds; only a live probe on real lines can say whether it hits or misses more than one question does (`scripts/probe.ts`, which costs money: ask first).
+- **The group first, then the rank within it**, as two questions to Jev. Wanted if it holds; only a live probe on real lines can say whether it hits or misses more than one question does (`scripts/probe.ts`, which costs money: ask first). To watch for when testing either way: a ranked list shown under group headings misleads, since the first and fourth best in one group read as that group's two best; that is why the list with words has no headings.
 
 ## What exists, verified 2026-11-25
 
@@ -80,8 +92,35 @@ In order. Each ends with `cargo test` passing in `app/` (under 30 seconds withou
 **Files.** `app/src/theme.rs` (new), `app/themes/*.json`, `app/fonts/`, `app/src/lib.rs`, `app/src/state.rs`, `app/src/markdown.rs`, `app/src/main.rs`.
 
 - `theme.rs`: parse an OpenCode theme file and resolve it for a mode, as Pathlight's `resolveRoles` does (hex with 3, 6 or 8 digits, a name in `defs`, another role, an ANSI number, `{dark, light}`; an unknown or circular name is an error). From the roles, the design's ten tokens: `bg`, `pane`, `pop`, `ink`, `ink2`, `ink3`, `line`, `hover`, `accent`, `fail`, a missing one blended from background and text as `derivePalette` does. Read Pathlight's file and its `tests/theme.test.ts` first and port the cases.
+- The tokens from the roles. OpenCode's `background` is where the work is, so it is the writing pane, and the bars take the panel:
+
+  | Token | Role, then what stands in when it is missing |
+  |---|---|
+  | `pane` | `background`; `#ffffff` light, `#141413` dark |
+  | `bg` | `backgroundPanel`; `pane` with 4% of `ink` |
+  | `pop` | `backgroundElement`; `pane` with 8% of `ink` in dark, `pane` in light |
+  | `ink` | `text` |
+  | `ink2` | `textMuted`; `pane` with 55% of `ink` |
+  | `ink3` | `textFaint` (Rubric's own role); `pane` with 60% of `ink2` |
+  | `line` | `line` (Rubric's own); `borderSubtle`; `border`; `pane` with 11% of `ink` |
+  | `hover` | `hover` (Rubric's own); `pane` with 6% of `ink` |
+  | `accent` | `primary`; `accent` |
+  | `on` | `onAccent` (Rubric's own); white or `#111111`, whichever is further from `accent` in luminance |
+  | `fail` | `error` |
+
+- The design's four, as files with plain values (no `{dark, light}`); an 8-digit hex is laid over `background`, which is how the design's `rgba` hairlines are written:
+
+  | File | background | backgroundPanel | backgroundElement | text | textMuted | textFaint | line | hover | primary | onAccent | error |
+  |---|---|---|---|---|---|---|---|---|---|---|---|
+  | `paper` | `#ffffff` | `#f6f6f4` | `#ffffff` | `#1c1c1a` | `#66665f` | `#96968e` | `#14140f1c` | `#14140f0e` | `#4257d0` | `#ffffff` | `#b3432c` |
+  | `ink` | `#1a1a19` | `#141413` | `#222221` | `#ecece8` | `#9c9c95` | `#6c6c66` | `#fffffa1c` | `#fffffa12` | `#9aa8f7` | `#111111` | `#e2806a` |
+  | `sepia` | `#f8f3e9` | `#f1eadc` | `#fcf8f0` | `#3b3228` | `#75675a` | `#a39582` | `#3c2d1426` | `#3c2d1412` | `#9a4a22` | `#ffffff` | `#a8321f` |
+  | `fjord` | `#252b35` | `#1e232b` | `#2c333f` | `#e3e7ee` | `#98a2b3` | `#687386` | `#dce6ff1f` | `#dce6ff12` | `#86c5cd` | `#10151c` | `#e58f7c` |
+
+- Rune's `Color` is linear with straight alpha; `rune::color::hex` reads `#rrggbb`. Blend in sRGB bytes as Pathlight's `mix` does, then convert, so the numbers match its tests.
 - `app/themes/`: Pathlight's 31 OpenCode files unchanged, with the notice and license beside them, and the design's four written with the Overview's values. They are compiled in; files in `$XDG_CONFIG_HOME/rubric/themes/` are read at start, a later name replacing an earlier, a file that does not parse skipped.
 - Every color in the app comes from the tokens; `state::theme()` and the calls to `tok::theme` and `Kit::neutral` for color go.
+- Fonts: the variable files of Instrument Sans, Literata and JetBrains Mono, upright and italic, from the `ofl/` folders of github.com/google/fonts at a pinned commit, each with its `OFL.txt`, and a `README.md` in `app/fonts/` naming the commit and each file's SHA-256. `AppSpec.fonts` takes them with `include_bytes!`; `families` is `("Instrument Sans", "JetBrains Mono")`; the writing field's style has `family: Family::Named("Literata")`. Rune says fonts given this way are selectable by name (`rune/src/text.rs:296-300`); find out with a headless render that the writing is not drawn in the sans, and if it is, say so and stop the task there.
 - Type, from the Overview's table: writing Literata 17/1.7, H1 30, H2 22, interface Instrument Sans 13, captions 12, the `:::` and Markdown markers in `ink3`.
 - The title row (40 points, a hairline under it): the post's first heading or its file name, then "Saved" when the text is as written.
 - The status line as the design's: 34 points, a hairline over it, a label in the state's color, one fact in `ink2`, and at most one action with its key. Its states are task 3's.
@@ -94,6 +133,8 @@ In order. Each ends with `cargo test` passing in `app/` (under 30 seconds withou
 **Files.** `app/src/panel.rs` (new; `menu.rs` goes when nothing uses it), `app/src/lib.rs`, `app/src/editor.rs`.
 
 A panel is a list of rows: `Item` (label, and any of a note, a chip, a key, a check, a "more" mark, a danger color), `Sep`, `Head` (a name and a note), `Seg` (a label and choices, one on), `Field` (with or without a label), `Title`, `Text`. Heights and widths are the design's (`I` 30, `S` 9, `H` 26, `G` 32, `F` 36).
+
+The model is plain data with no Rune in it, so the tests need no window: `Panel { id, rows, active, width }`, each row with an `id` the owner matches on, and `State` holding a stack of at most two panels in place of `menu`. `panel::key(&mut stack, &KeyEvent) -> Taken` answers `Moved`, `Chose(id)`, `Set(id, value)` for a segment, `Submitted(id, text)`, `Back`, `Closed` or `Passed`; whoever opened the panel acts on it. The view turns rows into elements: Rune has `Segmented` (`rune-kit/src/segmented.rs:20-80`), `text_input` in a layer (as `lib.rs:82-94` does now), `popover::raised` and `popover::anchored` (`rune-kit/src/popover.rs:20-53`), hover and press on any element, and springs (`El::motion`, `rune/src/el/motion.rs`). Draw the segments from `el` and `row` if `Segmented` cannot be made to look like the design's. A field is one `TextEdit` in `State` at a time, as `notes` is now.
 
 - Keys: Up and Down move over the rows that take the focus (`Item`, `Seg`, `Field`); Left and Right change a `Seg`; Return chooses an `Item` or submits a `Field`; a row's own key chooses it from anywhere in the panel; Esc goes back one panel, then closes; typing in a `Field` stays there; any other key closes the panel and is the editor's.
 - The pointer: over a row makes it the active one; a press chooses it, or the segment under it.
@@ -124,7 +165,29 @@ The `new:` line's menus as panels, from the design's `menu`, `draft-running`, `d
 - `rubric/part` `{ uri, line }`: for a line that places a part, its name, whether it is the catalog's, the site's own or a variant (and of what), how many blocks use it, and its settings in the catalog's order, then the four look settings: each with its type, its values, its default and the line's value. With `set: { name, value }` it answers `{ replace }`, the line with that setting set (dropped when the value is the default); a name or value the part does not have answers `{ error }`. Nothing is written but the answer.
 - `rubric/parts` `{ uri, words? }`: the site's own parts, then the catalog's for the page's kind, each with its name and description; with words, in Jev's order with the ones under the `near` threshold left out. No words asks Jev nothing.
 - Names are the catalog's; the app makes them readable ("tide-table" reads "Tide table").
-- `catalogs/universal/catalog.yaml`: a `group` on each part for the writing, from a short list of groups (seven or so; propose the list and each part's group to David before writing them). It is not sent to Jev: check that in `src/core/questions.ts` and the fixtures before deciding the version stays. `rubric/parts` answers each part's group; a site's own part has none and is listed under "Own".
+- The answer's shape, for `::: quote size=large` (a setting's `value` is absent when the line does not set it):
+
+  ```json
+  { "name": "quote", "kind": "catalog", "uses": { "blocks": 3, "pages": 2 },
+    "settings": [
+      { "name": "size", "type": "choice", "values": ["normal", "large"], "default": "normal", "value": "large" },
+      { "name": "cite", "type": "text" } ],
+    "look": [
+      { "name": "shadow", "type": "choice", "values": ["none", "soft", "deep"], "default": "none" } ] }
+  ```
+
+  `kind` is `catalog`, `own` or `variant`; a variant adds `"variant": { "of": "quote", "name": "torn-edge", "everywhere": true }`. A line that places no part answers `null`.
+- `catalogs/universal/catalog.yaml`: a `group` on each part for the writing, as below (David may move any). It is not sent to Jev: check that in `src/core/questions.ts` and the fixtures before deciding the version stays. `rubric/parts` answers each part's group; a site's own part has none and is listed under "Own".
+
+  | Group | Parts |
+  |---|---|
+  | Writing | lead, quote, callout, sidenote, glossary, fold, divider |
+  | Layout | section, hero, columns, tabs, cards |
+  | Lists and steps | steps, timeline, contents, post-list |
+  | Media | figure, gallery, video, audio, embed, map, pdf |
+  | Data and code | table, chart, stats, progress, code, diagram, math, file-tree |
+  | People and business | testimonial, people, logos, pricing |
+  | Actions | call-to-action, buttons, download, contact-form, subscribe |
 
 **Tests.** `bun test` with the stub resolver: a `::: quote size=large` line answers `size` with value `large` and `shadow` with its default; `set` to the default drops the setting and keeps the others in place; an unknown value is refused; `rubric/parts` with no words lists own parts first and calls no resolver.
 
@@ -165,4 +228,8 @@ Tab or a right-click on a part's line asks `rubric/part` and `rubric/draft` (no 
 - No window on David's display unless he says so. Don't touch `testing/` or a site process the session did not start.
 - Change nothing outside `app/`, the server files task 4 names, `docs/lsp.md`, `docs/app-slice-findings.md`, `testing/TESTING.md`, `CLAUDE.md` and `docs/plan.md`.
 - Do not commit. After each task, give the one-sentence commit message.
-- The reviewer once, when task 7 is done. Stop every process the session starts and check that it is gone.
+- No reviewer subagent: the session that wrote this plan reviews each sitting's diff. Stop every process the session starts and check that it is gone.
+
+## Decisions the build made
+
+None yet. One line each: what was chosen, and why the plan did not settle it.
