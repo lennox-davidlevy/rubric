@@ -66,6 +66,21 @@ pub struct State {
     pub looked: std::cell::Cell<Option<std::time::Instant>>,
     /// Wakes the app once a second while a draft runs or a flash shows.
     pub ticker: Option<Ticker>,
+    /// The app's theme and its colors.
+    pub look: crate::theme::Look,
+    /// The title row's words: the post's first heading, or its file's name.
+    pub title: String,
+    /// The writing pane's rectangle in window points, as last laid out: menus stay inside it.
+    pub pane: [f32; 4],
+    /// The open panels: one, or a second beside it.
+    pub panels: Vec<crate::panel::Panel>,
+    /// The text of a panel's field (one at a time).
+    pub field: TextEdit,
+    /// The line the panels hang from, for when a field has the focus and the editor reports no
+    /// caret.
+    pub panel_at: Option<[f32; 4]>,
+    /// The theme drawn when the list of themes opened, to go back to.
+    pub theme_before: Option<String>,
 }
 
 /// The thread that ticks: parked until `wake`, at rest again when nothing needs the time.
@@ -94,25 +109,78 @@ impl State {
         edit.focused = true;
         edit.set_caret(0);
         let uri = file_uri(&path);
-        let spans = markdown::spans(&text, &theme(), &[]);
+        let look = crate::theme::Look::load(None, None, crate::theme::Mode::Light);
+        let spans = markdown::spans(&text, &marks(&look.palette), &[]);
+        let title = title_of(&path, &text);
         State {
             path, edit, version: 1, saved: text, split: 0.5, last_range: (0, 0), uri, spans, problem: None, page: None, width: 0.0,
             bounds: None, client: None, cursor_line: None, page_url: None, ghost: None, asked: None, height: 0.0, menu: None,
             view: None, menu_at: None, notes: TextEdit::new(""), drafts: Vec::new(), flash: None, now_ms: draft::now_ms(),
-            pending: HashMap::new(), looked: std::cell::Cell::new(None), ticker: None,
+            pending: HashMap::new(), looked: std::cell::Cell::new(None), ticker: None, look, title, pane: [0.0; 4],
+            panels: Vec::new(), field: TextEdit::new(""), panel_at: None, theme_before: None,
         }
     }
 }
 
-pub fn theme() -> markdown::Theme {
-    let t = rune::tok::theme(false);
-    markdown::Theme { dim: t.text_secondary, accent: rune::tok::accent(0, false), warn: rune::tok::accent(3, false) }
+/// The Markdown's colors from the app's theme.
+pub fn marks(p: &crate::theme::Palette) -> markdown::Theme {
+    markdown::Theme { dim: p.ink3, accent: p.accent, warn: p.fail }
 }
 
 /// The Markdown styles for the text as it is, the `new:` lines by their drafts.
 pub fn spans(s: &State) -> Vec<Span> {
     let tones: Vec<(u32, draft::Tone)> = s.drafts.iter().map(|(l, st)| (*l, st.tone())).collect();
-    markdown::spans(&s.edit.text, &theme(), &tones)
+    markdown::spans(&s.edit.text, &marks(&s.look.palette), &tones)
+}
+
+/// The app drawn in another look: the writing's colors follow.
+pub fn set_look(s: &mut State, look: crate::theme::Look) {
+    s.look = look;
+    s.spans = spans(s);
+}
+
+/// The theme drawn changed (the list of themes moved): the writing's colors follow.
+pub fn show_theme(s: &mut State, name: &str) -> bool {
+    let shown = s.look.show(name);
+    s.spans = spans(s);
+    shown
+}
+
+/// The post's first ATX heading, outside front matter and code fences, or its file's name.
+pub fn title_of(path: &std::path::Path, text: &str) -> String {
+    let mut lines = text.split('\n').peekable();
+    if lines.peek().is_some_and(|l| l.trim_end() == "---") {
+        lines.next();
+        for l in lines.by_ref() {
+            if l.trim_end() == "---" {
+                break;
+            }
+        }
+    }
+    let mut fence = false;
+    for l in lines {
+        let t = l.trim_start();
+        if t.starts_with("```") || t.starts_with("~~~") {
+            fence = !fence;
+            continue;
+        }
+        if fence {
+            continue;
+        }
+        let n = t.bytes().take_while(|&b| b == b'#').count();
+        if (1..=6).contains(&n) && t[n..].starts_with([' ', '\t']) {
+            let words = t[n..].trim().trim_end_matches('#').trim();
+            if !words.is_empty() {
+                return words.to_string();
+            }
+        }
+    }
+    path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+}
+
+/// Whether the text is as last written.
+pub fn clean(s: &State) -> bool {
+    s.edit.text == s.saved
 }
 
 /// The text changed: a new version, new styles, and the whole text to the server.
@@ -122,6 +190,7 @@ pub fn changed(s: &mut State) {
     // Typing is not the menu's: it goes (a choice that changed the text closed it already).
     draft::close(s);
     s.spans = spans(s);
+    s.title = title_of(&s.path, &s.edit.text);
     if let Some(c) = &s.client {
         c.notify("textDocument/didChange", json!({
             "textDocument": { "uri": s.uri, "version": s.version },
@@ -140,8 +209,9 @@ pub fn moved(s: &mut State) -> bool {
         return false;
     }
     s.last_range = range;
-    // The caret went elsewhere: the menu was for where it was.
+    // The caret went elsewhere: the menu and the panels were for where it was.
     draft::close(s);
+    crate::look::close_panels(s);
     let line = position::line_char(&s.edit.text, s.edit.focus).0;
     if s.cursor_line != Some(line)
         && let Some(c) = &s.client
@@ -333,4 +403,17 @@ pub fn page_attached(s: &mut State, page: crate::page::Page) {
         page.send(crate::page::PageCmd::Load(url.clone()));
     }
     s.page = Some(page);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn the_title_is_the_first_heading_past_the_front_matter() {
+        let p = Path::new("/x/walk.md");
+        assert_eq!(title_of(p, "---\ntitle: x\n# not this\n---\n\n```\n# nor this\n```\n## The long walk ##\n# Later"), "The long walk");
+        assert_eq!(title_of(p, "no heading\n#tag"), "walk.md");
+    }
 }

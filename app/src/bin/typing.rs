@@ -20,7 +20,7 @@ fn runtime(text: &str, caret: usize) -> Runtime<State> {
     let mut s = State::open(PathBuf::from("/nonexistent/long.md"), text.to_string());
     s.edit.set_caret(caret);
     s.width = 1400.0;
-    let mut rt = Runtime::new(s, rubric_app::view, (1400.0, 900.0), Env::new(false, 1.0));
+    let mut rt = Runtime::with_text(s, rubric_app::view, (1400.0, 900.0), Env::new(false, 1.0), rubric_app::fonts::text_system());
     rt.frame(0.0);
     let mut n = 0;
     while n < 240 && rt.frame(1.0 / 120.0) {
@@ -40,7 +40,7 @@ fn main() {
     }
     println!("POST bytes={} words={} lines={}", text.len(), text.split_whitespace().count(), text.lines().count());
 
-    let theme = rubric_app::state::theme();
+    let theme = rubric_app::state::marks(&rubric_app::theme::Look::load(None, None, rubric_app::theme::Mode::Light).palette);
     let mut runs = Vec::new();
     for _ in 0..100 {
         let t = Instant::now();

@@ -15,7 +15,7 @@ An Opus session builds from this plan; the session that wrote it reviews. The sl
 | Sitting | Tasks | Ends with |
 |---|---|---|
 | 1 | 1 and 2: the look, the panel | The app themed, the theme list opening with Ctrl+, |
-| 2 | 3 and 4: the draft menus, the server's two requests | Every draft menu in the panel; `bun test` passing |
+| 2 | The review's fixes ("Before task 3"), then 3 and 4: the draft menus, the server's two requests | Every draft menu in the panel; `bun test` passing |
 | 3 | 5, 6 and 7: a placed part, insert, the write-up | Section C of `testing/TESTING.md` ready for David |
 
 A sitting stops at its end, says what it built, what it could not check and the commit message, and does not start the next. Where this plan says "find out", the answer goes in the findings before the code that depends on it. Where the plan and the code disagree (a line number, a field's name), the code is right: say so and go on. Where a decision is missing, take the smaller choice, write it under "Decisions the build made" at the end of this file, and go on; stop only for something that would change what the writer sees in a way the design does not show.
@@ -32,7 +32,7 @@ With the tests: the headless `Runtime`, and the stub server on a temp site. The 
 | Two kinds of theme | The app's own colors ("Appearance") are this slice's. The site's theme (Paper, Schematic, the skins; `::: theme` in `rubric.md`) is Rubric's own and is not touched here | David, 2026-11-25: Pathlight's way for the app, what Rubric has built for the site |
 | App themes | Pathlight's way (`pathlight/src/theme.ts`: `resolveRoles`, `derivePalette`, `loadThemes`), ported to Rust: OpenCode's theme format, Pathlight's 31 OpenCode themes copied with their notice (`pathlight/NOTICE.md`, MIT), the design's four (Paper, Ink, Sepia, Fjord) beside them, and the writer's own files from `$XDG_CONFIG_HOME/rubric/themes/` | David wants every one of them, easily changed |
 | Changing it | Ctrl+, (Cmd+, on the Mac) opens the list in a panel: moving draws the app in that theme, Return keeps it (written to `$XDG_CONFIG_HOME/rubric/app.json`), Esc goes back to the one before. Paper until one is kept; `RUBRIC_APP_THEME=<name>` for one run | Pathlight's picker; the design's Appearance window, with Markdown and the drafter in it, is a later slice |
-| Light or dark | A theme with both is drawn light unless `RUBRIC_APP_MODE=dark`; no following the system | Pathlight follows a terminal's background; following the desktop is new work, for the Appearance slice |
+| Light or dark | Chosen in the list of themes and kept with the theme (see "Before task 3"); `RUBRIC_APP_MODE=dark` for one run; no following the system | Pathlight follows a terminal's background; following the desktop is new work, for the Appearance slice |
 | Fonts | Instrument Sans, Literata and JetBrains Mono, vendored in `app/fonts/` with their licenses, compiled in | Rune takes font bytes at build time; nothing is fetched at run time |
 | The title bar | A 40-point row the app draws under whatever frame the system gives: the post's title and "Saved" or nothing | Rune replaces the native bar on the Mac only; on Hyprland there is none to replace |
 | One panel, not `PopupList` | The app's own panel (`panel.rs`) in Rune's `popover::raised`, from `el`, `row`, `col`, `Segmented` and `text_input` | `PopupList` rows have one shape: no separators, headers, controls or fields |
@@ -144,7 +144,21 @@ The model is plain data with no Rune in it, so the tests need no window: `Panel 
 
 **Tests.** Headless: moving in the theme list changes the tokens the view draws with; Esc restores them and writes nothing; Return writes the name to a config folder the test owns, and a new `State` reads it. The key model row by row (which rows take the focus, a `Seg` at its ends, a row's key from another row, Esc with two panels). `place` for under, above, beside and replaced, each inside the pane. Headless: a press on a segment reports that segment; the editor keeps its text while a `Field` is typed in.
 
-### Task 3: the draft menus
+### Before task 3: what the review of sitting 1 found
+
+Sitting 2 starts with two steps of housekeeping, then the fixes.
+
+- **Commit sitting 1.** Everything `git status` shows on `slice-3`, as one commit: `Add the app's themes, fonts, title and status bars, and the panel with the theme list.` One plain sentence, no body, no trailers, no Co-Authored-By. David asked for this commit and the next (2026-11-25); the rule against committing holds for everything after them.
+- **Remove the drafts left in the app's site by testing.** `git rm -r sites/app-slice/parts/tide-clock`, and delete `sites/app-slice/parts/` and everything in `sites/app-slice/.rubric/drafts/`. Run `git status` first and stop if `sites/app-slice/` holds changes other than these. Nothing under `testing/` is touched: its parts and drafts are David's own. Then run `cargo test -- --ignored` in `app/` (the stub, no Jev): both must pass. Commit: `Remove the drafts testing left in the app slice's site.`
+
+The fixes, each with a test that fails without it:
+
+1. **Light or dark is chosen in the list of themes.** Drawn light by default, Dracula, Monokai, Tokyonight and most of OpenCode's themes are their light halves, which nobody means by those names and which are weak (Monokai's accent on its light background is 1.6 to 1). The list of themes gets a `Seg` as its first row, `Mode` with `Light` and `Dark`: changing it redraws the theme under the focus at once, Return keeps the mode with the theme in `app.json` (`"mode": "dark"`), Esc restores both. `RUBRIC_APP_MODE` still wins for one run. With nothing kept the mode is light, since Paper is the start. This replaces the "Light or dark" row of the decisions.
+2. **A still pointer chooses nothing.** Rune refreshes hover on every build (`runtime/paint/build.rs`, `refresh_hover`), so a panel that opens, or scrolls by the keys, under a resting pointer may move its focus to the row there, and in the list of themes that draws another theme. Find out with a headless test (the pointer placed where the list will open, then Ctrl+,: the theme and the row with the focus must not change; then Down past the list's end with the pointer still). If it does, `look::hovered` acts only after the pointer has moved since the panel opened or last scrolled.
+3. **Ctrl+, with the list open closes it.** Now the panel passes the key, closes, and `editor::key` opens it again.
+4. **Left on a second panel goes back; Right on an item with `more` chooses it.** Now both close the panels and move the caret.
+5. **A writer's theme file that is skipped says why**, once, on stderr (`theme mine.json: color reference "x" is not in defs or theme`), and only the roles the tokens read are resolved, so a role this app never uses (a number that is no color, a key OpenCode adds later) does not cost the writer the theme.
+
 
 **Files.** `app/src/draft.rs`, `app/src/state.rs`.
 
@@ -227,9 +241,24 @@ Tab or a right-click on a part's line asks `rubric/part` and `rubric/draft` (no 
 - Never send `keep` with `global: true`, nor `remove`, to a server whose site or catalog is not a copy in a temp folder.
 - No window on David's display unless he says so. Don't touch `testing/` or a site process the session did not start.
 - Change nothing outside `app/`, the server files task 4 names, `docs/lsp.md`, `docs/app-slice-findings.md`, `testing/TESTING.md`, `CLAUDE.md` and `docs/plan.md`.
-- Do not commit. After each task, give the one-sentence commit message.
+- Do not commit, but for the two commits "Before task 3" names. After each task, give the one-sentence commit message.
 - No reviewer subagent: the session that wrote this plan reviews each sitting's diff. Stop every process the session starts and check that it is gone.
 
 ## Decisions the build made
 
-None yet. One line each: what was chosen, and why the plan did not settle it.
+One line each: what was chosen, and why the plan did not settle it.
+
+- Sitting 1 (2026-11-25):
+  - Pathlight has 32 OpenCode themes, not 31: all 32 are copied (`app/themes/`), with the design's four, 36 in all. The plan's count was off by one.
+  - The list of themes is the design's four first, then OpenCode's in name order; a writer's file with a bundled name takes that theme's place, a new name goes last. Names read as words ("Catppuccin frappe"), and a writer's own carry the note "Own".
+  - A writer's file that parses but does not resolve in both modes (a loop, a missing name) is skipped with the broken ones, so a theme never fails once chosen.
+  - A theme kept in `app.json` that no longer exists, or a `RUBRIC_APP_THEME` that does not, falls back to the next of: the environment's, the kept one, Paper.
+  - The `new:` line's edge and label cannot be drawn (see the findings), so its draft's state stays in the color of its `:::`: the design's `ink3` before a draft, the accent while drafting and ready, the failed color when failed. Every other `:::` is `ink3` and a part's name is the text's color, as the design draws them.
+  - The theme list opens at the caret's line, like every panel, 250 points wide; closing it any way but Return (Esc, a typed key, a click in the writing) draws the theme before again.
+  - Changes a panel makes (the lit row, a theme drawn) land at once (`Tx::color_motion(Spring::NONE)`): the design says list hover and theme previews change instantly.
+  - The writing column is the design's 540 points with 24 of padding a side and 56 above; slice 2's was 720.
+  - Headings in the writing are weight 600 with their `#` in `ink3` at 400, and bold is 600, as the design draws them.
+  - The status line is drawn only when it has something to say (the design's screens without one have none); its label is still slice 2's mark until task 3 gives it its states.
+  - The panel's field is drawn as a field only in the top panel; a panel under a second one shows its text without a field, so there are never two fields keyed alike.
+  - `panel::key` answers `Typing` besides the plan's seven, for a key the field's own editing takes.
+  - A debug build draws the list of themes headless: `rubric-app <post> --scene themes --snap out.png --at 1`.

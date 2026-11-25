@@ -87,6 +87,21 @@ The second slice: Tab on a `::: new: words` line opens a menu at the caret, whic
 
 **After B4 and B11, undo what they wrote.** `git status` shows it. B4: `git clean -fd sites/app-slice/parts`. B11: `git checkout catalogs/universal`, then `git clean -n catalogs/universal` to see the part's new files and `git clean -fd catalogs/universal` to remove them. The post: `git checkout sites/app-slice/pages/posts/long.md` if it was saved.
 
+## C. The designed app (branch `slice-3`)
+
+The third slice: the design's look, one panel for every menu, and the menus in it. The plan is [docs/app-slice-3.md](../docs/app-slice-3.md); what was found is under "Slice 3" in [docs/app-slice-findings.md](../docs/app-slice-findings.md). Start it natively: `cd app && cargo build --release`, then `app/target/release/rubric-app sites/app-slice/pages/posts/long.md`. Ctrl here is Cmd on the Mac.
+
+| # | Do this | Expect |
+|---|---|---|
+| C1 | Start the app | A 40-point row over both panes: `The long walk` and `Saved`. The writing in a serif (Literata), the row in a sans (Instrument Sans). `#`, `**` and `:::` in a light gray. |
+| C2 | Type a letter, then Ctrl+S | `Saved` goes at the letter and comes back at the save. |
+| C3 | Ctrl+, then Down and Up a few times | A list of themes at the caret, inside the writing pane, Paper checked. Each move draws the whole app in that theme at once. |
+| C4 | Esc; then Ctrl+, again and type a letter | Esc: the theme from before, nothing kept. The letter: the list closes, the theme from before, the letter in the writing. |
+| C5 | Ctrl+, move to Ink, Return; quit and start again | Ink stays, and is there after the restart. |
+| C6 | Copy `app/themes/nord.json` to `~/.config/rubric/themes/mine.json`, restart, Ctrl+, | `Mine` is last, with `Own`. The pointer over a row draws that theme; a click keeps it. `RUBRIC_APP_THEME=fjord` before the command starts in Fjord for that run only. |
+
+**After C5 and C6, undo what they wrote:** `rm ~/.config/rubric/app.json ~/.config/rubric/themes/mine.json`.
+
 ## Notes
 App starts well
 A2 - so there is a bit of a delay in the typing, and if we can get it instant or as close to that woudl be a priority.

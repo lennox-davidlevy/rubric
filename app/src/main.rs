@@ -32,6 +32,10 @@ fn init() -> State {
     let (path, text) = OPENED.get().expect("opened before run").clone();
     let mut s = State::open(path, text);
     s.width = SIZE.0;
+    // The app's theme: RUBRIC_APP_THEME for one run, else the one kept, else Paper.
+    let wanted = std::env::var("RUBRIC_APP_THEME").ok().filter(|v| !v.is_empty());
+    let look = rubric_app::theme::Look::load(rubric_app::theme::config_dir(), wanted, rubric_app::theme::Mode::from_env());
+    state::set_look(&mut s, look);
     s
 }
 
@@ -76,7 +80,13 @@ fn main() {
     let site = site_of(&path);
     let _ = OPENED.set((path, text));
 
-    let app = App::new(AppSpec::<State> { ..AppSpec::new("Rubric", SIZE, init, rubric_app::view) });
+    let app = App::new(AppSpec::<State> {
+        fonts: rubric_app::fonts::FONTS,
+        families: rubric_app::fonts::FAMILIES,
+        // For `--snap out.png --scene themes` in a debug build: the list of themes, drawn headless.
+        scenes: &[("themes", rubric_app::look::show_themes)],
+        ..AppSpec::new("Rubric", SIZE, init, rubric_app::view)
+    });
 
     // The server, from a thread of its own, so the first frame never waits on it.
     match site {

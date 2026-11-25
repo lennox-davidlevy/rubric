@@ -9,7 +9,7 @@ pub fn runtime(text: &str, caret: usize) -> Runtime<State> {
     let mut s = State::open(PathBuf::from("/nonexistent/post.md"), text.to_string());
     s.edit.set_caret(caret);
     s.width = 1000.0;
-    let mut rt = Runtime::new(s, rubric_app::view, (1000.0, 700.0), Env::new(false, 1.0));
+    let mut rt = Runtime::with_text(s, rubric_app::view, (1000.0, 700.0), Env::new(false, 1.0), rubric_app::fonts::text_system());
     rt.frame(0.0);
     rt
 }
@@ -557,4 +557,199 @@ fn diagnostics_for_another_document_change_nothing() {
     let (mut rt, _sent) = on_line(NEW, 1);
     tell(&mut rt, Incoming::Notification { method: "textDocument/publishDiagnostics".into(), params: json!({ "uri": "file:///other.md", "diagnostics": ready(1) }) });
     assert!(rt.state.drafts.is_empty());
+}
+
+// The look.
+
+fn text_of(rt: &Runtime<State>, key: &str) -> Option<String> {
+    rt.elements().into_iter().find(|e| e.key.as_deref() == Some(key)).and_then(|e| e.text)
+}
+
+#[test]
+fn the_title_row_says_saved_only_while_the_text_is_as_written() {
+    let dir = std::env::temp_dir().join(format!("rubric-app-title-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("walk.md");
+    std::fs::write(&path, "# The long walk\n\nbody").unwrap();
+    let mut s = State::open(path.clone(), "# The long walk\n\nbody".into());
+    s.edit.set_caret(21);
+    s.width = 1000.0;
+    let mut rt = Runtime::with_text(s, rubric_app::view, (1000.0, 700.0), Env::new(false, 1.0), rubric_app::fonts::text_system());
+    rt.frame(0.0);
+    assert_eq!(text_of(&rt, "title").as_deref(), Some("The long walk"));
+    assert!(rt.find("saved").is_some());
+    rt.ime(Ime::Commit("x".into()));
+    rt.frame(1.0 / 60.0);
+    assert!(rt.find("saved").is_none(), "changed since it was written");
+    rt.key(KeyEvent { key: Key::Command('s'), mods: Mods { cmd: true, ..Mods::default() } });
+    rt.frame(1.0 / 60.0);
+    assert!(rt.find("saved").is_some(), "written again");
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# The long walk\n\nbodyx");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+// The panel, and the list of app themes in it.
+
+use rubric_app::panel::{Item, Panel, Row};
+use rubric_app::theme::{Look, Mode};
+
+fn fill_of(rt: &Runtime<State>, key: &str) -> rune::Color {
+    rt.elements().into_iter().find(|e| e.key.as_deref() == Some(key)).unwrap_or_else(|| panic!("no {key}")).fill
+}
+
+fn config(name: &str) -> PathBuf {
+    let d = std::env::temp_dir().join(format!("rubric-app-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(&d).unwrap();
+    d
+}
+
+fn themed(dir: &std::path::Path) -> Runtime<State> {
+    let mut rt = runtime("# Hi\n\nbody", 4);
+    let look = Look::load(Some(dir.to_path_buf()), None, Mode::Light);
+    rt.update(|s, _| rubric_app::state::set_look(s, look));
+    rt.frame(1.0 / 60.0);
+    rt
+}
+
+fn cmd(rt: &mut Runtime<State>, key: Key) {
+    rt.key(KeyEvent { key, mods: Mods { cmd: true, ..Mods::default() } });
+    rt.frame(1.0 / 60.0);
+}
+
+#[test]
+fn moving_in_the_theme_list_draws_the_app_in_that_theme_and_esc_goes_back() {
+    let dir = config("themes-esc");
+    let mut rt = themed(&dir);
+    let paper = fill_of(&rt, "writing-pane");
+    cmd(&mut rt, Key::Command(','));
+    assert_eq!(rt.state.panels.len(), 1);
+    assert!(rt.find("panel-0").is_some(), "the list is drawn");
+    press(&mut rt, Key::Down);
+    assert_eq!(rt.state.look.name, "ink");
+    let ink = fill_of(&rt, "writing-pane");
+    assert_ne!(ink, paper);
+    assert_eq!(ink, Look::load(None, Some("ink".into()), Mode::Light).palette.pane);
+    press(&mut rt, Key::Escape);
+    assert!(rt.state.panels.is_empty());
+    assert_eq!(fill_of(&rt, "writing-pane"), paper);
+    assert!(!dir.join("app.json").exists(), "nothing written");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn return_in_the_theme_list_keeps_the_theme_for_the_next_start() {
+    let dir = config("themes-keep");
+    let mut rt = themed(&dir);
+    cmd(&mut rt, Key::Command(','));
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Enter);
+    assert!(rt.state.panels.is_empty());
+    assert_eq!(rt.state.look.name, "sepia");
+    assert_eq!(Look::load(Some(dir.clone()), None, Mode::Light).name, "sepia", "a new start reads it");
+    assert_eq!(rt.state.edit.text, "# Hi\n\nbody", "Return went to the list");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn a_typed_letter_closes_the_theme_list_restores_the_theme_and_lands_in_the_text() {
+    let dir = config("themes-type");
+    let mut rt = themed(&dir);
+    cmd(&mut rt, Key::Command(','));
+    press(&mut rt, Key::Down);
+    rt.ime(Ime::Commit("x".into()));
+    rt.frame(1.0 / 60.0);
+    assert!(rt.state.panels.is_empty());
+    assert_eq!(rt.state.look.name, "paper");
+    assert_eq!(rt.state.edit.text, "# Hix\n\nbody");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+fn controls() -> Panel {
+    Panel::new("test", "Test", 260.0, vec![
+        Row::Field { id: "words".into(), label: None, placeholder: "words".into() },
+        Row::Seg { id: "size".into(), label: "Size".into(), choices: vec!["Normal".into(), "Large".into(), "Huge".into()], on: 0 },
+        Row::Item(Item::new("keep", "Keep")),
+    ])
+}
+
+#[test]
+fn a_press_on_a_segment_sets_that_segment() {
+    let mut rt = runtime("text", 4);
+    rt.update(|s, _| s.panels = vec![controls()]);
+    for _ in 0..20 {
+        rt.frame(1.0 / 60.0);
+    }
+    let (x, y) = rt.find("row-test-size-2").expect("the segment is drawn");
+    rt.pointer_move(x, y);
+    rt.frame(1.0 / 60.0);
+    rt.pointer_down(x, y);
+    rt.frame(1.0 / 60.0);
+    rt.pointer_up(x, y);
+    rt.frame(1.0 / 60.0);
+    assert!(matches!(rt.state.panels[0].rows[1], Row::Seg { on: 2, .. }), "{:?}", rt.state.panels[0].rows[1]);
+}
+
+#[test]
+fn typing_in_a_panels_field_leaves_the_writing_alone() {
+    let mut rt = runtime("text", 4);
+    rt.update(|s, tx| {
+        s.panels = vec![controls()];
+        tx.focus("panel-field", false);
+    });
+    rt.frame(1.0 / 60.0);
+    rt.ime(Ime::Commit("torn".into()));
+    rt.frame(1.0 / 60.0);
+    press(&mut rt, Key::Backspace);
+    assert_eq!(rt.state.field.text, "tor");
+    assert_eq!(rt.state.edit.text, "text");
+    assert_eq!(rt.state.version, 1);
+    press(&mut rt, Key::Down);
+    assert_eq!(rt.state.panels[0].active_id(), Some("size"));
+    assert!(editor_focused(&rt), "off the field, the editor has the keys again");
+    press(&mut rt, Key::Escape);
+    assert!(rt.state.panels.is_empty());
+}
+
+#[test]
+fn panels_are_drawn_inside_the_writing_pane() {
+    let mut rt = runtime("text", 4);
+    let mut second = controls();
+    second.id = "second".into();
+    second.from = Some(2);
+    rt.update(|s, _| {
+        s.split = 0.9;
+        s.panels = vec![controls(), second];
+    });
+    for _ in 0..20 {
+        rt.frame(1.0 / 60.0);
+    }
+    let pane = rt.state.pane;
+    for key in ["panel-0", "panel-1"] {
+        let r = rt.elements().into_iter().find(|e| e.key.as_deref() == Some(key)).unwrap_or_else(|| panic!("no {key}")).rect;
+        assert!(r[0] >= pane[0] && r[0] + r[2] <= pane[0] + pane[2] && r[1] >= pane[1] && r[1] + r[3] <= pane[1] + pane[3], "{key} {r:?} in {pane:?}");
+    }
+}
+
+#[test]
+fn in_a_narrow_pane_the_second_panel_replaces_the_first_and_its_back_row_goes_back() {
+    let mut rt = runtime("text", 4);
+    let mut second = controls();
+    second.id = "second".into();
+    second.from = Some(2);
+    rt.update(|s, _| s.panels = vec![controls(), second]);
+    for _ in 0..20 {
+        rt.frame(1.0 / 60.0);
+    }
+    assert!(rt.find("panel-0").is_none() && rt.find("panel-1").is_some());
+    let (x, y) = rt.find("panel-back").expect("a row back");
+    rt.pointer_move(x, y);
+    rt.frame(1.0 / 60.0);
+    rt.pointer_down(x, y);
+    rt.frame(1.0 / 60.0);
+    rt.pointer_up(x, y);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.panels.len(), 1);
+    assert_eq!(rt.state.panels[0].id, "test");
 }

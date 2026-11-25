@@ -89,9 +89,31 @@ pub fn notes_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
     }
 }
 
+/// A panel's field: the panel's keys first, then the field's own editing.
+pub fn field_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
+    use crate::panel::Taken;
+    match crate::look::key(s, ev, tx) {
+        Taken::Typing => false,
+        // The panel closed; the key is not typed into a field that is gone.
+        Taken::Passed => {
+            tx.focus("editor", false);
+            true
+        }
+        _ => true,
+    }
+}
+
 /// The field's key handler, before focus navigation and the field's own editing. Tab is
 /// always consumed, so focus never leaves the writing.
 pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
+    // An open panel takes its keys first; any other key closes it and is the editor's.
+    if crate::look::key(s, ev, tx) != crate::panel::Taken::Passed {
+        return true;
+    }
+    if ev.is_command(',') {
+        crate::look::open_themes(s, tx);
+        return true;
+    }
     // An open menu takes its keys first; any other key closes it and is the editor's.
     if let Some(menu) = &mut s.menu {
         use crate::menu::Taken;
