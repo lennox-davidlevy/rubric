@@ -150,6 +150,7 @@ pub fn parts_answered(s: &mut State, asked: Asked, answer: Value) {
                 Some(c) => draft.chip(c),
                 None => draft,
             }));
+            s.anchor = None;
             s.panels = vec![Panel::new(WORDS, readable(&ins.words), 300.0, rows)];
         }
         _ => {}

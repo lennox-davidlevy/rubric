@@ -406,6 +406,8 @@ export class Workspace {
     if (!doc) return this.open(file, text);
     doc.editing = firstChangedLine(doc.text, text);
     doc.text = text;
+    // A part looked at on a line was for the text as it was.
+    if (this.#lineAs?.file === file) this.#lineAs = undefined;
     // Accepted or reworded: the line no longer holds the words it was for.
     if (doc.chosen && !scan(text, this.site.catalog).directives.some((d) => d.kind === "words" && d.words === doc.chosen!.words)) {
       doc.chosen = undefined;
@@ -480,6 +482,7 @@ export class Workspace {
     const doc = this.#docs.get(file);
     if (!doc) return;
     this.#docs.delete(file);
+    if (this.#lineAs?.file === file) this.#lineAs = undefined;
     // Opened again, its starters are sent again.
     this.#starters.delete(file);
     await this.#claimOpen();
@@ -1460,6 +1463,7 @@ export class Workspace {
         data: {
           status: latest.status, name: variant !== undefined ? latest.name ?? of : of, of, ...(variant !== undefined ? { variant: true as const } : {}), ...(latest.by ? { by: latest.by } : {}), started: latest.started,
           ...(shown && shown !== latest ? { shown: shown.original ? "the kept one" : `take ${this.#takes(key).take}` } : {}),
+          ...(latest.status === "failed" && latest.message ? { message: latest.message } : {}),
           ...this.#takes(key), ...(d.close === undefined ? {} : { close: d.close }),
         },
       };
@@ -1769,7 +1773,9 @@ export class Workspace {
     if (as) {
       const lines = splitLines(text);
       const was = lines[as.line];
-      if (was !== undefined) {
+      // Only while the line is still empty or still a line of words.
+      const d = was === undefined ? undefined : this.#directiveAt(doc, as.line);
+      if (was !== undefined && (was.trim() === "" || d?.kind === "words")) {
         const head = `${was.trim() === "" ? ":::" : opener(was)} ${as.part}`;
         const block = this.site.catalog.parts[as.part]?.empty || was.trim() !== "" ? [head] : [head, ":::"];
         lines.splice(as.line, 1, ...block);

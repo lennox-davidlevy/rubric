@@ -322,14 +322,23 @@ pub fn load_all(config: Option<&Path>) -> (Vec<Entry>, Vec<String>) {
     let mut skipped = Vec::new();
     let Some(dir) = config.map(|c| c.join("themes")) else { return (out, skipped) };
     let Ok(read) = std::fs::read_dir(&dir) else { return (out, skipped) };
+    // Hidden files (a Mac's .DS_Store) are no one's theme and are passed over unsaid.
     let mut files: Vec<PathBuf> = read.filter_map(|e| e.ok()).map(|e| e.path())
-        .filter(|p| p.extension().is_some_and(|x| x == "json") && p.is_file()).collect();
+        .filter(|p| p.is_file() && !p.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.'))).collect();
     files.sort();
     for path in files {
         let Some(name) = path.file_stem().map(|s| s.to_string_lossy().into_owned()) else { continue };
         let shown = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        if !path.extension().is_some_and(|x| x == "json") {
+            skipped.push(format!("theme {shown}: not a .json file"));
+            continue;
+        }
         let parsed = std::fs::read_to_string(&path).map_err(|e| e.to_string()).and_then(|t| File::parse(&t));
         let entry = parsed.and_then(|file| {
+            // Every token would fall back to Paper's: nothing in it is a theme.
+            if !file.theme.contains_key("background") && !file.theme.contains_key("text") {
+                return Err("neither background nor text".into());
+            }
             let entry = Entry { name, file, own: true };
             entry.tokens(Mode::Light)?;
             entry.tokens(Mode::Dark)?;
@@ -556,6 +565,21 @@ mod tests {
         assert!(all.iter().any(|e| e.name == "mine" && e.own));
         assert!(!all.iter().any(|e| e.name == "broken" || e.name == "loop"));
         assert!(all.iter().any(|e| e.name == "dracula" && !e.own));
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn every_file_that_is_no_theme_is_said_once_and_hidden_files_are_not() {
+        let d = temp("said");
+        std::fs::write(d.join("themes/a.json"), "not json").unwrap();
+        std::fs::write(d.join("themes/b.json"), r#"{ "colors": {} }"#).unwrap();
+        std::fs::write(d.join("themes/c.json"), r#"{ "theme": {} }"#).unwrap();
+        std::fs::write(d.join("themes/d.txt"), "{}").unwrap();
+        std::fs::write(d.join("themes/.DS_Store"), "x").unwrap();
+        let (all, skipped) = load_all(Some(&d));
+        let named: Vec<&str> = skipped.iter().filter_map(|w| w.strip_prefix("theme ").and_then(|w| w.split(':').next())).collect();
+        assert_eq!(named, ["a.json", "b.json", "c.json", "d.txt"], "{skipped:?}");
+        assert!(!all.iter().any(|e| e.own), "none is listed");
         std::fs::remove_dir_all(&d).unwrap();
     }
 

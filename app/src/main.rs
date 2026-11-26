@@ -133,10 +133,8 @@ fn main() {
     let handle = app.handle();
     app.on_frame_drawn(move |rt| {
         // Tab to the menu on screen, for the measure in the findings.
-        if !rt.state.panels.is_empty()
-            && let Some(asked) = rt.state.looked.take()
-        {
-            eprintln!("menu drawn {:.1} ms", asked.elapsed().as_secs_f64() * 1000.0);
+        if let Some(said) = state::menu_drawn(&rt.state) {
+            eprintln!("{said}");
         }
         if rt.state.edit.range() != rt.state.last_range {
             moves.update_if(|s, _| state::moved(s));

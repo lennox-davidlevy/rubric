@@ -78,6 +78,9 @@ fn fence_mark(t: &str) -> Option<(u8, usize)> {
 /// A panel's field: the panel's keys first, then the field's own editing.
 pub fn field_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
     use crate::panel::Taken;
+    // Keys reaching the field mean it has them, however it got them (a press on it).
+    s.field_live = true;
+    s.held = None;
     match crate::look::key(s, ev, tx) {
         Taken::Typing => false,
         // The panel closed; the key is not typed into a field that is gone.

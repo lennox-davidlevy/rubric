@@ -228,15 +228,16 @@ pub enum Taken {
     Passed,
 }
 
-/// A key in the top panel of `stack`: Up and Down over the rows that take the focus; Left and
-/// Right change a `Seg`; Return chooses an `Item` or submits a `Field` (`text` is the field's);
-/// a row's own key chooses it from anywhere in the panel; Esc goes back one panel, then
-/// closes; typing in a `Field` stays there; any other key closes the panels and is the
-/// editor's.
-pub fn key(stack: &mut Vec<Panel>, ev: &KeyEvent, text: &str) -> Taken {
+/// A key in the top panel of `stack`: Up and Down, and Tab and Shift+Tab, over the rows that
+/// take the focus; Left and Right change a `Seg`; Return chooses an `Item` or submits a
+/// `Field` (`text` is the field's); a row's own key chooses it from anywhere in the panel; Esc
+/// goes back one panel, then closes; typing in a `Field` that is `live` (has the keys) stays
+/// there; any other key closes the panels and is the editor's. Tab never chooses: it is the
+/// key that opens a menu, and a second Tab must not act.
+pub fn key(stack: &mut Vec<Panel>, ev: &KeyEvent, text: &str, live: bool) -> Taken {
     let depth = stack.len();
     let Some(panel) = stack.last_mut() else { return Taken::Passed };
-    let in_field = matches!(panel.row(), Some(Row::Field { .. }));
+    let in_field = live && matches!(panel.row(), Some(Row::Field { .. }));
     if ev.mods.cmd {
         let chosen = panel.rows.iter().find_map(|r| match r {
             Row::Item(i) if !i.off && i.key.as_ref().is_some_and(|k| k.matches(ev)) => Some(i.id.clone()),
@@ -261,9 +262,13 @@ pub fn key(stack: &mut Vec<Panel>, ev: &KeyEvent, text: &str) -> Taken {
             panel.step(ev.key == Key::Down);
             Taken::Moved
         }
-        Key::Enter | Key::Tab if !ev.mods.shift => match panel.row().cloned() {
+        Key::Tab => {
+            panel.step(!ev.mods.shift);
+            Taken::Moved
+        }
+        Key::Enter if !ev.mods.shift => match panel.row().cloned() {
             Some(Row::Item(i)) => Taken::Chose(i.id),
-            Some(Row::Field { id, .. }) if ev.key == Key::Enter => Taken::Submitted(id, text.to_string()),
+            Some(Row::Field { id, .. }) => Taken::Submitted(id, text.to_string()),
             _ => Taken::Moved,
         },
         Key::Left | Key::Right if !ev.mods.shift && !in_field => {
@@ -286,6 +291,8 @@ pub fn key(stack: &mut Vec<Panel>, ev: &KeyEvent, text: &str) -> Taken {
                 Row::Item(i) if right && i.more => Taken::Chose(i.id.clone()),
                 // Right on a row with a chip opens the chip's panel.
                 Row::Item(i) if right && i.chip.is_some() => Taken::Chip(i.id.clone()),
+                // On a field without the keys: nothing to move in.
+                Row::Field { .. } => Taken::Moved,
                 _ => {
                     stack.clear();
                     Taken::Passed
@@ -383,14 +390,37 @@ mod tests {
         let mut s = vec![panel()];
         assert_eq!(active(&s).as_deref(), Some("keep"), "the title is passed over");
         let order: Vec<_> = (0..5).map(|_| {
-            key(&mut s, &ev(Key::Down), "");
+            key(&mut s, &ev(Key::Down), "", true);
             active(&s).unwrap()
         }).collect();
         assert_eq!(order, ["size", "words", "remove", "remove", "remove"]);
         for _ in 0..5 {
-            key(&mut s, &ev(Key::Up), "");
+            key(&mut s, &ev(Key::Up), "", true);
         }
         assert_eq!(active(&s).as_deref(), Some("keep"));
+    }
+
+    #[test]
+    fn tab_moves_as_down_and_shift_tab_as_up_and_neither_chooses() {
+        let mut s = vec![panel()];
+        assert_eq!(key(&mut s, &ev(Key::Tab), "", false), Taken::Moved);
+        assert_eq!(active(&s).as_deref(), Some("size"));
+        let back = KeyEvent { key: Key::Tab, mods: Mods { shift: true, ..Mods::default() } };
+        assert_eq!(key(&mut s, &back, "", false), Taken::Moved);
+        assert_eq!(key(&mut s, &back, "", false), Taken::Moved, "at the top it stays");
+        assert_eq!(active(&s).as_deref(), Some("keep"));
+        s[0].focus("words");
+        assert_eq!(key(&mut s, &ev(Key::Tab), "typed", true), Taken::Moved, "a field with the keys is left");
+        assert_eq!(active(&s).as_deref(), Some("remove"));
+    }
+
+    #[test]
+    fn a_field_without_the_keys_takes_no_typing() {
+        let mut s = vec![panel()];
+        s[0].focus("words");
+        assert_eq!(key(&mut s, &ev(Key::Left), "", false), Taken::Moved);
+        assert_eq!(key(&mut s, &ev(Key::Down), "", false), Taken::Moved);
+        assert_eq!(active(&s).as_deref(), Some("remove"));
     }
 
     #[test]
@@ -401,8 +431,8 @@ mod tests {
             Row::Item(Item::new("c", "C").off()),
         ])];
         assert_eq!(active(&s).as_deref(), Some("b"), "the first that can be chosen");
-        key(&mut s, &ev(Key::Down), "");
-        key(&mut s, &ev(Key::Up), "");
+        key(&mut s, &ev(Key::Down), "", true);
+        key(&mut s, &ev(Key::Up), "", true);
         assert_eq!(active(&s).as_deref(), Some("b"));
         assert!(!s[0].focus("c"));
     }
@@ -411,26 +441,26 @@ mod tests {
     fn left_and_right_change_a_seg_and_stop_at_its_ends() {
         let mut s = vec![panel()];
         s[0].focus("size");
-        assert_eq!(key(&mut s, &ev(Key::Left), ""), Taken::Moved);
-        assert_eq!(key(&mut s, &ev(Key::Right), ""), Taken::Set("size".into(), 1));
-        assert_eq!(key(&mut s, &ev(Key::Right), ""), Taken::Moved);
+        assert_eq!(key(&mut s, &ev(Key::Left), "", true), Taken::Moved);
+        assert_eq!(key(&mut s, &ev(Key::Right), "", true), Taken::Set("size".into(), 1));
+        assert_eq!(key(&mut s, &ev(Key::Right), "", true), Taken::Moved);
         assert!(matches!(&s[0].rows[4], Row::Seg { on: 1, .. }));
-        assert_eq!(key(&mut s, &ev(Key::Left), ""), Taken::Set("size".into(), 0));
+        assert_eq!(key(&mut s, &ev(Key::Left), "", true), Taken::Set("size".into(), 0));
     }
 
     #[test]
     fn return_chooses_an_item_and_submits_a_field() {
         let mut s = vec![panel()];
-        assert_eq!(key(&mut s, &ev(Key::Enter), ""), Taken::Chose("keep".into()));
+        assert_eq!(key(&mut s, &ev(Key::Enter), "", true), Taken::Chose("keep".into()));
         s[0].focus("words");
-        assert_eq!(key(&mut s, &ev(Key::Enter), "torn edge"), Taken::Submitted("words".into(), "torn edge".into()));
+        assert_eq!(key(&mut s, &ev(Key::Enter), "torn edge", true), Taken::Submitted("words".into(), "torn edge".into()));
     }
 
     #[test]
     fn a_rows_own_key_chooses_it_from_another_row() {
         let mut s = vec![panel()];
         s[0].focus("remove");
-        assert_eq!(key(&mut s, &cmd(Key::Enter), ""), Taken::Chose("keep".into()));
+        assert_eq!(key(&mut s, &cmd(Key::Enter), "", true), Taken::Chose("keep".into()));
         assert_eq!(s.len(), 1);
     }
 
@@ -439,23 +469,23 @@ mod tests {
         let mut s = vec![panel()];
         s[0].focus("words");
         for k in [Key::Text("a".into()), Key::Backspace, Key::Left, Key::Right, Key::Home] {
-            assert_eq!(key(&mut s, &ev(k), ""), Taken::Typing);
+            assert_eq!(key(&mut s, &ev(k), "", true), Taken::Typing);
         }
-        assert_eq!(key(&mut s, &cmd(Key::Command('v')), ""), Taken::Typing);
+        assert_eq!(key(&mut s, &cmd(Key::Command('v')), "", true), Taken::Typing);
         s[0].focus("keep");
-        assert_eq!(key(&mut s, &ev(Key::Text("a".into())), ""), Taken::Passed);
+        assert_eq!(key(&mut s, &ev(Key::Text("a".into())), "", true), Taken::Passed);
         assert!(s.is_empty());
         let mut s = vec![panel()];
-        assert_eq!(key(&mut s, &cmd(Key::Command('s')), ""), Taken::Passed, "Ctrl+S is the editor's");
+        assert_eq!(key(&mut s, &cmd(Key::Command('s')), "", true), Taken::Passed, "Ctrl+S is the editor's");
         assert!(s.is_empty());
     }
 
     #[test]
     fn esc_goes_back_one_panel_then_closes() {
         let mut s = vec![panel(), Panel::new("more", "More", 200.0, vec![Row::Item(Item::new("a", "A"))])];
-        assert_eq!(key(&mut s, &ev(Key::Escape), ""), Taken::Back);
+        assert_eq!(key(&mut s, &ev(Key::Escape), "", true), Taken::Back);
         assert_eq!(s.len(), 1);
-        assert_eq!(key(&mut s, &ev(Key::Escape), ""), Taken::Closed);
+        assert_eq!(key(&mut s, &ev(Key::Escape), "", true), Taken::Closed);
         assert!(s.is_empty());
     }
 
@@ -463,10 +493,10 @@ mod tests {
     fn left_on_a_second_panel_goes_back_and_right_on_more_opens() {
         let more = Panel::new("first", "First", 200.0, vec![Row::Item(Item::new("plain", "Plain")), Row::Item(Item::new("deeper", "Deeper").more())]);
         let mut s = vec![more.clone(), Panel::new("second", "Second", 200.0, vec![Row::Item(Item::new("a", "A"))])];
-        assert_eq!(key(&mut s, &ev(Key::Left), ""), Taken::Back);
+        assert_eq!(key(&mut s, &ev(Key::Left), "", true), Taken::Back);
         assert_eq!(s.len(), 1);
         s[0].focus("deeper");
-        assert_eq!(key(&mut s, &ev(Key::Right), ""), Taken::Chose("deeper".into()));
+        assert_eq!(key(&mut s, &ev(Key::Right), "", true), Taken::Chose("deeper".into()));
         assert_eq!(s.len(), 1, "the owner opens what comes next");
     }
 

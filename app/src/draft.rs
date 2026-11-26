@@ -123,16 +123,38 @@ fn action(id: &str) -> Option<(String, Chord)> {
     Some((label.into(), Chord(key)))
 }
 
-/// What the line's status says, and the id of its action.
+/// What a `new:` line's status says, and the id of its action.
 pub fn says(status: &Status, words: &str, now_ms: u64) -> (Said, &'static str) {
     let fact = readable(words);
+    said(status, &fact.clone(), fact, now_ms)
+}
+
+/// What the status of a draft of `name` says, with `fact` while it is not failed.
+fn said(status: &Status, name: &str, fact: String, now_ms: u64) -> (Said, &'static str) {
     let (label, fact, id) = match status {
         Status::None { .. } => ("Not started".to_string(), fact, "build"),
         Status::Drafting { started_ms, .. } => (format!("Drafting {}", clock(now_ms.saturating_sub(*started_ms))), fact, "stop"),
         Status::Ready { .. } => ("Ready".into(), fact, "keep"),
-        Status::Failed { message } => (format!("{fact} failed"), message.as_deref().map_or_else(|| "No reason given".into(), readable), "reroll"),
+        Status::Failed { message } => (format!("{name} failed"), message.as_deref().map_or_else(|| "No reason given".into(), readable), "reroll"),
     };
     (Said { label, tone: status.tone(), fact, action: action(id) }, id)
+}
+
+/// What the status of a placed part's take or new variant says: the part, and the change
+/// asked for after the line's `:` ("Quote, torn paper edge").
+pub fn says_for_part(status: &Status, line: &str, now_ms: u64) -> Option<(Said, &'static str)> {
+    if matches!(status, Status::None { .. }) {
+        return None;
+    }
+    let lead = crate::part::lead(line);
+    let part = lead.trim_start_matches([' ', '\t']).trim_start_matches(':').split_whitespace().next()?;
+    let name = readable(part);
+    let change = crate::part::refine_colon(line).map(|c| line[c + 1..].trim()).filter(|w| !w.is_empty());
+    let fact = match change {
+        Some(w) => format!("{name}, {w}"),
+        None => name.clone(),
+    };
+    Some(said(status, &name, fact, now_ms))
 }
 
 /// The fields of the server's `DraftView` the app reads.
@@ -391,16 +413,21 @@ pub fn status_of(s: &State, line: u32) -> Status {
     s.drafts.iter().find(|(l, _)| *l == line).map_or(Status::None { earlier: 0 }, |(_, st)| st.clone())
 }
 
-/// The caret's `new:` line with words, its status and its action's id.
+/// The caret's `new:` line with words, or its placed part with a take or a new variant on
+/// the way: its status and its action's id.
 fn caret_status(s: &State) -> Option<(u32, String, Said, &'static str)> {
     let (line, text) = caret_line(s);
-    let words = new_words(text).filter(|w| !w.is_empty())?;
-    let (said, id) = says(&status_of(s, line), words, s.now_ms);
+    let (said, id) = match new_words(text) {
+        Some(words) if words.is_empty() => return None,
+        Some(words) => says(&status_of(s, line), words, s.now_ms),
+        None if crate::part::names_something(text) => says_for_part(&status_of(s, line), text, s.now_ms)?,
+        None => return None,
+    };
     Some((line, text.to_string(), said, id))
 }
 
 /// What the bottom of the writing pane says: something that just happened, or where the
-/// caret's `new:` line is.
+/// caret's `new:` line or part's draft is.
 pub fn line(s: &State) -> Option<Said> {
     if let Some((said, _)) = &s.flash {
         return Some(said.clone());
@@ -487,10 +514,12 @@ pub fn drafted(s: &mut State, params: &Value) {
     }
 }
 
-pub fn send(s: &mut State, method: &str, what: What, line: u32, text: String, params: Value) {
-    let Some(c) = &s.client else { return };
+pub fn send(s: &mut State, method: &str, what: What, line: u32, text: String, params: Value) -> Option<i64> {
+    let c = s.client.as_ref()?;
     let id = c.request(method, params);
     s.pending.insert(id, Asked { line, text, what });
+    s.sent_at.insert(id, std::time::Instant::now());
+    Some(id)
 }
 
 /// Tab on a `new:` line: asks for its view, whose answer opens the menu. False on any other line.
@@ -500,7 +529,7 @@ pub fn tab(s: &mut State) -> bool {
         return false;
     }
     let text = text.to_string();
-    s.looked.set(Some(std::time::Instant::now()));
+    state::start_look(s);
     let params = params(None, &s.uri, line);
     send(s, "rubric/draft", What::Look, line, text, params);
     true
@@ -611,8 +640,13 @@ pub fn refresh_menu(s: &mut State) {
 }
 
 /// An answer to a request this module sent.
-pub fn answered(s: &mut State, asked: Asked, result: Result<Value, String>) {
+pub fn answered(s: &mut State, id: i64, asked: Asked, result: Result<Value, String>) {
+    let said = s.said_on.remove(&id);
+    let done = result.as_ref().is_ok_and(|v| v.get("error").is_none());
     answer(s, asked, result);
+    if let (Some((label, fact)), true) = (said, done) {
+        flash(s, label, Tone::Ink, fact);
+    }
     crate::look::sync_field(s);
 }
 
@@ -725,7 +759,7 @@ fn ask_take(s: &mut State, to: u32) {
 
 /// Sends `action` for the line that read `text` at `line`, with `extra` beside it; build and
 /// reroll carry the drafter chosen for the line.
-pub fn ask(s: &mut State, action: &str, what: What, line: u32, text: String, extra: Value) {
+pub fn ask(s: &mut State, action: &str, what: What, line: u32, text: String, extra: Value) -> Option<i64> {
     let mut p = params(Some(action), &s.uri, line);
     if let (Some(p), Some(e)) = (p.as_object_mut(), extra.as_object()) {
         p.extend(e.clone());
@@ -735,7 +769,14 @@ pub fn ask(s: &mut State, action: &str, what: What, line: u32, text: String, ext
     {
         p["drafter"] = c.json();
     }
-    send(s, "rubric/draft", what, line, text, p);
+    send(s, "rubric/draft", what, line, text, p)
+}
+
+/// Sends `action` as `ask` does, and says `label` and `fact` once the server has done it.
+pub fn ask_then_say(s: &mut State, action: &str, line: u32, text: String, extra: Value, label: &str, fact: String) {
+    if let Some(id) = ask(s, action, What::Act, line, text, extra) {
+        s.said_on.insert(id, (label.to_string(), fact));
+    }
 }
 
 /// Does the action `id` on the line, as its menu row or its key on the status line does.
@@ -746,8 +787,8 @@ fn perform(s: &mut State, id: &str, line: u32, text: String) {
         "restore" => ask(s, "restore", What::Build, line, text, json!({})),
         "stop" | "cancel" => ask(s, id, What::Act, line, text, json!({})),
         "keep" => ask(s, "keep", What::Act, line, text, json!({ "global": false })),
-        _ => {}
-    }
+        _ => None,
+    };
 }
 
 /// The status line's key, on a `new:` line with no panel open: Cmd+Enter drafts or keeps,

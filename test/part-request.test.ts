@@ -16,6 +16,7 @@ let dir: string;
 let ws: Workspace;
 let asked: string[] = [];
 let page: string;
+let text: string;
 
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), "rubric-part-"));
@@ -28,7 +29,7 @@ beforeAll(async () => {
   };
   ws = new Workspace(site, await Cache.load(site.cache), resolver, () => {}, { idleMs: 5, waitMs: 1000, drawMs: 5 });
   page = join(dir, "pages/posts/part-request.md");
-  await ws.open(page, [
+  text = [
     "---",
     "title: Parts",
     "---",
@@ -41,7 +42,8 @@ beforeAll(async () => {
     "::: post-list style=titles",                                   // 9
     "",                                                             // 10
     "",
-  ].join("\n"));
+  ].join("\n");
+  await ws.open(page, text);
 });
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -111,6 +113,27 @@ test("a part looked at on an empty line is drawn there, and goes when the look e
   ws.peek(page, 10, "divider");
   expect(await drawn(true)).toBe(true);
   ws.peek(page, 10);
+  expect(await drawn(false)).toBe(true);
+});
+
+test("a part looked at on a line goes when the text changes or the file closes", async () => {
+  const content = join(dir, "content/posts/part-request.md");
+  const drawn = async (want: boolean) => {
+    for (let i = 0; i < 100; i++) {
+      await Bun.sleep(10);
+      if (readFileSync(content, "utf8").includes("{{< divider") === want) return true;
+    }
+    return false;
+  };
+  ws.peek(page, 10, "divider");
+  expect(await drawn(true)).toBe(true);
+  await ws.change(page, text.replace("Plain writing.", "Plain writing, changed."));
+  expect(await drawn(false)).toBe(true);
+  await ws.change(page, text);
+  ws.peek(page, 10, "divider");
+  expect(await drawn(true)).toBe(true);
+  await ws.close(page);
+  await ws.open(page, text);
   expect(await drawn(false)).toBe(true);
 });
 

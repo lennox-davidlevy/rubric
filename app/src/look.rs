@@ -2,7 +2,7 @@
 //! under the focus, Return keeps it, Esc goes back to the one before. And the routing of keys
 //! to whatever panel is open.
 
-use rune::{KeyEvent, Spring, Tx};
+use rune::{Key, KeyEvent, Spring, Tx};
 
 use crate::panel::{self, Item, Panel, Row, Taken};
 use crate::state::{self, State};
@@ -74,10 +74,14 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> Taken {
         act(s, &top, taken.clone(), tx);
         return taken;
     }
-    let was_field = in_field(s);
+    // A field row without the keys: typing on it, or Return, gives it the keys.
+    if on_field(s) && !s.field_live && let Some(taken) = wake_field(s, ev, tx) {
+        return taken;
+    }
+    let was_field = s.field_live;
     let peeking = s.panels.iter().any(|p| p.id == crate::draft::NEAR);
     let before = (s.panels.len(), s.panels.last().map(|p| p.active));
-    let taken = panel::key(&mut s.panels, ev, &s.field.text);
+    let taken = panel::key(&mut s.panels, ev, &s.field.text, s.field_live);
     // A key that moved nothing (Down on the last row) tells no one.
     if taken == Taken::Moved && before == (s.panels.len(), s.panels.last().map(|p| p.active)) {
         return taken;
@@ -91,12 +95,20 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> Taken {
     if taken != Taken::Typing {
         sync_field(s);
     }
+    // Return in a field leaves it, as moving off it does.
+    if matches!(taken, Taken::Submitted(..)) && s.field_live {
+        s.field_live = false;
+        hold(s);
+    }
     follow(s, was_field, tx);
     taken
 }
 
 /// The field typed in is the top panel's row with the focus: a field taking the focus starts
-/// from its row's value, and one left goes back to it.
+/// from its row's value, and one left goes back to it. A field row reached by the keys or the
+/// pointer does not have the keys until it is typed on, given Return or pressed: the writing
+/// keeps them, so crossing a field moves no focus between two text inputs (which resets the
+/// window's input method each time; see the findings).
 pub fn sync_field(s: &mut State) {
     let at = s.panels.last().and_then(|p| match p.row() {
         Some(Row::Field { id, value, .. }) => Some(((p.id.clone(), id.clone()), value.clone())),
@@ -108,22 +120,101 @@ pub fn sync_field(s: &mut State) {
             let end = s.field.text.len();
             s.field.set_caret(end);
             s.field_of = Some(key);
+            s.field_live = false;
         }
         Some(_) => {}
-        None => s.field_of = None,
+        None => {
+            s.field_of = None;
+            s.field_live = false;
+        }
+    }
+    hold(s);
+}
+
+/// While a field row without the keys has the focus, a copy of the writing as it is: text the
+/// input method commits to the writing then goes to the field instead (`typed_on_field`).
+fn hold(s: &mut State) {
+    if on_field(s) && !s.field_live {
+        if s.held.as_ref().is_none_or(|h| h.text != s.edit.text) {
+            s.held = Some(s.edit.clone());
+        }
+    } else {
+        s.held = None;
     }
 }
 
-fn in_field(s: &State) -> bool {
+/// The top panel's row with the focus is a field.
+fn on_field(s: &State) -> bool {
     matches!(s.panels.last().and_then(Panel::row), Some(Row::Field { .. }))
 }
 
-/// The keys go to a field when the focus moved onto one, and back to the writing when it left.
-fn follow(s: &State, was_field: bool, tx: &mut Tx) {
-    let now = in_field(s);
-    if now && !was_field {
-        tx.focus("panel-field", false);
-    } else if was_field && !now {
+/// The field gets the keys.
+pub fn give_field(s: &mut State, tx: &mut Tx) {
+    s.field_live = true;
+    s.held = None;
+    tx.focus("panel-field", false);
+}
+
+/// A key on a field row without the keys: a typed character, Backspace or Return gives the field
+/// the keys, the character typed into it. None for any other key.
+fn wake_field(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> Option<Taken> {
+    if ev.mods.cmd || ev.mods.ctrl || ev.mods.alt {
+        return None;
+    }
+    match &ev.key {
+        Key::Text(t) => {
+            s.field.insert(t);
+            give_field(s, tx);
+            crate::insert::typed(s, tx);
+            Some(Taken::Typing)
+        }
+        Key::Backspace => {
+            let end = s.field.text.len();
+            if let Some(start) = s.field.text[..end].char_indices().next_back().map(|(i, _)| i) {
+                s.field.set_selection(start, end);
+                s.field.insert("");
+            }
+            give_field(s, tx);
+            crate::insert::typed(s, tx);
+            Some(Taken::Typing)
+        }
+        Key::Enter if !ev.mods.shift => {
+            give_field(s, tx);
+            Some(Taken::Moved)
+        }
+        _ => None,
+    }
+}
+
+/// The writing changed while a field row without the keys had the focus: what the input method
+/// committed was meant for the field. The writing goes back as it was, history and all, and the
+/// text goes to the field, which gets the keys. False when the change was something else.
+pub fn typed_on_field(s: &mut State, tx: &mut Tx) -> bool {
+    if s.field_live || !on_field(s) {
+        return false;
+    }
+    let Some(held) = s.held.take() else { return false };
+    let (a, b) = held.range();
+    let (was, now) = (&held.text, &s.edit.text);
+    let tail = was.len() - b;
+    let fits = now.len() >= a + tail && now.is_char_boundary(a) && now.is_char_boundary(now.len() - tail)
+        && now[..a] == was[..a] && now[now.len() - tail..] == was[b..];
+    if !fits {
+        return false;
+    }
+    let typed = now[a..now.len() - tail].to_string();
+    s.edit = held;
+    s.field.insert(&typed);
+    give_field(s, tx);
+    crate::insert::typed(s, tx);
+    true
+}
+
+/// A field that had the keys and is no longer the row with the focus gives them back to the
+/// writing. Reaching a field gives it nothing.
+fn follow(s: &mut State, was_field: bool, tx: &mut Tx) {
+    if was_field && !(s.field_live && on_field(s)) {
+        s.field_live = false;
         tx.focus("editor", false);
     }
 }
@@ -182,11 +273,15 @@ fn restore(s: &mut State) {
 
 /// Closes every panel as Esc would, its owner told.
 pub fn close_panels(s: &mut State) {
+    // The next panel to open hangs from its own line.
+    s.anchor = None;
     let Some(id) = s.panels.first().map(|p| p.id.clone()) else { return };
     let peeking = s.panels.iter().any(|p| p.id == crate::draft::NEAR);
     let looking = s.panels.iter().any(|p| p.id == crate::insert::LIST || p.id == crate::insert::SIMILAR);
     s.panels.clear();
     s.field_of = None;
+    s.field_live = false;
+    s.held = None;
     if id == THEMES {
         restore(s);
     } else if crate::insert::owns(&id) {
@@ -207,7 +302,7 @@ pub fn hovered(s: &mut State, depth: usize, i: usize, tx: &mut Tx) {
     p.active = i;
     let id = p.id.clone();
     if depth + 1 == s.panels.len() {
-        let was_field = in_field(s);
+        let was_field = s.field_live;
         moved(s, &id);
         sync_field(s);
         follow(s, was_field, tx);
@@ -221,7 +316,7 @@ pub fn pressed(s: &mut State, depth: usize, i: usize, segment: Option<usize>, tx
     if !s.panels.get(depth).and_then(|p| p.rows.get(i)).is_some_and(Row::takes_focus) {
         return;
     }
-    let was_field = in_field(s);
+    let was_field = s.field_live;
     // A second panel open beside: a press on the first goes back to it.
     while s.panels.len() > depth + 1 {
         back(s, tx);
@@ -237,7 +332,7 @@ pub fn pressed(s: &mut State, depth: usize, i: usize, segment: Option<usize>, tx
         }
         (Row::Field { .. }, _) => {
             sync_field(s);
-            tx.focus("panel-field", false);
+            give_field(s, tx);
             return;
         }
         _ => return,
@@ -248,9 +343,10 @@ pub fn pressed(s: &mut State, depth: usize, i: usize, segment: Option<usize>, tx
     keys_home(s, tx);
 }
 
-/// After a press in a panel the keys go where they would after a key: the field, or the writing.
+/// After a press in a panel the keys go where they would after a key: the field that has them,
+/// or the writing.
 fn keys_home(s: &State, tx: &mut Tx) {
-    if !in_field(s) {
+    if !s.field_live {
         tx.focus("editor", false);
     }
 }

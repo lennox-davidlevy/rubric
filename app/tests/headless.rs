@@ -23,6 +23,10 @@ fn editor_focused(rt: &Runtime<State>) -> bool {
     rt.elements().into_iter().any(|e| e.key.as_deref() == Some("editor") && e.focused)
 }
 
+fn field_focused(rt: &Runtime<State>) -> bool {
+    rt.elements().into_iter().any(|e| e.key.as_deref() == Some("panel-field") && e.focused)
+}
+
 #[test]
 fn a_typed_character_lands_in_the_text_and_the_version_goes_up() {
     let mut rt = runtime("# Hi\n\nbody", 10);
@@ -494,10 +498,11 @@ fn notes_typed_for_a_reroll_go_with_it_and_not_into_the_writing() {
     press(&mut rt, Key::Enter);
     rt.frame(1.0 / 60.0);
     assert_eq!(top(&rt).as_deref(), Some("notes"));
-    assert!(rt.elements().into_iter().any(|e| e.key.as_deref() == Some("panel-field") && e.focused), "the field has the focus");
+    assert!(editor_focused(&rt), "reaching the field moves no focus");
     rt.ime(Ime::Commit("name it tide-two".into()));
     rt.frame(1.0 / 60.0);
     assert_eq!(rt.state.edit.text, NEW);
+    assert!(field_focused(&rt), "typed on, the field has the keys");
     press(&mut rt, Key::Enter);
     let reroll = drafts(&sent);
     assert_eq!((reroll[0]["params"]["action"].as_str(), reroll[0]["params"]["change"].as_str()), (Some("reroll"), Some("name it tide-two")));
@@ -677,6 +682,31 @@ fn the_status_shows_only_while_the_caret_is_on_a_new_line() {
     assert_eq!(after.tone, rubric_app::draft::Tone::Accent);
     caret_to(&mut rt, 0);
     assert!(rt.find("status-words").is_none());
+}
+
+#[test]
+fn the_status_follows_a_variant_drafting_on_a_parts_line_with_its_one_action() {
+    let text = "before\n::: quote : torn edge\nWords.\n:::";
+    let (mut rt, sent) = on_line(text, 1);
+    assert!(rubric_app::draft::line(&rt.state).is_none(), "a part with nothing drafting says nothing");
+    let note = |code: &str| json!([{ "source": "rubric", "code": code, "range": { "start": { "line": 1, "character": 0 } },
+        "data": { "name": "quote-torn-edge", "of": "quote", "variant": true, "started": 0, "message": "no part" } }]);
+    diagnostics(&mut rt, note("drafting"));
+    let said = rubric_app::draft::line(&rt.state).expect("said");
+    assert!(said.label.starts_with("Drafting"));
+    assert!(said.fact.starts_with("Quote"));
+    cmd(&mut rt, Key::Command('.'));
+    let stop = drafts(&sent);
+    assert_eq!((stop[0]["params"]["action"].as_str(), stop[0]["params"]["line"].as_u64()), (Some("stop"), Some(1)));
+    diagnostics(&mut rt, note("draft-ready"));
+    assert_eq!(rubric_app::draft::line(&rt.state).unwrap().label, "Ready");
+    cmd(&mut rt, Key::Enter);
+    assert_eq!(drafts(&sent)[0]["params"]["action"], "keep");
+    diagnostics(&mut rt, note("draft-failed"));
+    let failed = rubric_app::draft::line(&rt.state).unwrap();
+    assert_eq!(failed.tone, rubric_app::draft::Tone::Warn);
+    cmd(&mut rt, Key::Command('r'));
+    assert_eq!(drafts(&sent)[0]["params"]["action"], "reroll");
 }
 
 #[test]
@@ -1039,6 +1069,90 @@ fn a_part_menu_segment_sends_set_with_its_name_and_value_and_nothing_else() {
 }
 
 #[test]
+fn crossing_every_row_of_a_parts_menu_moves_no_focus() {
+    let (mut rt, _sent) = part_menu(QUOTE, 1, quote("catalog"), json!({ "words": "A quote", "of": "quote", "catalog": true }));
+    let n = rt.state.panels[0].rows.iter().filter(|r| r.takes_focus()).count();
+    let shift_tab = KeyEvent { key: Key::Tab, mods: Mods { shift: true, ..Mods::default() } };
+    let mut seen = std::collections::HashSet::new();
+    for round in 0..6 {
+        for _ in 0..n + 1 {
+            if round % 2 == 0 { press(&mut rt, Key::Down) } else { press(&mut rt, Key::Tab) }
+            seen.insert(rt.state.panels[0].active_id().unwrap().to_string());
+            assert!(editor_focused(&rt) && !field_focused(&rt), "on {:?}", rt.state.panels[0].active_id());
+        }
+        for _ in 0..n + 1 {
+            if round % 2 == 0 { press(&mut rt, Key::Up) } else { rt.key(shift_tab.clone()); rt.frame(1.0 / 60.0); }
+            assert!(editor_focused(&rt) && !field_focused(&rt), "on {:?}", rt.state.panels[0].active_id());
+        }
+    }
+    assert!(seen.contains("set:cite") && seen.contains("words"), "both fields were crossed: {seen:?}");
+    assert_eq!(top(&rt).as_deref(), Some("part"), "Tab chose nothing");
+    assert_eq!(rt.state.edit.text, QUOTE);
+}
+
+#[test]
+fn typing_on_a_field_row_keeps_the_first_character_as_a_key_or_a_commit() {
+    for first in ["key", "commit"] {
+        let (mut rt, sent) = part_menu(QUOTE, 1, quote("catalog"), json!({ "words": "A quote", "of": "quote", "catalog": true }));
+        press(&mut rt, Key::Down);
+        assert_eq!(rt.state.panels[0].active_id(), Some("set:cite"));
+        if first == "key" { press(&mut rt, Key::Text("A".into())) } else { rt.ime(Ime::Commit("A".into())); rt.frame(1.0 / 60.0); }
+        assert!(field_focused(&rt), "{first}: typed on, the field has the keys");
+        rt.ime(Ime::Commit(". Keeper".into()));
+        rt.frame(1.0 / 60.0);
+        assert_eq!(rt.state.edit.text, QUOTE, "{first}: the writing is untouched");
+        press(&mut rt, Key::Enter);
+        let set = sent_to(&sent, "rubric/part");
+        assert_eq!(set[0]["params"]["set"], json!({ "name": "cite", "value": "A. Keeper" }), "{first}");
+        assert!(editor_focused(&rt), "{first}: Return gives the keys back to the writing");
+        // The writing's history is as it was: undo brings back no stray text.
+        press(&mut rt, Key::Escape);
+        cmd(&mut rt, Key::Command('z'));
+        assert_eq!(rt.state.edit.text, QUOTE, "{first}");
+    }
+}
+
+fn rect_of(rt: &Runtime<State>, key: &str) -> [f32; 4] {
+    rt.elements().into_iter().find(|e| e.key.as_deref() == Some(key) && !e.exiting).unwrap_or_else(|| panic!("no {key}")).rect
+}
+
+#[test]
+fn a_panel_hangs_from_the_start_of_its_line_and_stays_there_until_the_writing_scrolls() {
+    let text = format!("{}::: quote\nWords inside.\n:::\n{}", "Line before.\n\n".repeat(8), "Line after.\n\n".repeat(40));
+    let at = 16;
+    let (mut rt, sent) = part_menu(&text, at, quote("catalog"), json!({ "words": "A quote", "of": "quote", "catalog": true }));
+    settle(&mut rt);
+    let first = rect_of(&rt, "panel-0");
+    let editor = rect_of(&rt, "editor");
+    assert!((first[0] - editor[0]).abs() < 1.0, "at the line's left edge: {first:?} {editor:?}");
+    // A setting written puts the caret at the end of a longer line: the panel stays.
+    press(&mut rt, Key::Right);
+    let set = sent_to(&sent, "rubric/part");
+    answer(&mut rt, &set[0], json!({ "replace": "::: quote size=large cite=\"The keeper of the lighthouse\"" }));
+    settle(&mut rt);
+    assert_eq!(top(&rt).as_deref(), Some("part"));
+    assert_eq!(rect_of(&rt, "panel-0")[..2], first[..2], "the panel did not move");
+    // The writing scrolls: the panel goes with its line.
+    let pane = rect_of(&rt, "writing");
+    rt.wheel(pane[0] + 4.0, pane[1] + pane[3] - 10.0, -60.0);
+    settle(&mut rt);
+    let moved = rect_of(&rt, "editor")[1] - editor[1];
+    assert!(moved < -1.0, "the writing scrolled: {moved}");
+    let now = rect_of(&rt, "panel-0");
+    assert!((now[1] - (first[1] + moved)).abs() < 1.0, "the panel followed: {now:?} from {first:?} by {moved}");
+}
+
+#[test]
+fn the_time_to_a_menu_names_the_menu_and_the_servers_share_once() {
+    let (rt, _sent) = part_menu(QUOTE, 1, quote("catalog"), json!({ "words": "A quote", "of": "quote", "catalog": true }));
+    let said = rubric_app::state::menu_drawn(&rt.state).expect("said");
+    assert!(said.contains(": part,") && said.contains("server"), "{said}");
+    assert!(rubric_app::state::menu_drawn(&rt.state).is_none(), "once");
+    let (rt, _sent) = with_menu(NEW, 1, json!({ "words": "a tide clock" }));
+    assert!(rubric_app::state::menu_drawn(&rt.state).unwrap().contains(": draft,"));
+}
+
+#[test]
 fn undo_after_a_setting_restores_the_line() {
     let (mut rt, sent) = part_menu(QUOTE, 1, quote("catalog"), json!({ "words": "A quote", "of": "quote", "catalog": true }));
     press(&mut rt, Key::Right);
@@ -1092,6 +1206,32 @@ fn remove_on_an_own_part_sends_nothing_until_the_second_panels_choice() {
     let removed = drafts(&sent);
     assert_eq!(removed.len(), 1);
     assert_eq!(removed[0]["params"]["action"], "remove");
+}
+
+#[test]
+fn kept_and_removed_are_said_once_the_server_has_done_it() {
+    let tide = "::: tide-table\n:::";
+    let own = || json!({ "name": "tide-table", "kind": "own", "uses": { "blocks": 1, "pages": 1 }, "close": 1, "settings": [], "look": [] });
+    let label = |rt: &Runtime<State>| rt.state.flash.as_ref().map(|f| f.0.label.clone());
+    // Add to every site, refused.
+    let (mut rt, sent) = part_menu(tide, 0, own(), json!({ "words": "Tides", "of": "tide-table" }));
+    rt.update(|s, _| { s.panels[0].focus("global"); });
+    press(&mut rt, Key::Enter);
+    let keep = drafts(&sent);
+    assert_eq!(keep[0]["params"]["global"], true);
+    assert_eq!(label(&rt), None, "nothing said before the answer");
+    answer(&mut rt, &keep[0], json!({ "error": "no such part" }));
+    assert_eq!(label(&rt).as_deref(), Some("Failed"));
+    // Remove from site, done.
+    let (mut rt, sent) = part_menu(tide, 0, own(), json!({ "words": "Tides", "of": "tide-table" }));
+    rt.update(|s, _| { s.panels[0].focus("remove-ask"); });
+    press(&mut rt, Key::Enter);
+    rt.update(|s, _| { s.panels[1].focus("remove-site"); });
+    press(&mut rt, Key::Enter);
+    let removed = drafts(&sent);
+    assert_eq!(label(&rt), None);
+    answer(&mut rt, &removed[0], json!({}));
+    assert_eq!(label(&rt).as_deref(), Some("Removed"));
 }
 
 #[test]

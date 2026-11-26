@@ -93,37 +93,77 @@ The third slice: the design's look, one panel for every menu, and the menus in i
 
 | # | Do this | Expect |
 |---|---|---|
-| C1 | Start the app | A 40-point row over both panes: `The long walk` and `Saved`. The writing in a serif (Literata), the row in a sans (Instrument Sans). `#`, `**` and `:::` in a light gray. |
-| C2 | Type a letter, then Ctrl+S | `Saved` goes at the letter and comes back at the save. |
-| C3 | Ctrl+T then Down and Up a few times | A list of themes at the caret, inside the writing pane, Paper checked. Each move draws the whole app in that theme at once. |
-| C4 | Esc; then Ctrl+T again and type a letter | Esc: the theme from before, nothing kept. The letter: the list closes, the theme from before, the letter in the writing. |
-| C5 | Ctrl+T move to Ink, Return; quit and start again | Ink stays, and is there after the restart. |
-| C6 | Copy `app/themes/nord.json` to `~/.config/rubric/themes/mine.json`, restart, Ctrl+T | `Mine` is last, with `Own`. The pointer over a row draws that theme; a click keeps it. `RUBRIC_APP_THEME=fjord` before the command starts in Fjord for that run only. |
-| C7 | Ctrl+T then Up to `Mode`, Right, Down to Ink, Return; quit and start again | `Mode` is the first row. Right draws the app dark at once. Ink in dark after the restart. |
-| C8 | Ctrl+T Esc, leave the pointer where the list was; Ctrl+T again, then Down past the list's end | Nothing changes under the still pointer. Moving it over a row draws that theme. |
-| C9 | Ctrl+T twice | The list closes; the theme from before. |
-| C10 | Put a broken file in `~/.config/rubric/themes/` and start from a terminal | One line on stderr names the file and why it was skipped. |
-| C11 | On an empty line type `::: new: a tide clock`, then Tab | Under the writing: `Not started`, the words, `Draft Ctrl+Enter`. A panel with `Draft` and its chip. |
-| C12 | Click the chip, choose a model, Right on `Effort`, Esc | A second panel beside the first: tools, models, effort. The chip names the choice. |
-| C13 | Return on `Draft` | The status line counts the draft with `Stop Ctrl+.`, then reads `Ready` with `Keep Ctrl+Enter`. |
-| C14 | Tab, `Reroll with changes…`, type `name it tide-two`, Return; when ready, Tab, `Takes (2)`, Up and Down, Esc | The words go into the field, not the writing. Each move draws that take in the page; Esc draws the one shown before. |
-| C15 | Ctrl+Enter | The line becomes `::: tide-two`; `Kept` shows for 4 s. |
-| C16 | `::: new: a failing bell`, Ctrl+Enter, then Tab | The status line names the failure and its reason, with `Reroll Ctrl+R`. The panel shows both above `Reroll`. |
-| C17 | Type a quote block (`::: quote`, a line of words, `:::`), caret on its first line, Tab | A panel headed `Quote`: `Size` and `Align` as segments, `Cite` as a field, `Look`, a field for words, `Change…`, `Remove` in red. The page draws the quote. |
-| C18 | Right on `Size`; then Ctrl+Z | The line reads `::: quote size=large` at once and the page follows; the panel stays. Ctrl+Z puts the line back and closes the panel. |
-| C19 | Tab, Down to `Cite`, type `A. Keeper`, Return | The letters go into the field. Return: the line gains `cite="A. Keeper"`. |
-| C20 | Tab, Down to the words field, type `bigger`, Return | The line ends ` : bigger`, the caret after it, the pick showing; Tab takes it. |
-| C21 | Tab, `Change…`, type `torn edge`, Return; Tab while it drafts; Tab when ready, `Keep` | The line ends ` : torn edge`. While drafting: `Stop` and `Back to quote`. Keep: the line reads `::: quote variant=…`. |
-| C22 | Tab on that line, then `Back to quote` | Rows `Every quote as …` and `Back to quote`. The line reads `::: quote` again. |
-| C23 | Tab, Ctrl+Delete; then Ctrl+Z | The `:::` lines go, the words inside stay, `Removed` shows. Ctrl+Z brings both lines back. |
-| C24 | Tab on `::: tide-two` (from C15), Ctrl+Delete, `Keep`; Ctrl+Delete, `Remove from site` | `Own` in the heading; `Reroll`, `Add to every site` and `Remove…`. Remove… opens a second panel titled with the blocks using it. Keep goes back. Remove from site: `Removed`, and `sites/app-slice/parts/tide-two` is gone. Do not choose `Add to every site`: it writes the catalog. |
-| C25 | On an empty line, Tab, `Insert part…`, then Down a few times, Esc | A menu: `Insert part…`, `New part…`, `Cut` and `Copy` dimmed, `Paste`. The list is under its groups. Each move draws that part in the page at the line; Esc leaves text and page as they were. |
-| C26 | Tab, `Insert part…`, type `quote`, wait, Return | The list turns flat a moment after typing stops. Return writes `::: quote` and its closer. |
-| C27 | Type `::: three numbered steps`, caret back inside the words, Tab | `Steps` first, `Similar parts (N)`, `Draft new part`. Return on `Steps`: the line reads `::: steps`. |
+| C1 | Start the app | A row over both panes reads `The long walk` and `Saved`. The writing is a serif (Literata), the row a sans (Instrument Sans). `#`, `**` and `:::` are light gray. |
+| C2 | Type a letter | `Saved` goes. |
+| C3 | Ctrl+S | `Saved` comes back. |
+| C4 | Ctrl+T | A list of themes at the caret, inside the writing pane, Paper checked. |
+| C5 | Down, a few times | Each move draws the whole app in that theme at once. |
+| C6 | Esc | The theme from before. |
+| C7 | With the list open, type a letter | The list closes, the theme from before, the letter in the writing. |
+| C8 | Ctrl+T twice | The list opens and closes; the theme from before. |
+| C9 | With the list open, Return on Ink | The app is Ink; the list closes. |
+| C10 | With the list open, Right on `Mode` (the first row) | The app turns dark at once. |
+| C11 | Return | The list closes; still dark. |
+| C12 | Quit and start again | Ink, dark. |
+| C13 | Start again with `app/themes/nord.json` copied to `~/.config/rubric/themes/mine.json` | The app starts as before. |
+| C14 | Ctrl+T | `Mine` is last, noted `Own`. |
+| C15 | Move the pointer over a row | That theme is drawn. |
+| C16 | Click a row | That theme is kept; the list closes. |
+| C17 | With the pointer resting where the list opens, Ctrl+T | The checked theme has the focus; nothing changes under the still pointer. |
+| C18 | Down past the list's end, the pointer still | Nothing changes under the pointer. |
+| C19 | Start once with `RUBRIC_APP_THEME=fjord` before the command | Fjord. |
+| C20 | Start from a terminal with these in `~/.config/rubric/themes/`: `a.json` reading `not json`, `b.json` reading `{}`, `c.json` reading `{ "theme": {} }`, and `d.txt` | Four lines on stderr, one for each file, each saying why it was skipped. |
+| C21 | On a line reading `::: new: a tide clock`, Tab | Under the writing: `Not started`, the words, `Draft Ctrl+Enter`. A panel with `Draft` and its chip. |
+| C22 | Tab | The highlight moves down a row, or stays on the last; no draft starts. |
+| C23 | Click the chip | A second panel beside the first: tools, models, effort. |
+| C24 | Choose a model | The chip names it. |
+| C25 | Esc | The second panel closes. |
+| C26 | Return on `Draft` | The status line counts the draft with `Stop Ctrl+.`, then reads `Ready` with `Keep Ctrl+Enter`. |
+| C27 | In the line's menu, Return on `Reroll with changes…` | A second panel with a field. |
+| C28 | Type `name it tide-two` | The letters go into the field, the first one too; the writing is untouched. |
+| C29 | Return | Another take drafts; the status line reads `Ready` when it is done. |
+| C30 | In the line's menu, Return on `Takes (2)` | The takes, the one shown checked. |
+| C31 | Up and Down | Each move draws that take in the page. |
+| C32 | Esc | The take shown before is drawn again. |
+| C33 | Ctrl+Enter | The line becomes `::: tide-two`; `Kept` shows for 4 s. |
+| C34 | On a line reading `::: new: a failing bell`, Ctrl+Enter | When it fails, the status line names the failure and its reason, with `Reroll Ctrl+R`. |
+| C35 | Tab | The panel shows the failure above `Reroll`. |
+| C36 | On the first line of a quote block (`::: quote`, a line of words, `:::`), Tab | A panel headed `Quote` under the start of the line: `Size` and `Align` as segments, `Cite` and a words field, `Look`, `Change…`, `Remove` in red. The page draws the quote. |
+| C37 | Down and Up over every row, ten times each way | The highlight follows every key. |
+| C38 | With the panel closed (Esc), type a letter | The letter lands in the writing. |
+| C39 | In the quote's menu, Tab and Shift+Tab | Tab moves the highlight down a row, Shift+Tab up; neither chooses. |
+| C40 | Right on `Size` | The line reads `::: quote size=large` at once and the page follows; the panel stays where it was. |
+| C41 | Ctrl+Z | The line goes back; the panel closes. |
+| C42 | In the quote's menu, on `Cite`, type `A. Keeper` | The letters go into the field, the first one too. |
+| C43 | Return | The line gains `cite="A. Keeper"`; the panel does not move. |
+| C44 | On the words field, type `bigger` | The letters go into the field. |
+| C45 | Return | The line ends ` : bigger`, the caret after it, the pick showing. |
+| C46 | Tab | The pick is taken. |
+| C47 | In the quote's menu, Return on `Change…` | A second panel with a field and `Draft variant`. |
+| C48 | Type `torn edge` | The letters go into the field. |
+| C49 | Return | The line ends ` : torn edge`; the status line reads `Drafting` with `Stop Ctrl+.`. |
+| C50 | Tab | `Stop` and `Back to quote`. |
+| C51 | Once the status line reads `Ready`, Ctrl+Enter | The line reads `::: quote variant=…`. |
+| C52 | Tab | Rows `Every quote as …` and `Back to quote`. |
+| C53 | Return on `Back to quote` | The line reads `::: quote` again. |
+| C54 | In the quote's menu, Ctrl+Delete | The `:::` lines go, the words inside stay; `Removed` shows. |
+| C55 | Ctrl+Z | Both lines come back. |
+| C56 | Tab on `::: tide-two` (from C33) | `Own` in the heading; `Reroll`, `Add to every site` and `Remove…`. |
+| C57 | Ctrl+Delete | A second panel titled with the blocks that use it. |
+| C58 | Return on `Keep` | The second panel closes. |
+| C59 | In `Remove…` (Ctrl+Delete), Return on `Remove from site` | `Removed` once the server has done it; `sites/app-slice/parts/tide-two` is gone. |
+| C60 | On an empty line, Tab | `Insert part…`, `New part…`, `Cut` and `Copy` dimmed, `Paste`. |
+| C61 | Return on `Insert part…` | The parts under their groups. |
+| C62 | Down, a few times | Each move draws that part in the page at the line. |
+| C63 | Esc | The text and the page as they were. |
+| C64 | In `Insert part…`, type `quote` | The list turns flat a moment after typing stops. |
+| C65 | Return | `::: quote` and its closer. |
+| C66 | On a line reading `::: three numbered steps`, the caret inside the words, Tab | `Steps` first, `Similar parts (N)`, `Draft new part`. |
+| C67 | Return on `Steps` | The line reads `::: steps`. |
 
-C11 to C27 run with the stub, so nothing is paid for. A tool or model chosen in C12 is only checked, never run. The menus open with Tab; a right-click is still the editor's own menu.
+C21 to C67 run with the stub, so nothing is paid for. A tool or model chosen in C24 is only checked, never run. The menus open with Tab; a right-click is still the editor's own menu. Delete is ⌫ on the Mac. Never choose `Add to every site` (C56): it writes the catalog.
 
-**After C5 to C27, undo what they wrote:** `rm ~/.config/rubric/app.json ~/.config/rubric/themes/mine.json`, the broken file from C10, then `git checkout sites/app-slice/pages/posts/long.md && rm -rf sites/app-slice/parts sites/app-slice/.rubric/drafts/* sites/app-slice/.rubric/logs/removed`.
+**After the rows, undo what they wrote:** `rm ~/.config/rubric/app.json ~/.config/rubric/themes/{mine.json,a.json,b.json,c.json,d.txt}`, then close the app and run `app/scripts/clean-test.sh`, which puts the site back.
 
 ## Notes
 App starts well

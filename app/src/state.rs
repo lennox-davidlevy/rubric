@@ -60,6 +60,10 @@ pub struct State {
     pub pending: HashMap<i64, draft::Asked>,
     /// When Tab asked for a line's menu, until the frame that draws it: the time is printed.
     pub looked: std::cell::Cell<Option<std::time::Instant>>,
+    /// Of that time, how long the server took to answer, in ms.
+    pub looked_server_ms: f64,
+    /// When each request not answered yet was sent, by its id.
+    pub sent_at: HashMap<i64, std::time::Instant>,
     /// Wakes the app once a second while a draft runs or a flash shows.
     pub ticker: Option<Ticker>,
     /// The app's theme and its colors.
@@ -86,11 +90,44 @@ pub struct State {
     pub drafter: Option<String>,
     /// A panel opened by an answer has a field with the focus: the keys go to it.
     pub focus_field: bool,
-    /// The line the panels hang from, for when a field has the focus and the editor reports no
-    /// caret.
-    pub panel_at: Option<[f32; 4]>,
+    /// The panel's field has the keys (it was typed on, given Return or pressed); a field row
+    /// that only has the focus leaves them with the writing.
+    pub field_live: bool,
+    /// The writing as it was when a field row without the keys took the focus.
+    pub held: Option<TextEdit>,
+    /// Where the panels hang: the line they opened on, from the writing field's top.
+    pub anchor: Option<Anchor>,
+    /// The writing field's rectangle in window points, after scrolling.
+    pub editor_rect: [f32; 4],
+    /// What to say once the server has answered a request, by its id: a label and a fact.
+    pub said_on: HashMap<i64, (String, String)>,
     /// The theme and mode drawn when the list of themes opened, to go back to.
     pub theme_before: Option<(String, crate::theme::Mode)>,
+}
+
+/// The line a panel hangs from, taken when it opens: which line, where it starts in the text,
+/// and the writing field's width then (a resize wraps the text again), with the line's offset
+/// from the field's top and its height. Scrolling moves the field, and the panel with it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Anchor {
+    pub line: u32,
+    pub start: usize,
+    pub width: f32,
+    pub dy: f32,
+    pub h: f32,
+}
+
+impl Anchor {
+    /// Still the caret's line, as it was laid out.
+    pub fn holds(&self, line: u32, start: usize, width: f32) -> bool {
+        self.line == line && self.start == start && (self.width - width).abs() < 0.5
+    }
+}
+
+/// The caret's line and the byte it starts at.
+pub fn caret_line_start(s: &State) -> (u32, usize) {
+    let line = position::line_char(&s.edit.text, s.edit.focus).0;
+    (line, position::line_range(&s.edit.text, line).start)
 }
 
 /// The thread that ticks: parked until `wake`, at rest again when nothing needs the time.
@@ -126,8 +163,8 @@ impl State {
             path, edit, version: 1, saved: text, split: 0.5, last_range: (0, 0), uri, spans, problem: None, page: None, width: 0.0,
             bounds: None, client: None, cursor_line: None, page_url: None, ghost: None, asked: None, height: 0.0,
             view: None, choice: None, drafts: Vec::new(), flash: None, now_ms: draft::now_ms(),
-            pending: HashMap::new(), looked: std::cell::Cell::new(None), ticker: None, look, title, pane: [0.0; 4],
-            panels: Vec::new(), field: TextEdit::new(""), field_of: None, part_wait: None, set_next: None, setting: false, insert: None, drafter: None, focus_field: false, panel_at: None, theme_before: None,
+            pending: HashMap::new(), looked: std::cell::Cell::new(None), looked_server_ms: 0.0, sent_at: HashMap::new(), ticker: None, look, title, pane: [0.0; 4],
+            panels: Vec::new(), field: TextEdit::new(""), field_of: None, part_wait: None, set_next: None, setting: false, insert: None, drafter: None, focus_field: false, field_live: false, held: None, anchor: None, editor_rect: [0.0; 4], said_on: HashMap::new(), theme_before: None,
         }
     }
 }
@@ -225,7 +262,7 @@ fn sent(s: &mut State) {
 /// After a message from the server: a field a panel opened with takes the keys.
 pub fn follow_up(s: &mut State, tx: &mut Tx) {
     if std::mem::take(&mut s.focus_field) {
-        tx.focus("panel-field", false);
+        crate::look::give_field(s, tx);
     }
 }
 
@@ -295,8 +332,13 @@ pub fn incoming(s: &mut State, m: crate::lsp::Incoming) {
     match m {
         // Only the answer to the last question, for the version and line it was asked about.
         Incoming::Response { id, result } => {
+            if let Some(sent) = s.sent_at.remove(&id)
+                && s.looked.get().is_some()
+            {
+                s.looked_server_ms += sent.elapsed().as_secs_f64() * 1000.0;
+            }
             if let Some(about) = s.pending.remove(&id) {
-                return draft::answered(s, about, result);
+                return draft::answered(s, id, about, result);
             }
             let Some((asked, version, line)) = s.asked else { return };
             if id != asked {
@@ -331,6 +373,20 @@ pub fn serving(s: &mut State, url: String) {
         page.send(crate::page::PageCmd::Load(url.clone()));
     }
     s.page_url = Some(url);
+}
+
+/// Tab asked for a line's menu: the time to its drawing starts now.
+pub fn start_look(s: &mut State) {
+    s.looked.set(Some(std::time::Instant::now()));
+    s.looked_server_ms = 0.0;
+}
+
+/// Once the menu Tab asked for is drawn: how long it took, which menu it is and how long the
+/// server took of it ("menu drawn 52.5 ms: part, server 50.8 ms"), said once.
+pub fn menu_drawn(s: &State) -> Option<String> {
+    let id = s.panels.first()?.id.clone();
+    let asked = s.looked.take()?;
+    Some(format!("menu drawn {:.1} ms: {id}, server {:.1} ms", asked.elapsed().as_secs_f64() * 1000.0, s.looked_server_ms))
 }
 
 /// The window is going: the document and the server close, then the web view.

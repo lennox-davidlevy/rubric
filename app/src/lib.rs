@@ -95,14 +95,28 @@ pub fn view(s: &State, cx: &mut Cx<State>) -> El {
         );
     }
     let mut layer = Vec::new();
-    // The panels, from the caret's line, in the layer above the window's.
+    // The panels, in the layer above the window's, hang from the left edge of their line's
+    // text and its bottom, taken when they open: a caret moving along the line (a setting
+    // written) leaves them where they are; scrolling and a resize move them with the line.
     if !s.panels.is_empty() {
-        // Before anything was laid out, the top of the column.
-        let start = [s.pane[0] + PAD, s.pane[1] + TOP, 1.0, fonts::LINE];
-        let line = cx.caret("editor").or(s.panel_at).unwrap_or(start);
+        let ed = s.editor_rect;
+        let (at, start) = state::caret_line_start(s);
+        let kept = s.anchor.filter(|a| a.holds(at, start, ed[2]));
+        let line = match (kept, kept.is_none().then(|| cx.caret("editor")).flatten()) {
+            (Some(a), _) => [ed[0], ed[1] + a.dy, 1.0, a.h],
+            (None, Some(c)) if ed[2] > 0.0 => [ed[0], c[1], 1.0, c[3]],
+            (None, Some(c)) => c,
+            // Before anything was laid out, the top of the column.
+            (None, None) => s.anchor.map_or([s.pane[0] + PAD, s.pane[1] + TOP, 1.0, fonts::LINE], |a| [ed[0], ed[1] + a.dy, 1.0, a.h]),
+        };
         window = window.child(
             el().key("panel-anchor").absolute(line[0], line[1]).w(1.0).h(line[3])
-                .on_layout(|s: &mut State, rect| s.panel_at = Some(rect)),
+                .on_layout(move |s: &mut State, rect| {
+                    let width = s.editor_rect[2];
+                    if width > 0.0 && !s.anchor.is_some_and(|a| a.holds(at, start, width)) {
+                        s.anchor = Some(state::Anchor { line: at, start, width, dy: rect[1] - s.editor_rect[1], h: rect[3] });
+                    }
+                }),
         );
         let placed = panel::place(line, s.pane, &s.panels);
         let shown = if placed.replaced { &s.panels[1..] } else { &s.panels[..] };
@@ -310,6 +324,7 @@ fn writing(s: &State) -> El {
     let p = s.look.palette;
     let field = text_input(&s.edit, fonts::writing())
         .key("editor")
+        .on_layout(|s: &mut State, rect| s.editor_rect = rect)
         .label("Writing")
         .w_full()
         .color(p.ink)
@@ -322,7 +337,12 @@ fn writing(s: &State) -> El {
             s.edit.insert("\n");
             state::changed(s);
         })
-        .on_input_change(|s: &mut State, _| state::changed(s))
+        .on_input_change(|s: &mut State, tx| {
+            // Typed on a field row of a panel: the field's.
+            if !look::typed_on_field(s, tx) {
+                state::changed(s);
+            }
+        })
         .on_input_key(editor::key);
     let scroll = col().key("writing").w_full().grow(1.0).min_h(0.0).fill(p.pane).scroll(ScrollSpec { stick_bottom: false }).child(
         col().w_full().items_center().pt(TOP).pb(48.0).child(col().w_full().max_w(COLUMN).px(PAD).child(field)),

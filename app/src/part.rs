@@ -209,7 +209,7 @@ pub fn tab(s: &mut State, change: bool) -> bool {
         return false;
     }
     let text = text.to_string();
-    s.looked.set(Some(std::time::Instant::now()));
+    state::start_look(s);
     let p = json!({ "uri": s.uri, "line": line });
     draft::send(s, "rubric/part", What::Part(change), line, text, p);
     true
@@ -408,9 +408,8 @@ pub fn act(s: &mut State, id: &str, taken: Taken, tx: &mut Tx) {
                 draft::second(s, Panel::new(REMOVE, "Remove", 250.0, rows), "remove-ask");
             }
             "global" => {
-                draft::ask(s, "keep", What::Act, line, open.asked.text.clone(), json!({ "global": true }));
+                draft::ask_then_say(s, "keep", line, open.asked.text.clone(), json!({ "global": true }), "Kept", format!("{}, in every site", part.title()));
                 close(s);
-                draft::flash(s, "Kept", draft::Tone::Ink, format!("{}, in every site", part.title()));
             }
             "everywhere" => {
                 let on = !part.variant.as_ref().is_some_and(|v| v.everywhere);
@@ -477,9 +476,8 @@ pub fn act(s: &mut State, id: &str, taken: Taken, tx: &mut Tx) {
                 draft::flash(s, "Removed", draft::Tone::Ink, format!("{}, from this block", part.title()));
             }
             "remove-site" => {
-                draft::ask(s, "remove", What::Act, line, open.asked.text.clone(), json!({}));
+                draft::ask_then_say(s, "remove", line, open.asked.text.clone(), json!({}), "Removed", format!("{}, from this site", part.title()));
                 close(s);
-                draft::flash(s, "Removed", draft::Tone::Ink, format!("{}, from this site", part.title()));
             }
             _ => {}
         },

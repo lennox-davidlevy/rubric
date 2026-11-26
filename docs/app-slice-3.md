@@ -259,7 +259,7 @@ From David's live test of section C (2026-11-26; his words are in the Notes of `
 6. **A panel hangs from the start of its line and stays there.** Now it hangs from the caret, so it jumps to the right when a setting is written and the caret goes to the line's end. Its place is the left edge of the line's text and the line's bottom, taken when it opens and kept until it closes; it follows the line only when the writing scrolls or the pane is resized.
 7. **A broken theme file prints nothing.** In C10 David's `~/.config/rubric/themes/broken.json` got no line on stderr in the release app started from a terminal, though `load_all`'s test passes. Find out why with a file that is not JSON, one that is JSON with no `theme` object, and one that is `{ "theme": {} }` (which resolves, every token falling back, and so is listed as a theme and not skipped: decide whether a theme with neither `background` nor `text` is one). A file in `themes/` that does not end in `.json` is said once too (`theme mine.txt: not a .json file`).
 8. **Two Tabs took 52 ms to their menu**, among the others at 1 to 2 ms, over the 50 ms budget. The line `menu drawn N ms` names which menu it was and how long the server took of it, so the next run can say where the time went.
-9. **Section C of `testing/TESTING.md` is written again**: what to do in the left column only, what to expect in the right column only, one action a row. Rows that do several things with an expectation after each (C4, C14, C21, C24) become several rows. Add rows for 4 to 6 here.
+9. **Section C of `testing/TESTING.md` is written again**: what to do in the left column only, what to expect in the right column only, one action a row. Rows that do several things with an expectation after each (C4, C14, C21, C24) become several rows. Add rows for 4 to 6 here. And `app/scripts/clean-test.sh` does what the line under the table says for the site (restores `long.md`, removes `sites/app-slice/parts`, the drafts and `logs/removed`), refusing while the app or the site's process runs; the line under the table names it.
 
 The right-click is David's to decide and is not part of this sitting. 5 and 6 are settled with him (2026-11-26).
 
@@ -322,3 +322,11 @@ One line each: what was chosen, and why the plan did not settle it.
   - Cut, Copy and Paste in the menu send their key to the writing (`Tx::send_key`).
   - The menu with Remove… has no key on Keep: Esc goes back already, and a row's key must take Cmd.
   - The status line follows `new:` lines only; a variant or a part's take drafting says nothing there.
+- Sitting 4 (2026-11-26):
+  - Sitting 3 was already committed (58b2816), so no commit opened the sitting.
+  - Return on a field row without the keys gives it the keys and submits nothing; Backspace there gives it the keys and takes the field's last character. Left and Right on such a row do nothing (Left on a second panel still goes back).
+  - Text an input method commits to the writing while a field row without the keys has the focus goes to the field: the writing is put back from a copy kept while the row had the focus, history and all. A field opened by an answer with its keys (Change… from a pick) still gets them at once.
+  - A panel's place is kept with the line's number, where the line starts in the text, and the writing field's width: a change to any of them (a resize; text above the line) takes the place from the caret again. With a panel's field holding the keys the editor reports no caret, so the place kept is used.
+  - A theme file with neither `background` nor `text` is no theme: skipped and said. Hidden files in `themes/` are passed over unsaid, so a Mac's `.DS_Store` prints nothing at every start.
+  - The time to a menu counts the server's share as the time from each request of that Tab being sent to its answer, summed: the part's menu asks twice, one after the other.
+  - A failed take or variant of a placed part names the part in its label ("Quote failed") and the reason as its fact, as a `new:` line does.
