@@ -103,6 +103,8 @@ pub struct State {
     pub said_on: HashMap<i64, (String, String)>,
     /// The theme and mode drawn when the list of themes opened, to go back to.
     pub theme_before: Option<(String, crate::theme::Mode)>,
+    /// The page's process over the run: media off, restarted, stopped.
+    pub page_life: crate::page::Life,
 }
 
 /// The line a panel hangs from, taken when it opens: which line, where it starts in the text,
@@ -164,7 +166,7 @@ impl State {
             bounds: None, client: None, cursor_line: None, page_url: None, ghost: None, asked: None, height: 0.0,
             view: None, choice: None, drafts: Vec::new(), flash: None, now_ms: draft::now_ms(),
             pending: HashMap::new(), looked: std::cell::Cell::new(None), looked_server_ms: 0.0, sent_at: HashMap::new(), ticker: None, look, title, pane: [0.0; 4],
-            panels: Vec::new(), field: TextEdit::new(""), field_of: None, part_wait: None, set_next: None, setting: false, insert: None, drafter: None, focus_field: false, field_live: false, held: None, anchor: None, editor_rect: [0.0; 4], said_on: HashMap::new(), theme_before: None,
+            panels: Vec::new(), field: TextEdit::new(""), field_of: None, part_wait: None, set_next: None, setting: false, insert: None, drafter: None, focus_field: false, field_live: false, held: None, anchor: None, editor_rect: [0.0; 4], said_on: HashMap::new(), theme_before: None, page_life: crate::page::Life::default(),
         }
     }
 }
@@ -497,6 +499,41 @@ pub fn page_attached(s: &mut State, page: crate::page::Page) {
     s.page = Some(page);
 }
 
+/// The page's process ended. The first time, media goes off and the page loads again; a death
+/// within `AGAIN_MS` of that leaves it stopped, and the status line offers Reload. Answers what
+/// was sent to the page.
+pub fn page_died(s: &mut State, reason: &str) -> Vec<crate::page::PageCmd> {
+    use crate::page::{Death, PageCmd};
+    eprintln!("page: the web view's process ended ({reason})");
+    match s.page_life.died(draft::now_ms()) {
+        Death::Restart => {
+            draft::flash(s, "Page restarted", draft::Tone::Ink, "audio and video off");
+            send_page(s, vec![PageCmd::MediaOff, PageCmd::Reload])
+        }
+        Death::Stop => {
+            s.flash = None;
+            Vec::new()
+        }
+    }
+}
+
+/// Reload on a stopped page: it loads again, media still off. Answers what was sent.
+pub fn reload_page(s: &mut State) -> Vec<crate::page::PageCmd> {
+    if !s.page_life.reload(draft::now_ms()) {
+        return Vec::new();
+    }
+    send_page(s, vec![crate::page::PageCmd::Reload])
+}
+
+fn send_page(s: &State, cmds: Vec<crate::page::PageCmd>) -> Vec<crate::page::PageCmd> {
+    if let Some(page) = &s.page {
+        for c in &cmds {
+            page.send(c.clone());
+        }
+    }
+    cmds
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -507,5 +544,57 @@ mod tests {
         let p = Path::new("/x/walk.md");
         assert_eq!(title_of(p, "---\ntitle: x\n# not this\n---\n\n```\n# nor this\n```\n## The long walk ##\n# Later"), "The long walk");
         assert_eq!(title_of(p, "no heading\n#tag"), "walk.md");
+    }
+
+    fn reload_key() -> rune::KeyEvent {
+        rune::KeyEvent { key: rune::Key::Command('r'), mods: rune::Mods { cmd: true, shift: true, ..rune::Mods::default() } }
+    }
+
+    #[test]
+    fn a_death_turns_media_off_and_loads_the_page_once_again() {
+        use crate::page::PageCmd;
+        let mut s = State::open(PathBuf::from("/x/walk.md"), "# Walk\n".into());
+        assert_eq!(page_died(&mut s, "Crashed"), [PageCmd::MediaOff, PageCmd::Reload]);
+        assert!(s.page_life.media_off && !s.page_life.stopped);
+        let said = draft::line(&s).expect("the status line says it");
+        assert_eq!((said.tone, said.action), (draft::Tone::Ink, None), "a flash, with nothing to do");
+        assert!(!crate::draft::status_key(&mut s, &reload_key()), "nothing to reload while it runs");
+    }
+
+    #[test]
+    fn a_second_death_soon_after_stops_and_offers_reload() {
+        let mut s = State::open(PathBuf::from("/x/walk.md"), "# Walk\n".into());
+        page_died(&mut s, "Crashed");
+        assert_eq!(page_died(&mut s, "Crashed"), [], "no loop");
+        assert!(s.page_life.stopped && s.page_life.media_off);
+        let said = draft::line(&s).expect("the status line keeps it");
+        assert_eq!(said.tone, draft::Tone::Warn);
+        assert!(said.action.as_ref().is_some_and(|(_, k)| k.matches(&reload_key())), "its one action has the key");
+        let mut plain_r = reload_key();
+        plain_r.mods.shift = false;
+        assert!(!crate::draft::status_key(&mut s, &plain_r), "Ctrl+R is not Reload");
+        assert!(crate::draft::status_key(&mut s, &reload_key()));
+        assert!(!s.page_life.stopped && s.page_life.media_off, "media stays off");
+        assert!(draft::line(&s).is_none());
+        assert_eq!(reload_page(&mut s), [], "a page that runs is not reloaded");
+        assert_eq!(page_died(&mut s, "Crashed"), [], "a death soon after Reload stops again");
+    }
+
+    #[test]
+    fn reload_asks_the_page_to_load() {
+        use crate::page::PageCmd;
+        let mut s = State::open(PathBuf::from("/x/walk.md"), "# Walk\n".into());
+        page_died(&mut s, "Crashed");
+        page_died(&mut s, "Crashed");
+        assert_eq!(reload_page(&mut s), [PageCmd::Reload]);
+    }
+
+    #[test]
+    fn a_death_long_after_the_restart_restarts_again() {
+        let mut life = crate::page::Life::default();
+        assert_eq!(life.died(1_000), crate::page::Death::Restart);
+        assert_eq!(life.died(1_000 + crate::page::AGAIN_MS), crate::page::Death::Restart);
+        assert_eq!(life.died(1_000 + crate::page::AGAIN_MS + 9_999), crate::page::Death::Stop);
+        assert!(life.media_off);
     }
 }

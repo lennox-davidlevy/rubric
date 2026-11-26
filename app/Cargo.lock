@@ -3345,6 +3345,7 @@ dependencies = [
  "rune-kit",
  "serde",
  "serde_json",
+ "webkit2gtk",
  "wry",
 ]
 

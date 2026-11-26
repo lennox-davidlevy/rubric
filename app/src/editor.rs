@@ -105,7 +105,7 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
         crate::look::open_themes(s, tx);
         return true;
     }
-    // On a `new:` line, the status line's action has its key.
+    // The status line's action has its key: a `new:` line's, or Reload on a stopped page.
     if crate::draft::status_key(s, ev) {
         return true;
     }

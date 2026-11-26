@@ -7,7 +7,55 @@
 pub enum PageCmd {
     Bounds { x: i32, y: i32, w: u32, h: u32 },
     Load(String),
+    /// Audio and video off in the view's settings, for the rest of the run.
+    MediaOff,
+    /// The address the view had, loaded again.
+    Reload,
     Close,
+}
+
+/// How long after the page is loaded again a second death of its process stops it.
+pub const AGAIN_MS: u64 = 10_000;
+
+/// What the app does when the page's process dies.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Death {
+    /// Media off, then the address loaded again.
+    Restart,
+    /// Left stopped until the writer reloads it.
+    Stop,
+}
+
+/// The page's process over the run: whether media was turned off, when the page was last
+/// loaded again, and whether it is stopped. Plain data, so the tests need no window.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Life {
+    pub media_off: bool,
+    pub again_ms: Option<u64>,
+    pub stopped: bool,
+}
+
+impl Life {
+    /// The process died at `now_ms`: restarted unless it was loaded again under `AGAIN_MS` ago.
+    pub fn died(&mut self, now_ms: u64) -> Death {
+        if self.stopped || self.again_ms.is_some_and(|t| now_ms.saturating_sub(t) < AGAIN_MS) {
+            self.stopped = true;
+            return Death::Stop;
+        }
+        self.media_off = true;
+        self.again_ms = Some(now_ms);
+        Death::Restart
+    }
+
+    /// The writer reloads a stopped page at `now_ms`; false when it is not stopped.
+    pub fn reload(&mut self, now_ms: u64) -> bool {
+        if !self.stopped {
+            return false;
+        }
+        self.stopped = false;
+        self.again_ms = Some(now_ms);
+        true
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -23,7 +71,8 @@ mod linux {
         HandleError, HasWindowHandle, RawWindowHandle, WindowHandle, XlibWindowHandle,
     };
     use wry::dpi::{PhysicalPosition, PhysicalSize};
-    use wry::{PageLoadEvent, Rect, WebView, WebViewBuilder};
+    use webkit2gtk::{SettingsExt, WebViewExt};
+    use wry::{PageLoadEvent, Rect, WebView, WebViewBuilder, WebViewExtUnix};
 
     use super::PageCmd;
 
@@ -55,12 +104,14 @@ mod linux {
 
     impl Page {
         /// Returns at once. The web view is made on its own thread; `loaded` is called there with
-        /// each URL that finishes loading, `failed` once if it cannot attach.
+        /// each URL that finishes loading, `failed` once if it cannot attach, `died` each time
+        /// the web view's process ends (a crash, or the system ending it) with the reason.
         pub fn attach(
             parent_x11_window: u32,
             url: &str,
             loaded: impl Fn(String) + Send + 'static,
             failed: impl FnOnce(String) + Send + 'static,
+            died: impl Fn(String) + Send + 'static,
         ) -> Page {
             let (tx, rx) = mpsc::channel();
             let url = url.to_string();
@@ -84,7 +135,10 @@ mod linux {
                         })
                         .build_as_child(&Parent(parent_x11_window));
                     match built {
-                        Ok(view) => OWNED.with(|o| *o.borrow_mut() = Some(Owned { view, rx })),
+                        Ok(view) => {
+                            view.webview().connect_web_process_terminated(move |_, reason| died(format!("{reason:?}")));
+                            OWNED.with(|o| *o.borrow_mut() = Some(Owned { view, rx }));
+                        }
                         Err(e) => {
                             failed(format!("build_as_child: {e}"));
                             return;
@@ -150,6 +204,15 @@ mod linux {
                         PageCmd::Load(url) => {
                             let _ = owned.view.load_url(&url);
                         }
+                        PageCmd::MediaOff => {
+                            if let Some(settings) = WebViewExt::settings(&owned.view.webview()) {
+                                settings.set_enable_media(false);
+                                settings.set_enable_webaudio(false);
+                            }
+                        }
+                        PageCmd::Reload => {
+                            let _ = owned.view.reload();
+                        }
                         PageCmd::Close => close = true,
                     }
                 }
@@ -174,6 +237,7 @@ impl Page {
         _url: &str,
         _loaded: impl Fn(String) + Send + 'static,
         failed: impl FnOnce(String) + Send + 'static,
+        _died: impl Fn(String) + Send + 'static,
     ) -> Page {
         failed("no web view on this system yet".into());
         Page

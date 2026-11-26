@@ -173,7 +173,13 @@ fn main() {
                 eprintln!("page loaded {url} {} ms", begun.elapsed().as_millis());
             }
         };
-        let page = Page::attach(id, "about:blank", loaded, |e| eprintln!("page failed: {e}"));
+        let deaths = handle.clone();
+        let died = move |reason: String| {
+            deaths.update(move |s, _| {
+                state::page_died(s, &reason);
+            });
+        };
+        let page = Page::attach(id, "about:blank", loaded, |e| eprintln!("page failed: {e}"), died);
         handle.update(move |s, _| state::page_attached(s, page));
     })
     // Linux runs `on_close` when the window closes but not `on_quit`, so the server and the page go here.

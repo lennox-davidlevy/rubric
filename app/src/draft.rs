@@ -120,7 +120,7 @@ fn action(id: &str) -> Option<(String, Chord)> {
         "reroll" => ("Reroll", Key::Command('r')),
         _ => return None,
     };
-    Some((label.into(), Chord(key)))
+    Some((label.into(), Chord::cmd(key)))
 }
 
 /// What a `new:` line's status says, and the id of its action.
@@ -432,7 +432,15 @@ pub fn line(s: &State) -> Option<Said> {
     if let Some((said, _)) = &s.flash {
         return Some(said.clone());
     }
+    if s.page_life.stopped {
+        return Some(Said { label: "Page stopped".into(), tone: Tone::Warn, fact: String::new(), action: Some(("Reload".into(), reload_chord())) });
+    }
     caret_status(s).map(|(_, _, said, _)| said)
+}
+
+/// Reload on a stopped page: Cmd+Shift+R.
+fn reload_chord() -> Chord {
+    Chord::cmd_shift(Key::Command('r'))
 }
 
 pub fn flash(s: &mut State, label: impl Into<String>, tone: Tone, fact: impl Into<String>) {
@@ -794,6 +802,10 @@ fn perform(s: &mut State, id: &str, line: u32, text: String) {
 /// The status line's key, on a `new:` line with no panel open: Cmd+Enter drafts or keeps,
 /// Cmd+R rerolls, Cmd+. stops. True when it was taken.
 pub fn status_key(s: &mut State, ev: &KeyEvent) -> bool {
+    if s.page_life.stopped && reload_chord().matches(ev) {
+        state::reload_page(s);
+        return true;
+    }
     if !s.panels.is_empty() {
         return false;
     }
@@ -808,6 +820,10 @@ pub fn status_key(s: &mut State, ev: &KeyEvent) -> bool {
 /// A press on the status line's action.
 pub fn status_pressed(s: &mut State) {
     if s.flash.is_some() {
+        return;
+    }
+    if s.page_life.stopped {
+        state::reload_page(s);
         return;
     }
     if let Some((line, text, _, id)) = caret_status(s) {

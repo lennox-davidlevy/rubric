@@ -20,25 +20,42 @@ pub const BORDER: f32 = 1.0;
 pub const GAP: f32 = 6.0;
 pub const MARGIN: f32 = 8.0;
 
-/// A key held with Cmd (Ctrl off the Mac) that chooses a row from anywhere in its panel.
+/// A key held with Cmd (Ctrl off the Mac), and Shift when `shift`, that chooses a row from
+/// anywhere in its panel.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Chord(pub Key);
+pub struct Chord {
+    pub key: Key,
+    pub shift: bool,
+}
 
 impl Chord {
+    pub fn cmd(key: Key) -> Chord {
+        Chord { key, shift: false }
+    }
+
+    pub fn cmd_shift(key: Key) -> Chord {
+        Chord { key, shift: true }
+    }
+
     pub fn matches(&self, ev: &KeyEvent) -> bool {
-        ev.mods.cmd && !ev.mods.alt && ev.key == self.0
+        ev.mods.cmd && !ev.mods.alt && ev.mods.shift == self.shift && ev.key == self.key
     }
 
     /// "⌘↩" on the Mac, "Ctrl+Enter" elsewhere.
     pub fn label(&self) -> String {
         let mac = cfg!(target_os = "macos");
-        let key = match &self.0 {
+        let key = match &self.key {
             Key::Enter => if mac { "↩".to_string() } else { "Enter".to_string() },
             Key::Delete | Key::Backspace => if mac { "⌫".to_string() } else { "Delete".to_string() },
             Key::Command(c) => c.to_ascii_uppercase().to_string(),
             other => format!("{other:?}"),
         };
-        if mac { format!("⌘{key}") } else { format!("Ctrl+{key}") }
+        match (mac, self.shift) {
+            (true, false) => format!("⌘{key}"),
+            (true, true) => format!("⇧⌘{key}"),
+            (false, false) => format!("Ctrl+{key}"),
+            (false, true) => format!("Ctrl+Shift+{key}"),
+        }
     }
 }
 
@@ -74,7 +91,7 @@ impl Item {
         self
     }
     pub fn key(mut self, k: Key) -> Item {
-        self.key = Some(Chord(k));
+        self.key = Some(Chord::cmd(k));
         self
     }
     pub fn check(mut self, on: bool) -> Item {

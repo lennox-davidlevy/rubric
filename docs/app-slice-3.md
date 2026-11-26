@@ -64,6 +64,7 @@ To design, then build:
 - **The group first, then the rank within it**, as two questions to Jev. Wanted if it holds; only a live probe on real lines can say whether it hits or misses more than one question does (`scripts/probe.ts`, which costs money: ask first). To watch for when testing either way: a ranked list shown under group headings misleads, since the first and fourth best in one group read as that group's two best; that is why the list with words has no headings.
 - **Zoom, for the writing and for the page** (David, 2026-11-26, during the live test of section C): one elegant way to do both. Zooming the page out shows the whole page on a ground of another color, so it reads as the full page and not as the pane. With it, a choice of mobile and desktop widths for the page.
 - **The page in the writer's own browser** (David, 2026-11-26): a way to open it there from the app.
+- **The Linux package requires `gst-plugins-base` and `gst-plugins-good`**, and when the app turned media off for want of them it says which package to add.
 
 ## What exists, verified 2026-11-25
 
@@ -362,3 +363,10 @@ One line each: what was chosen, and why the plan did not settle it.
   - A theme file with neither `background` nor `text` is no theme: skipped and said. Hidden files in `themes/` are passed over unsaid, so a Mac's `.DS_Store` prints nothing at every start.
   - The time to a menu counts the server's share as the time from each request of that Tab being sent to its answer, summed: the part's menu asks twice, one after the other.
   - A failed take or variant of a placed part names the part in its label ("Quote failed") and the reason as its fact, as a `new:` line does.
+- Sitting 5 (2026-11-26):
+  - Nothing was waiting in `git status`, so no commit opened the sitting.
+  - A death more than 10 s after the page was last loaded again restarts it again, media already off; Reload counts as loading it again, so a death within 10 s of Reload stops it again.
+  - `Page stopped` comes before a line's own draft status on the status line, after a flash; its fact is empty. `Page restarted` is in the text's color, as `Kept` is.
+  - Reload loads the view's own address again (`WebView::reload`), which is the page's address or wherever the page went since.
+  - `Chord` gained Shift, and a chord without it no longer matches with Shift held, so Ctrl+Shift+R is not Ctrl+R's Reroll.
+  - `webkit2gtk` is a dependency of its own on Linux, at wry's pinned version, for the view's settings and its `web-process-terminated`.

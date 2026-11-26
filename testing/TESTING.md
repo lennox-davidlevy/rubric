@@ -160,8 +160,17 @@ The third slice: the design's look, one panel for every menu, and the menus in i
 | C65 | Return | `::: quote` and its closer. |
 | C66 | On a line reading `::: three numbered steps`, the caret inside the words, Tab | `Steps` first, `Similar parts (N)`, `Draft new part`. |
 | C67 | Return on `Steps` | The line reads `::: steps`. |
+| C68 | In `Insert part…`, Down to `Audio` | `Page restarted`, `audio and video off` for 4 s; the page comes back. |
+| C69 | Down to `Video` | The page stays drawn. |
+| C70 | Esc | The page as it was. |
+| C71 | On an empty line, type `::: audio`, Return, `:::` | The page draws the audio part. |
+| C72 | Ctrl+S | `Saved`. |
+| C73 | Quit and start again from a terminal | `Page restarted` once; the page draws the audio part. |
+| C74 | From another terminal, `pkill -P "$(pgrep -x rubric-app)" -f WebKitWebProcess` | `Page restarted`, `audio and video off`; the page comes back. |
+| C75 | The same again within 10 s | `Page stopped` in red with `Reload Ctrl+Shift+R`. |
+| C76 | Ctrl+Shift+R | The page comes back; `Page stopped` goes. |
 
-C21 to C67 run with the stub, so nothing is paid for. A tool or model chosen in C24 is only checked, never run. The menus open with Tab; a right-click is still the editor's own menu. Delete is ⌫ on the Mac. Never choose `Add to every site` (C56): it writes the catalog.
+C68 to C73 are for a machine without `gst-plugins-base` and `gst-plugins-good`; C74 to C76 work on any. C21 to C67 run with the stub, so nothing is paid for. A tool or model chosen in C24 is only checked, never run. The menus open with Tab; a right-click is still the editor's own menu. Delete is ⌫ on the Mac. Never choose `Add to every site` (C56): it writes the catalog.
 
 **After the rows, undo what they wrote:** `rm ~/.config/rubric/app.json ~/.config/rubric/themes/{mine.json,a.json,b.json,c.json,d.txt}`, then close the app and run `app/scripts/clean-test.sh`, which puts the site back.
 
