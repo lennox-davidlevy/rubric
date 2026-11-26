@@ -23,6 +23,17 @@ An Opus session builds from this plan; the session that wrote it reviews. The sl
 
 A sitting stops at its end, says what it built, what it could not check and the commit message, and does not start the next. Where this plan says "find out", the answer goes in the findings before the code that depends on it. Where the plan and the code disagree (a line number, a field's name), the code is right: say so and go on. Where a decision is missing, take the smaller choice, write it under "Decisions the build made" at the end of this file, and go on; stop only for something that would change what the writer sees in a way the design does not show.
 
+## Where the slice stands (2026-11-26), for the session that reviews next
+
+Sittings 1 to 5 are committed on `slice-3`. What is open, in order:
+
+1. **Sitting 5 is not seen yet.** David runs rows C68 to C76 of `testing/TESTING.md` with `gst-plugins-base` and `gst-plugins-good` still not installed (his machine without them is the only place the crash happens). The question that decides: with media off, does the page live through `::: audio`? If it stops again at once (`Page stopped`), turning media off is not enough and the approach in "Sitting 5" is thought again.
+2. **Sitting 6 is planned and not built** ("Sitting 6" below): the answers David gave to his second live test.
+3. Then David runs section C whole, and the slice is merged.
+4. **After the merge, Rune is moved to today's `dev`** in one step (the app pins `0ca0756` of 2026-11-13; `dev` was 1,102 commits on by 2026-11-26): every Rune line in `app/Cargo.toml` to one revision, the `[patch.crates-io]` list copied from Rune's own `Cargo.toml` at that revision (their README lists more than the app has: `sctk-adwaita`, `naga`, `accesskit_macos`, `accesskit_atspi_common`), what no longer compiles fixed, the tests run. Then, with `RUBRIC_IME=1`, the keyboard is tried again (in and out of a part's Cite field twenty times): if it is still lost, an issue goes to github.com/anomalyco/rune against that revision (none there covers it as of 2026-11-26; the findings' "After sitting 4" has the cause and the wording), and if not, `XMODIFIERS=@im=none` comes out of `main.rs`. And what Rune lacked is looked for again: the text position under a right-click (David's first ask, still not built), a line's rectangle other than the caret's, a font family for a span.
+
+How a sitting is reviewed: read `git diff` (or the sitting's commit) against the sitting's section here, run `cargo test` and `cargo test -- --ignored` in `app/`, `bun test test/part-request.test.ts` and `bun run typecheck`, check nothing is left running and `sites/` is clean, and write what is found into this file as the next sitting's first items. The reviewer writes plans and reviews; the build is Opus's; small fixes David asks for directly are made. A fault only the window shows is traced with `RUBRIC_APP_TRACE=app/target/trace.log` (the app's own switch; `RUBRIC_TRACE` is the server's).
+
 ## How the session checks its work
 
 With the tests: the headless `Runtime`, and the stub server on a temp site. The session opens no window on David's display unless he says it may; he runs `app/target/release/rubric-app sites/app-slice/pages/posts/long.md` himself. The findings say plainly what no one saw. Rune's source is cargo's checkout, `~/.cargo/git/checkouts/rune-c9b805e9ed8a3730/0ca0756/`.
