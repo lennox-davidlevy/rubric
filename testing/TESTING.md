@@ -95,13 +95,13 @@ The third slice: the design's look, one panel for every menu, and the menus in i
 |---|---|---|
 | C1 | Start the app | A 40-point row over both panes: `The long walk` and `Saved`. The writing in a serif (Literata), the row in a sans (Instrument Sans). `#`, `**` and `:::` in a light gray. |
 | C2 | Type a letter, then Ctrl+S | `Saved` goes at the letter and comes back at the save. |
-| C3 | Ctrl+, then Down and Up a few times | A list of themes at the caret, inside the writing pane, Paper checked. Each move draws the whole app in that theme at once. |
-| C4 | Esc; then Ctrl+, again and type a letter | Esc: the theme from before, nothing kept. The letter: the list closes, the theme from before, the letter in the writing. |
-| C5 | Ctrl+, move to Ink, Return; quit and start again | Ink stays, and is there after the restart. |
-| C6 | Copy `app/themes/nord.json` to `~/.config/rubric/themes/mine.json`, restart, Ctrl+, | `Mine` is last, with `Own`. The pointer over a row draws that theme; a click keeps it. `RUBRIC_APP_THEME=fjord` before the command starts in Fjord for that run only. |
-| C7 | Ctrl+, then Up to `Mode`, Right, Down to Ink, Return; quit and start again | `Mode` is the first row. Right draws the app dark at once. Ink in dark after the restart. |
-| C8 | Ctrl+, Esc, leave the pointer where the list was; Ctrl+, again, then Down past the list's end | Nothing changes under the still pointer. Moving it over a row draws that theme. |
-| C9 | Ctrl+, twice | The list closes; the theme from before. |
+| C3 | Ctrl+T then Down and Up a few times | A list of themes at the caret, inside the writing pane, Paper checked. Each move draws the whole app in that theme at once. |
+| C4 | Esc; then Ctrl+T again and type a letter | Esc: the theme from before, nothing kept. The letter: the list closes, the theme from before, the letter in the writing. |
+| C5 | Ctrl+T move to Ink, Return; quit and start again | Ink stays, and is there after the restart. |
+| C6 | Copy `app/themes/nord.json` to `~/.config/rubric/themes/mine.json`, restart, Ctrl+T | `Mine` is last, with `Own`. The pointer over a row draws that theme; a click keeps it. `RUBRIC_APP_THEME=fjord` before the command starts in Fjord for that run only. |
+| C7 | Ctrl+T then Up to `Mode`, Right, Down to Ink, Return; quit and start again | `Mode` is the first row. Right draws the app dark at once. Ink in dark after the restart. |
+| C8 | Ctrl+T Esc, leave the pointer where the list was; Ctrl+T again, then Down past the list's end | Nothing changes under the still pointer. Moving it over a row draws that theme. |
+| C9 | Ctrl+T twice | The list closes; the theme from before. |
 | C10 | Put a broken file in `~/.config/rubric/themes/` and start from a terminal | One line on stderr names the file and why it was skipped. |
 | C11 | On an empty line type `::: new: a tide clock`, then Tab | Under the writing: `Not started`, the words, `Draft Ctrl+Enter`. A panel with `Draft` and its chip. |
 | C12 | Click the chip, choose a model, Right on `Effort`, Esc | A second panel beside the first: tools, models, effort. The chip names the choice. |
@@ -109,7 +109,6 @@ The third slice: the design's look, one panel for every menu, and the menus in i
 | C14 | Tab, `Reroll with changes…`, type `name it tide-two`, Return; when ready, Tab, `Takes (2)`, Up and Down, Esc | The words go into the field, not the writing. Each move draws that take in the page; Esc draws the one shown before. |
 | C15 | Ctrl+Enter | The line becomes `::: tide-two`; `Kept` shows for 4 s. |
 | C16 | `::: new: a failing bell`, Ctrl+Enter, then Tab | The status line names the failure and its reason, with `Reroll Ctrl+R`. The panel shows both above `Reroll`. |
-
 | C17 | Type a quote block (`::: quote`, a line of words, `:::`), caret on its first line, Tab | A panel headed `Quote`: `Size` and `Align` as segments, `Cite` as a field, `Look`, a field for words, `Change…`, `Remove` in red. The page draws the quote. |
 | C18 | Right on `Size`; then Ctrl+Z | The line reads `::: quote size=large` at once and the page follows; the panel stays. Ctrl+Z puts the line back and closes the panel. |
 | C19 | Tab, Down to `Cite`, type `A. Keeper`, Return | The letters go into the field. Return: the line gains `cite="A. Keeper"`. |
@@ -131,4 +130,64 @@ App starts well
 A2 - so there is a bit of a delay in the typing, and if we can get it instant or as close to that woudl be a priority.
 
 The rest is fine, i didnt complete it, but its too early to really test
+
+C10 - didnt see an error either in the app or in the rust cli. ALTHOUGH i do see this error
+
+```sh
+(rubric-app:3080967): Gdk-CRITICAL **: 20:36:46.561: _gdk_frame_clock_freeze: assertion 'GDK_IS_FRAME_CLOCK (clock)' failed
+page loaded http://127.0.0.1:1415/ 265 ms
+page loaded http://127.0.0.1:1415/posts/long/ 321 ms
+```
+
+
+C19 - Tab doesnt traverse the menu, only up/down/ for the rows, and left/right for the values
+***NOTES***  the menu is attached to the cursor, so when a new value comes up ie `cite="A. Keeper`, the menu jumps right. I think the menu should render above the cursor but stick there? maybe? or maybe not, i am not sure. do you have a better idea? 
+
+Ok I have to stop because the app stopped recognizing my keyboard inputs. The mouse still works. I was C21 when it happened, i did some of it wrong tbh, so i cant tell you exactly what i did. Also for the table, have all the instructions on the left and what we should expect on the right, its messing me up that there are more instrctions on the right. 
+
+BUT! This is BEAUTIFUL! it works mostly incredibly well holy smokes. Great job so far!
+
+Here are the logs from the rust cli:
+
+```sh
+(rubric-app:3080967): Gdk-CRITICAL **: 20:36:46.561: _gdk_frame_clock_freeze: assertion 'GDK_IS_FRAME_CLOCK (clock)' failed
+page loaded http://127.0.0.1:1415/ 265 ms
+page loaded http://127.0.0.1:1415/posts/long/ 321 ms
+^T^[[menu drawn 1.7 ms
+menu drawn 1.2 ms
+menu drawn 1.3 ms
+menu drawn 1.3 ms
+menu drawn 52.5 ms
+menu drawn 1.1 ms
+menu drawn 0.9 ms
+menu drawn 1.6 ms
+menu drawn 1.2 ms
+menu drawn 53.0 ms
+menu drawn 1.5 ms
+menu drawn 1.6 ms
+menu drawn 1.1 ms
+menu drawn 2.3 ms
+menu drawn 2.7 ms
+menu drawn 1.2 ms
+menu drawn 1.1 ms
+menu drawn 2.0 ms
+menu drawn 1.5 ms
+menu drawn 2.3 ms
+menu drawn 1.3 ms
+menu drawn 1.6 ms
+menu drawn 1.3 ms
+menu drawn 1.5 ms
+menu drawn 2.1 ms
+menu drawn 1.7 ms
+menu drawn 1.9 ms
+```
+
+
+Ok i recreated the behavior, i restarted the app, when to `C17` saw the menu, and use the arrows to go down until i got to the text box where it says `in words: bigger, cenetered`
+
+And i lost the keyboard strokes again!
+
+
+
+
 

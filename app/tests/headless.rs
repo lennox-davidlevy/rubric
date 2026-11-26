@@ -798,7 +798,7 @@ fn moving_in_the_theme_list_draws_the_app_in_that_theme_and_esc_goes_back() {
 fn return_in_the_theme_list_keeps_the_theme_for_the_next_start() {
     let dir = config("themes-keep");
     let mut rt = themed(&dir);
-    cmd(&mut rt, Key::Command(','));
+    cmd(&mut rt, Key::Command('t'));
     press(&mut rt, Key::Down);
     press(&mut rt, Key::Down);
     press(&mut rt, Key::Enter);

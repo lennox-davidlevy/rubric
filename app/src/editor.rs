@@ -96,7 +96,7 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
     if crate::look::key(s, ev, tx) != crate::panel::Taken::Passed {
         return true;
     }
-    if ev.is_command(',') {
+    if crate::look::themes_key(ev) {
         crate::look::open_themes(s, tx);
         return true;
     }

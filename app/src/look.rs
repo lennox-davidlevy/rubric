@@ -1,4 +1,4 @@
-//! The list of app themes in a panel (Ctrl+, or Cmd+,): moving draws the app in the theme
+//! The list of app themes in a panel (Ctrl+T or Ctrl+,; Cmd on the Mac): moving draws the app in the theme
 //! under the focus, Return keeps it, Esc goes back to the one before. And the routing of keys
 //! to whatever panel is open.
 
@@ -12,6 +12,11 @@ pub const THEMES: &str = "themes";
 /// The list's first row: light or dark.
 pub const MODE: &str = "mode";
 const WIDTH: f32 = 250.0;
+
+/// The key that opens and closes the list of themes: Cmd+T or Cmd+, (Ctrl off the Mac).
+pub fn themes_key(ev: &KeyEvent) -> bool {
+    ev.is_command('t') || ev.is_command(',')
+}
 
 /// Opens the list with the theme drawn now under the focus.
 pub fn open_themes(s: &mut State, tx: &mut Tx) {
@@ -59,7 +64,7 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> Taken {
     // What a panel changes shows at once: the row lit, a theme drawn.
     tx.color_motion(Spring::NONE);
     // The key that opens the list of themes closes it.
-    if top == THEMES && ev.is_command(',') {
+    if top == THEMES && themes_key(ev) {
         close_panels(s);
         return Taken::Closed;
     }
