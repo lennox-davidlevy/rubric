@@ -19,6 +19,7 @@ An Opus session builds from this plan; the session that wrote it reviews. The sl
 | 3 | 5, 6 and 7: a placed part, insert, the write-up | Section C of `testing/TESTING.md` ready for David |
 | 4 | What the review of sitting 3 found ("Sitting 4", after task 7) | The slice ready to merge |
 | 5 | The page's process dying ("Sitting 5") | The page restarts with media off; David's rows |
+| 6 | Names, the theme list, Insert part…, starters ("Sitting 6") | The slice ready to merge |
 
 A sitting stops at its end, says what it built, what it could not check and the commit message, and does not start the next. Where this plan says "find out", the answer goes in the findings before the code that depends on it. Where the plan and the code disagree (a line number, a field's name), the code is right: say so and go on. Where a decision is missing, take the smaller choice, write it under "Decisions the build made" at the end of this file, and go on; stop only for something that would change what the writer sees in a way the design does not show.
 
@@ -278,6 +279,21 @@ Commit what `git status` shows first, if anything (`Plan sitting 5 from the seco
 6. `testing/TESTING.md`, section C: rows for David, steps on the left only. Insert part…, Down to `Audio`; then to `Video`; a post with `::: audio` kept in it, started fresh. And one line in "After this slice": the Linux package requires `gst-plugins-base` and `gst-plugins-good`, and when media was turned off for want of them the app says which package to add.
 
 Stop at the end of the sitting. The design questions from the same notes (the names `Own` and `Back to …`, Insert part…'s groups, a theme's modes, previews with sample content) are being settled with David and are not part of it.
+
+### Sitting 6: names, the theme list, Insert part… and starters
+
+Settled with David, 2026-11-26, from his second live test. Each with a test that fails without it; text the writer sees is asserted by its smallest stable part or not at all.
+
+1. **A theme with one mode is dimmed in the other.** A theme whose tokens are the same in light and dark has one mode: light when its background's luminance is over one half, dark otherwise (Paper and Sepia light; Ink and Fjord dark). In the list of themes, with `Mode` on the other, its row is `off`: dimmed, passed over by the keys, dead to a press. The theme drawn when the mode changes, if it lacks the new mode, stays drawn until another is chosen, and the focus goes to the first row that can be chosen.
+2. **The list of themes wraps**: Down on the last row goes to the first row that takes the focus, Up on the first to the last. The list of themes only; a field on `Panel` (`wraps`), off elsewhere.
+3. **`Back to <part>` is two things, named apart.** While a variant or a take is drafting, ready or failed, the row that throws it away reads `Cancel`, as a `new:` line's does. On a kept variant's line, the row that puts the line back to the catalog's part reads `Revert to original`.
+4. **`Own` reads `Custom`** wherever the writer sees it: the note in a part's heading, the group in Insert part…, the note on a theme file of the writer's, and `added to Custom parts`. Names in the code and the server's `own` stay.
+5. **Insert part… lists the groups, and a group opens its parts.** The first panel under the field: `Custom (N)` when the site has any, then each of the catalog's groups with its count, each a row with `more`. Return or Right on a group opens its parts in a second panel beside it (in a narrow pane, in its place, with the row back), a part a row with its description as the note; moving there draws the part in the page, Return puts it on the line. With words in the field the first panel is the flat ranked list as now, and no second panel. **A list is at most twelve rows tall** (12 × `ITEM`, with its field and heading above them), its rows scrolling inside it with a scroll bar that shows (`rune_kit`'s `scroll_bar`): the list of themes, Insert part…'s ranked list, a group's parts, Similar parts and Takes. A flag on `Panel` (`list`) says which. With less room than that under the line it goes above the line, as panels do, before it is made shorter. A menu of controls (a part's menu, a draft's) is as tall as its rows and cut only by the pane, as now. Nothing is drawn outside the pane.
+6. **Every part that holds writing has a starter.** The catalog's `body` is what an empty part shows (32 of the 40 parts for the writing have one). Add one to `quote`, `callout`, `sidenote` and `section`, a sentence in the part's own voice as `lead`'s is ("A sentence or two that sets up what follows."). `divider`, `contents`, `post-list` and `contact-form` draw themselves and need none. Find out whether a `body` is in anything Jev is sent; only if it is, the catalog's version goes up. The page drawing a part looked at in Insert part… shows its starter, as an empty part on a line does.
+
+Decided and not built here: Cmd+Enter drafts from the line with no menu (kept, to look at again once real drafts are in use); the right-click waits for the newer Rune.
+
+`testing/TESTING.md`, section C: the rows these change are written again, and rows added for 1, 2, 5 and 6, steps on the left only.
 
 ## Rules for the session
 
