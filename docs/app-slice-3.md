@@ -18,6 +18,7 @@ An Opus session builds from this plan; the session that wrote it reviews. The sl
 | 2 | The review's fixes ("Before task 3"), then 3 and 4: the draft menus, the server's two requests | Every draft menu in the panel; `bun test` passing |
 | 3 | 5, 6 and 7: a placed part, insert, the write-up | Section C of `testing/TESTING.md` ready for David |
 | 4 | What the review of sitting 3 found ("Sitting 4", after task 7) | The slice ready to merge |
+| 5 | The page's process dying ("Sitting 5") | The page restarts with media off; David's rows |
 
 A sitting stops at its end, says what it built, what it could not check and the commit message, and does not start the next. Where this plan says "find out", the answer goes in the findings before the code that depends on it. Where the plan and the code disagree (a line number, a field's name), the code is right: say so and go on. Where a decision is missing, take the smaller choice, write it under "Decisions the build made" at the end of this file, and go on; stop only for something that would change what the writer sees in a way the design does not show.
 
@@ -262,6 +263,21 @@ From David's live test of section C (2026-11-26; his words are in the Notes of `
 9. **Section C of `testing/TESTING.md` is written again**: what to do in the left column only, what to expect in the right column only, one action a row. Rows that do several things with an expectation after each (C4, C14, C21, C24) become several rows. Add rows for 4 to 6 here. And `app/scripts/clean-test.sh` does what the line under the table says for the site (restores `long.md`, removes `sites/app-slice/parts`, the drafts and `logs/removed`), refusing while the app or the site's process runs; the line under the table names it.
 
 The right-click is David's to decide and is not part of this sitting. 5 and 6 are settled with him (2026-11-26).
+
+### Sitting 5: the page's process dies
+
+From David's second live test (2026-11-26): in Insert part…, moving onto `audio` killed the page. `coredumpctl` has it: `WebKitWebProcess` aborted on its main thread in the second the terminal printed `GStreamer element autoaudiosink not found` and two GLib criticals. His machine has `gstreamer` and no `gst-plugins-base` or `gst-plugins-good`. The frames are not symbolized, so the audio sink as the cause is inferred. The app must not depend on a writer's machine having them: David keeps the plugins uninstalled until this is seen to hold.
+
+Commit what `git status` shows first, if anything (`Plan sitting 5 from the second live test.`).
+
+1. **The app hears that the page's process died.** `webkit2gtk`'s `web-process-terminated` on the wry web view (`app/src/page.rs`; the GTK thread owns the view), sent to the state as `loaded` and `failed` are.
+2. **The first death turns media off and loads the page again.** `enable-media` off in the view's settings (and `enable-webaudio`), then a reload of the address it had. Find out, and write in the findings, whether a page with `::: audio` and one with `::: video` then load with media off; only David's window can say, so the rows for him come first in section C's new rows. The status line says it for 4 s, as a flash: `Page restarted`, `audio and video off`.
+3. **A second death within 10 s of that reload stops there.** No loop. The status line keeps `Page stopped` in the failed color with one action, `Reload` (Cmd+Shift+R), which loads it again with media still off.
+4. **Media stays off for the run** once turned off; a start with the plugins there never turns it off. Nothing is written to disk.
+5. Tests: the state's part headless (a death reloads once and says so; a second within 10 s stops and offers Reload; Reload asks the page to load). The view's part cannot be tested without a window: say so.
+6. `testing/TESTING.md`, section C: rows for David, steps on the left only. Insert part…, Down to `Audio`; then to `Video`; a post with `::: audio` kept in it, started fresh. And one line in "After this slice": the Linux package requires `gst-plugins-base` and `gst-plugins-good`, and when media was turned off for want of them the app says which package to add.
+
+Stop at the end of the sitting. The design questions from the same notes (the names `Own` and `Back to …`, Insert part…'s groups, a theme's modes, previews with sample content) are being settled with David and are not part of it.
 
 ## Rules for the session
 
