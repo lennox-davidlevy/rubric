@@ -37,6 +37,12 @@ pub struct Ghost {
     pub pick: Pick,
 }
 
+/// What the ghost draws: the first line of `show`, so a part's starter body does not lie over the
+/// writing below. Tab still puts the whole of `show` in.
+pub fn line(show: &str) -> &str {
+    show.split('\n').next().unwrap_or("").trim_end_matches('\r')
+}
+
 /// The caret's line, when it is a `:::` line with words and the caret is at its end.
 pub fn wants(text: &str, caret: usize) -> Option<u32> {
     let (line, _) = position::line_char(text, caret);
@@ -198,6 +204,14 @@ mod tests {
         let mut e = at_end("::: a divider\n\ntext", 0);
         accept(&mut e, &ghost(" divider", (0, 13), 0, "::: divider", Some(2)));
         assert_eq!(e.text, "::: divider\n\ntext");
+    }
+
+    #[test]
+    fn line_keeps_only_the_first_line() {
+        assert_eq!(line(" → steps\n### The first step\n\nWhat to do."), " → steps");
+        assert_eq!(line(" → steps\r\n### The first step"), " → steps");
+        assert_eq!(line(" → quote"), " → quote");
+        assert_eq!(line(""), "");
     }
 
     #[test]

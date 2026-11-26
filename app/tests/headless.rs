@@ -184,6 +184,32 @@ fn tab_takes_the_pick_and_sends_the_change() {
 }
 
 #[test]
+fn a_pick_with_a_starter_draws_one_line_and_tab_puts_the_starter_in() {
+    let text = "a\n::: three numbered steps\n:::\nbody";
+    let end = rubric_app::position::line_range(text, 1).end;
+    let mut rt = runtime(text, end);
+    let (client, sent) = rubric_app::lsp::Client::recording();
+    rubric_app::state::connected(&mut rt.state, client);
+    rubric_app::state::moved(&mut rt.state);
+    let asked = std::iter::from_fn(|| sent.try_recv().ok()).find(|m| m["method"] == "textDocument/inlineCompletion").expect("asked");
+    let id = asked["id"].as_i64().unwrap();
+    let ch = rubric_app::position::line_char(text, end).1;
+    let show = " → steps\n### The first step\n\nWhat to do.";
+    let result = serde_json::json!([{
+        "insertText": show,
+        "range": { "start": { "line": 1, "character": ch }, "end": { "line": 1, "character": ch } },
+        "command": { "title": "Pin", "command": "rubric.pin", "arguments": [{ "line": 1, "text": "::: steps" }] }
+    }]);
+    rubric_app::state::incoming(&mut rt.state, rubric_app::lsp::Incoming::Response { id, result: Ok(result) });
+    rt.frame(1.0 / 60.0);
+    let shown = text_of(&rt, "ghost").expect("ghost drawn");
+    assert_eq!(shown, " → steps");
+    assert!(!shown.contains('\n'), "ghost text is one line: {shown:?}");
+    press(&mut rt, Key::Tab);
+    assert_eq!(rt.state.edit.text, "a\n::: steps\n### The first step\n\nWhat to do.\n:::\nbody");
+}
+
+#[test]
 fn tab_on_the_offer_of_a_new_part_makes_the_line_and_asks_for_its_menu() {
     let (mut rt, sent) = with_ghost("::: some words\n:::", 0, serde_json::json!({ "line": 0, "text": "::: new: some words", "build": true }));
     assert!(rt.find("ghost").is_some(), "shown");
@@ -1340,7 +1366,7 @@ fn catalog() -> Value {
 #[test]
 fn typing_in_insert_part_asks_once_after_the_pause_and_drops_older_answers() {
     let (mut rt, sent) = insert_list(catalog());
-    for ch in ["s", "t", "e"] {
+    for ch in ["x", "y", "z"] {
         rt.ime(Ime::Commit(ch.into()));
         rt.frame(0.05);
     }
@@ -1350,21 +1376,87 @@ fn typing_in_insert_part_asks_once_after_the_pause_and_drops_older_answers() {
     }
     let asked = sent_to(&sent, "rubric/parts");
     assert_eq!(asked.len(), 1, "{asked:?}");
-    assert_eq!(asked[0]["params"]["words"], "ste");
-    // More typed before the answer: the answer for "ste" changes nothing.
-    rt.ime(Ime::Commit("p".into()));
+    assert_eq!(asked[0]["params"]["words"], "xyz");
+    // More typed before the answer: the answer for "xyz" changes nothing.
+    rt.ime(Ime::Commit("w".into()));
     rt.frame(0.05);
     for _ in 0..20 {
         rt.frame(0.05);
     }
     let newer = sent_to(&sent, "rubric/parts");
-    assert_eq!(newer[0]["params"]["words"], "step");
+    assert_eq!(newer[0]["params"]["words"], "xyzw");
     let before = rt.state.panels.last().unwrap().rows.clone();
     answer(&mut rt, &asked[0], json!({ "parts": [{ "name": "timeline", "description": "x" }] }));
     assert_eq!(rt.state.panels.last().unwrap().rows, before);
     answer(&mut rt, &newer[0], json!({ "parts": [{ "name": "steps", "description": "Steps" }] }));
     assert!(rows(&rt).contains(&"part:steps".to_string()));
-    assert_eq!(rt.state.field.text, "step", "the field keeps what was typed");
+    assert_eq!(rt.state.field.text, "xyzw", "the field keeps what was typed");
+}
+
+#[test]
+fn insert_part_finds_by_name_and_description_at_once_and_asks_server_only_when_empty() {
+    let parts = json!([
+        { "name": "tide-table", "description": "A chart of tides.", "own": true },
+        { "name": "callout", "description": "A short note, such as a tip or a warning.", "group": "Writing" },
+        { "name": "quote", "description": "Words as said.", "group": "Writing" },
+        { "name": "sidenote", "description": "A warning beside the quote.", "group": "Writing" },
+        { "name": "steps", "description": "Numbered points.", "group": "Lists and steps" }
+    ]);
+    let (mut rt, sent) = insert_list(parts);
+    // "quo" lists quote before sidenote (name beats description) in the same frame, with no request.
+    for ch in ["q", "u", "o"] {
+        rt.ime(Ime::Commit(ch.into()));
+        rt.frame(1.0 / 60.0);
+    }
+    assert_eq!(rows(&rt), ["find", "part:quote", "part:sidenote", "draft"]);
+    for _ in 0..20 {
+        rt.frame(0.05);
+    }
+    assert!(sent_to(&sent, "rubric/parts").is_empty(), "matched locally: nothing asked");
+
+    // Emptying the field brings the groups back at once, with no request.
+    for _ in 0..3 {
+        press(&mut rt, Key::Backspace);
+    }
+    assert_eq!(rows(&rt), ["find", "group:Custom", "group:Writing", "group:Lists and steps", "draft"]);
+    for _ in 0..20 {
+        rt.frame(0.05);
+    }
+    assert!(sent_to(&sent, "rubric/parts").is_empty());
+
+    // A description word finds callout and sidenote at once.
+    rt.ime(Ime::Commit("warning".into()));
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rows(&rt), ["find", "part:callout", "part:sidenote", "draft"]);
+    assert!(sent_to(&sent, "rubric/parts").is_empty());
+
+    // Words that find nothing clear the list and ask the server after the pause.
+    rt.ime(Ime::Commit(" of storms".into()));
+    rt.frame(0.05);
+    assert_eq!(rows(&rt), ["find", "draft"]);
+    assert!(sent_to(&sent, "rubric/parts").is_empty());
+    for _ in 0..20 {
+        rt.frame(0.05);
+    }
+    let asked = sent_to(&sent, "rubric/parts");
+    assert_eq!(asked.len(), 1);
+    assert_eq!(asked[0]["params"]["words"], "warning of storms");
+    answer(&mut rt, &asked[0], json!({ "parts": [{ "name": "callout", "description": "A short note." }] }));
+    assert_eq!(rows(&rt), ["find", "part:callout", "draft"]);
+}
+
+#[test]
+fn return_in_insert_part_field_takes_the_first_found_part() {
+    let (mut rt, sent) = insert_list(catalog());
+    for ch in ["q", "u", "o"] {
+        rt.ime(Ime::Commit(ch.into()));
+        rt.frame(1.0 / 60.0);
+    }
+    assert_eq!(rows(&rt), ["find", "part:quote", "draft"]);
+    press(&mut rt, Key::Enter);
+    assert_eq!(rt.state.edit.text, "a\n::: quote\n:::\nb");
+    assert!(rt.state.panels.is_empty());
+    assert!(sent_to(&sent, "rubric/parts").is_empty());
 }
 
 #[test]
@@ -1406,7 +1498,7 @@ fn return_on_a_groups_part_writes_it_as_one_undo() {
 fn a_long_list_keeps_its_field_in_place_while_its_rows_scroll() {
     let many: Vec<Value> = (0..40).map(|i| json!({ "name": format!("part-{i}"), "description": "x" })).collect();
     let (mut rt, sent) = insert_list(catalog());
-    rt.ime(Ime::Commit("p".into()));
+    rt.ime(Ime::Commit("z".into()));
     for _ in 0..20 {
         rt.frame(0.05);
     }

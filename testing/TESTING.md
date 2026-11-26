@@ -4,7 +4,7 @@ What changed in the plan's "Before the app" list (docs/plan.md, under step 8), i
 
 Write what you find in **Notes** at the bottom, by test number.
 
-Last updated: 2026-11-26 (section C, sitting 6 of slice 3).
+Last updated: 2026-11-26 (section C, sitting 7 of slice 3).
 
 ## Set up
 
@@ -156,7 +156,7 @@ The third slice: the design's look, one panel for every menu, and the menus in i
 | C61 | Return on `Insert part…` | The list takes the menu's place: a field, then each group with its count. |
 | C62 | Down to `Writing (7)`, then Right | Its parts in a panel beside, each with its description; the page draws `Lead` at the line. |
 | C63 | Esc, then Esc | The text and the page as they were. |
-| C64 | In `Insert part…`, type `quote` | The list turns flat a moment after typing stops. |
+| C64 | In `Insert part…`, type `quote` | The list turns flat with `Quote` at once as the letters are typed. |
 | C65 | Return | `::: quote` and its closer. |
 | C66 | On a line reading `::: three numbered steps`, the caret inside the words, Tab | `Steps` first, `Similar parts (N)`, `Draft new part`. |
 | C67 | Return on `Steps` | The line reads `::: steps`. |
@@ -183,8 +183,12 @@ The third slice: the design's look, one panel for every menu, and the menus in i
 | C94 | Esc. On an empty line with a blank line above it, Tab, `Insert part…`, Right on `Writing (7)`, Down to `Callout` | The page draws a callout holding faded sample text. |
 | C95 | Down to `Sidenote`, then Up to `Quote` | Each drawn with faded sample text. |
 | C96 | Esc twice, then type `::: section ` (with the space) | A closer appears; the page draws a section holding faded sample text. |
+| C97 | Esc. On an empty line, Tab, `Insert part…`, type `warning` | `Callout` shows at once as the letters are typed. |
+| C98 | Clear the field, then type `a quote from the keeper` | The groups come back when cleared; after typing stops, `Quote` appears a moment later from the server. |
+| C99 | Esc. On an empty line above a paragraph, type `::: three numbered steps` (leaving the block empty) | A closing `:::` appears below; one line of gray (`→ steps`) shows after the caret, with nothing over the `:::` or the paragraph below. |
+| C100 | Tab | The line becomes `::: steps` and the starter lines appear between the fences. |
 
-Run every row. There is no C68 to C73: they needed a machine without `gst-plugins-base` and `gst-plugins-good`, and the run of 2026-11-26 saw what they asked. C77 to C96 are sitting 6: themes with one mode, the list that wraps, Insert part…'s groups, lists of at most twelve rows and the starters. C21 to C67 run with the stub, so nothing is paid for. A tool or model chosen in C24 is only checked, never run. The menus open with Tab; a right-click is still the editor's own menu. Delete is ⌫ on the Mac. Never choose `Add to every site` (C56): it writes the catalog.
+Run every row. There is no C68 to C73: they needed a machine without `gst-plugins-base` and `gst-plugins-good`, and the run of 2026-11-26 saw what they asked. C77 to C96 are sitting 6: themes with one mode, the list that wraps, Insert part…'s groups, lists of at most twelve rows and the starters. C64 and C97 to C100 are sitting 7: instant search in Insert part… with server fallback, and one-line ghost text. C21 to C67 run with the stub, so nothing is paid for. A tool or model chosen in C24 is only checked, never run. The menus open with Tab; a right-click is still the editor's own menu. Delete is ⌫ on the Mac. Never choose `Add to every site` (C56): it writes the catalog.
 
 **After the rows, undo what they wrote:** `rm ~/.config/rubric/app.json ~/.config/rubric/themes/{mine.json,a.json,b.json,c.json,d.txt}`, then close the app and run `app/scripts/clean-test.sh`, which puts the site back.
 

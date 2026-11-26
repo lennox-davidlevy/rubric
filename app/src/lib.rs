@@ -92,7 +92,7 @@ pub fn view(s: &State, cx: &mut Cx<State>) -> El {
         && let Some([x, y, w, _]) = cx.caret("editor")
     {
         window = window.child(
-            text(g.pick.show.clone()).key("ghost").font(fonts::writing()).color(p.ink3).absolute(x + w, y),
+            text(ghost::line(&g.pick.show).to_string()).key("ghost").font(fonts::writing()).color(p.ink3).absolute(x + w, y),
         );
     }
     let mut layer = Vec::new();

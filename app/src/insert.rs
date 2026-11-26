@@ -1,8 +1,9 @@
 //! Putting a part on a line: Tab on an empty line opens the design's `insert` menu (Insert
-//! part…, New part…, Cut, Copy, Paste); Insert part… is a field over the parts
-//! (`rubric/parts`), grouped when it is empty and in Jev's order for words, asked again a
-//! pause after the last key. On a `:::` line of words that places no part, Tab opens
-//! `words-menu`: the best part, the others near the words, and Draft new part.
+//! part…, New part…, Cut, Copy, Paste); Insert part… is a field over the parts (`rubric/parts`),
+//! grouped when it is empty, matched by name and description at once as the writer types, and
+//! asked of the server after a pause only when nothing matches. On a `:::` line of words that
+//! places no part, Tab opens `words-menu`: the best part, the others near the words, and Draft
+//! new part.
 
 use rune::{Key, KeyEvent, Mods, TextEdit, Tx};
 use serde_json::{Value, json};
@@ -60,6 +61,8 @@ pub struct Insert {
     pub line: u32,
     /// The line as it read.
     pub text: String,
+    /// Every part the site has, from the empty `rubric/parts` answer.
+    pub all: Vec<Entry>,
     /// The words the list answers; the list shown.
     pub words: String,
     pub parts: Vec<Entry>,
@@ -112,27 +115,36 @@ pub fn words_menu(s: &mut State, asked: Asked) {
 
 /// The parts for the words in `asked.text`.
 pub fn parts_answered(s: &mut State, asked: Asked, answer: Value) {
+    let parsed: Vec<Entry> = answer.get("parts").and_then(Value::as_array).map(|a| a.iter().filter_map(Entry::parse).collect()).unwrap_or_default();
+    let is_list = s.panels.last().map(|p| p.id.as_str()) == Some(LIST);
     let Some(ins) = s.insert.as_mut() else { return };
+    if is_list && asked.text.is_empty() {
+        ins.all = parsed.clone();
+        let q = s.field.text.trim().to_string();
+        if q.is_empty() {
+            ins.words.clear();
+            ins.parts = parsed;
+            ins.wanted = None;
+            refresh_list(s);
+        } else {
+            let found = find(&ins.all, &q);
+            if !found.is_empty() {
+                ins.words = q;
+                ins.parts = found;
+                ins.due = None;
+                ins.wanted = None;
+                refresh_list(s);
+            }
+        }
+        return;
+    }
     if ins.wanted.as_deref() != Some(asked.text.as_str()) {
         return;
     }
     ins.words = asked.text.clone();
-    ins.parts = answer.get("parts").and_then(Value::as_array).map(|a| a.iter().filter_map(Entry::parse).collect()).unwrap_or_default();
+    ins.parts = parsed;
     match s.panels.last().map(|p| p.id.clone()).as_deref() {
-        Some(LIST) => {
-            let rows = list_rows(s.insert.as_ref().unwrap());
-            let field = s.panels.last().and_then(|p| p.rows.first().cloned());
-            let p = s.panels.last_mut().unwrap();
-            p.rows = rows;
-            // The field stays as typed.
-            if let (Some(Row::Field { value, .. }), Some(Row::Field { value: v, .. })) = (p.rows.first_mut(), field) {
-                *value = v;
-            }
-            p.active = p.active.min(p.rows.len().saturating_sub(1));
-            if !p.rows[p.active].takes_focus() {
-                p.active = 0;
-            }
-        }
+        Some(LIST) => refresh_list(s),
         None if s.view.as_ref().is_some_and(|o| o.asked.text == s.insert.as_ref().unwrap().text) => {
             let ins = s.insert.as_ref().unwrap();
             let open = s.view.as_ref().unwrap();
@@ -157,6 +169,52 @@ pub fn parts_answered(s: &mut State, asked: Asked, answer: Value) {
         }
         _ => {}
     }
+}
+
+/// Rebuilds the open `Insert part…` panel's rows from `s.insert`, keeping the field as typed.
+fn refresh_list(s: &mut State) {
+    if s.panels.last().map(|p| p.id.as_str()) != Some(LIST) {
+        return;
+    }
+    let Some(ins) = s.insert.as_ref() else { return };
+    let rows = list_rows(ins);
+    let field = s.field.text.clone();
+    let p = s.panels.last_mut().unwrap();
+    p.rows = rows;
+    if let Some(Row::Field { value, .. }) = p.rows.first_mut() {
+        *value = field;
+    }
+    p.active = p.active.min(p.rows.len().saturating_sub(1));
+    if !p.rows[p.active].takes_focus() {
+        p.active = 0;
+    }
+}
+
+/// Parts matching `query` by name or description, flat, preserving the server's order within each
+/// tier: name starts with `query`, then name holds `query`, then a word of the description starts
+/// with `query`. Both the readable name and the catalog's name are matched, case-insensitively.
+pub fn find(parts: &[Entry], query: &str) -> Vec<Entry> {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return Vec::new();
+    }
+    let mut starts = Vec::new();
+    let mut holds = Vec::new();
+    let mut desc = Vec::new();
+    for e in parts {
+        let name = e.name.to_lowercase();
+        let nice = readable(&e.name).to_lowercase();
+        if name.starts_with(&q) || nice.starts_with(&q) {
+            starts.push(e.clone());
+        } else if name.contains(&q) || nice.contains(&q) {
+            holds.push(e.clone());
+        } else if e.description.split(|c: char| !c.is_alphanumeric()).any(|w| !w.is_empty() && w.to_lowercase().starts_with(&q)) {
+            desc.push(e.clone());
+        }
+    }
+    starts.extend(holds);
+    starts.extend(desc);
+    starts
 }
 
 /// The parts by group: the site's own first, as Custom, then the catalog's groups in the order
@@ -188,7 +246,9 @@ pub fn list_rows(ins: &Insert) -> Vec<Row> {
     } else {
         rows.extend(ins.parts.iter().map(Entry::row));
     }
-    rows.push(Row::Sep);
+    if !ins.parts.is_empty() {
+        rows.push(Row::Sep);
+    }
     let draft = Item::new("draft", "Draft new part").key(Key::Enter);
     rows.push(Row::Item(if ins.words.is_empty() { draft } else { draft.note(format!("“{}”", ins.words)) }));
     rows
@@ -209,15 +269,42 @@ fn peek(s: &State, part: Option<&str>) {
     c.notify("rubric/peek", json!({ "uri": s.uri, "line": line, "part": part }));
 }
 
-/// A key in Insert part…'s field changed its text: the list is asked again after a pause.
+/// A key in Insert part…'s field changed its text: match by name or description at once, and ask
+/// the server after a pause only when nothing matches.
 pub fn typed(s: &mut State, tx: &mut Tx) {
     if s.panels.last().map(|p| p.id.as_str()) != Some(LIST) {
         return;
     }
-    if let Some(ins) = &mut s.insert {
-        ins.due = Some(tx.clock() + PAUSE);
-        tx.wake_after(std::time::Duration::from_secs_f64(PAUSE));
+    let q = s.field.text.trim().to_string();
+    let Some(ins) = &mut s.insert else { return };
+    if q.is_empty() {
+        ins.words.clear();
+        ins.parts = ins.all.clone();
+        ins.due = None;
+        ins.wanted = None;
+        refresh_list(s);
+        return;
     }
+    let found = find(&ins.all, &q);
+    if !found.is_empty() {
+        ins.words = q;
+        ins.parts = found;
+        ins.due = None;
+        ins.wanted = None;
+        refresh_list(s);
+        return;
+    }
+    // Trailing whitespace on the same unfound words keeps what is already pending or shown.
+    if ins.words == q && (ins.due.is_some() || ins.wanted.as_deref() == Some(q.as_str())) {
+        refresh_list(s);
+        return;
+    }
+    ins.words = q;
+    ins.parts.clear();
+    ins.wanted = None;
+    ins.due = Some(tx.clock() + PAUSE);
+    tx.wake_after(std::time::Duration::from_secs_f64(PAUSE));
+    refresh_list(s);
 }
 
 /// At the start of each frame (`AppSpec::poll`): the list asked for once its pause is over.
@@ -453,6 +540,27 @@ mod tests {
         let mut e = TextEdit::new("a\n\nb");
         place(&mut e, 1, &entry("divider", false, None, true));
         assert_eq!(e.text, "a\n::: divider\nb");
+    }
+
+    fn entry_desc(name: &str, desc: &str, own: bool, group: Option<&str>) -> Entry {
+        Entry { name: name.into(), description: desc.into(), own, group: group.map(str::to_string), empty: false }
+    }
+
+    #[test]
+    fn find_orders_starts_then_holds_then_description_word_case_insensitively() {
+        let parts = vec![
+            entry_desc("tide-table", "A chart of tides.", true, None),
+            entry_desc("callout", "A short note, such as a tip or a warning.", false, Some("Writing")),
+            entry_desc("quote", "Words as said.", false, Some("Writing")),
+            entry_desc("blockquote", "Another quote.", false, Some("Writing")),
+            entry_desc("sidenote", "A warning in the margin, like a quote.", false, Some("Writing")),
+        ];
+        let names = |q: &str| -> Vec<String> { find(&parts, q).into_iter().map(|e| e.name).collect() };
+        assert_eq!(names("QUO"), ["quote", "blockquote", "sidenote"]);
+        assert_eq!(names("warning"), ["callout", "sidenote"]);
+        assert_eq!(names("Tide t"), ["tide-table"]);
+        assert_eq!(names("tide-t"), ["tide-table"]);
+        assert!(names("numbered steps").is_empty());
     }
 
     #[test]

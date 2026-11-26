@@ -412,3 +412,9 @@ One line each: what was chosen, and why the plan did not settle it.
   - The narrow pane's row back is drawn over the scrolling rows, not among them, in every panel.
   - The starters: quote "The words, as they were said or written.", callout "Something worth knowing before going on.", sidenote "A word about the sentence beside it.", section "Writing set apart from the rest of the page."
   - Moving onto a group row in Insert part… sends `rubric/peek` with no part, as moving onto `Draft new part` does, so the page shows the line as it is.
+- Sitting 7 (2026-11-26):
+  - Description words are split on non-alphanumeric characters (`!c.is_alphanumeric()`), so trailing punctuation (such as `"warning."` in `callout`) does not block prefix matches.
+  - On a local miss, the list clears its previous local rows at once and drops the second separator before `Draft new part`, so stale matches are neither shown nor taken by Return during the 250 ms pause before the server answers.
+  - Trailing whitespace typed after unfound words keeps a pending or already-answered server request for those same trimmed words rather than clearing and re-asking.
+  - If the initial empty `rubric/parts` answer arrives after the writer has already started typing, `Insert.all` is saved and matched against the field at once, cancelling the server timer if anything matches.
+  - Rebuilding `Insert part…`'s rows syncs the `find` row's stored `value` with `s.field.text`, so moving Down into matched rows and back Up to the field keeps the typed search text.
