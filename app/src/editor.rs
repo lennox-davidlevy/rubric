@@ -78,6 +78,7 @@ fn fence_mark(t: &str) -> Option<(u8, usize)> {
 /// A panel's field: the panel's keys first, then the field's own editing.
 pub fn field_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
     use crate::panel::Taken;
+    crate::trace::say(|| format!("key    field  {:?} {:?}", ev.key, ev.mods));
     // Keys reaching the field mean it has them, however it got them (a press on it).
     s.field_live = true;
     s.held = None;
@@ -95,6 +96,7 @@ pub fn field_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
 /// The field's key handler, before focus navigation and the field's own editing. Tab is
 /// always consumed, so focus never leaves the writing.
 pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
+    crate::trace::say(|| format!("key    editor {:?} {:?}", ev.key, ev.mods));
     // An open panel takes its keys first; any other key closes it and is the editor's.
     if crate::look::key(s, ev, tx) != crate::panel::Taken::Passed {
         return true;

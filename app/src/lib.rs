@@ -15,6 +15,7 @@ pub mod position;
 pub mod split;
 pub mod state;
 pub mod theme;
+pub mod trace;
 
 use rune::{Cursor, Cx, Effect, El, Phase, ScrollSpec, Spring, SpringPair, Transition, col, el, row, text, text_input};
 use rune_kit::{Kit, PaletteSeed, popover};
@@ -228,7 +229,10 @@ fn row_view(s: &State, p: &Panel, depth: usize, i: usize, r: &Row) -> El {
                 .caret(c.accent, c.accent.alpha(0.25))
                 .placeholder(placeholder.clone(), c.ink3)
                 .on_edit(|s: &mut State| &mut s.field)
-                .on_input_change(|s: &mut State, tx| insert::typed(s, tx))
+                .on_input_change(|s: &mut State, tx| {
+                    trace::say(|| format!("change field  {:?}", s.field.text));
+                    insert::typed(s, tx)
+                })
                 .on_input_key(editor::field_key);
             let mut boxed = row().grow(1.0).h(30.0).px(9.0).center_y().radius(6.0).fill(c.pane).border(1.0, c.line).child(input);
             if on {
@@ -339,6 +343,7 @@ fn writing(s: &State) -> El {
         })
         .on_input_change(|s: &mut State, tx| {
             // Typed on a field row of a panel: the field's.
+            trace::say(|| format!("change editor len {} caret {:?} held {}", s.edit.text.len(), s.edit.range(), s.held.is_some()));
             if !look::typed_on_field(s, tx) {
                 state::changed(s);
             }

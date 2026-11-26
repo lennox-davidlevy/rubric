@@ -11,7 +11,8 @@ const SIZE: (f32, f32) = (1400.0, 900.0);
 
 /// On Linux the page attaches to an X11 window only, so under Wayland the app runs through
 /// XWayland: no `WAYLAND_DISPLAY` for the window, X11 for GTK. WebKit's DMABUF renderer draws
-/// a black page on NVIDIA's driver, so it is off unless the environment says otherwise.
+/// a black page on NVIDIA's driver, so it is off unless the environment says otherwise. The
+/// X11 input method is off too (below).
 /// Called before any thread starts, which is what makes changing the environment sound.
 fn x11_session() {
     // RUBRIC_WAYLAND=1 keeps the window on Wayland, with no page: to compare typing there.
@@ -24,6 +25,13 @@ fn x11_session() {
         std::env::set_var("GDK_BACKEND", "x11");
         if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
             std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+        // No X11 input method: Rune turns the window's input method off and on at every focus
+        // move between text inputs, and under fcitx5 through XWayland that now and then leaves
+        // the app with no keys at all (the findings, slice 3, sitting 4). Composing (Chinese,
+        // Japanese, Korean) is lost with it until Rune is fixed; RUBRIC_IME=1 keeps it.
+        if std::env::var_os("RUBRIC_IME").is_none() {
+            std::env::set_var("XMODIFIERS", "@im=none");
         }
     }
 }
@@ -135,6 +143,15 @@ fn main() {
         // Tab to the menu on screen, for the measure in the findings.
         if let Some(said) = state::menu_drawn(&rt.state) {
             eprintln!("{said}");
+        }
+        if rubric_app::trace::on() {
+            rubric_app::trace::frame(|| {
+                let s = &rt.state;
+                let focused: Vec<String> = rt.elements().into_iter().filter(|e| e.focused).map(|e| e.key.clone().unwrap_or_else(|| "?".into())).collect();
+                let panels: Vec<String> = s.panels.iter().map(|p| format!("{}@{}", p.id, p.active_id().unwrap_or("-"))).collect();
+                format!("focused {focused:?} ime_area {:?} panels {panels:?} field_live {} held {} edit.focused {} field.focused {}",
+                    rt.ime_area.map(|a| a.map(|v| v.round())), s.field_live, s.held.is_some(), s.edit.focused, s.field.focused)
+            });
         }
         if rt.state.edit.range() != rt.state.last_range {
             moves.update_if(|s, _| state::moved(s));
