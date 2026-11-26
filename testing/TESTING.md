@@ -320,3 +320,11 @@ GStreamer element autoaudiosink not found. Please install it
 ```
 
 So we got pretty far, but found another crash. most of this is ExCELLENT. 
+
+
+# NEW NOTES
+C61/62 So for this search parts input box, we should hook up jev to this as well, potentially. pattern match first -> if nothing after n ms (to ensure its not just a typo) it shows the suggestions. if its in multiple categories, we have to think of how to render that for the user.
+
+C64 - insert step prefill preview malformed in app. look at `reference/screenshots/instert-steps-malformed.png` to see. It probably should be placed in between the fences `:::`, very similar to how we do it in neovim.
+
+Otherwise things look fantastic!

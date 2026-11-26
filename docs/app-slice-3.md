@@ -20,6 +20,7 @@ An Opus session builds from this plan; the session that wrote it reviews. The sl
 | 4 | What the review of sitting 3 found ("Sitting 4", after task 7) | The slice ready to merge |
 | 5 | The page's process dying ("Sitting 5") | The page restarts with media off; David's rows |
 | 6 | Names, the theme list, Insert part…, starters ("Sitting 6") | The slice ready to merge |
+| 7 | The pick's starter over the writing, Insert part…'s search ("Sitting 7") | The slice ready to merge |
 
 A sitting stops at its end, says what it built, what it could not check and the commit message, and does not start the next. Where this plan says "find out", the answer goes in the findings before the code that depends on it. Where the plan and the code disagree (a line number, a field's name), the code is right: say so and go on. Where a decision is missing, take the smaller choice, write it under "Decisions the build made" at the end of this file, and go on; stop only for something that would change what the writer sees in a way the design does not show.
 
@@ -28,9 +29,9 @@ A sitting stops at its end, says what it built, what it could not check and the 
 Sittings 1 to 5 are committed on `slice-3`. What is open, in order:
 
 1. **Sitting 5 held.** David's run of 2026-11-26 (10:23), without the plugins: one core dump, the handler fired (`page: the web view's process ended (Crashed)`), media went off, a new web process loaded the page, and nothing died after it. The abort is WebKit's own assertion in `MediaPlayerPrivateGStreamer::createAudioSink` (read from the core by another agent's disassembly; not checked again here). The restart is the net for a death nobody foresaw, not the answer to missing plugins: the shipped app brings them (David, 2026-11-26; "After this slice"). David has them installed from here on, so C68 to C73 can no longer be run on his machine; C74 to C76 are still unseen.
-2. **Sitting 6 is built and reviewed** (2026-11-26; nothing to fix). Unseen: rows C77 to C96 and the rewritten ones. To watch in C86: a letter typed while a group's parts are open closes both panels and lands in the writing, since the field is the first panel's; if that reads wrong, the letter goes to the field and the parts close.
-3. **The first Insert part… of a fresh start drew no part in the page** (David, 2026-11-26; the second did, and the first after a restart did). Not looked into: the first `rubric/peek`'s timing, the starter's blank-line rule, or the page's script just after it loads. Reproduce it before anything is changed.
-4. Then David runs section C whole, and the slice is merged.
+2. **Sittings 5 and 6 are seen.** David ran section C whole on 2026-11-26 (the plugins installed, so without C68 to C73): everything passed but the two notes "Sitting 7" answers. The first Insert part… of a fresh start, which once drew no part in the page, drew it this time; it is not explained, and is looked at only if it comes back.
+3. **Sitting 7 is planned and not built** ("Sitting 7" below).
+4. Then David runs its rows, and the slice is merged.
 5. **After the merge, Rune is moved to today's `dev`** in one step (the app pins `0ca0756` of 2026-11-13; `dev` was 1,102 commits on by 2026-11-26): every Rune line in `app/Cargo.toml` to one revision, the `[patch.crates-io]` list copied from Rune's own `Cargo.toml` at that revision (their README lists more than the app has: `sctk-adwaita`, `naga`, `accesskit_macos`, `accesskit_atspi_common`), what no longer compiles fixed, the tests run. Then, with `RUBRIC_IME=1`, the keyboard is tried again (in and out of a part's Cite field twenty times): if it is still lost, an issue goes to github.com/anomalyco/rune against that revision (none there covers it as of 2026-11-26; the findings' "After sitting 4" has the cause and the wording), and if not, `XMODIFIERS=@im=none` comes out of `main.rs`. And what Rune lacked is looked for again: the text position under a right-click (David's first ask, still not built), a line's rectangle other than the caret's, a font family for a span.
 
 How a sitting is reviewed: read `git diff` (or the sitting's commit) against the sitting's section here, run `cargo test` and `cargo test -- --ignored` in `app/`, `bun test test/part-request.test.ts` and `bun run typecheck`, check nothing is left running and `sites/` is clean, and write what is found into this file as the next sitting's first items. The reviewer writes plans and reviews; the build is Opus's; small fixes David asks for directly are made. A fault only the window shows is traced with `RUBRIC_APP_TRACE=app/target/trace.log` (the app's own switch; `RUBRIC_TRACE` is the server's).
@@ -307,6 +308,23 @@ Settled with David, 2026-11-26, from his second live test. Each with a test that
 Decided and not built here: Cmd+Enter drafts from the line with no menu (kept, to look at again once real drafts are in use); the right-click waits for the newer Rune.
 
 `testing/TESTING.md`, section C: the rows these change are written again, and rows added for 1, 2, 5 and 6, steps on the left only.
+
+### Sitting 7: the pick's starter over the writing, and Insert part…'s search
+
+From David's whole run of section C (2026-11-26; his words are under "NEW NOTES" in `testing/TESTING.md`, the picture is `reference/screenshots/instert-steps-malformed.png`). Each with a test that fails without it. Only `app/` changes, with the findings and section C.
+
+1. **A pick's ghost text is one line.** On a line of words over an empty block the server's pick carries the part's starter after a newline (`workspace.ts`, "An empty block gets the part's starter body with the pin"), and the app draws all of `show` as one text at the caret (`lib.rs`, the element keyed `ghost`), so the starter's lines lie over the closer and the writing under it. The ghost draws `show` up to its first newline. Tab still puts the whole of it in, starter and all (`a_starter_body_is_kept_and_the_caret_ends_after_it` stays as it is). The starter is seen in the page, where an empty block already shows it faded. Neovim shows it between the fences as lines that are not in the text; Rune's field has no such lines at the pinned revision, and whether today's has is one more thing the move after the merge looks for.
+2. **Insert part…'s field finds by name at once, and asks Jev only when nothing is found.** Now every change of the field waits 250 ms and asks `rubric/parts` with the words, so typing `quote` costs a call to Jev to find `quote`. Instead:
+   - The app keeps the whole list it got with no words (now the ranked answer replaces `Insert.parts`, so the list needs a place of its own).
+   - On each key, with no pause and no request, the list is the parts the field's text finds, flat: first those whose name starts with it, then those whose name holds it, then those with a word of the description starting with it; Custom parts and the catalog's alike, each in the order the server listed them. The name matched is the readable one and the catalog's (`Tide table`, `tide-table`), without regard to case. A row is as a ranked row is now: the name, the description as its note, no group and no headings.
+   - When that finds nothing, `rubric/parts` is asked with the words 250 ms after the last key, as now, and its answer is the list; an answer for older words is dropped, as now. When it finds something, nothing is asked.
+   - `Draft new part` stays the last row either way; the field emptied shows the groups again.
+   - Return in the field takes the first row, found or ranked.
+   David asked how a part found in several groups is shown: the list with words has no groups, as the ranked one has none (a part is in one group; it is the list that mixes them).
+
+Tests, headless with the recording client: `quo` typed lists `quote` in the same frame and sends no `rubric/parts`, the pause passed; text that finds nothing sends one after the pause and its answer is listed; a name found beats a description found; the field emptied lists the groups; Return takes the first found. And the ghost: a pick with a starter draws no second line (the element's text holds no newline), and Tab puts the starter in.
+
+`testing/TESTING.md`, section C: C64 says the list is flat as the letters are typed; rows added for a description found (`warning` finds `Callout`), for words that find nothing (the list comes a moment later, from Jev), and for the ghost on `::: three numbered steps` over an empty block (one line of gray after the caret, nothing over the writing below).
 
 ## Rules for the session
 
