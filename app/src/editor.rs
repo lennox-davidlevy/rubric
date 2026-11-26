@@ -75,44 +75,39 @@ fn fence_mark(t: &str) -> Option<(u8, usize)> {
     (n >= 3).then_some((ch, n))
 }
 
-/// The notes field's keys: Esc goes back to the reroll menu, and Tab stays in the field.
-/// (Return is the field's submit.)
-pub fn notes_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
-    match ev.key {
-        Key::Escape => {
-            crate::draft::back(s);
+/// A panel's field: the panel's keys first, then the field's own editing.
+pub fn field_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
+    use crate::panel::Taken;
+    crate::trace::say(|| format!("key    field  {:?} {:?}", ev.key, ev.mods));
+    // Keys reaching the field mean it has them, however it got them (a press on it).
+    s.field_live = true;
+    s.held = None;
+    match crate::look::key(s, ev, tx) {
+        Taken::Typing => false,
+        // The panel closed; the key is not typed into a field that is gone.
+        Taken::Passed => {
             tx.focus("editor", false);
             true
         }
-        Key::Tab => true,
-        _ => false,
+        _ => true,
     }
 }
 
 /// The field's key handler, before focus navigation and the field's own editing. Tab is
 /// always consumed, so focus never leaves the writing.
 pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
-    // An open menu takes its keys first; any other key closes it and is the editor's.
-    if let Some(menu) = &mut s.menu {
-        use crate::menu::Taken;
-        let before = menu.active;
-        match crate::menu::key(menu, ev) {
-            Taken::Moved => {
-                if menu.active != before {
-                    crate::draft::looked(s);
-                }
-                return true;
-            }
-            Taken::Chose(id) => {
-                crate::draft::chose(s, &id, tx);
-                return true;
-            }
-            Taken::Closed => {
-                crate::draft::back(s);
-                return true;
-            }
-            Taken::Passed => crate::draft::close(s),
-        }
+    crate::trace::say(|| format!("key    editor {:?} {:?}", ev.key, ev.mods));
+    // An open panel takes its keys first; any other key closes it and is the editor's.
+    if crate::look::key(s, ev, tx) != crate::panel::Taken::Passed {
+        return true;
+    }
+    if crate::look::themes_key(ev) {
+        crate::look::open_themes(s, tx);
+        return true;
+    }
+    // The status line's action has its key: a `new:` line's, or Reload on a stopped page.
+    if crate::draft::status_key(s, ev) {
+        return true;
     }
     if ev.key == Key::Tab {
         crate::state::tab(s, tx);

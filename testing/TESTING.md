@@ -4,7 +4,7 @@ What changed in the plan's "Before the app" list (docs/plan.md, under step 8), i
 
 Write what you find in **Notes** at the bottom, by test number.
 
-Last updated: 2026-11-19 (section B, the app's menu and a new part).
+Last updated: 2026-11-26 (section C, sitting 7 of slice 3).
 
 ## Set up
 
@@ -87,9 +87,248 @@ The second slice: Tab on a `::: new: words` line opens a menu at the caret, whic
 
 **After B4 and B11, undo what they wrote.** `git status` shows it. B4: `git clean -fd sites/app-slice/parts`. B11: `git checkout catalogs/universal`, then `git clean -n catalogs/universal` to see the part's new files and `git clean -fd catalogs/universal` to remove them. The post: `git checkout sites/app-slice/pages/posts/long.md` if it was saved.
 
+## C. The designed app (branch `slice-3`)
+
+The third slice: the design's look, one panel for every menu, and the menus in it. The plan is [docs/app-slice-3.md](../docs/app-slice-3.md); what was found is under "Slice 3" in [docs/app-slice-findings.md](../docs/app-slice-findings.md). Start it natively: `cd app && cargo build --release`, then `app/target/release/rubric-app sites/app-slice/pages/posts/long.md`. Ctrl here is Cmd on the Mac.
+
+| # | Do this | Expect |
+|---|---|---|
+| C1 | Start the app | A row over both panes reads `The long walk` and `Saved`. The writing is a serif (Literata), the row a sans (Instrument Sans). `#`, `**` and `:::` are light gray. |
+| C2 | Type a letter | `Saved` goes. |
+| C3 | Ctrl+S | `Saved` comes back. |
+| C4 | Ctrl+T | A list of themes at the caret, inside the writing pane, Paper checked. |
+| C5 | Down, a few times | Each move draws the whole app in that theme at once. |
+| C6 | Esc | The theme from before. |
+| C7 | With the list open, type a letter | The list closes, the theme from before, the letter in the writing. |
+| C8 | Ctrl+T twice | The list opens and closes; the theme from before. |
+| C9 | With the list open, Right on `Mode` (the first row) | Paper and Sepia dim; the app stays Paper. |
+| C10 | Down | Ink, drawn at once. |
+| C11 | Return | The list closes; Ink. |
+| C12 | Quit and start again | Ink, dark. |
+| C13 | Start again with `app/themes/nord.json` copied to `~/.config/rubric/themes/mine.json` | The app starts as before. |
+| C14 | Ctrl+T | `Mine` is last, noted `Custom`. |
+| C15 | Move the pointer over a row | That theme is drawn. |
+| C16 | Click a row | That theme is kept; the list closes. |
+| C17 | With the pointer resting where the list opens, Ctrl+T | The checked theme has the focus; nothing changes under the still pointer. |
+| C18 | Up twice, the pointer still | The highlight is on the last theme; nothing changes under the pointer. |
+| C19 | Start once with `RUBRIC_APP_THEME=fjord` before the command | Fjord. |
+| C20 | Start from a terminal with these in `~/.config/rubric/themes/`: `a.json` reading `not json`, `b.json` reading `{}`, `c.json` reading `{ "theme": {} }`, and `d.txt` | Four lines on stderr, one for each file, each saying why it was skipped. |
+| C21 | On a line reading `::: new: a tide clock`, Tab | Under the writing: `Not started`, the words, `Draft Ctrl+Enter`. A panel with `Draft` and its chip. |
+| C22 | Tab | The highlight moves down a row, or stays on the last; no draft starts. |
+| C23 | Click the chip | A second panel beside the first: tools, models, effort. |
+| C24 | Choose a model | The chip names it. |
+| C25 | Esc | The second panel closes. |
+| C26 | Return on `Draft` | The status line counts the draft with `Stop Ctrl+.`, then reads `Ready` with `Keep Ctrl+Enter`. |
+| C27 | In the line's menu, Return on `Reroll with changes…` | A second panel with a field. |
+| C28 | Type `name it tide-two` | The letters go into the field, the first one too; the writing is untouched. |
+| C29 | Return | Another take drafts; the status line reads `Ready` when it is done. |
+| C30 | In the line's menu, Return on `Takes (2)` | The takes, the one shown checked. |
+| C31 | Up and Down | Each move draws that take in the page. |
+| C32 | Esc | The take shown before is drawn again. |
+| C33 | Ctrl+Enter | The line becomes `::: tide-two`; `Kept` shows for 4 s. |
+| C34 | On a line reading `::: new: a failing bell`, Ctrl+Enter | When it fails, the status line names the failure and its reason, with `Reroll Ctrl+R`. |
+| C35 | Tab | The panel shows the failure above `Reroll`. |
+| C36 | On the first line of a quote block (`::: quote`, a line of words, `:::`), Tab | A panel headed `Quote` under the start of the line: `Size` and `Align` as segments, `Cite` and a words field, `Look`, `Change…`, `Remove` in red. The page draws the quote. |
+| C37 | Down and Up over every row, ten times each way | The highlight follows every key. |
+| C38 | With the panel closed (Esc), type a letter | The letter lands in the writing. |
+| C39 | In the quote's menu, Tab and Shift+Tab | Tab moves the highlight down a row, Shift+Tab up; neither chooses. |
+| C40 | Right on `Size` | The line reads `::: quote size=large` at once and the page follows; the panel stays where it was. |
+| C41 | Ctrl+Z | The line goes back; the panel closes. |
+| C42 | In the quote's menu, on `Cite`, type `A. Keeper` | The letters go into the field, the first one too. |
+| C43 | Return | The line gains `cite="A. Keeper"`; the panel does not move. |
+| C44 | On the words field, type `bigger` | The letters go into the field. |
+| C45 | Return | The line ends ` : bigger`, the caret after it, the pick showing. |
+| C46 | Tab | The pick is taken. |
+| C47 | In the quote's menu, Return on `Change…` | A second panel with a field and `Draft variant`. |
+| C48 | Type `torn edge` | The letters go into the field. |
+| C49 | Return | The line ends ` : torn edge`; the status line reads `Drafting` with `Stop Ctrl+.`. |
+| C50 | Tab | `Stop` and `Cancel`. |
+| C51 | Once the status line reads `Ready`, Ctrl+Enter | The line reads `::: quote variant=…`. |
+| C52 | Tab | Rows `Every quote as …` and `Revert to original`. |
+| C53 | Return on `Revert to original` | The line reads `::: quote` again. |
+| C54 | In the quote's menu, Ctrl+Delete | The `:::` lines go, the words inside stay; `Removed` shows. |
+| C55 | Ctrl+Z | Both lines come back. |
+| C56 | Tab on `::: tide-two` (from C33) | `Custom` in the heading; `Reroll`, `Add to every site` and `Remove…`. |
+| C57 | Ctrl+Delete | A second panel titled with the blocks that use it. |
+| C58 | Return on `Keep` | The second panel closes. |
+| C59 | In `Remove…` (Ctrl+Delete), Return on `Remove from site` | `Removed` once the server has done it; `sites/app-slice/parts/tide-two` is gone. |
+| C60 | On an empty line, Tab | `Insert part…`, `New part…`, `Cut` and `Copy` dimmed, `Paste`. |
+| C61 | Return on `Insert part…` | The list takes the menu's place: a field, then each group with its count. |
+| C62 | Down to `Writing (7)`, then Right | Its parts in a panel beside, each with its description; the page draws `Lead` at the line. |
+| C63 | Esc, then Esc | The text and the page as they were. |
+| C64 | In `Insert part…`, type `quote` | The list turns flat with `Quote` at once as the letters are typed. |
+| C65 | Return | `::: quote` and its closer. |
+| C66 | On a line reading `::: three numbered steps`, the caret inside the words, Tab | `Steps` first, `Similar parts (N)`, `Draft new part`. |
+| C67 | Return on `Steps` | The line reads `::: steps`. |
+| C74 | From another terminal, `pkill -P "$(pgrep -x rubric-app)" -f WebKitWebProcess` | `Page restarted`, `audio and video off`; the page comes back. |
+| C75 | The same again within 10 s | `Page stopped` in red with `Reload Ctrl+Shift+R`. |
+| C76 | Ctrl+Shift+R | The page comes back; `Page stopped` goes. |
+| C77 | Start with `RUBRIC_APP_THEME=paper RUBRIC_APP_MODE=light` before the command | Paper. |
+| C78 | Ctrl+T | Ink, Fjord and the other themes with only a dark half are dim. |
+| C79 | Down | Sepia; Ink is passed over. |
+| C80 | Click `Ink` | Nothing changes. |
+| C81 | Up twice | `Mode` has the highlight. |
+| C82 | Right | Paper and Sepia dim, Ink and Fjord not; the app stays Sepia. |
+| C83 | Up | The highlight goes to the last theme that is not dim. |
+| C84 | Down | The highlight is back on `Mode`. |
+| C85 | Esc | Paper, light. |
+| C86 | On an empty line, Tab, then Return on `Insert part…`, Right on `Writing (7)` | The parts beside the groups. |
+| C87 | Left | Back to the groups; the page as it was. |
+| C88 | Type `a` | The list turns flat with no groups, at most twelve rows tall, with a scroll bar. |
+| C89 | Down twenty times | The rows scroll under the field; the field stays where it is. |
+| C90 | Esc | The text and the page as they were. |
+| C91 | Drag the divider until the writing pane is about 400 wide, then Tab on an empty line, `Insert part…`, Right on a group | The parts in the groups' place, with `‹ Insert part` on top. |
+| C92 | Click `‹ Insert part` | The groups again. |
+| C93 | Esc, drag the divider back, then Tab on an empty line near the bottom of the window, `Insert part…`, type `a` | The list opens above the line, twelve rows tall. |
+| C94 | Esc. On an empty line with a blank line above it, Tab, `Insert part…`, Right on `Writing (7)`, Down to `Callout` | The page draws a callout holding faded sample text. |
+| C95 | Down to `Sidenote`, then Up to `Quote` | Each drawn with faded sample text. |
+| C96 | Esc twice, then type `::: section ` (with the space) | A closer appears; the page draws a section holding faded sample text. |
+| C97 | Esc. On an empty line, Tab, `Insert part…`, type `warning` | `Callout` shows at once as the letters are typed. |
+| C98 | Clear the field, then type `a quote from the keeper` | The groups come back when cleared; after typing stops, `Quote` appears a moment later from the server. |
+| C99 | Esc. On an empty line above a paragraph, type `::: three numbered steps` (leaving the block empty) | A closing `:::` appears below; one line of gray (`→ steps`) shows after the caret, with nothing over the `:::` or the paragraph below. |
+| C100 | Tab | The line becomes `::: steps` and the starter lines appear between the fences. |
+
+Run every row. There is no C68 to C73: they needed a machine without `gst-plugins-base` and `gst-plugins-good`, and the run of 2026-11-26 saw what they asked. C77 to C96 are sitting 6: themes with one mode, the list that wraps, Insert part…'s groups, lists of at most twelve rows and the starters. C64 and C97 to C100 are sitting 7: instant search in Insert part… with server fallback, and one-line ghost text. C21 to C67 run with the stub, so nothing is paid for. A tool or model chosen in C24 is only checked, never run. The menus open with Tab; a right-click is still the editor's own menu. Delete is ⌫ on the Mac. Never choose `Add to every site` (C56): it writes the catalog.
+
+**After the rows, undo what they wrote:** `rm ~/.config/rubric/app.json ~/.config/rubric/themes/{mine.json,a.json,b.json,c.json,d.txt}`, then close the app and run `app/scripts/clean-test.sh`, which puts the site back.
+
 ## Notes
 App starts well
 A2 - so there is a bit of a delay in the typing, and if we can get it instant or as close to that woudl be a priority.
 
 The rest is fine, i didnt complete it, but its too early to really test
 
+C10 - didnt see an error either in the app or in the rust cli. ALTHOUGH i do see this error
+
+```sh
+(rubric-app:3080967): Gdk-CRITICAL **: 20:36:46.561: _gdk_frame_clock_freeze: assertion 'GDK_IS_FRAME_CLOCK (clock)' failed
+page loaded http://127.0.0.1:1415/ 265 ms
+page loaded http://127.0.0.1:1415/posts/long/ 321 ms
+```
+
+
+C19 - Tab doesnt traverse the menu, only up/down/ for the rows, and left/right for the values
+***NOTES***  the menu is attached to the cursor, so when a new value comes up ie `cite="A. Keeper`, the menu jumps right. I think the menu should render above the cursor but stick there? maybe? or maybe not, i am not sure. do you have a better idea? 
+
+Ok I have to stop because the app stopped recognizing my keyboard inputs. The mouse still works. I was C21 when it happened, i did some of it wrong tbh, so i cant tell you exactly what i did. Also for the table, have all the instructions on the left and what we should expect on the right, its messing me up that there are more instrctions on the right. 
+
+BUT! This is BEAUTIFUL! it works mostly incredibly well holy smokes. Great job so far!
+
+Here are the logs from the rust cli:
+
+```sh
+(rubric-app:3080967): Gdk-CRITICAL **: 20:36:46.561: _gdk_frame_clock_freeze: assertion 'GDK_IS_FRAME_CLOCK (clock)' failed
+page loaded http://127.0.0.1:1415/ 265 ms
+page loaded http://127.0.0.1:1415/posts/long/ 321 ms
+^T^[[menu drawn 1.7 ms
+menu drawn 1.2 ms
+menu drawn 1.3 ms
+menu drawn 1.3 ms
+menu drawn 52.5 ms
+menu drawn 1.1 ms
+menu drawn 0.9 ms
+menu drawn 1.6 ms
+menu drawn 1.2 ms
+menu drawn 53.0 ms
+menu drawn 1.5 ms
+menu drawn 1.6 ms
+menu drawn 1.1 ms
+menu drawn 2.3 ms
+menu drawn 2.7 ms
+menu drawn 1.2 ms
+menu drawn 1.1 ms
+menu drawn 2.0 ms
+menu drawn 1.5 ms
+menu drawn 2.3 ms
+menu drawn 1.3 ms
+menu drawn 1.6 ms
+menu drawn 1.3 ms
+menu drawn 1.5 ms
+menu drawn 2.1 ms
+menu drawn 1.7 ms
+menu drawn 1.9 ms
+```
+
+
+Ok i recreated the behavior, i restarted the app, when to `C17` saw the menu, and use the arrows to go down until i got to the text box where it says `in words: bigger, cenetered`
+
+And i lost the keyboard strokes again!
+
+## pre move revision of rune to current
+
+do we have dark/light mode for every theme? it doesnt seem like we do. Paper and speia only have light and ink only has dark i didnt test more. i am just making sure this is by design. if a theme does not have a built in dark/light mode, depending on the `mode` grey out and skip the themes that dont have that mode ie if dark paper is not selectable
+
+
+for theme menus make it so if you click down on the last item it goes back to the top and up on the top it goes to do the bottom. this behavior MAYBE for all menus, so dont make it too specific yet, just do it for theme menu first
+
+C49 when i hit return, it instantly said ready (probably a test thing), and created the take, i was able to go back to the menu and `go back to quote`
+
+also rewrite the `go back to <component>` for originals, and just say `revert to original` or something like that? lets discuss this.
+
+Same with `Own` on drafted components.  its not clear what `own` means. maybe `custom`? i dunno, not `own`. again lets discuss
+
+Insert part works great, the menu can be a bit more clear, i am not sure how tho, i like the vertial menu, but `writing 7` and then 7 options is ok, but i wonder if there is a better way? lets discuss. 
+
+Also, so some components show prefilled template stuff like `lead` and `glossary` and some dont like `quote` and some others but as i was testing it crashed:
+
+
+```sh 
+A process crashed on this Omarchy machine and I want to know why.
+
+What systemd-coredump recorded:
+  process:  WebKitWebProcess
+  PID:      3169970
+  binary:   /usr/lib/webkit2gtk-4.1/WebKitWebProcess
+  signal:   SIGABRT
+  time:     Wed 2026-11-25 23:04:14 EST
+
+Use the diagnose-crash skill: it covers how to investigate, what to report, and
+when a crash is worth reporting upstream to Omarchy. If your harness has no skill
+mechanism, read the skill files directly and follow them instead:
+
+  /usr/share/omarchy/default/agents/skills/diagnose-crash/SKILL.md
+```
+
+and from the rust cli:
+
+```sh
+(rubric-app:3169868): Gdk-CRITICAL **: 22:38:25.077: _gdk_frame_clock_freeze: assertion 'GDK_IS_FRAME_CLOCK (clock)' failed
+page loaded http://127.0.0.1:1415/ 254 ms
+page loaded http://127.0.0.1:1415/posts/long/ 308 ms
+menu drawn 3.1 ms: draft, server 1.8 ms
+menu drawn 1.8 ms: draft, server 0.9 ms
+menu drawn 1.3 ms: draft, server 0.9 ms
+menu drawn 1.0 ms: draft, server 0.6 ms
+menu drawn 1.1 ms: draft, server 0.7 ms
+menu drawn 53.0 ms: draft, server 52.0 ms
+menu drawn 1.5 ms: draft, server 0.7 ms
+menu drawn 3.3 ms: part, server 2.0 ms
+menu drawn 1.7 ms: part, server 1.2 ms
+menu drawn 1.6 ms: part, server 1.2 ms
+menu drawn 2.0 ms: part, server 1.5 ms
+menu drawn 2.1 ms: part, server 1.2 ms
+menu drawn 1.9 ms: part, server 1.2 ms
+menu drawn 1.9 ms: part, server 1.0 ms
+menu drawn 1.9 ms: part, server 1.2 ms
+menu drawn 1.9 ms: part, server 1.4 ms
+menu drawn 1.9 ms: part, server 1.1 ms
+menu drawn 1.8 ms: part, server 1.2 ms
+menu drawn 53.3 ms: words-menu, server 52.4 ms
+GStreamer element autoaudiosink not found. Please install it
+
+(WebKitWebProcess:3169970): GLib-GObject-CRITICAL **: 23:04:12.544: invalid (NULL) pointer instance
+
+(WebKitWebProcess:3169970): GLib-GObject-CRITICAL **: 23:04:12.544: g_signal_connect_data: assertion 'G_TYPE_CHECK_INSTANCE (instance)' failed
+```
+```
+```
+
+So we got pretty far, but found another crash. most of this is ExCELLENT. 
+
+
+# NEW NOTES
+C61/62 So for this search parts input box, we should hook up jev to this as well, potentially. pattern match first -> if nothing after n ms (to ensure its not just a typo) it shows the suggestions. if its in multiple categories, we have to think of how to render that for the user.
+
+C64 - insert step prefill preview malformed in app. look at `reference/screenshots/instert-steps-malformed.png` to see. It probably should be placed in between the fences `:::`, very similar to how we do it in neovim.
+
+Otherwise things look fantastic!

@@ -11,7 +11,8 @@ const SIZE: (f32, f32) = (1400.0, 900.0);
 
 /// On Linux the page attaches to an X11 window only, so under Wayland the app runs through
 /// XWayland: no `WAYLAND_DISPLAY` for the window, X11 for GTK. WebKit's DMABUF renderer draws
-/// a black page on NVIDIA's driver, so it is off unless the environment says otherwise.
+/// a black page on NVIDIA's driver, so it is off unless the environment says otherwise. The
+/// X11 input method is off too (below).
 /// Called before any thread starts, which is what makes changing the environment sound.
 fn x11_session() {
     // RUBRIC_WAYLAND=1 keeps the window on Wayland, with no page: to compare typing there.
@@ -25,6 +26,13 @@ fn x11_session() {
         if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
             std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
         }
+        // No X11 input method: Rune turns the window's input method off and on at every focus
+        // move between text inputs, and under fcitx5 through XWayland that now and then leaves
+        // the app with no keys at all (the findings, slice 3, sitting 4). Composing (Chinese,
+        // Japanese, Korean) is lost with it until Rune is fixed; RUBRIC_IME=1 keeps it.
+        if std::env::var_os("RUBRIC_IME").is_none() {
+            std::env::set_var("XMODIFIERS", "@im=none");
+        }
     }
 }
 
@@ -32,6 +40,10 @@ fn init() -> State {
     let (path, text) = OPENED.get().expect("opened before run").clone();
     let mut s = State::open(path, text);
     s.width = SIZE.0;
+    // The app's theme: RUBRIC_APP_THEME for one run, else the one kept, else Paper.
+    let wanted = std::env::var("RUBRIC_APP_THEME").ok().filter(|v| !v.is_empty());
+    let look = rubric_app::theme::Look::load(rubric_app::theme::config_dir(), wanted, rubric_app::theme::Mode::from_env());
+    state::set_look(&mut s, look);
     s
 }
 
@@ -76,7 +88,15 @@ fn main() {
     let site = site_of(&path);
     let _ = OPENED.set((path, text));
 
-    let app = App::new(AppSpec::<State> { ..AppSpec::new("Rubric", SIZE, init, rubric_app::view) });
+    let app = App::new(AppSpec::<State> {
+        fonts: rubric_app::fonts::FONTS,
+        families: rubric_app::fonts::FAMILIES,
+        // For `--snap out.png --scene themes` in a debug build: the list of themes, drawn headless.
+        scenes: &[("themes", rubric_app::look::show_themes)],
+        // Insert part…'s list, asked again a pause after the last key.
+        poll: Some(rubric_app::insert::poll),
+        ..AppSpec::new("Rubric", SIZE, init, rubric_app::view)
+    });
 
     // The server, from a thread of its own, so the first frame never waits on it.
     match site {
@@ -85,7 +105,10 @@ fn main() {
             std::thread::spawn(move || {
                 let repo = Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("app/ is in the repo").to_path_buf();
                 let to_ui = handle.clone();
-                let started = Client::start(&repo, &site, !live, move |m| to_ui.update(move |s, _| state::incoming(s, m)));
+                let started = Client::start(&repo, &site, !live, move |m| to_ui.update(move |s, tx| {
+                    state::incoming(s, m);
+                    state::follow_up(s, tx);
+                }));
                 match started {
                     Ok(client) => handle.update(move |s, _| state::connected(s, client)),
                     Err(e) => eprintln!("server: {e}"),
@@ -118,10 +141,17 @@ fn main() {
     let handle = app.handle();
     app.on_frame_drawn(move |rt| {
         // Tab to the menu on screen, for the measure in the findings.
-        if rt.state.menu.is_some()
-            && let Some(asked) = rt.state.looked.take()
-        {
-            eprintln!("menu drawn {:.1} ms", asked.elapsed().as_secs_f64() * 1000.0);
+        if let Some(said) = state::menu_drawn(&rt.state) {
+            eprintln!("{said}");
+        }
+        if rubric_app::trace::on() {
+            rubric_app::trace::frame(|| {
+                let s = &rt.state;
+                let focused: Vec<String> = rt.elements().into_iter().filter(|e| e.focused).map(|e| e.key.clone().unwrap_or_else(|| "?".into())).collect();
+                let panels: Vec<String> = s.panels.iter().map(|p| format!("{}@{}", p.id, p.active_id().unwrap_or("-"))).collect();
+                format!("focused {focused:?} ime_area {:?} panels {panels:?} field_live {} held {} edit.focused {} field.focused {}",
+                    rt.ime_area.map(|a| a.map(|v| v.round())), s.field_live, s.held.is_some(), s.edit.focused, s.field.focused)
+            });
         }
         if rt.state.edit.range() != rt.state.last_range {
             moves.update_if(|s, _| state::moved(s));
@@ -143,7 +173,13 @@ fn main() {
                 eprintln!("page loaded {url} {} ms", begun.elapsed().as_millis());
             }
         };
-        let page = Page::attach(id, "about:blank", loaded, |e| eprintln!("page failed: {e}"));
+        let deaths = handle.clone();
+        let died = move |reason: String| {
+            deaths.update(move |s, _| {
+                state::page_died(s, &reason);
+            });
+        };
+        let page = Page::attach(id, "about:blank", loaded, |e| eprintln!("page failed: {e}"), died);
         handle.update(move |s, _| state::page_attached(s, page));
     })
     // Linux runs `on_close` when the window closes but not `on_quit`, so the server and the page go here.

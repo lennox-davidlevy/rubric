@@ -218,7 +218,17 @@ export async function runSite(root: string, opts: SiteOptions): Promise<RunningS
     });
     // With this process however it ends; Hugo is not stopped with its parent.
     process.once("exit", () => hugo?.kill("SIGKILL"));
-    hugo.stdout?.on("data", (b: Buffer) => say(b.toString().trimEnd()));
+    // Each finished build bumps the relay's revision so a preview whose
+    // LiveReload socket stalled still knows to redraw and catches up on reconnect.
+    let outBuf = "";
+    hugo.stdout?.on("data", (b: Buffer) => {
+      const chunk = b.toString();
+      say(chunk.trimEnd());
+      outBuf += chunk;
+      const lines = outBuf.split(/\r?\n/);
+      outBuf = lines.pop() ?? "";
+      for (const line of lines) if (isHugoBuilt(line)) relay.built();
+    });
     hugo.stderr?.on("data", (b: Buffer) => say(b.toString().trimEnd()));
     url = `http://127.0.0.1:${port}/`;
   }
@@ -287,22 +297,28 @@ export async function runSite(root: string, opts: SiteOptions): Promise<RunningS
   return { ...(url ? { url } : {}), ...(problem ? { problem } : {}), serving, stop, done };
 }
 
-// The relay for the live preview's cursor: each open page listens and scrolls
-// to where the writer's cursor is (rubric-live.js). The last position goes to
-// a page as it connects, so a page opened by moving to another file scrolls
-// straight to the cursor.
+// A line Hugo prints when a build or rebuild finishes ("Built in 9 ms", "Total in 3 ms").
+export function isHugoBuilt(line: string): boolean {
+  return /^(?:Built|Total) in \d+(?:\.\d+)?\s*(?:ms|s|µs|us|ns)\b/.test(line.trim());
+}
+
+// The relay for the live preview: each open page listens for the writer's
+// cursor and for finished Hugo builds (rubric-live.js). The last cursor and
+// build revision go to a page as it connects, so a new page scrolls straight
+// to the cursor and a reconnecting page catches up on missed builds.
 interface Relay {
   port: number;
   push: (body: string) => void;
+  built: () => void;
   stop: () => void;
 }
 
 function startRelay(port: number): Relay {
   const listeners = new Set<ReadableStreamDefaultController<string>>();
   let last: string | undefined;
+  let rev = 0;
   const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type" };
-  const push = (body: string) => {
-    last = body;
+  const broadcast = (body: string) => {
     for (const c of listeners) {
       try {
         c.enqueue(`data: ${body}\n\n`);
@@ -310,6 +326,14 @@ function startRelay(port: number): Relay {
         listeners.delete(c);
       }
     }
+  };
+  const push = (body: string) => {
+    last = body;
+    broadcast(body);
+  };
+  const built = () => {
+    rev++;
+    broadcast(JSON.stringify({ built: rev }));
   };
   const server = Bun.serve({
     port,
@@ -325,6 +349,7 @@ function startRelay(port: number): Relay {
             me = c;
             listeners.add(c);
             c.enqueue(": rubric\n\n");
+            c.enqueue(`data: ${JSON.stringify({ built: rev })}\n\n`);
             if (last) c.enqueue(`data: ${last}\n\n`);
           },
           cancel() {
@@ -339,6 +364,7 @@ function startRelay(port: number): Relay {
   return {
     port,
     push,
+    built,
     stop: () => {
       for (const c of listeners) {
         try {

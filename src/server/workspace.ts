@@ -10,7 +10,7 @@ import { join, relative } from "node:path";
 import {
   applyRefine, atPlace, Cache, frontMatterProblem, liveContent, settingsOf, formatPlain, frame, FRAME_PAGE, framePage, parsePlain, preprocess, refineWords, scan, lines as splitLines,
   formatThemeLine, PIECES, THEME, THRESHOLDS, writeWhole, type Piece, drawnForm, PLAIN, VARIANT, type DrawAs,
-  type Catalog, type Diagnostic, type Directive, type Entry, type PageKind, type Place, type Refined, type Resolution, type Resolve, type ThemeChoice,
+  type Catalog, type Diagnostic, type Directive, type Entry, type PageKind, type Part, type Place, type Refined, type Resolution, type Resolve, type Setting, type ThemeChoice,
 } from "../core/index.ts";
 import { catalogFiles, changeable, DRAFT_INDEX, DRAFT_LOGS, draftKey, DRAFTS, keepLocal, keepTake, makeGlobal, ownKey, putAway, readDrafts, setEverywhere, shownTake, takesFor, variantKey, variantsOf, writeHugoTree, type DraftState } from "../parts.ts";
 import { openSite, pageKind, pagePath, type Site } from "../site.ts";
@@ -406,6 +406,8 @@ export class Workspace {
     if (!doc) return this.open(file, text);
     doc.editing = firstChangedLine(doc.text, text);
     doc.text = text;
+    // A part looked at on a line was for the text as it was.
+    if (this.#lineAs?.file === file) this.#lineAs = undefined;
     // Accepted or reworded: the line no longer holds the words it was for.
     if (doc.chosen && !scan(text, this.site.catalog).directives.some((d) => d.kind === "words" && d.words === doc.chosen!.words)) {
       doc.chosen = undefined;
@@ -480,6 +482,7 @@ export class Workspace {
     const doc = this.#docs.get(file);
     if (!doc) return;
     this.#docs.delete(file);
+    if (this.#lineAs?.file === file) this.#lineAs = undefined;
     // Opened again, its starters are sent again.
     this.#starters.delete(file);
     await this.#claimOpen();
@@ -866,13 +869,108 @@ export class Workspace {
   // The part the writer is looking at for a `new:` line, from the list of
   // near ones: the preview draws it where the line is. No part: back to the
   // line as it was.
+  // On an empty line, or a line of words placing no part, the part is drawn
+  // there with its closer (`#lineAs`), for the app's Insert part… and the
+  // menu on a line of words.
   #peek: { words: string; part: string } | undefined;
+  #lineAs: { file: string; line: number; part: string } | undefined;
   peek(file: string, line: number, part?: string): void {
     const at = this.#newLine(file, line);
-    const next = at && part && Object.hasOwn(this.site.catalog.parts, part) ? { words: at.d.words!, part } : undefined;
-    if (this.#peek?.words === next?.words && this.#peek?.part === next?.part) return;
+    const known = part !== undefined && Object.hasOwn(this.site.catalog.parts, part);
+    const next = at && known ? { words: at.d.words!, part: part! } : undefined;
+    const doc = this.#docs.get(file);
+    const d = doc && !at ? this.#directiveAt(doc, line) : undefined;
+    const blank = doc && (splitLines(doc.text)[line] ?? "").trim() === "";
+    const lineAs = !at && known && doc && (blank || d?.kind === "words") ? { file, line, part: part! } : undefined;
+    const same = this.#peek?.words === next?.words && this.#peek?.part === next?.part;
+    const sameLine = this.#lineAs?.file === lineAs?.file && this.#lineAs?.line === lineAs?.line && this.#lineAs?.part === lineAs?.part;
+    if (same && sameLine) return;
+    const was = this.#lineAs?.file;
     this.#peek = next;
-    for (const f of this.#docs.keys()) this.#drawSoon(f);
+    this.#lineAs = lineAs;
+    if (!same) for (const f of this.#docs.keys()) this.#drawSoon(f);
+    else for (const f of new Set([was, lineAs?.file])) if (f) this.#drawSoon(f);
+  }
+
+  // The part a line places, for the editor's menu on it: its name, whose it
+  // is, how many blocks use it, and its settings with their values, its own
+  // first in the catalog's order and then the look settings. With `set`, the
+  // line with that setting given (dropped when it is the default), as
+  // `replace`; nothing is written. A line that places no part: undefined.
+  async part(file: string, line: number, set?: { name: string; value: string }): Promise<PartView | { replace: string } | { error: string } | undefined> {
+    const doc = this.#docs.get(file);
+    const d = doc && this.#directiveAt(doc, line);
+    const form = d?.plain;
+    const catalog = this.site.catalog;
+    if (!doc || !d || !form || !Object.hasOwn(catalog.parts, form.part) || catalog.parts[form.part]!.origin === "draft") return undefined;
+    const drawn = drawnForm(form, catalog).part;
+    const def = Object.hasOwn(catalog.parts, drawn) ? catalog.parts[drawn]! : catalog.parts[form.part]!;
+    const own = Object.entries(def.settings).filter(([k]) => k !== VARIANT);
+    const look = def.place === "writing" ? Object.entries(catalog.look) : [];
+    const given = new Map(form.settings.map((s) => [s.key, s.value]));
+    if (set) {
+      const found = [...own, ...look].find(([k]) => k === set.name)?.[1];
+      if (!found) return { error: `${form.part} has no setting "${set.name}"` };
+      const allowed = valuesOf(found);
+      if (allowed ? !allowed.includes(set.value) : found.type === "number" ? set.value !== "" && !Number.isFinite(Number(set.value)) : set.value.includes('"')) {
+        return { error: `"${set.value}" is not allowed for ${set.name}` };
+      }
+      const drop = set.value === defaultOf(found) || (!allowed && set.value === "");
+      const at = form.settings.findIndex((x) => x.key === set.name);
+      const settings = form.settings.map((x) => ({ key: x.key, value: x.value }));
+      if (drop && at >= 0) settings.splice(at, 1);
+      else if (!drop && at >= 0) settings[at] = { key: set.name, value: set.value };
+      else if (!drop) settings.push({ key: set.name, value: set.value });
+      const text = splitLines(doc.text)[line] ?? "";
+      const words = d.refine ? ` ${text.slice(d.refine.colon)}` : "";
+      return { replace: `${opener(text)} ${formatPlain({ part: form.part, settings })}${words}` };
+    }
+    const view = (name: string, x: Setting): PartSetting => {
+      const values = valuesOf(x);
+      const dflt = defaultOf(x);
+      const value = given.get(name);
+      return { name, type: x.type, ...(values ? { values } : {}), ...(dflt !== undefined ? { default: dflt } : {}), ...(value !== undefined ? { value } : {}) };
+    };
+    const kind = this.#kind(drawn);
+    const uses = await this.#uses(drawn, file, -1);
+    return {
+      name: form.part,
+      kind: kind.variant ? "variant" : kind.catalog ? "catalog" : "own",
+      ...(kind.variant ? { variant: { of: kind.variant.of, name: kind.variant.name, everywhere: kind.variant.everywhere === true } } : {}),
+      uses,
+      settings: own.map(([k, x]) => view(k, x)),
+      look: look.map(([k, x]) => view(k, x)),
+      ...(d.close !== undefined ? { close: d.close } : {}),
+    };
+  }
+
+  // The parts a writer can put on a line of the page: the site's own first,
+  // then the catalog's for the page's kind in its groups. With words, in
+  // Jev's order, the ones under the near threshold left out; with none, Jev
+  // is asked nothing.
+  async parts(file: string, words?: string): Promise<{ parts: PartEntry[] } | { error: string }> {
+    const doc = this.#docs.get(file);
+    const page: PageKind = doc?.page ?? pageKind(relative(this.site.pages, file));
+    const catalog = atPlace(this.site.catalog, page === "site" ? "site" : "writing");
+    const entry = ([name, p]: [string, Part]): PartEntry => p.origin === "site"
+      ? { name, description: p.description, own: true, ...(p.empty ? { empty: true as const } : {}) }
+      : { name, description: p.description, ...(p.group ? { group: p.group } : {}), ...(p.empty ? { empty: true as const } : {}) };
+    const all = Object.entries(catalog.parts);
+    const wanted = words?.trim();
+    if (!wanted) {
+      const order = this.site.catalog.groups ?? [];
+      const rank = (p: Part) => (p.group && order.includes(p.group) ? order.indexOf(p.group) : order.length);
+      const theirs = all.filter(([, p]) => p.origin !== "site").map((e, i) => ({ e, i })).sort((a, b) => rank(a.e[1]) - rank(b.e[1]) || a.i - b.i).map(({ e }) => e);
+      return { parts: [...all.filter(([, p]) => p.origin === "site"), ...theirs].map(entry) };
+    }
+    await this.#ask(page, wanted);
+    const hit = this.#cache.get(this.site.catalog, page, wanted);
+    if (!hit) return { error: this.#errors.get(this.#key(page, wanted)) ?? "no answer for the words" };
+    const ranked = Object.entries(hit.parts)
+      .filter(([name, p]) => p >= THRESHOLDS.near && Object.hasOwn(catalog.parts, name))
+      .sort((a, b) => b[1] - a[1])
+      .map(([name]) => entry([name, catalog.parts[name]!]));
+    return { parts: ranked };
   }
 
   // draft(), and for a line of the site's own part, how many other blocks
@@ -1330,7 +1428,7 @@ export class Workspace {
       const settings = latest?.status === "ready" && latest.name ? this.#kept(latest.name).settings : [];
       const sets = settings.length ? `. Settings: ${settings.map((t) => (t.values.length ? `${t.name}=${t.values.join("|")}` : `${t.name}=`)).join(" ")}` : "";
       const data = latest
-        ? { data: { status: latest.status, ...(latest.name ? { name: latest.name } : {}), ...(latest.by ? { by: latest.by } : {}), started: latest.started, ...(shown?.name && shown !== latest ? { shown: shown.name } : {}), ...this.#takes(words), ...close, ...(settings.length ? { settings } : {}) } }
+        ? { data: { status: latest.status, ...(latest.name ? { name: latest.name } : {}), ...(latest.by ? { by: latest.by } : {}), started: latest.started, ...(shown?.name && shown !== latest ? { shown: shown.name } : {}), ...(latest.status === "failed" && latest.message ? { message: latest.message } : {}), ...this.#takes(words), ...close, ...(settings.length ? { settings } : {}) } }
         : { data: { status: "none", ...close, ...(() => {
           const earlier = words ? this.#earlier(words).length : 0;
           return earlier ? { earlier } : {};
@@ -1365,6 +1463,7 @@ export class Workspace {
         data: {
           status: latest.status, name: variant !== undefined ? latest.name ?? of : of, of, ...(variant !== undefined ? { variant: true as const } : {}), ...(latest.by ? { by: latest.by } : {}), started: latest.started,
           ...(shown && shown !== latest ? { shown: shown.original ? "the kept one" : `take ${this.#takes(key).take}` } : {}),
+          ...(latest.status === "failed" && latest.message ? { message: latest.message } : {}),
           ...this.#takes(key), ...(d.close === undefined ? {} : { close: d.close }),
         },
       };
@@ -1668,6 +1767,22 @@ export class Workspace {
     // The text drawn, which the starters are read against: the writer may
     // type on while it's written.
     const text = doc.text;
+    // A part looked at on an empty line or a line of words: drawn there, its
+    // closer added, while the notes and starters stay those of the text.
+    const as = this.#lineAs?.file === file ? this.#lineAs : undefined;
+    if (as) {
+      const lines = splitLines(text);
+      const was = lines[as.line];
+      // Only while the line is still empty or still a line of words.
+      const d = was === undefined ? undefined : this.#directiveAt(doc, as.line);
+      if (was !== undefined && (was.trim() === "" || d?.kind === "words")) {
+        const head = `${was.trim() === "" ? ":::" : opener(was)} ${as.part}`;
+        const block = this.site.catalog.parts[as.part]?.empty || was.trim() !== "" ? [head] : [head, ":::"];
+        lines.splice(as.line, 1, ...block);
+        await this.#write(doc.rel, doc.page, lines.join("\n"), doc.chosen, doc.cancelled);
+        return;
+      }
+    }
     const { entries, diagnostics } = await this.#write(doc.rel, doc.page, text, doc.chosen, doc.cancelled);
     this.#sendStarters(file, { ...doc, text }, entries);
     this.#publish(file, [
@@ -2013,4 +2128,48 @@ function alive(pid: number): boolean {
   } catch (err) {
     return (err as NodeJS.ErrnoException).code === "EPERM";
   }
+}
+
+// A setting as the editor's menu on a part shows it.
+export interface PartSetting {
+  name: string;
+  type: Setting["type"];
+  values?: string[];
+  default?: string;
+  // What the line sets, if it sets it.
+  value?: string;
+}
+
+// A placed part, for the editor's menu on its line (`rubric/part`).
+export interface PartView {
+  name: string;
+  // The catalog's part, the site's own, or a variant of a part.
+  kind: "catalog" | "own" | "variant";
+  variant?: { of: string; name: string; everywhere: boolean };
+  // Every block on the site's pages that draws it, this one with them.
+  uses: { blocks: number; pages: number };
+  settings: PartSetting[];
+  look: PartSetting[];
+  // The block's closing line, when it has one: removing the part takes it
+  // with the opening line and leaves the writing between.
+  close?: number;
+}
+
+// A part to put on a line (`rubric/parts`): a site's own has no group.
+export interface PartEntry {
+  name: string;
+  description: string;
+  own?: true;
+  group?: string;
+  // Takes nothing inside: placed without a closer.
+  empty?: true;
+}
+
+// The values a choice, level or flag takes; none for the rest.
+function valuesOf(x: Setting): string[] | undefined {
+  return x.type === "choice" ? Object.keys(x.values) : x.type === "level" ? Object.keys(x.levels) : x.type === "flag" ? ["true", "false"] : undefined;
+}
+
+function defaultOf(x: Setting): string | undefined {
+  return x.type === "flag" ? String(x.default ?? false) : x.default === undefined ? undefined : String(x.default);
 }

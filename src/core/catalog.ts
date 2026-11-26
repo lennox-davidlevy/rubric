@@ -58,11 +58,16 @@ export interface Part {
   variant?: string;
   // The variant drawn for every line of its part that sets none.
   everywhere?: true;
+  // Where the editor lists it among the catalog's parts ("Media"), one of
+  // the catalog's `groups`. Jev is never sent it.
+  group?: string;
 }
 
 export interface Catalog {
   name: string;
   version: number;
+  // The groups the editor lists parts under, in their order.
+  groups?: string[];
   slots: string[];
   parts: Record<string, Part>;
   // Settings every part in the writing has, the same for all of them: how it
@@ -275,8 +280,12 @@ export function parseCatalog(text: string): Catalog {
     }
   }
   if (Object.keys(parts).length === 0) throw new CatalogError("parts must name at least one part");
+  const groups = root.groups === undefined ? undefined : array(root.groups, "groups").map((g, i) => string(g, `groups[${i}]`));
+  for (const [partName, p] of Object.entries(parts)) {
+    if (p.group !== undefined && !groups?.includes(p.group)) throw new CatalogError(`parts.${partName}.group: "${p.group}" is not one of groups`);
+  }
 
-  return { name, version, slots, parts, look, elsewhere: { parts: {}, settings: {} } };
+  return { name, version, ...(groups ? { groups } : {}), slots, parts, look, elsewhere: { parts: {}, settings: {} } };
 }
 
 function parsePart(rawPart: unknown, at: string): Part {
@@ -299,7 +308,8 @@ function parsePart(rawPart: unknown, at: string): Part {
   const already = part.already === undefined ? {} : {
     already: Object.fromEntries(Object.entries(record(part.already, `${at}.already`)).map(([k, v]) => [k, string(v, `${at}.already.${k}`)])),
   };
-  return { description: string(part.description, `${at}.description`), place, ...body, children, ...(empty ? { empty: true as const } : {}), script, settings, ...(part.drafted === true ? { drafted: true as const } : {}), ...already };
+  const group = part.group === undefined ? {} : { group: string(part.group, `${at}.group`) };
+  return { description: string(part.description, `${at}.description`), place, ...body, ...group, children, ...(empty ? { empty: true as const } : {}), script, settings, ...(part.drafted === true ? { drafted: true as const } : {}), ...already };
 }
 
 function setting(raw: unknown, at: string): Setting {

@@ -10,21 +10,22 @@ use crate::draft::Tone;
 /// The colors the spans use.
 #[derive(Clone, Copy, Debug)]
 pub struct Theme {
-    /// Marks: the `#` of a heading, the stars around bold and italic.
+    /// Marks: the `#` of a heading, the stars around bold and italic, a part's `:::`.
     pub dim: Color,
-    /// A `:::` line.
+    /// The `:::` of a `new:` line while it drafts or is ready.
     pub accent: Color,
-    /// A `new:` line whose draft failed.
+    /// The `:::` of a `new:` line whose draft failed.
     pub warn: Color,
 }
 
-/// The editor's text size, in points; headings are larger.
-pub const BODY: f32 = 17.0;
-const HEADINGS: [f32; 3] = [28.0, 23.0, 19.0];
+/// The editor's text size, in points; headings are larger (the Overview's H1 30, H2 22).
+pub const BODY: f32 = crate::fonts::BODY;
+const HEADINGS: [f32; 3] = [30.0, 22.0, 19.0];
 
-/// Styles for the whole text: ATX headings, `**bold**`, `*italic*`, `:::` lines, and fenced
-/// code, inside which nothing else is styled. A `::: new:` line is dim until `drafts` (line,
-/// tone) says where its draft is. Runs over the whole text; no incremental pass.
+/// Styles for the whole text: ATX headings, `**bold**`, `*italic*`, the colons of `:::` lines,
+/// and fenced code, inside which nothing else is styled. A `::: new:` line's colons are dim
+/// until `drafts` (line, tone) says where its draft is. Runs over the whole text; no
+/// incremental pass.
 pub fn spans(text: &str, theme: &Theme, drafts: &[(u32, Tone)]) -> Vec<Span> {
     let mut out = Vec::new();
     let mut fence: Option<(u8, usize)> = None;
@@ -46,19 +47,20 @@ pub fn spans(text: &str, theme: &Theme, drafts: &[(u32, Tone)]) -> Vec<Span> {
             let tone = if crate::draft::is_new_line(rest) {
                 drafts.iter().find(|(l, _)| *l as usize == n).map_or(Tone::Dim, |(_, t)| *t)
             } else {
-                Tone::Accent
+                Tone::Dim
             };
-            out.push(Span::new(start, end).color(match tone {
-                Tone::Dim => theme.dim,
+            let colons = start + lead + rest.bytes().take_while(|&b| b == b':').count();
+            out.push(Span::new(start + lead, colons).color(match tone {
+                Tone::Dim | Tone::Ink => theme.dim,
                 Tone::Accent => theme.accent,
                 Tone::Warn => theme.warn,
             }));
         } else if let Some(level) = heading_level(rest) {
             let size = HEADINGS.get(level - 1).copied().unwrap_or(BODY);
             let marks = start + lead + level;
-            out.push(Span::new(start + lead, marks).size(size).bold().color(theme.dim));
+            out.push(Span::new(start + lead, marks).size(size).color(theme.dim));
             if marks < end {
-                out.push(Span::new(marks, end).size(size).bold());
+                out.push(Span::new(marks, end).size(size).weight(600.0));
             }
         } else {
             inline(line, start, theme, &mut out);
@@ -109,7 +111,7 @@ fn inline(line: &str, base: usize, theme: &Theme, out: &mut Vec<Span>) {
         let (s, e) = (base + i, base + close + width);
         out.push(Span::new(s, s + width).color(theme.dim));
         let inner = Span::new(s + width, base + close);
-        out.push(if double { inner.bold() } else { inner.italic() });
+        out.push(if double { inner.weight(600.0) } else { inner.italic() });
         out.push(Span::new(base + close, e).color(theme.dim));
         i = close + width;
     }
@@ -189,20 +191,21 @@ mod tests {
     }
 
     #[test]
-    fn a_directive_line_takes_the_accent() {
-        let s = spans("text\n::: a quote\n:::", &T, &[]);
-        assert_eq!(at(&s, 5, 16).color, Some(T.accent));
+    fn a_directive_lines_colons_are_marks_and_its_words_are_not() {
+        let s = spans("text\n::: a quote\n  :::", &T, &[]);
+        assert_eq!(at(&s, 5, 8).color, Some(T.dim));
+        assert!(!s.iter().any(|x| x.start >= 8 && (x.start as usize) < 16), "the words take the text's color");
+        assert_eq!(at(&s, 19, 22).color, Some(T.dim), "a closer is a mark");
     }
 
     #[test]
-    fn a_new_line_is_dim_until_its_draft_says_otherwise() {
+    fn a_new_lines_colons_are_dim_until_its_draft_says_otherwise() {
         let text = "::: new: a clock\n:::\n::: new: a bell\n:::";
         let s = spans(text, &T, &[(2, Tone::Warn)]);
-        assert_eq!(at(&s, 0, 16).color, Some(T.dim));
-        assert_eq!(at(&s, 21, 36).color, Some(T.warn));
-        assert_eq!(at(&s, 17, 20).color, Some(T.accent), "a closer keeps the accent");
+        assert_eq!(at(&s, 0, 3).color, Some(T.dim));
+        assert_eq!(at(&s, 21, 24).color, Some(T.warn));
         let s = spans(text, &T, &[(0, Tone::Accent)]);
-        assert_eq!(at(&s, 0, 16).color, Some(T.accent));
+        assert_eq!(at(&s, 0, 3).color, Some(T.accent));
     }
 
     #[test]

@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createMessageConnection, StreamMessageReader, StreamMessageWriter, type MessageConnection } from "vscode-jsonrpc/node";
 import { newSite } from "../src/new-site.ts";
-import { alive, readServing, socketPath } from "../src/server/site-process.ts";
+import { alive, isHugoBuilt, readServing, socketPath } from "../src/server/site-process.ts";
 
 const repo = join(import.meta.dir, "..");
 const tmp = mkdtempSync(join(tmpdir(), "rubric-process-"));
@@ -152,3 +152,67 @@ test("rubric stop leaves alone a process whose pid a crashed one left behind", (
   const r = Bun.spawnSync(["bun", join(repo, "src/cli.ts"), "stop", root], { cwd: repo, env });
   expect(r.stdout.toString().trim()).toBe("not running");
 });
+
+test("isHugoBuilt matches Hugo build completion lines only", () => {
+  expect(isHugoBuilt("Built in 9 ms")).toBe(true);
+  expect(isHugoBuilt("Total in 3 ms")).toBe(true);
+  expect(isHugoBuilt("Total in 1.2 s")).toBe(true);
+  expect(isHugoBuilt("Total in 450 µs")).toBe(true);
+  expect(isHugoBuilt("Source changed /posts/long.md")).toBe(false);
+  expect(isHugoBuilt("Web Server is available at //localhost:1415/")).toBe(false);
+});
+
+test("the SSE relay broadcasts monotonic built revisions and replays the latest on connect", async () => {
+  const root = join(tmp, "relay-built");
+  newSite(root);
+  const chattyHugo = join(tmp, "chatty-hugo");
+  writeFileSync(chattyHugo, `#!/bin/sh\necho "Built in 9 ms"\nsleep 0.2\necho "Total in 3 ms"\nexec sleep 600\n`);
+  chmodSync(chattyHugo, 0o755);
+  const proc = Bun.spawn(["bun", join(repo, "src/cli.ts"), "lsp", "--stub"], { cwd: repo, env: { ...env, RUBRIC_HUGO: chattyHugo }, stdin: "pipe", stdout: "pipe", stderr: "pipe" });
+  const { Readable, Writable } = await import("node:stream");
+  const conn = createMessageConnection(
+    new StreamMessageReader(Readable.fromWeb(proc.stdout as never)),
+    new StreamMessageWriter(new Writable({ write: (chunk, _, done) => { proc.stdin.write(chunk); done(); } })),
+  );
+  conn.onNotification(() => {});
+  conn.onRequest(() => null);
+  conn.listen();
+  await conn.sendRequest("initialize", { processId: process.pid, rootUri: pathToFileURL(root).href, capabilities: {} });
+  await conn.sendNotification("initialized", {});
+  const serving = readServing(root)!;
+  pids.push(serving.pid!);
+
+  const readEvents = async (want: number): Promise<unknown[]> => {
+    const ac = new AbortController();
+    const res = await fetch(`http://127.0.0.1:${serving.relay}/events`, { signal: ac.signal });
+    const reader = res.body!.getReader();
+    const dec = new TextDecoder();
+    const out: unknown[] = [];
+    let buf = "";
+    try {
+      while (out.length < want) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        for (const frame of buf.split("\n\n")) {
+          const line = frame.split("\n").find((l) => l.startsWith("data: "));
+          if (line) out.push(JSON.parse(line.slice(6)));
+        }
+        buf = buf.slice(buf.lastIndexOf("\n\n") + 2);
+      }
+    } finally {
+      ac.abort();
+      reader.releaseLock();
+    }
+    return out;
+  };
+
+  // Wait for both builds from chattyHugo, then verify a fresh SSE client gets built >= 2 immediately.
+  const saw = await readEvents(2);
+  expect(saw.some((e) => typeof (e as { built?: number }).built === "number")).toBe(true);
+  await Bun.sleep(300);
+  const fresh = await readEvents(1);
+  expect((fresh[0] as { built?: number }).built).toBeGreaterThanOrEqual(2);
+
+  await leave({ conn, proc, notes: new Map() });
+}, 20_000);

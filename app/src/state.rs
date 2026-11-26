@@ -46,26 +46,90 @@ pub struct State {
     pub asked: Option<(i64, i32, u32)>,
     /// The window's height in points, for the menu's place.
     pub height: f32,
-    /// The menu at the caret, and the view and line it is about.
-    pub menu: Option<crate::menu::Menu>,
-    pub view: Option<(draft::View, draft::Asked)>,
-    /// Where the menu's anchor was last laid out, for when the notes field has the focus and
-    /// the editor reports no caret.
-    pub menu_at: Option<[f32; 4]>,
-    /// A reroll's notes, while `menu` is the notes field.
-    pub notes: TextEdit,
+    /// The `new:` line whose menu is open, and what the server said of it.
+    pub view: Option<draft::Open>,
+    /// A drafter chosen for one line (the line's text): it rides on that line's builds.
+    pub choice: Option<(String, draft::Choice)>,
     /// Each `new:` line's status, from the server's diagnostics: line, status.
     pub drafts: Vec<(u32, draft::Status)>,
     /// Something that just happened, said at the bottom of the writing until the time in ms.
-    pub flash: Option<(char, String, draft::Tone, u64)>,
+    pub flash: Option<(draft::Said, u64)>,
     /// The time the status line counts from, in ms; set by what changes it and by the ticker.
     pub now_ms: u64,
     /// `rubric/draft` requests not answered yet.
     pub pending: HashMap<i64, draft::Asked>,
     /// When Tab asked for a line's menu, until the frame that draws it: the time is printed.
     pub looked: std::cell::Cell<Option<std::time::Instant>>,
+    /// Of that time, how long the server took to answer, in ms.
+    pub looked_server_ms: f64,
+    /// When each request not answered yet was sent, by its id.
+    pub sent_at: HashMap<i64, std::time::Instant>,
     /// Wakes the app once a second while a draft runs or a flash shows.
     pub ticker: Option<Ticker>,
+    /// The app's theme and its colors.
+    pub look: crate::theme::Look,
+    /// The title row's words: the post's first heading, or its file's name.
+    pub title: String,
+    /// The writing pane's rectangle in window points, as last laid out: menus stay inside it.
+    pub pane: [f32; 4],
+    /// The open panels: one, or a second beside it.
+    pub panels: Vec<crate::panel::Panel>,
+    /// The text of a panel's field (one at a time).
+    pub field: TextEdit,
+    /// Whose text `field` holds: the panel's id and the row's.
+    pub field_of: Option<(String, String)>,
+    /// The part a line places, while its drafts are asked about, before its menu opens.
+    pub part_wait: Option<crate::part::Part>,
+    /// A setting changed while another change was on its way: sent once that one is answered.
+    pub set_next: Option<(String, String)>,
+    /// A setting's change is on its way.
+    pub setting: bool,
+    /// The line Insert part… or a line of words' menu is for, and the parts it lists.
+    pub insert: Option<crate::insert::Insert>,
+    /// The writer's default drafter, as the server last named it.
+    pub drafter: Option<String>,
+    /// A panel opened by an answer has a field with the focus: the keys go to it.
+    pub focus_field: bool,
+    /// The panel's field has the keys (it was typed on, given Return or pressed); a field row
+    /// that only has the focus leaves them with the writing.
+    pub field_live: bool,
+    /// The writing as it was when a field row without the keys took the focus.
+    pub held: Option<TextEdit>,
+    /// Where the panels hang: the line they opened on, from the writing field's top.
+    pub anchor: Option<Anchor>,
+    /// The writing field's rectangle in window points, after scrolling.
+    pub editor_rect: [f32; 4],
+    /// What to say once the server has answered a request, by its id: a label and a fact.
+    pub said_on: HashMap<i64, (String, String)>,
+    /// The theme and mode drawn when the list of themes opened, to go back to.
+    pub theme_before: Option<(String, crate::theme::Mode)>,
+    /// The page's process over the run: media off, restarted, stopped.
+    pub page_life: crate::page::Life,
+}
+
+/// The line a panel hangs from, taken when it opens: which line, where it starts in the text,
+/// and the writing field's width then (a resize wraps the text again), with the line's offset
+/// from the field's top and its height. Scrolling moves the field, and the panel with it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Anchor {
+    pub line: u32,
+    pub start: usize,
+    pub width: f32,
+    pub dy: f32,
+    pub h: f32,
+}
+
+impl Anchor {
+    /// Still the caret's line, as it was laid out.
+    pub fn holds(&self, line: u32, start: usize, width: f32) -> bool {
+        self.line == line && self.start == start && (self.width - width).abs() < 0.5
+    }
+}
+
+/// The caret's line and the byte it starts at.
+pub fn caret_line_start(s: &State) -> (u32, usize) {
+    let line = position::line_char(&s.edit.text, s.edit.focus).0;
+    (line, position::line_range(&s.edit.text, line).start)
 }
 
 /// The thread that ticks: parked until `wake`, at rest again when nothing needs the time.
@@ -94,42 +158,114 @@ impl State {
         edit.focused = true;
         edit.set_caret(0);
         let uri = file_uri(&path);
-        let spans = markdown::spans(&text, &theme(), &[]);
+        let look = crate::theme::Look::load(None, None, None);
+        let spans = markdown::spans(&text, &marks(&look.palette), &[]);
+        let title = title_of(&path, &text);
         State {
             path, edit, version: 1, saved: text, split: 0.5, last_range: (0, 0), uri, spans, problem: None, page: None, width: 0.0,
-            bounds: None, client: None, cursor_line: None, page_url: None, ghost: None, asked: None, height: 0.0, menu: None,
-            view: None, menu_at: None, notes: TextEdit::new(""), drafts: Vec::new(), flash: None, now_ms: draft::now_ms(),
-            pending: HashMap::new(), looked: std::cell::Cell::new(None), ticker: None,
+            bounds: None, client: None, cursor_line: None, page_url: None, ghost: None, asked: None, height: 0.0,
+            view: None, choice: None, drafts: Vec::new(), flash: None, now_ms: draft::now_ms(),
+            pending: HashMap::new(), looked: std::cell::Cell::new(None), looked_server_ms: 0.0, sent_at: HashMap::new(), ticker: None, look, title, pane: [0.0; 4],
+            panels: Vec::new(), field: TextEdit::new(""), field_of: None, part_wait: None, set_next: None, setting: false, insert: None, drafter: None, focus_field: false, field_live: false, held: None, anchor: None, editor_rect: [0.0; 4], said_on: HashMap::new(), theme_before: None, page_life: crate::page::Life::default(),
         }
     }
 }
 
-pub fn theme() -> markdown::Theme {
-    let t = rune::tok::theme(false);
-    markdown::Theme { dim: t.text_secondary, accent: rune::tok::accent(0, false), warn: rune::tok::accent(3, false) }
+/// The Markdown's colors from the app's theme.
+pub fn marks(p: &crate::theme::Palette) -> markdown::Theme {
+    markdown::Theme { dim: p.ink3, accent: p.accent, warn: p.fail }
 }
 
 /// The Markdown styles for the text as it is, the `new:` lines by their drafts.
 pub fn spans(s: &State) -> Vec<Span> {
     let tones: Vec<(u32, draft::Tone)> = s.drafts.iter().map(|(l, st)| (*l, st.tone())).collect();
-    markdown::spans(&s.edit.text, &theme(), &tones)
+    markdown::spans(&s.edit.text, &marks(&s.look.palette), &tones)
+}
+
+/// The app drawn in another look: the writing's colors follow.
+pub fn set_look(s: &mut State, look: crate::theme::Look) {
+    s.look = look;
+    s.spans = spans(s);
+}
+
+/// The theme drawn changed (the list of themes moved): the writing's colors follow.
+pub fn show_theme(s: &mut State, name: &str) -> bool {
+    let shown = s.look.show(name);
+    s.spans = spans(s);
+    shown
+}
+
+/// The post's first ATX heading, outside front matter and code fences, or its file's name.
+pub fn title_of(path: &std::path::Path, text: &str) -> String {
+    let mut lines = text.split('\n').peekable();
+    if lines.peek().is_some_and(|l| l.trim_end() == "---") {
+        lines.next();
+        for l in lines.by_ref() {
+            if l.trim_end() == "---" {
+                break;
+            }
+        }
+    }
+    let mut fence = false;
+    for l in lines {
+        let t = l.trim_start();
+        if t.starts_with("```") || t.starts_with("~~~") {
+            fence = !fence;
+            continue;
+        }
+        if fence {
+            continue;
+        }
+        let n = t.bytes().take_while(|&b| b == b'#').count();
+        if (1..=6).contains(&n) && t[n..].starts_with([' ', '\t']) {
+            let words = t[n..].trim().trim_end_matches('#').trim();
+            if !words.is_empty() {
+                return words.to_string();
+            }
+        }
+    }
+    path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+}
+
+/// Whether the text is as last written.
+pub fn clean(s: &State) -> bool {
+    s.edit.text == s.saved
 }
 
 /// The text changed: a new version, new styles, and the whole text to the server.
 pub fn changed(s: &mut State) {
+    // Typing is not the panels': they go (a choice that changed the text closed them already).
+    crate::look::close_panels(s);
+    sent(s);
+    moved(s);
+    ask(s);
+}
+
+/// A panel rewrote its line (a setting changed): as `changed`, with the panels left open.
+pub fn rewritten(s: &mut State) {
+    sent(s);
+    s.last_range = s.edit.range();
+    ask(s);
+}
+
+fn sent(s: &mut State) {
     s.version += 1;
     s.ghost = None;
-    // Typing is not the menu's: it goes (a choice that changed the text closed it already).
-    draft::close(s);
     s.spans = spans(s);
+    s.title = title_of(&s.path, &s.edit.text);
     if let Some(c) = &s.client {
         c.notify("textDocument/didChange", json!({
             "textDocument": { "uri": s.uri, "version": s.version },
             "contentChanges": [{ "text": s.edit.text }],
         }));
     }
-    moved(s);
-    ask(s);
+}
+
+/// After a message from the server: a field a panel opened with takes the keys.
+pub fn follow_up(s: &mut State, tx: &mut Tx) {
+    if std::mem::take(&mut s.focus_field) {
+        crate::look::give_field(s, tx);
+    }
 }
 
 /// Run after each drawn frame (`App::on_frame_drawn`) and after each change: a caret that
@@ -140,8 +276,8 @@ pub fn moved(s: &mut State) -> bool {
         return false;
     }
     s.last_range = range;
-    // The caret went elsewhere: the menu was for where it was.
-    draft::close(s);
+    // The caret went elsewhere: the panels were for where it was.
+    crate::look::close_panels(s);
     let line = position::line_char(&s.edit.text, s.edit.focus).0;
     if s.cursor_line != Some(line)
         && let Some(c) = &s.client
@@ -198,8 +334,13 @@ pub fn incoming(s: &mut State, m: crate::lsp::Incoming) {
     match m {
         // Only the answer to the last question, for the version and line it was asked about.
         Incoming::Response { id, result } => {
+            if let Some(sent) = s.sent_at.remove(&id)
+                && s.looked.get().is_some()
+            {
+                s.looked_server_ms += sent.elapsed().as_secs_f64() * 1000.0;
+            }
             if let Some(about) = s.pending.remove(&id) {
-                return draft::answered(s, about, result);
+                return draft::answered(s, id, about, result);
             }
             let Some((asked, version, line)) = s.asked else { return };
             if id != asked {
@@ -236,6 +377,20 @@ pub fn serving(s: &mut State, url: String) {
     s.page_url = Some(url);
 }
 
+/// Tab asked for a line's menu: the time to its drawing starts now.
+pub fn start_look(s: &mut State) {
+    s.looked.set(Some(std::time::Instant::now()));
+    s.looked_server_ms = 0.0;
+}
+
+/// Once the menu Tab asked for is drawn: how long it took, which menu it is and how long the
+/// server took of it ("menu drawn 52.5 ms: part, server 50.8 ms"), said once.
+pub fn menu_drawn(s: &State) -> Option<String> {
+    let id = s.panels.first()?.id.clone();
+    let asked = s.looked.take()?;
+    Some(format!("menu drawn {:.1} ms: {id}, server {:.1} ms", asked.elapsed().as_secs_f64() * 1000.0, s.looked_server_ms))
+}
+
 /// The window is going: the document and the server close, then the web view.
 pub fn shut(s: &mut State) {
     if let Some(c) = s.client.take() {
@@ -248,17 +403,26 @@ pub fn shut(s: &mut State) {
 }
 
 /// Tab: takes a pick showing whose pin acts, or the offer of a new part, which makes the line
-/// a `new:` line; on a `new:` line it asks for the line's menu. Otherwise nothing. Always
-/// consumed.
+/// a `new:` line; on a `new:` line it asks for the line's menu, on a part's line for the
+/// part's, on a line of words for theirs, and on an empty line it offers to put a part there.
+/// Always consumed.
 pub fn tab(s: &mut State, _tx: &mut Tx) {
-    if let Some(g) = showing(s).filter(|g| g.pick.pin.as_ref().is_some_and(|p| p.acts || p.build)).cloned() {
-        ghost::accept(&mut s.edit, &g);
-        changed(s);
-        if g.pick.pin.is_some_and(|p| p.acts) {
+    if let Some(g) = showing(s).filter(|g| g.pick.pin.is_some()).cloned() {
+        let pin = g.pick.pin.clone().unwrap();
+        // Words after a part's ":" that set nothing: its Change….
+        if pin.change {
+            crate::part::tab(s, true);
             return;
         }
+        if pin.acts || pin.build {
+            ghost::accept(&mut s.edit, &g);
+            changed(s);
+            if pin.acts {
+                return;
+            }
+        }
     }
-    draft::tab(s);
+    let _ = draft::tab(s) || crate::part::tab(s, false) || crate::insert::tab(s);
 }
 
 /// Ctrl+S writes the file whole.
@@ -333,4 +497,104 @@ pub fn page_attached(s: &mut State, page: crate::page::Page) {
         page.send(crate::page::PageCmd::Load(url.clone()));
     }
     s.page = Some(page);
+}
+
+/// The page's process ended. The first time, media goes off and the page loads again; a death
+/// within `AGAIN_MS` of that leaves it stopped, and the status line offers Reload. Answers what
+/// was sent to the page.
+pub fn page_died(s: &mut State, reason: &str) -> Vec<crate::page::PageCmd> {
+    use crate::page::{Death, PageCmd};
+    eprintln!("page: the web view's process ended ({reason})");
+    match s.page_life.died(draft::now_ms()) {
+        Death::Restart => {
+            draft::flash(s, "Page restarted", draft::Tone::Ink, "audio and video off");
+            send_page(s, vec![PageCmd::MediaOff, PageCmd::Reload])
+        }
+        Death::Stop => {
+            s.flash = None;
+            Vec::new()
+        }
+    }
+}
+
+/// Reload on a stopped page: it loads again, media still off. Answers what was sent.
+pub fn reload_page(s: &mut State) -> Vec<crate::page::PageCmd> {
+    if !s.page_life.reload(draft::now_ms()) {
+        return Vec::new();
+    }
+    send_page(s, vec![crate::page::PageCmd::Reload])
+}
+
+fn send_page(s: &State, cmds: Vec<crate::page::PageCmd>) -> Vec<crate::page::PageCmd> {
+    if let Some(page) = &s.page {
+        for c in &cmds {
+            page.send(c.clone());
+        }
+    }
+    cmds
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn the_title_is_the_first_heading_past_the_front_matter() {
+        let p = Path::new("/x/walk.md");
+        assert_eq!(title_of(p, "---\ntitle: x\n# not this\n---\n\n```\n# nor this\n```\n## The long walk ##\n# Later"), "The long walk");
+        assert_eq!(title_of(p, "no heading\n#tag"), "walk.md");
+    }
+
+    fn reload_key() -> rune::KeyEvent {
+        rune::KeyEvent { key: rune::Key::Command('r'), mods: rune::Mods { cmd: true, shift: true, ..rune::Mods::default() } }
+    }
+
+    #[test]
+    fn a_death_turns_media_off_and_loads_the_page_once_again() {
+        use crate::page::PageCmd;
+        let mut s = State::open(PathBuf::from("/x/walk.md"), "# Walk\n".into());
+        assert_eq!(page_died(&mut s, "Crashed"), [PageCmd::MediaOff, PageCmd::Reload]);
+        assert!(s.page_life.media_off && !s.page_life.stopped);
+        let said = draft::line(&s).expect("the status line says it");
+        assert_eq!((said.tone, said.action), (draft::Tone::Ink, None), "a flash, with nothing to do");
+        assert!(!crate::draft::status_key(&mut s, &reload_key()), "nothing to reload while it runs");
+    }
+
+    #[test]
+    fn a_second_death_soon_after_stops_and_offers_reload() {
+        let mut s = State::open(PathBuf::from("/x/walk.md"), "# Walk\n".into());
+        page_died(&mut s, "Crashed");
+        assert_eq!(page_died(&mut s, "Crashed"), [], "no loop");
+        assert!(s.page_life.stopped && s.page_life.media_off);
+        let said = draft::line(&s).expect("the status line keeps it");
+        assert_eq!(said.tone, draft::Tone::Warn);
+        assert!(said.action.as_ref().is_some_and(|(_, k)| k.matches(&reload_key())), "its one action has the key");
+        let mut plain_r = reload_key();
+        plain_r.mods.shift = false;
+        assert!(!crate::draft::status_key(&mut s, &plain_r), "Ctrl+R is not Reload");
+        assert!(crate::draft::status_key(&mut s, &reload_key()));
+        assert!(!s.page_life.stopped && s.page_life.media_off, "media stays off");
+        assert!(draft::line(&s).is_none());
+        assert_eq!(reload_page(&mut s), [], "a page that runs is not reloaded");
+        assert_eq!(page_died(&mut s, "Crashed"), [], "a death soon after Reload stops again");
+    }
+
+    #[test]
+    fn reload_asks_the_page_to_load() {
+        use crate::page::PageCmd;
+        let mut s = State::open(PathBuf::from("/x/walk.md"), "# Walk\n".into());
+        page_died(&mut s, "Crashed");
+        page_died(&mut s, "Crashed");
+        assert_eq!(reload_page(&mut s), [PageCmd::Reload]);
+    }
+
+    #[test]
+    fn a_death_long_after_the_restart_restarts_again() {
+        let mut life = crate::page::Life::default();
+        assert_eq!(life.died(1_000), crate::page::Death::Restart);
+        assert_eq!(life.died(1_000 + crate::page::AGAIN_MS), crate::page::Death::Restart);
+        assert_eq!(life.died(1_000 + crate::page::AGAIN_MS + 9_999), crate::page::Death::Stop);
+        assert!(life.media_off);
+    }
 }

@@ -143,7 +143,7 @@ fn a_new_part_is_drafted_rerolled_kept_and_cancelled_with_the_stub() {
     let clock = line_of(&edit.text, "::: new: a tide clock");
     let view = View::parse(&ask(None, clock, json!({}))).expect("a view");
     assert_eq!(view.words, "a tide clock");
-    assert!(draft::menu_for(&view).unwrap().rows.iter().any(|r| r.id == "build"));
+    assert!(ids(&view).contains(&"build".to_string()));
 
     // Drafted: the page's content draws it.
     ask(Some("build"), clock, json!({}));
@@ -157,6 +157,14 @@ fn a_new_part_is_drafted_rerolled_kept_and_cancelled_with_the_stub() {
     // Rerolled with notes: another take, named as the notes say.
     ask(Some("reroll"), clock, json!({ "change": "name it tide-two" }));
     assert_eq!(drafted("ready", "a tide clock")["name"], "tide-two");
+
+    // Two takes: the first back on screen, then the second again.
+    let view = View::parse(&ask(None, clock, json!({}))).unwrap();
+    assert_eq!((view.take, view.takes, view.list.len()), (Some(2), 2, 2));
+    assert!(ids(&view).contains(&"takes".to_string()));
+    let first = View::parse(&ask(Some("take"), clock, json!({ "to": 1 }))).unwrap();
+    assert_eq!((first.take, first.name.as_deref()), (Some(1), Some(name.as_str())));
+    assert_eq!(View::parse(&ask(Some("take"), clock, json!({ "to": 2 }))).unwrap().take, Some(2));
 
     // Kept for the site: the line is the part's, and the site has the part.
     let asked = Asked { line: clock, text: "::: new: a tide clock".into(), what: What::Act };
@@ -175,7 +183,7 @@ fn a_new_part_is_drafted_rerolled_kept_and_cancelled_with_the_stub() {
     drafted("failed", "a failing bell");
     let view = View::parse(&ask(None, bell, json!({}))).unwrap();
     assert_eq!(view.status.as_deref(), Some("failed"));
-    assert_eq!(draft::menu_for(&view).unwrap().rows[0].id, "build");
+    assert_eq!(ids(&view)[0], "reroll");
 
     // A draft cancelled: the line keeps its words, without `new:`.
     let brass = line_of(&edit.text, "::: new: a brass bell");
@@ -189,7 +197,7 @@ fn a_new_part_is_drafted_rerolled_kept_and_cancelled_with_the_stub() {
     let keeper = line_of(&edit.text, "::: new: a quote from the keeper");
     let view = View::parse(&ask(None, keeper, json!({}))).unwrap();
     assert!(view.near.iter().any(|n| n.name == "quote"), "{:?}", view.near);
-    assert_eq!(draft::menu_for(&view).unwrap().rows[0].id, "near");
+    assert!(ids(&view).contains(&"near".to_string()));
     client.notify("rubric/peek", json!({ "uri": uri, "line": keeper, "part": "quote" }));
     let asked = Asked { line: keeper, text: "::: new: a quote from the keeper".into(), what: What::Act };
     assert!(draft::replace(&mut edit, &asked, &ask(Some("use"), keeper, json!({ "part": "quote" }))));
@@ -200,6 +208,124 @@ fn a_new_part_is_drafted_rerolled_kept_and_cancelled_with_the_stub() {
 
     client.stop();
     wait_for("the server's process to end", || !alive(pid));
+}
+
+#[test]
+#[ignore = "starts Bun, a site process and Hugo"]
+fn a_part_is_inserted_changed_into_a_variant_kept_rerolled_and_removed_with_the_stub() {
+    use rubric_app::draft::{self, Asked, View, What};
+    use rubric_app::part::{self, Part};
+
+    let site = std::env::temp_dir().join(format!("rubric-app-part-{}", std::process::id()));
+    std::fs::create_dir_all(&site).unwrap();
+    let _cleanup = Cleanup(site.clone());
+    copy_site(&site);
+    let post = site.join("pages/posts/long.md");
+    let uri = rubric_app::state::file_uri(&post);
+    let text = std::fs::read_to_string(&post).unwrap();
+
+    let (tx, rx) = mpsc::channel::<Incoming>();
+    let client = Client::start(&repo(), &site, true, move |m| {
+        let _ = tx.send(m);
+    })
+    .expect("the server starts");
+    let pid = client.pid().unwrap();
+
+    let mut edit = rune::TextEdit::new(format!("{text}\n\n::: new: a tide clock\n:::\n"));
+    let mut version = 1;
+    client.notify("textDocument/didOpen", json!({ "textDocument": { "uri": uri, "languageId": "markdown", "version": version, "text": edit.text } }));
+    let mut sync = |edit: &rune::TextEdit| {
+        version += 1;
+        client.notify("textDocument/didChange", json!({ "textDocument": { "uri": uri, "version": version }, "contentChanges": [{ "text": edit.text }] }));
+    };
+    let line_of = |text: &str, l: &str| text.lines().position(|x| x == l).unwrap_or_else(|| panic!("no line {l:?} in {text}")) as u32;
+    let call = |method: &str, p: serde_json::Value| {
+        let id = client.request(method, p);
+        next(&rx, method, |m| match m {
+            Incoming::Response { id: got, result } if *got == id => Some(result.clone().expect("no error")),
+            _ => None,
+        })
+    };
+    let ask = |action: Option<&str>, line: u32, extra: serde_json::Value| {
+        let mut p = draft::params(action, &uri, line);
+        p.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        call("rubric/draft", p)
+    };
+    let ready = |name: &dyn Fn(&str) -> bool| {
+        next(&rx, "rubric/drafted", |m| match m {
+            Incoming::Notification { method, params } if method == "rubric/drafted" && params["status"] == "ready" && params["name"].as_str().is_some_and(name) => Some(params.clone()),
+            _ => None,
+        })
+    };
+    let written = site.join("content/posts/long.md");
+
+    // Inserted on the empty line: the page draws a quote there.
+    let empty = line_of(&edit.text, "");
+    let entry = rubric_app::insert::Entry { name: "quote".into(), ..Default::default() };
+    rubric_app::insert::place(&mut edit, empty, &entry);
+    let body = rubric_app::position::line_range(&edit.text, empty + 1).start;
+    edit.set_caret(body);
+    edit.insert("Water before food.\n");
+    sync(&edit);
+    wait_for("the quote in content/", || std::fs::read_to_string(&written).is_ok_and(|t| t.contains("{{< quote")));
+    let quote = line_of(&edit.text, "::: quote");
+    let p = Part::parse(&call("rubric/part", json!({ "uri": uri, "line": quote }))).expect("a part");
+    assert_eq!((p.name.as_str(), p.kind.as_str(), p.close), ("quote", "catalog", Some(quote + 2)));
+
+    // Change…: the words after the colon, and a variant drafted from them.
+    let lead = edit.text.lines().nth(quote as usize).unwrap().to_string();
+    part::set_line(&mut edit, quote, &format!("{} : torn edge", part::lead(&lead)));
+    sync(&edit);
+    let view = View::parse(&ask(None, quote, json!({}))).expect("a view");
+    assert_eq!(view.of.as_deref(), Some("quote"));
+    ask(Some("build"), quote, json!({ "variant": true }));
+    let name = ready(&|n| n.starts_with("quote--"))["name"].as_str().unwrap().to_string();
+    let view = View::parse(&ask(None, quote, json!({}))).unwrap();
+    assert_eq!((view.status.as_deref(), view.new_variant.as_deref()), (Some("ready"), Some("quote")));
+
+    // Kept: the line asks for the variant, and the server reads it so.
+    let asked = Asked { line: quote, text: edit.text.lines().nth(quote as usize).unwrap().to_string(), what: What::Act };
+    assert!(draft::replace(&mut edit, &asked, &ask(Some("keep"), quote, json!({ "global": false }))));
+    let kept = edit.text.lines().nth(quote as usize).unwrap().to_string();
+    assert_eq!(kept, format!("::: quote variant={}", &name["quote--".len()..]));
+    assert!(site.join("parts").join(&name).join("part.yaml").is_file());
+    sync(&edit);
+    let p = Part::parse(&call("rubric/part", json!({ "uri": uri, "line": quote }))).unwrap();
+    assert_eq!(p.kind, "variant");
+
+    // Back to quote.
+    let asked = Asked { line: quote, text: kept, what: What::Act };
+    assert!(draft::replace(&mut edit, &asked, &ask(Some("plain"), quote, json!({}))));
+    assert_eq!(edit.text.lines().nth(quote as usize), Some("::: quote"));
+    sync(&edit);
+
+    // A new part kept for the site, rerolled on its own line, then removed from the site.
+    let clock = line_of(&edit.text, "::: new: a tide clock");
+    ask(Some("build"), clock, json!({}));
+    let clock_name = ready(&|n| !n.starts_with("quote"))["name"].as_str().unwrap().to_string();
+    let asked = Asked { line: clock, text: "::: new: a tide clock".into(), what: What::Act };
+    assert!(draft::replace(&mut edit, &asked, &ask(Some("keep"), clock, json!({ "global": false }))));
+    sync(&edit);
+    let own = site.join("parts").join(&clock_name);
+    assert!(own.join("part.yaml").is_file());
+    let p = Part::parse(&call("rubric/part", json!({ "uri": uri, "line": clock }))).unwrap();
+    assert_eq!(p.kind, "own");
+    ask(Some("reroll"), clock, json!({ "change": "" }));
+    ready(&|n| n == clock_name);
+    let view = View::parse(&ask(None, clock, json!({}))).unwrap();
+    assert_eq!((view.status.as_deref(), view.takes), (Some("ready"), 2));
+    ask(Some("keep"), clock, json!({ "global": false }));
+    let removed = ask(Some("remove"), clock, json!({}));
+    assert!(removed.get("removed").is_some(), "{removed}");
+    assert!(!own.exists(), "the site's parts/ lost it");
+
+    client.stop();
+    wait_for("the server's process to end", || !alive(pid));
+}
+
+/// The ids of the rows of a line's menu.
+fn ids(view: &rubric_app::draft::View) -> Vec<String> {
+    rubric_app::draft::menu_rows(view, None, None).0.iter().filter(|r| r.takes_focus()).filter_map(|r| r.id().map(str::to_string)).collect()
 }
 
 struct Cleanup(PathBuf);

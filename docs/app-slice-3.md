@@ -15,10 +15,26 @@ An Opus session builds from this plan; the session that wrote it reviews. The sl
 | Sitting | Tasks | Ends with |
 |---|---|---|
 | 1 | 1 and 2: the look, the panel | The app themed, the theme list opening with Ctrl+, |
-| 2 | 3 and 4: the draft menus, the server's two requests | Every draft menu in the panel; `bun test` passing |
+| 2 | The review's fixes ("Before task 3"), then 3 and 4: the draft menus, the server's two requests | Every draft menu in the panel; `bun test` passing |
 | 3 | 5, 6 and 7: a placed part, insert, the write-up | Section C of `testing/TESTING.md` ready for David |
+| 4 | What the review of sitting 3 found ("Sitting 4", after task 7) | The slice ready to merge |
+| 5 | The page's process dying ("Sitting 5") | The page restarts with media off; David's rows |
+| 6 | Names, the theme list, Insert part…, starters ("Sitting 6") | The slice ready to merge |
+| 7 | The pick's starter over the writing, Insert part…'s search ("Sitting 7") | The slice ready to merge |
 
 A sitting stops at its end, says what it built, what it could not check and the commit message, and does not start the next. Where this plan says "find out", the answer goes in the findings before the code that depends on it. Where the plan and the code disagree (a line number, a field's name), the code is right: say so and go on. Where a decision is missing, take the smaller choice, write it under "Decisions the build made" at the end of this file, and go on; stop only for something that would change what the writer sees in a way the design does not show.
+
+## Where the slice stands (2026-11-26), for the session that reviews next
+
+Sittings 1 to 5 are committed on `slice-3`. What is open, in order:
+
+1. **Sitting 5 held.** David's run of 2026-11-26 (10:23), without the plugins: one core dump, the handler fired (`page: the web view's process ended (Crashed)`), media went off, a new web process loaded the page, and nothing died after it. The abort is WebKit's own assertion in `MediaPlayerPrivateGStreamer::createAudioSink` (read from the core by another agent's disassembly; not checked again here). The restart is the net for a death nobody foresaw, not the answer to missing plugins: the shipped app brings them (David, 2026-11-26; "After this slice"). David has them installed from here on, so C68 to C73 can no longer be run on his machine; C74 to C76 are still unseen.
+2. **Sittings 5 and 6 are seen.** David ran section C whole on 2026-11-26 (the plugins installed, so without C68 to C73): everything passed but the two notes "Sitting 7" answers. The first Insert part… of a fresh start, which once drew no part in the page, drew it this time; it is not explained, and is looked at only if it comes back.
+3. **Sitting 7 is planned and not built** ("Sitting 7" below).
+4. Then David runs its rows, and the slice is merged.
+5. **After the merge, Rune is moved to today's `dev`** in one step (the app pins `0ca0756` of 2026-11-13; `dev` was 1,102 commits on by 2026-11-26): every Rune line in `app/Cargo.toml` to one revision, the `[patch.crates-io]` list copied from Rune's own `Cargo.toml` at that revision (their README lists more than the app has: `sctk-adwaita`, `naga`, `accesskit_macos`, `accesskit_atspi_common`), what no longer compiles fixed, the tests run. Then, with `RUBRIC_IME=1`, the keyboard is tried again (in and out of a part's Cite field twenty times): if it is still lost, an issue goes to github.com/anomalyco/rune against that revision (none there covers it as of 2026-11-26; the findings' "After sitting 4" has the cause and the wording), and if not, `XMODIFIERS=@im=none` comes out of `main.rs`. And what Rune lacked is looked for again: the text position under a right-click (David's first ask, still not built), a line's rectangle other than the caret's, a font family for a span.
+
+How a sitting is reviewed: read `git diff` (or the sitting's commit) against the sitting's section here, run `cargo test` and `cargo test -- --ignored` in `app/`, `bun test test/part-request.test.ts` and `bun run typecheck`, check nothing is left running and `sites/` is clean, and write what is found into this file as the next sitting's first items. The reviewer writes plans and reviews; the build is Opus's; small fixes David asks for directly are made. A fault only the window shows is traced with `RUBRIC_APP_TRACE=app/target/trace.log` (the app's own switch; `RUBRIC_TRACE` is the server's).
 
 ## How the session checks its work
 
@@ -32,7 +48,7 @@ With the tests: the headless `Runtime`, and the stub server on a temp site. The 
 | Two kinds of theme | The app's own colors ("Appearance") are this slice's. The site's theme (Paper, Schematic, the skins; `::: theme` in `rubric.md`) is Rubric's own and is not touched here | David, 2026-11-25: Pathlight's way for the app, what Rubric has built for the site |
 | App themes | Pathlight's way (`pathlight/src/theme.ts`: `resolveRoles`, `derivePalette`, `loadThemes`), ported to Rust: OpenCode's theme format, Pathlight's 31 OpenCode themes copied with their notice (`pathlight/NOTICE.md`, MIT), the design's four (Paper, Ink, Sepia, Fjord) beside them, and the writer's own files from `$XDG_CONFIG_HOME/rubric/themes/` | David wants every one of them, easily changed |
 | Changing it | Ctrl+, (Cmd+, on the Mac) opens the list in a panel: moving draws the app in that theme, Return keeps it (written to `$XDG_CONFIG_HOME/rubric/app.json`), Esc goes back to the one before. Paper until one is kept; `RUBRIC_APP_THEME=<name>` for one run | Pathlight's picker; the design's Appearance window, with Markdown and the drafter in it, is a later slice |
-| Light or dark | A theme with both is drawn light unless `RUBRIC_APP_MODE=dark`; no following the system | Pathlight follows a terminal's background; following the desktop is new work, for the Appearance slice |
+| Light or dark | Chosen in the list of themes and kept with the theme (see "Before task 3"); `RUBRIC_APP_MODE=dark` for one run; no following the system | Pathlight follows a terminal's background; following the desktop is new work, for the Appearance slice |
 | Fonts | Instrument Sans, Literata and JetBrains Mono, vendored in `app/fonts/` with their licenses, compiled in | Rune takes font bytes at build time; nothing is fetched at run time |
 | The title bar | A 40-point row the app draws under whatever frame the system gives: the post's title and "Saved" or nothing | Rune replaces the native bar on the Mac only; on Hyprland there is none to replace |
 | One panel, not `PopupList` | The app's own panel (`panel.rs`) in Rune's `popover::raised`, from `el`, `row`, `col`, `Segmented` and `text_input` | `PopupList` rows have one shape: no separators, headers, controls or fields |
@@ -59,6 +75,9 @@ To design, then build:
 
 - **The writer's parts in the catalog** (David, 2026-11-25: once someone uses the app the catalog is theirs, and a part they want everywhere is added to it). Owed around it: the part marked in the catalog as the writer's own, not shipped; a way to show or hide those; the same row and words in Neovim ("Every theme" reads as themes, and means every site); and, before the app is packaged, the writer's additions kept where an update of the shipped catalog does not replace them.
 - **The group first, then the rank within it**, as two questions to Jev. Wanted if it holds; only a live probe on real lines can say whether it hits or misses more than one question does (`scripts/probe.ts`, which costs money: ask first). To watch for when testing either way: a ranked list shown under group headings misleads, since the first and fourth best in one group read as that group's two best; that is why the list with words has no headings.
+- **Zoom, for the writing and for the page** (David, 2026-11-26, during the live test of section C): one elegant way to do both. Zooming the page out shows the whole page on a ground of another color, so it reads as the full page and not as the pane. With it, a choice of mobile and desktop widths for the page.
+- **The page in the writer's own browser** (David, 2026-11-26): a way to open it there from the app.
+- **The shipped app brings `gst-plugins-base` and `gst-plugins-good` itself** (David, 2026-11-26: what the app needs to work, it provides; installing them is never the writer's task). Declared as required in a package the system installs (Arch, deb, rpm), or carried inside (a Flatpak's runtime has them and WebKitGTK too; an AppImage bundles them): which one is decided with the package's format. Not found out: how the site's process and the drafting tools run inside a Flatpak's sandbox. A build from source needs the two installed by hand.
 
 ## What exists, verified 2026-11-25
 
@@ -144,7 +163,21 @@ The model is plain data with no Rune in it, so the tests need no window: `Panel 
 
 **Tests.** Headless: moving in the theme list changes the tokens the view draws with; Esc restores them and writes nothing; Return writes the name to a config folder the test owns, and a new `State` reads it. The key model row by row (which rows take the focus, a `Seg` at its ends, a row's key from another row, Esc with two panels). `place` for under, above, beside and replaced, each inside the pane. Headless: a press on a segment reports that segment; the editor keeps its text while a `Field` is typed in.
 
-### Task 3: the draft menus
+### Before task 3: what the review of sitting 1 found
+
+Sitting 2 starts with two steps of housekeeping, then the fixes.
+
+- **Commit sitting 1.** Everything `git status` shows on `slice-3`, as one commit: `Add the app's themes, fonts, title and status bars, and the panel with the theme list.` One plain sentence, no body, no trailers, no Co-Authored-By. David asked for this commit and the next (2026-11-25); the rule against committing holds for everything after them.
+- **Remove the drafts left in the app's site by testing.** `git rm -r sites/app-slice/parts/tide-clock`, and delete `sites/app-slice/parts/` and everything in `sites/app-slice/.rubric/drafts/`. Run `git status` first and stop if `sites/app-slice/` holds changes other than these. Nothing under `testing/` is touched: its parts and drafts are David's own. Then run `cargo test -- --ignored` in `app/` (the stub, no Jev): both must pass. Commit: `Remove the drafts testing left in the app slice's site.`
+
+The fixes, each with a test that fails without it:
+
+1. **Light or dark is chosen in the list of themes.** Drawn light by default, Dracula, Monokai, Tokyonight and most of OpenCode's themes are their light halves, which nobody means by those names and which are weak (Monokai's accent on its light background is 1.6 to 1). The list of themes gets a `Seg` as its first row, `Mode` with `Light` and `Dark`: changing it redraws the theme under the focus at once, Return keeps the mode with the theme in `app.json` (`"mode": "dark"`), Esc restores both. `RUBRIC_APP_MODE` still wins for one run. With nothing kept the mode is light, since Paper is the start. This replaces the "Light or dark" row of the decisions.
+2. **A still pointer chooses nothing.** Rune refreshes hover on every build (`runtime/paint/build.rs`, `refresh_hover`), so a panel that opens, or scrolls by the keys, under a resting pointer may move its focus to the row there, and in the list of themes that draws another theme. Find out with a headless test (the pointer placed where the list will open, then Ctrl+,: the theme and the row with the focus must not change; then Down past the list's end with the pointer still). If it does, `look::hovered` acts only after the pointer has moved since the panel opened or last scrolled.
+3. **Ctrl+, with the list open closes it.** Now the panel passes the key, closes, and `editor::key` opens it again.
+4. **Left on a second panel goes back; Right on an item with `more` chooses it.** Now both close the panels and move the caret.
+5. **A writer's theme file that is skipped says why**, once, on stderr (`theme mine.json: color reference "x" is not in defs or theme`), and only the roles the tokens read are resolved, so a role this app never uses (a number that is no color, a key OpenCode adds later) does not cost the writer the theme.
+
 
 **Files.** `app/src/draft.rs`, `app/src/state.rs`.
 
@@ -191,7 +224,13 @@ The `new:` line's menus as panels, from the design's `menu`, `draft-running`, `d
 
 **Tests.** `bun test` with the stub resolver: a `::: quote size=large` line answers `size` with value `large` and `shadow` with its default; `set` to the default drops the setting and keeps the others in place; an unknown value is refused; `rubric/parts` with no words lists own parts first and calls no resolver.
 
-### Task 5: a placed part
+### Before task 5: what the review of sitting 2 found
+
+Sitting 3 starts by committing sitting 2 if `git status` still shows it (`Fix the theme list's review findings, draw the draft menus as panels, and add the server's part and parts requests.`, one sentence, nothing else), then these two, each with a test:
+
+1. **A tool that is not installed cannot be chosen.** In the drafter's panel its row keeps "Not installed", takes no focus from the keys and does nothing on a press. Now it can be chosen and the draft fails.
+2. **`rubric/part` with `set` takes a text and a number setting**, and refuses a number that is none: `test/part-request.test.ts` sets choices only.
+
 
 **Files.** `app/src/part.rs` (new), `app/src/draft.rs`, `app/src/state.rs`, `app/src/ghost.rs`.
 
@@ -221,15 +260,161 @@ Tab or a right-click on a part's line asks `rubric/part` and `rubric/draft` (no 
 
 `docs/app-slice-findings.md` gains "Slice 3": slice 2's budgets rerun (typing p95 4 ms, Tab to menu 50 ms, a menu key one frame, idle under 1%), a segment's press to the line's change, what the panel needed that Rune lacked, each "untested" above answered, and what no one saw. `testing/TESTING.md` gains section C, one row a test and few of them, started natively, with the line that undoes what the rows write. `CLAUDE.md`'s State and `docs/plan.md`'s "Order of work" say where the app stands.
 
+### Sitting 4: what the review of sitting 3 found
+
+Commit sitting 3 first if `git status` still shows it (`Fix the drafter's uninstalled tools, add the menu on a placed part, Insert part… and the words menu, and measure and write up slice 3.`, one sentence, nothing else). Then, each with a test that fails without it:
+
+1. **A part looked at on a line does not outlive the look.** `#lineAs` in `workspace.ts` is a line number, set and cleared only by `rubric/peek`. An app that quits with Insert part… open, or another editor changing the file, leaves the server drawing a part over whatever is on that line now. It is dropped when its file's text changes or the file closes, and it draws only while the line is still empty or still a line of words.
+2. **The status line follows a variant and a part's take.** On a part's line whose variant or take is drafting, ready or failed, it says so as it does for a `new:` line (the design's `variant-drafting` and `variant-ready`), with the same one action and key.
+3. **`Kept` and `Removed` are said when the server has answered**, not when the request is sent: "Add to every site" and "Remove from site" now say it at once and say `Failed` after.
+
+From David's live test of section C (2026-11-26; his words are in the Notes of `testing/TESTING.md`):
+
+4. **The keyboard is lost after going up and down a part's menu.** Found on Omarchy (the app through XWayland, fcitx5 as the input method): after the highlight crosses the text rows (Cite, the words field) a number of times, no key reaches the app, while the pointer works. With `XMODIFIERS=@im=none` it does not happen, with the page or without. Each crossing moves the focus between the writing and the panel's field, two text inputs, and Rune turns the window's input method off and on for it (`window/events.rs`, `ime_reset`). The headless tests cannot see this: 4,000 rounds of random Up and Down, several keys a frame, kept the focus right. The fix is in the app: **the highlight passing over a field row moves no focus.** The focus goes to the field when the writer types on that row, presses Return on it or presses it with the pointer, and back to the writing when the field is left by Return, Esc, Up or Down. Typing on a field row must still lose no character, the first one included, and through `Ime::Commit` as a real keyboard sends it. The test: going Up and Down across every row of a part's menu any number of times leaves the same element focused throughout. Write what was found in the findings as something Rune should hear of (a focus move from one text input to another need not reset the input method), and say plainly that only David's window can confirm the fix. Do not set `XMODIFIERS` in the app: it would take the input method from writers who need it.
+5. **Tab in a panel never chooses.** Tab opens the menu, so a second Tab on `Draft` starts a draft nobody meant (David, 2026-11-26: that is the problem, not how Tab moves). Tab and Shift+Tab move between a panel's rows, as Down and Up do; Return chooses. Cmd+Enter still drafts or keeps from the line.
+6. **A panel hangs from the start of its line and stays there.** Now it hangs from the caret, so it jumps to the right when a setting is written and the caret goes to the line's end. Its place is the left edge of the line's text and the line's bottom, taken when it opens and kept until it closes; it follows the line only when the writing scrolls or the pane is resized.
+7. **A broken theme file prints nothing.** In C10 David's `~/.config/rubric/themes/broken.json` got no line on stderr in the release app started from a terminal, though `load_all`'s test passes. Find out why with a file that is not JSON, one that is JSON with no `theme` object, and one that is `{ "theme": {} }` (which resolves, every token falling back, and so is listed as a theme and not skipped: decide whether a theme with neither `background` nor `text` is one). A file in `themes/` that does not end in `.json` is said once too (`theme mine.txt: not a .json file`).
+8. **Two Tabs took 52 ms to their menu**, among the others at 1 to 2 ms, over the 50 ms budget. The line `menu drawn N ms` names which menu it was and how long the server took of it, so the next run can say where the time went.
+9. **Section C of `testing/TESTING.md` is written again**: what to do in the left column only, what to expect in the right column only, one action a row. Rows that do several things with an expectation after each (C4, C14, C21, C24) become several rows. Add rows for 4 to 6 here. And `app/scripts/clean-test.sh` does what the line under the table says for the site (restores `long.md`, removes `sites/app-slice/parts`, the drafts and `logs/removed`), refusing while the app or the site's process runs; the line under the table names it.
+
+The right-click is David's to decide and is not part of this sitting. 5 and 6 are settled with him (2026-11-26).
+
+### Sitting 5: the page's process dies
+
+From David's second live test (2026-11-26): in Insert part…, moving onto `audio` killed the page. `coredumpctl` has it: `WebKitWebProcess` aborted on its main thread in the second the terminal printed `GStreamer element autoaudiosink not found` and two GLib criticals. His machine has `gstreamer` and no `gst-plugins-base` or `gst-plugins-good`. The frames are not symbolized, so the audio sink as the cause is inferred. The app must not depend on a writer's machine having them: David keeps the plugins uninstalled until this is seen to hold.
+
+Commit what `git status` shows first, if anything (`Plan sitting 5 from the second live test.`).
+
+1. **The app hears that the page's process died.** `webkit2gtk`'s `web-process-terminated` on the wry web view (`app/src/page.rs`; the GTK thread owns the view), sent to the state as `loaded` and `failed` are.
+2. **The first death turns media off and loads the page again.** `enable-media` off in the view's settings (and `enable-webaudio`), then a reload of the address it had. Find out, and write in the findings, whether a page with `::: audio` and one with `::: video` then load with media off; only David's window can say, so the rows for him come first in section C's new rows. The status line says it for 4 s, as a flash: `Page restarted`, `audio and video off`.
+3. **A second death within 10 s of that reload stops there.** No loop. The status line keeps `Page stopped` in the failed color with one action, `Reload` (Cmd+Shift+R), which loads it again with media still off.
+4. **Media stays off for the run** once turned off; a start with the plugins there never turns it off. Nothing is written to disk.
+5. Tests: the state's part headless (a death reloads once and says so; a second within 10 s stops and offers Reload; Reload asks the page to load). The view's part cannot be tested without a window: say so.
+6. `testing/TESTING.md`, section C: rows for David, steps on the left only. Insert part…, Down to `Audio`; then to `Video`; a post with `::: audio` kept in it, started fresh. And one line in "After this slice": the Linux package requires `gst-plugins-base` and `gst-plugins-good`, and when media was turned off for want of them the app says which package to add.
+
+Stop at the end of the sitting. The design questions from the same notes (the names `Own` and `Back to …`, Insert part…'s groups, a theme's modes, previews with sample content) are being settled with David and are not part of it.
+
+### Sitting 6: names, the theme list, Insert part… and starters
+
+Settled with David, 2026-11-26, from his second live test. Each with a test that fails without it; text the writer sees is asserted by its smallest stable part or not at all.
+
+1. **A theme with one mode is dimmed in the other.** A theme whose tokens are the same in light and dark has one mode: light when its background's luminance is over one half, dark otherwise (Paper and Sepia light; Ink and Fjord dark). In the list of themes, with `Mode` on the other, its row is `off`: dimmed, passed over by the keys, dead to a press. The theme drawn when the mode changes, if it lacks the new mode, stays drawn until another is chosen, and the focus goes to the first row that can be chosen.
+2. **The list of themes wraps**: Down on the last row goes to the first row that takes the focus, Up on the first to the last. The list of themes only; a field on `Panel` (`wraps`), off elsewhere.
+3. **`Back to <part>` is two things, named apart.** While a variant or a take is drafting, ready or failed, the row that throws it away reads `Cancel`, as a `new:` line's does. On a kept variant's line, the row that puts the line back to the catalog's part reads `Revert to original`.
+4. **`Own` reads `Custom`** wherever the writer sees it: the note in a part's heading, the group in Insert part…, the note on a theme file of the writer's, and `added to Custom parts`. Names in the code and the server's `own` stay.
+5. **Insert part… lists the groups, and a group opens its parts.** The first panel under the field: `Custom (N)` when the site has any, then each of the catalog's groups with its count, each a row with `more`. Return or Right on a group opens its parts in a second panel beside it (in a narrow pane, in its place, with the row back), a part a row with its description as the note; moving there draws the part in the page, Return puts it on the line. With words in the field the first panel is the flat ranked list as now, and no second panel. **A list is at most twelve rows tall** (12 × `ITEM`, with its field and heading above them), its rows scrolling inside it with a scroll bar that shows (`rune_kit`'s `scroll_bar`): the list of themes, Insert part…'s ranked list, a group's parts, Similar parts and Takes. A flag on `Panel` (`list`) says which. With less room than that under the line it goes above the line, as panels do, before it is made shorter. A menu of controls (a part's menu, a draft's) is as tall as its rows and cut only by the pane, as now. Nothing is drawn outside the pane.
+6. **Every part that holds writing has a starter.** The catalog's `body` is what an empty part shows (32 of the 40 parts for the writing have one). Add one to `quote`, `callout`, `sidenote` and `section`, a sentence in the part's own voice as `lead`'s is ("A sentence or two that sets up what follows."). `divider`, `contents`, `post-list` and `contact-form` draw themselves and need none. Find out whether a `body` is in anything Jev is sent; only if it is, the catalog's version goes up. The page drawing a part looked at in Insert part… shows its starter, as an empty part on a line does.
+
+Decided and not built here: Cmd+Enter drafts from the line with no menu (kept, to look at again once real drafts are in use); the right-click waits for the newer Rune.
+
+`testing/TESTING.md`, section C: the rows these change are written again, and rows added for 1, 2, 5 and 6, steps on the left only.
+
+### Sitting 7: the pick's starter over the writing, and Insert part…'s search
+
+From David's whole run of section C (2026-11-26; his words are under "NEW NOTES" in `testing/TESTING.md`, the picture is `reference/screenshots/instert-steps-malformed.png`). Each with a test that fails without it. Only `app/` changes, with the findings and section C.
+
+1. **A pick's ghost text is one line.** On a line of words over an empty block the server's pick carries the part's starter after a newline (`workspace.ts`, "An empty block gets the part's starter body with the pin"), and the app draws all of `show` as one text at the caret (`lib.rs`, the element keyed `ghost`), so the starter's lines lie over the closer and the writing under it. The ghost draws `show` up to its first newline. Tab still puts the whole of it in, starter and all (`a_starter_body_is_kept_and_the_caret_ends_after_it` stays as it is). The starter is seen in the page, where an empty block already shows it faded. Neovim shows it between the fences as lines that are not in the text; Rune's field has no such lines at the pinned revision, and whether today's has is one more thing the move after the merge looks for.
+2. **Insert part…'s field finds by name at once, and asks Jev only when nothing is found.** Now every change of the field waits 250 ms and asks `rubric/parts` with the words, so typing `quote` costs a call to Jev to find `quote`. Instead:
+   - The app keeps the whole list it got with no words (now the ranked answer replaces `Insert.parts`, so the list needs a place of its own).
+   - On each key, with no pause and no request, the list is the parts the field's text finds, flat: first those whose name starts with it, then those whose name holds it, then those with a word of the description starting with it; Custom parts and the catalog's alike, each in the order the server listed them. The name matched is the readable one and the catalog's (`Tide table`, `tide-table`), without regard to case. A row is as a ranked row is now: the name, the description as its note, no group and no headings.
+   - When that finds nothing, `rubric/parts` is asked with the words 250 ms after the last key, as now, and its answer is the list; an answer for older words is dropped, as now. When it finds something, nothing is asked.
+   - `Draft new part` stays the last row either way; the field emptied shows the groups again.
+   - Return in the field takes the first row, found or ranked.
+   David asked how a part found in several groups is shown: the list with words has no groups, as the ranked one has none (a part is in one group; it is the list that mixes them).
+
+Tests, headless with the recording client: `quo` typed lists `quote` in the same frame and sends no `rubric/parts`, the pause passed; text that finds nothing sends one after the pause and its answer is listed; a name found beats a description found; the field emptied lists the groups; Return takes the first found. And the ghost: a pick with a starter draws no second line (the element's text holds no newline), and Tab puts the starter in.
+
+`testing/TESTING.md`, section C: C64 says the list is flat as the letters are typed; rows added for a description found (`warning` finds `Callout`), for words that find nothing (the list comes a moment later, from Jev), and for the ghost on `::: three numbered steps` over an empty block (one line of gray after the caret, nothing over the writing below).
+
 ## Rules for the session
 
 - No call to Jev, no real drafts, no bench runs, no probes. Never pass `--live` or set `LIVE`. Never read `.env`. Real drafts are David's rows.
 - Never send `keep` with `global: true`, nor `remove`, to a server whose site or catalog is not a copy in a temp folder.
 - No window on David's display unless he says so. Don't touch `testing/` or a site process the session did not start.
 - Change nothing outside `app/`, the server files task 4 names, `docs/lsp.md`, `docs/app-slice-findings.md`, `testing/TESTING.md`, `CLAUDE.md` and `docs/plan.md`.
-- Do not commit. After each task, give the one-sentence commit message.
+- Do not commit, but for the two commits "Before task 3" names. After each task, give the one-sentence commit message.
 - No reviewer subagent: the session that wrote this plan reviews each sitting's diff. Stop every process the session starts and check that it is gone.
 
 ## Decisions the build made
 
-None yet. One line each: what was chosen, and why the plan did not settle it.
+One line each: what was chosen, and why the plan did not settle it.
+
+- Sitting 1 (2026-11-25):
+  - Pathlight has 32 OpenCode themes, not 31: all 32 are copied (`app/themes/`), with the design's four, 36 in all. The plan's count was off by one.
+  - The list of themes is the design's four first, then OpenCode's in name order; a writer's file with a bundled name takes that theme's place, a new name goes last. Names read as words ("Catppuccin frappe"), and a writer's own carry the note "Own".
+  - A writer's file that parses but does not resolve in both modes (a loop, a missing name) is skipped with the broken ones, so a theme never fails once chosen.
+  - A theme kept in `app.json` that no longer exists, or a `RUBRIC_APP_THEME` that does not, falls back to the next of: the environment's, the kept one, Paper.
+  - The `new:` line's edge and label cannot be drawn (see the findings), so its draft's state stays in the color of its `:::`: the design's `ink3` before a draft, the accent while drafting and ready, the failed color when failed. Every other `:::` is `ink3` and a part's name is the text's color, as the design draws them.
+  - The theme list opens at the caret's line, like every panel, 250 points wide; closing it any way but Return (Esc, a typed key, a click in the writing) draws the theme before again.
+  - Changes a panel makes (the lit row, a theme drawn) land at once (`Tx::color_motion(Spring::NONE)`): the design says list hover and theme previews change instantly.
+  - The writing column is the design's 540 points with 24 of padding a side and 56 above; slice 2's was 720.
+  - Headings in the writing are weight 600 with their `#` in `ink3` at 400, and bold is 600, as the design draws them.
+  - The status line is drawn only when it has something to say (the design's screens without one have none); its label is still slice 2's mark until task 3 gives it its states.
+  - The panel's field is drawn as a field only in the top panel; a panel under a second one shows its text without a field, so there are never two fields keyed alike.
+  - `panel::key` answers `Typing` besides the plan's seven, for a key the field's own editing takes.
+  - A debug build draws the list of themes headless: `rubric-app <post> --scene themes --snap out.png --at 1`.
+- Sitting 2 (2026-11-25):
+  - A resting pointer did take a row (the headless test reproduced it: the list opened on Fjord). Rows now follow `on_pointer_move`, which Rune sends only when the pointer moves, in place of hover; the plan's "acts only after the pointer has moved" without a flag to keep.
+  - `RUBRIC_APP_MODE` takes `light` as well as `dark`, so one run can be light over a kept dark.
+  - Return on the list's `Mode` row keeps the theme drawn, as Return on its row does.
+  - Left and Right do what the plan names (Left back from a second panel, Right on a `more` row) and otherwise still close the panels; Right on a row with a chip opens the chip's panel (`Taken::Chip`), and so does a press on the chip.
+  - Only the roles the tokens read are resolved: `background`, `backgroundPanel`, `backgroundElement`, `text`, `textMuted`, `textFaint`, `line`, `borderSubtle`, `border`, `hover`, `primary`, `accent`, `onAccent`, `error`.
+  - The `new:` line's state is the status line's, as sitting 1 left it, so "Not started" is drawn there too, with `Draft Ctrl+Enter`. The status line's action key works on the line with no panel open (Cmd+Enter drafts or keeps, Cmd+R rerolls, Cmd+. stops), and a press on the action does it; only the action shown has its key.
+  - The not-started menu has no Cancel (the design draws none). Reroll and Reroll with changes… on a failed line send `reroll`, which drafts another take as `build` would.
+  - Takes: each row's note is its drafter and the change asked for; the server gives no draft's length, which the design's notes show.
+  - The drafting panel's heading reads the seconds and the chip; the menu is drawn again each second while it shows, and when the server's word for the line changes (a draft finishing shows Keep in place of Stop).
+  - A drafter choice belongs to the line's text and stays until the app closes; Esc in its panel keeps what was chosen there and sends nothing.
+  - The server's diagnostic for a failed draft now carries its `message`, so the status line can say why without asking (`workspace.ts`).
+  - Kept says "<Name>, added to Own parts" as the design does. Cancel says nothing; Removed is for task 5. An error answer says "Failed" and the error.
+  - `rubric/part`'s `uses` counts every block drawing the part, this one with them; its settings leave out Rubric's `variant`, which the variant rows handle.
+  - `rubric/parts` lists the catalog's parts in the order of a new top-level `groups` list in `catalog.yaml`, which `src/core/catalog.ts` reads and checks (a file task 4 did not name; without it `group` was dropped). The version stays 13: nothing in a question reads `group`.
+  - A press on a panel row gives the keys back to the writing (Rune moved the focus off the editor on a press).
+  - The test of "Every theme" (`every_theme_sends_global`) went with the Keep menu it tested; Keep asks nothing now.
+- Sitting 3 (2026-11-25):
+  - The menus open with Tab only. Rune lets the app take a right-click before the field's own menu, but gives no text position for it and does not move the caret, so it could only act on the caret's line wherever pressed (see the findings). The right-click stays Rune's Cut, Copy, Paste.
+  - Tab on a `:::` line that names something asks `rubric/part`, then the line's drafts: the first answer decides between the part's menu and the words menu, so they go one after the other.
+  - The server gained three things the plan did not name: `close` in `rubric/part` (Remove takes the closer), `empty` in `rubric/parts` (Insert writes no closer for such a part), and `rubric/peek` on an empty line or a line of words, which keeps the notes and starters of the text while it draws.
+  - An `Item` can be `off`: drawn dim, passed over, dead to a press. It serves the uninstalled tool and Cut and Copy with nothing selected.
+  - A `Field` row carries its `value`; only the focused one is a field, the others show their value. Text typed in a field and left without Return is dropped.
+  - A setting's change is sent one at a time; one made while another is on its way is sent after its answer, from the line as that left it.
+  - A site's own part being rerolled draws the same rows as a variant drafting: Stop or Keep, Reroll, Reroll with changes…, Takes, and "Back to <part>", which sends `cancel`.
+  - `Kept` with "added to Own parts" is said for a `new:` line only. Add to every site says `Kept`, "<Name>, in every site"; Remove and Remove from this block say `Removed`, "<Name>, from this block"; Remove from site, "from this site".
+  - A pick whose pin has `change` opens the part's menu with Change… beside it, its field holding the words after `:`, with the keys in it.
+  - Insert part…'s field reads "Search parts" (the design's "Search 59 parts" has a number the writer does not act on). Insert and New part… on an empty line write the closer too, unless the part takes nothing inside.
+  - The words menu's first row is the first part `rubric/parts` ranks for the words, not the ghost text; "Similar parts (N)" shows from two. Choosing a part puts it in place of the words. Its "Draft new part" chip shows once the server has named the default drafter in this run: it asks no `rubric/drafter`, which may start a drafting tool.
+  - Cut, Copy and Paste in the menu send their key to the writing (`Tx::send_key`).
+  - The menu with Remove… has no key on Keep: Esc goes back already, and a row's key must take Cmd.
+  - The status line follows `new:` lines only; a variant or a part's take drafting says nothing there.
+- Sitting 4 (2026-11-26):
+  - Sitting 3 was already committed (58b2816), so no commit opened the sitting.
+  - Return on a field row without the keys gives it the keys and submits nothing; Backspace there gives it the keys and takes the field's last character. Left and Right on such a row do nothing (Left on a second panel still goes back).
+  - Text an input method commits to the writing while a field row without the keys has the focus goes to the field: the writing is put back from a copy kept while the row had the focus, history and all. A field opened by an answer with its keys (Change… from a pick) still gets them at once.
+  - A panel's place is kept with the line's number, where the line starts in the text, and the writing field's width: a change to any of them (a resize; text above the line) takes the place from the caret again. With a panel's field holding the keys the editor reports no caret, so the place kept is used.
+  - A theme file with neither `background` nor `text` is no theme: skipped and said. Hidden files in `themes/` are passed over unsaid, so a Mac's `.DS_Store` prints nothing at every start.
+  - The time to a menu counts the server's share as the time from each request of that Tab being sent to its answer, summed: the part's menu asks twice, one after the other.
+  - A failed take or variant of a placed part names the part in its label ("Quote failed") and the reason as its fact, as a `new:` line does.
+- Sitting 5 (2026-11-26):
+  - Nothing was waiting in `git status`, so no commit opened the sitting.
+  - A death more than 10 s after the page was last loaded again restarts it again, media already off; Reload counts as loading it again, so a death within 10 s of Reload stops it again.
+  - `Page stopped` comes before a line's own draft status on the status line, after a flash; its fact is empty. `Page restarted` is in the text's color, as `Kept` is.
+  - Reload loads the view's own address again (`WebView::reload`), which is the page's address or wherever the page went since.
+  - `Chord` gained Shift, and a chord without it no longer matches with Shift held, so Ctrl+Shift+R is not Ctrl+R's Reroll.
+  - `webkit2gtk` is a dependency of its own on Linux, at wry's pinned version, for the view's settings and its `web-process-terminated`.
+- Sitting 6 (2026-11-26):
+  - Nothing was waiting in `git status`, so no commit opened the sitting.
+  - A theme has one mode when its tokens are the same in light and dark, whatever its file looks like; the plan's "the same in light and dark" read on the tokens, which are what the writer sees.
+  - The focus stays on `Mode` when the mode changes (the row the writer is on); it moves to the first row that can be chosen only when its row became dim, which `Mode` never does.
+  - Return on `Mode`, or on the theme drawn, keeps that theme with the mode it is drawn in: Paper drawn while `Mode` reads dark is kept as Paper, light. Keeping a mode a theme cannot show would open the list next time with the drawn theme dimmed.
+  - Insert part…'s list takes the first menu's place rather than opening beside it, so a group's parts can open beside the list without a third panel. Esc from the list closes it; it no longer goes back to the first menu.
+  - A group is a row reading `<Group> (N)`, the count in the label as `Similar parts (N)` has it; the parts' panel is headed with the group's name and is 300 points wide.
+  - Return in Insert part…'s empty field does nothing; before, it put the first part of the catalog on the line, which the groups no longer show.
+  - A list's leading rows (a field and its rule, a heading, the list of themes' `Mode`) stay put over the scrolling rows; the twelve rows are counted under them. The rows after the list (`Draft new part`) scroll with it.
+  - The narrow pane's row back is drawn over the scrolling rows, not among them, in every panel.
+  - The starters: quote "The words, as they were said or written.", callout "Something worth knowing before going on.", sidenote "A word about the sentence beside it.", section "Writing set apart from the rest of the page."
+  - Moving onto a group row in Insert part… sends `rubric/peek` with no part, as moving onto `Draft new part` does, so the page shows the line as it is.
+- Sitting 7 (2026-11-26):
+  - Description words are split on non-alphanumeric characters (`!c.is_alphanumeric()`), so trailing punctuation (such as `"warning."` in `callout`) does not block prefix matches.
+  - On a local miss, the list clears its previous local rows at once and drops the second separator before `Draft new part`, so stale matches are neither shown nor taken by Return during the 250 ms pause before the server answers.
+  - Trailing whitespace typed after unfound words keeps a pending or already-answered server request for those same trimmed words rather than clearing and re-asking.
+  - If the initial empty `rubric/parts` answer arrives after the writer has already started typing, `Insert.all` is saved and matched against the field at once, cancelling the server timer if anything matches.
+  - Rebuilding `Insert part…`'s rows syncs the `find` row's stored `value` with `s.field.text`, so moving Down into matched rows and back Up to the field keeps the typed search text.

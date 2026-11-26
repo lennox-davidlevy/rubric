@@ -87,13 +87,19 @@ slots:
 # Descriptions are Jev's prompt and are read literally: say what the part is,
 # in the words a writer would use. Value names are sent too; name a value for
 # what it does.
+# Where the editor lists each part of the writing; Jev is never sent them.
+groups: [Writing, Layout, "Lists and steps", Media, "Data and code", "People and business", Actions]
+
 parts:
 
   # ── Blocks in the writing ─────────────────────────────────────────────
 
   section:
+    group: Layout
     description: A box or a band across the page that sets the writing inside it apart from the rest of the page.
     children: true
+    body: |
+      Writing set apart from the rest of the page.
     settings:
       tone:
         type: choice
@@ -118,6 +124,7 @@ parts:
           raised: lifted off the page with a shadow
 
   hero:
+    group: Layout
     description: A hero, the big opening at the top of a page, usually a large title.
     children: true
     already: { text: bigger }
@@ -142,6 +149,7 @@ parts:
         type: image
 
   lead:
+    group: Writing
     description: An opening paragraph set larger than the rest of the writing, to lead into it.
     children: true
     already: { text: bigger }
@@ -149,8 +157,11 @@ parts:
       A sentence or two that sets up what follows.
 
   quote:
+    group: Writing
     description: A quotation of words someone said or wrote.
     children: true
+    body: |
+      The words, as they were said or written.
     settings:
       size:
         type: choice
@@ -169,6 +180,7 @@ parts:
         type: text
 
   testimonial:
+    group: People and business
     description: What a customer or reader said about the product or the work, with their name, role and photo.
     children: true
     body: |
@@ -180,8 +192,11 @@ parts:
         type: image
 
   callout:
+    group: Writing
     description: A short note for the reader, set off from the main prose, such as a tip or a warning.
     children: true
+    body: |
+      Something worth knowing before going on.
     settings:
       kind:
         type: choice
@@ -206,10 +221,14 @@ parts:
           fire: a flame, for something urgent or exciting
 
   sidenote:
+    group: Writing
     description: A note beside the writing, in the margin, about the sentence next to it.
     children: true
+    body: |
+      A word about the sentence beside it.
 
   glossary:
+    group: Writing
     description: A glossary, a list of the terms the writing uses, each with what it means.
     children: true
     script: true
@@ -218,6 +237,7 @@ parts:
       - **Another term**: what it means.
 
   figure:
+    group: Media
     description: One picture or photo on its own, maybe with a caption.
     children: true
     body: |
@@ -234,6 +254,7 @@ parts:
           full: the full width of the screen
 
   gallery:
+    group: Media
     description: A set of pictures shown together.
     children: true
     script: true
@@ -263,6 +284,7 @@ parts:
           none: pictures open, close and slide at once, with no movement
 
   video:
+    group: Media
     description: A video to watch in the page, from a file or from a site like YouTube or Vimeo.
     children: true
     body: |
@@ -279,6 +301,7 @@ parts:
           full: the full width of the screen
 
   audio:
+    group: Media
     description: A sound to play in the page, such as a podcast episode, a song or a recording.
     children: true
     body: |
@@ -287,12 +310,14 @@ parts:
       A line about it, shown with the player.
 
   embed:
+    group: Media
     description: Something from another site shown in the page, such as a social media post, presentation slides or a gist.
     children: true
     body: |
       https://
 
   map:
+    group: Media
     description: A map of a place or an area, with a marker on it.
     children: true
     settings:
@@ -309,12 +334,14 @@ parts:
       A sentence about the place.
 
   pdf:
+    group: Media
     description: A PDF document shown in the page for the reader to scroll through, with a link to open it.
     children: true
     body: |
       /files/document.pdf
 
   file-tree:
+    group: Data and code
     description: The files and folders of a project, drawn as a tree.
     children: true
     body: |
@@ -324,6 +351,7 @@ parts:
       - file
 
   progress:
+    group: Data and code
     description: Labeled bars showing how far along each thing is or how much of it there is, such as goals or skills.
     children: true
     body: |
@@ -331,6 +359,7 @@ parts:
       - What it measures: 50%
 
   code:
+    group: Data and code
     description: A block of code with the name of its file above it, or the code of a file from the site.
     children: true
     body: |
@@ -343,6 +372,7 @@ parts:
         type: text
 
   diagram:
+    group: Data and code
     description: A diagram drawn from a short text description, such as a flowchart, a sequence of steps between people or systems, or a timeline.
     children: true
     script: true
@@ -351,12 +381,14 @@ parts:
         A[Start] --> B[Finish]
 
   math:
+    group: Data and code
     description: A mathematical formula or equation.
     children: true
     body: |
       y = f(x)
 
   chart:
+    group: Data and code
     description: A chart of numbers, drawn from a small table, such as a bar chart, a line chart or a pie chart.
     children: true
     body: |
@@ -374,6 +406,7 @@ parts:
           pie: slices of a circle
 
   table:
+    group: Data and code
     description: A table of rows and columns.
     children: true
     script: true
@@ -390,6 +423,7 @@ parts:
           striped: every other row shaded
 
   tabs:
+    group: Layout
     description: Tabs, each showing its own panel in the same place, one at a time.
     children: true
     script: true
@@ -403,6 +437,7 @@ parts:
       What the second tab shows.
 
   fold:
+    group: Writing
     description: Writing that stays closed until the reader opens it, one section or several, such as questions and their answers.
     children: true
     body: |
@@ -420,6 +455,7 @@ parts:
           first: the first section starts open
 
   columns:
+    group: Layout
     description: The writing split into columns side by side.
     children: true
     body: |
@@ -438,6 +474,7 @@ parts:
           wide-last: the last column wider than the rest
 
   cards:
+    group: Layout
     description: A grid of boxes, each with a short title, a line of writing and maybe an icon, a picture or a link, such as features or projects.
     children: true
     body: |
@@ -469,6 +506,7 @@ parts:
           raised: each box lifted off the page with a shadow
 
   steps:
+    group: Lists and steps
     description: Numbered points in order, each with a short title, such as steps to follow or lessons learned.
     children: true
     body: |
@@ -481,6 +519,7 @@ parts:
       What to do next.
 
   timeline:
+    group: Lists and steps
     description: Events in the order they happened, along a line, each with its date.
     children: true
     body: |
@@ -493,6 +532,7 @@ parts:
       A line about it.
 
   stats:
+    group: Data and code
     description: A few big numbers side by side, each with a short line saying what it counts.
     children: true
     body: |
@@ -501,6 +541,7 @@ parts:
       - **0** what it counts
 
   pricing:
+    group: People and business
     description: Plans or prices side by side, each with what it includes and a button to choose it.
     children: true
     body: |
@@ -531,6 +572,7 @@ parts:
           middle: the middle plan stands out as the one to choose
 
   people:
+    group: People and business
     description: A grid of people, each with a photo, their name and their role, such as a team.
     children: true
     body: |
@@ -538,6 +580,7 @@ parts:
       - ![Their name](/images/) **Their name**, their role
 
   logos:
+    group: People and business
     description: A row of logos of customers, partners or places the work has appeared.
     children: true
     body: |
@@ -546,6 +589,7 @@ parts:
       ![A name](/images/)
 
   call-to-action:
+    group: Actions
     description: A short pitch that urges the reader to sign up, buy or try something, with a button to do it.
     children: true
     body: |
@@ -564,6 +608,7 @@ parts:
           accent: the site's accent color behind it
 
   buttons:
+    group: Actions
     description: One or more links shown as buttons.
     children: true
     body: |
@@ -577,6 +622,7 @@ parts:
           center: centered on the page
 
   download:
+    group: Actions
     description: A file for the reader to download.
     children: true
     body: |
@@ -585,6 +631,7 @@ parts:
       What is in it.
 
   post-list:
+    group: Lists and steps
     description: A list of posts or articles from this site, such as the latest ones.
     empty: true
     children: false
@@ -602,11 +649,13 @@ parts:
         type: text
 
   contents:
+    group: Lists and steps
     description: A table of contents, listing what is on this page.
     empty: true
     children: false
 
   divider:
+    group: Writing
     description: A break between parts of the writing.
     empty: true
     children: false
@@ -620,6 +669,7 @@ parts:
           space: blank space with no mark
 
   contact-form:
+    group: Actions
     description: A form for readers to send a message, with their name, their email and the message.
     empty: true
     children: false
@@ -630,6 +680,7 @@ parts:
         site: form
 
   subscribe:
+    group: Actions
     description: A box where readers give their email address to get new posts or a newsletter.
     children: true
     body: |

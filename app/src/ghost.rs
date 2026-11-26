@@ -23,6 +23,8 @@ pub struct Pin {
     pub acts: bool,
     /// The offer of a new part: the line becomes a `new:` line, and its menu opens.
     pub build: bool,
+    /// Words after a part's ":" that set nothing: the line stays, and Change… opens.
+    pub change: bool,
     /// The block's closer line, taken away with the empty lines inside it.
     pub drop: Option<u32>,
 }
@@ -33,6 +35,12 @@ pub struct Ghost {
     pub version: i32,
     /// The first item only.
     pub pick: Pick,
+}
+
+/// What the ghost draws: the first line of `show`, so a part's starter body does not lie over the
+/// writing below. Tab still puts the whole of `show` in.
+pub fn line(show: &str) -> &str {
+    show.split('\n').next().unwrap_or("").trim_end_matches('\r')
 }
 
 /// The caret's line, when it is a `:::` line with words and the caret is at its end.
@@ -63,6 +71,7 @@ pub fn parse(result: &Value, line: u32, version: i32) -> Option<Ghost> {
                 text: a.get("text")?.as_str()?.to_string(),
                 acts: !flag("build") && !flag("change"),
                 build: flag("build"),
+                change: flag("change"),
                 drop: a.get("drop").and_then(Value::as_u64).map(|n| n as u32),
             })
         });
@@ -136,7 +145,7 @@ mod tests {
         let g = parse(&item(" quote", 1, 11, json!({ "line": 1, "text": "::: quote" })), 1, 3).unwrap();
         assert_eq!(g.pick.show, " quote");
         assert_eq!(g.pick.at, (1, 11));
-        assert_eq!(g.pick.pin, Some(Pin { line: 1, text: "::: quote".into(), acts: true, build: false, drop: None }));
+        assert_eq!(g.pick.pin, Some(Pin { line: 1, text: "::: quote".into(), acts: true, build: false, change: false, drop: None }));
         assert_eq!(g.version, 3);
 
         let built = parse(&item(" draft a new part", 1, 11, json!({ "line": 1, "text": "::: new: x", "build": true })), 1, 3).unwrap();
@@ -151,7 +160,7 @@ mod tests {
     }
 
     fn ghost(show: &str, at: (u32, u32), line: u32, text: &str, drop: Option<u32>) -> Ghost {
-        Ghost { line, version: 1, pick: Pick { show: show.into(), at, pin: Some(Pin { line, text: text.into(), acts: true, build: false, drop }) } }
+        Ghost { line, version: 1, pick: Pick { show: show.into(), at, pin: Some(Pin { line, text: text.into(), acts: true, build: false, change: false, drop }) } }
     }
 
     fn at_end(text: &str, line: u32) -> TextEdit {
@@ -195,6 +204,14 @@ mod tests {
         let mut e = at_end("::: a divider\n\ntext", 0);
         accept(&mut e, &ghost(" divider", (0, 13), 0, "::: divider", Some(2)));
         assert_eq!(e.text, "::: divider\n\ntext");
+    }
+
+    #[test]
+    fn line_keeps_only_the_first_line() {
+        assert_eq!(line(" → steps\n### The first step\n\nWhat to do."), " → steps");
+        assert_eq!(line(" → steps\r\n### The first step"), " → steps");
+        assert_eq!(line(" → quote"), " → quote");
+        assert_eq!(line(""), "");
     }
 
     #[test]
