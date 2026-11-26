@@ -128,7 +128,7 @@ fn main() {
     let handle = app.handle();
     app.on_frame_drawn(move |rt| {
         // Tab to the menu on screen, for the measure in the findings.
-        if rt.state.menu.is_some()
+        if !rt.state.panels.is_empty()
             && let Some(asked) = rt.state.looked.take()
         {
             eprintln!("menu drawn {:.1} ms", asked.elapsed().as_secs_f64() * 1000.0);

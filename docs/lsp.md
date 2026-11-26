@@ -96,6 +96,7 @@ parts:
 - `text` and `number` settings are never asked of Jev. They come from the plain form or from the snippet placeholder.
 - `children: false` parts (a `divider`, later) are where a nested directive is an error.
 - The version is part of the cache key. Change a description, bump the version, and every live line is asked again.
+- `group` on a part names where the editor lists it, one of the catalog's top-level `groups`, in their order. Jev is never sent it, so changing one needs no new version.
 
 The shortcode for a part reads the same setting names: `{{< quote size="large" align="center" >}}`. The validator checks a plain form against this file before the preprocessor writes it, so the shortcode can never receive a value the file does not allow.
 
@@ -130,6 +131,11 @@ Every feature is a standard protocol method, so VS Code and the browser editor g
 | `textDocument/documentColor` | A swatch beside theme values in `rubric.md`. Neovim and VS Code draw these natively. | later |
 | `workspace/executeCommand` | `rubric.round`, `rubric.new`, `rubric.draft`: the commands behind `:Rubric` that hand things to the harness. | later |
 | `textDocument/didOpen`, `didChange`, `didSave` | The document flow below. | yes |
+
+Beside the protocol, the app asks two of Rubric's own (2026-11-25, `src/server/main.ts`; their shapes are `PartView` and `PartEntry` in `workspace.ts`):
+
+- **`rubric/part`** `{ uri, line, set? }`: for a line that places a part, its `name`, its `kind` (`catalog`, `own` or `variant`, the last with `variant: { of, name, everywhere }`), `uses` (every block on the site's pages that draws it, this one with them), its `settings` in the catalog's order (Rubric's `variant` left out) and then the `look` settings, each with its `type`, `values`, `default` and the line's `value` when it sets one. With `set: { name, value }` it answers `{ replace }`, the line with that setting given and dropped when it is the default, the words after `:` kept; a name or value the part lacks answers `{ error }`. Nothing is written. A line that places no part answers `null`.
+- **`rubric/parts`** `{ uri, words? }`: `{ parts }`, the site's own (`own: true`) and then the catalog's for the page's kind, each with its `name`, `description` and, for the catalog's, its `group`, in the order of the catalog's `groups`. With words, the parts in Jev's order with those under the near threshold left out, or `{ error }` when Jev could not answer; with none Jev is asked nothing. A part's `group` is the editor's, never sent to Jev, so adding groups left the catalog's version as it was.
 
 ## Completion and snippets
 

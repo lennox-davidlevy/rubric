@@ -6,13 +6,15 @@ use rune::{KeyEvent, Spring, Tx};
 
 use crate::panel::{self, Item, Panel, Row, Taken};
 use crate::state::{self, State};
+use crate::theme::Mode;
 
 pub const THEMES: &str = "themes";
+/// The list's first row: light or dark.
+pub const MODE: &str = "mode";
 const WIDTH: f32 = 250.0;
 
 /// Opens the list with the theme drawn now under the focus.
 pub fn open_themes(s: &mut State, tx: &mut Tx) {
-    crate::draft::close(s);
     close_panels(s);
     show_themes(s);
     reveal(s, tx);
@@ -20,15 +22,19 @@ pub fn open_themes(s: &mut State, tx: &mut Tx) {
 
 /// The list of themes as the only panel.
 pub fn show_themes(s: &mut State) {
-    let rows = s.look.themes.iter()
-        .map(|e| {
-            let item = Item::new(e.name.clone(), e.label()).check(e.name == s.look.name);
-            Row::Item(if e.own { item.note("Own") } else { item })
-        })
-        .collect();
-    let mut p = Panel::new(THEMES, "Themes", WIDTH, rows);
+    let mode = Row::Seg {
+        id: MODE.into(),
+        label: "Mode".into(),
+        choices: vec!["Light".into(), "Dark".into()],
+        on: usize::from(s.look.mode == Mode::Dark),
+    };
+    let rows = std::iter::once(mode).chain(s.look.themes.iter().map(|e| {
+        let item = Item::new(e.name.clone(), e.label()).check(e.name == s.look.name);
+        Row::Item(if e.own { item.note("Own") } else { item })
+    }));
+    let mut p = Panel::new(THEMES, "Themes", WIDTH, rows.collect());
     p.focus(&s.look.name);
-    s.theme_before = Some(s.look.name.clone());
+    s.theme_before = Some((s.look.name.clone(), s.look.mode));
     s.panels = vec![p];
 }
 
@@ -52,16 +58,47 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> Taken {
     let Some(top) = s.panels.last().map(|p| p.id.clone()) else { return Taken::Passed };
     // What a panel changes shows at once: the row lit, a theme drawn.
     tx.color_motion(Spring::NONE);
-    let was_field = matches!(s.panels.last().and_then(Panel::row), Some(Row::Field { .. }));
+    // The key that opens the list of themes closes it.
+    if top == THEMES && ev.is_command(',') {
+        close_panels(s);
+        return Taken::Closed;
+    }
+    // Return on the mode keeps the theme drawn, as on its row.
+    if top == THEMES && ev.key == rune::Key::Enter && !ev.mods.cmd && !ev.mods.shift && !ev.mods.alt && s.panels.last().and_then(Panel::active_id) == Some(MODE) {
+        let taken = Taken::Chose(s.look.name.clone());
+        act(s, &top, taken.clone(), tx);
+        return taken;
+    }
+    let was_field = in_field(s);
+    let peeking = s.panels.iter().any(|p| p.id == crate::draft::NEAR);
+    let before = (s.panels.len(), s.panels.last().map(|p| p.active));
     let taken = panel::key(&mut s.panels, ev, &s.field.text);
-    act(s, &top, taken.clone(), tx);
-    let in_field = matches!(s.panels.last().and_then(Panel::row), Some(Row::Field { .. }));
-    if in_field && !was_field {
+    // A key that moved nothing (Down on the last row) tells no one.
+    if taken == Taken::Moved && before == (s.panels.len(), s.panels.last().map(|p| p.active)) {
+        return taken;
+    }
+    // A key that closed the panels closed the near list's look too.
+    if s.panels.is_empty() && peeking && matches!(taken, Taken::Passed | Taken::Closed) {
+        crate::draft::closed(s, true);
+    } else {
+        act(s, &top, taken.clone(), tx);
+    }
+    follow(s, was_field, tx);
+    taken
+}
+
+fn in_field(s: &State) -> bool {
+    matches!(s.panels.last().and_then(Panel::row), Some(Row::Field { .. }))
+}
+
+/// The keys go to a field when the focus moved onto one, and back to the writing when it left.
+fn follow(s: &State, was_field: bool, tx: &mut Tx) {
+    let now = in_field(s);
+    if now && !was_field {
         tx.focus("panel-field", false);
-    } else if was_field && !in_field {
+    } else if was_field && !now {
         tx.focus("editor", false);
     }
-    taken
 }
 
 /// What the panel `id` answered.
@@ -73,20 +110,28 @@ pub fn act(s: &mut State, id: &str, taken: Taken, tx: &mut Tx) {
     }
     if id == THEMES {
         themes(s, taken);
+    } else {
+        crate::draft::act(s, id, taken, tx);
     }
 }
 
 /// The focus moved to another row of the panel `id`, by a key or the pointer.
 fn moved(s: &mut State, id: &str) {
-    if id == THEMES
-        && let Some(name) = s.panels.last().and_then(|p| p.active_id()).map(str::to_string)
-    {
-        state::show_theme(s, &name);
+    if id == THEMES {
+        if let Some(name) = s.panels.last().and_then(|p| p.active_id()).filter(|n| *n != MODE).map(str::to_string) {
+            state::show_theme(s, &name);
+        }
+    } else {
+        crate::draft::moved(s, id);
     }
 }
 
 fn themes(s: &mut State, taken: Taken) {
     match taken {
+        Taken::Set(id, on) if id == MODE => {
+            s.look.set_mode(if on == 1 { Mode::Dark } else { Mode::Light });
+            s.spans = state::spans(s);
+        }
         Taken::Chose(name) => {
             state::show_theme(s, &name);
             if let Err(e) = s.look.keep() {
@@ -102,7 +147,8 @@ fn themes(s: &mut State, taken: Taken) {
 
 /// The theme list closed without a choice: the theme before it comes back.
 fn restore(s: &mut State) {
-    if let Some(name) = s.theme_before.take() {
+    if let Some((name, mode)) = s.theme_before.take() {
+        s.look.mode = mode;
         state::show_theme(s, &name);
     }
 }
@@ -110,9 +156,12 @@ fn restore(s: &mut State) {
 /// Closes every panel as Esc would, its owner told.
 pub fn close_panels(s: &mut State) {
     let Some(id) = s.panels.first().map(|p| p.id.clone()) else { return };
+    let peeking = s.panels.iter().any(|p| p.id == crate::draft::NEAR);
     s.panels.clear();
     if id == THEMES {
         restore(s);
+    } else {
+        crate::draft::closed(s, peeking);
     }
 }
 
@@ -133,6 +182,7 @@ pub fn hovered(s: &mut State, depth: usize, i: usize, tx: &mut Tx) {
 /// A press on a row: an item is chosen, a segment set.
 pub fn pressed(s: &mut State, depth: usize, i: usize, segment: Option<usize>, tx: &mut Tx) {
     tx.color_motion(Spring::NONE);
+    let was_field = in_field(s);
     // A second panel open beside: a press on the first goes back to it.
     while s.panels.len() > depth + 1 {
         back(s, tx);
@@ -153,6 +203,29 @@ pub fn pressed(s: &mut State, depth: usize, i: usize, segment: Option<usize>, tx
         _ => return,
     };
     act(s, &id, taken, tx);
+    follow(s, was_field, tx);
+    keys_home(s, tx);
+}
+
+/// After a press in a panel the keys go where they would after a key: the field, or the writing.
+fn keys_home(s: &State, tx: &mut Tx) {
+    if !in_field(s) {
+        tx.focus("editor", false);
+    }
+}
+
+/// A press on an item's chip: the chip's panel.
+pub fn chip_pressed(s: &mut State, depth: usize, i: usize, tx: &mut Tx) {
+    tx.color_motion(Spring::NONE);
+    while s.panels.len() > depth + 1 {
+        back(s, tx);
+    }
+    let Some(p) = s.panels.get_mut(depth) else { return };
+    let Some(Row::Item(item)) = p.rows.get(i) else { return };
+    let (pid, iid) = (p.id.clone(), item.id.clone());
+    p.active = i;
+    act(s, &pid, Taken::Chip(iid), tx);
+    keys_home(s, tx);
 }
 
 /// The row back from a second panel drawn in the first's place.

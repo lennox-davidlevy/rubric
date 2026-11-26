@@ -7,7 +7,6 @@ pub mod ghost;
 pub mod look;
 pub mod lsp;
 pub mod markdown;
-pub mod menu;
 pub mod page;
 pub mod panel;
 pub mod position;
@@ -15,8 +14,8 @@ pub mod split;
 pub mod state;
 pub mod theme;
 
-use rune::{Align, Cursor, Cx, Effect, El, Phase, ScrollSpec, Side, Spring, SpringPair, Transition, col, el, row, text, text_input};
-use rune_kit::{Kit, PaletteSeed, Placement, PopupItem, PopupList, popover};
+use rune::{Cursor, Cx, Effect, El, Phase, ScrollSpec, Spring, SpringPair, Transition, col, el, row, text, text_input};
+use rune_kit::{Kit, PaletteSeed, popover};
 
 use panel::{Item, Panel, Row};
 
@@ -38,7 +37,7 @@ pub const TITLE: f32 = 40.0;
 /// The status line's height, under the writing.
 pub const STATUS: f32 = 34.0;
 
-/// Rune's kit, colored from the app's theme, for what the kit draws (the draft menu's list).
+/// Rune's kit, colored from the app's theme, for what the kit draws (the panels' surface).
 pub fn kit(p: &Palette) -> Kit {
     let mut k = Kit::from_palette(PaletteSeed { bg: p.pop, fg: p.ink, accent: p.accent });
     k.c.surface_raised = p.pop;
@@ -93,51 +92,7 @@ pub fn view(s: &State, cx: &mut Cx<State>) -> El {
             text(g.pick.show.clone()).key("ghost").font(fonts::writing()).color(p.ink3).absolute(x + w, y),
         );
     }
-    // The menu, in a layer above the window's, anchored to an element at the caret. It stays
-    // inside the writing pane: the page is a native window over everything right of it.
     let mut layer = Vec::new();
-    if let Some(menu) = &s.menu
-        && let Some(caret) = cx.caret("editor").or(s.menu_at)
-    {
-        let notes = menu.kind == menu::Kind::Notes;
-        let rows = if notes { 3 } else { menu.rows.len() + 1 };
-        let at = menu::place(caret, s.pane, rows);
-        window = window.child(
-            el().key("menu-anchor").absolute(at.x, at.y).w(1.0).h(caret[3])
-                .on_layout(|s: &mut State, rect| s.menu_at = Some(rect)),
-        );
-        let kit = kit(&p);
-        if notes {
-            let field = text_input(&s.notes, fonts::ui(400.0))
-                .key("notes")
-                .label("Notes")
-                .w_full()
-                .color(p.ink)
-                .caret(p.accent, p.accent.alpha(0.25))
-                .placeholder("notes", p.ink3)
-                .on_edit(|s: &mut State| &mut s.notes)
-                .on_submit(|s: &mut State, tx| draft::reroll_with_notes(s, tx))
-                .on_input_key(editor::notes_key);
-            let body = col().key("menu-notes").w(at.width).padding(12.0).gap(8.0)
-                .child(text(menu.title.clone()).font(fonts::ui(400.0)).color(p.ink2))
-                .child(field);
-            let placement = if at.side == Side::Top { Placement::TopStart } else { Placement::BottomStart };
-            layer.push(popover::anchored(&kit, popover::raised(&kit, body, kit.radius.md), "menu-anchor", placement, menu::GAP));
-        } else {
-            // The title is a first row that cannot be chosen.
-            let title = PopupItem::new("menu-title", menu.title.clone()).disabled(true);
-            let items = menu.rows.iter().map(|r| PopupItem::new(r.id.clone(), r.label.clone()).description(r.note.clone().unwrap_or_default()));
-            PopupList::new("menu", "menu-anchor")
-                .anchored("menu-anchor", at.side, Align::Start, menu::GAP)
-                .width(at.width)
-                .max_height(8.0 * menu::ROW)
-                .items(std::iter::once(title).chain(items))
-                .active(Some(menu.active + 1))
-                .on_active(|s: &mut State, i| draft::active(s, i.saturating_sub(1)))
-                .on_choose(|s: &mut State, id, tx| draft::chose(s, id, tx))
-                .build(&kit, &mut layer);
-        }
-    }
     // The panels, from the caret's line, in the layer above the window's.
     if !s.panels.is_empty() {
         // Before anything was laid out, the top of the column.
@@ -197,16 +152,14 @@ fn panel_view(s: &State, p: &Panel, depth: usize, rect: [f32; 4], back: Option<&
 fn row_view(s: &State, p: &Panel, depth: usize, i: usize, r: &Row) -> El {
     let c = s.look.palette;
     let on = i == p.active && r.takes_focus();
-    let hover = move |s: &mut State, inside: bool, tx: &mut rune::Tx| {
-        if inside {
-            look::hovered(s, depth, i, tx);
-        }
-    };
+    // Only the pointer moving takes a row: hover alone also changes under a still pointer when
+    // a panel opens or scrolls beneath it.
+    let hover = move |s: &mut State, _: rune::PointerEvent, tx: &mut rune::Tx| look::hovered(s, depth, i, tx);
     let key = r.id().map(|id| look::row_key(&p.id, id));
     let el = match r {
-        Row::Item(item) => item_view(&c, item)
+        Row::Item(item) => item_view(&c, item, depth, i)
             .fill(if on { c.hover } else { c.pop.alpha(0.0) })
-            .on_hover_change(hover)
+            .on_pointer_move_local(hover)
             .on_press_tx(move |s: &mut State, tx| look::pressed(s, depth, i, None, tx)),
         Row::Sep => row().w_full().h(panel::SEP).center_y().child(el().w_full().h(1.0).fill(c.line)),
         Row::Head { name, note } => row().w_full().h(panel::HEAD).items_end().pb(6.0).px(10.0).gap(8.0)
@@ -233,7 +186,7 @@ fn row_view(s: &State, p: &Panel, depth: usize, i: usize, r: &Row) -> El {
                 .fill(if on { c.hover } else { c.pop.alpha(0.0) })
                 .child(text(label.clone()).key(format!("seg-label-{i}")).font(fonts::caption(400.0)).color(c.ink2).w(56.0))
                 .child(segs)
-                .on_hover_change(hover)
+                .on_pointer_move_local(hover)
         }
         Row::Field { label, placeholder, .. } if depth + 1 < s.panels.len() => {
             // Under a second panel: the text as it was, not a field.
@@ -260,7 +213,7 @@ fn row_view(s: &State, p: &Panel, depth: usize, i: usize, r: &Row) -> El {
             if on {
                 boxed = boxed.border(2.0, c.accent);
             }
-            let mut line = row().w_full().h(panel::FIELD).py(3.0).px(2.0).gap(8.0).center_y().on_hover_change(hover)
+            let mut line = row().w_full().h(panel::FIELD).py(3.0).px(2.0).gap(8.0).center_y().on_pointer_move_local(hover)
                 .on_press_tx(move |s: &mut State, tx| look::pressed(s, depth, i, None, tx));
             if let Some(l) = label {
                 line = line.pl(10.0).child(text(l.clone()).font(fonts::caption(400.0)).color(c.ink2).w(56.0));
@@ -279,7 +232,7 @@ fn row_view(s: &State, p: &Panel, depth: usize, i: usize, r: &Row) -> El {
 }
 
 /// An item's row: its label, then any note, chip, check, key and "more" mark.
-fn item_view(c: &Palette, item: &Item) -> El {
+fn item_view(c: &Palette, item: &Item, depth: usize, i: usize) -> El {
     let mut r = row().w_full().h(panel::ITEM).pl(10.0).pr(8.0).gap(8.0).center_y().radius(5.0)
         .child(text(item.label.clone()).font(fonts::ui(400.0)).color(if item.danger { c.fail } else { c.ink }));
     r = r.child(el().grow(1.0));
@@ -287,7 +240,11 @@ fn item_view(c: &Palette, item: &Item) -> El {
         r = r.child(text(n.clone()).font(fonts::caption(400.0)).color(c.ink2).truncate().shrink());
     }
     if let Some(chip) = &item.chip {
-        r = r.child(row().px(8.0).py(3.0).radius(10.0).border(1.0, c.line).child(text(chip.clone()).font(fonts::small(400.0)).color(c.ink2)));
+        r = r.child(
+            row().key(format!("chip-{depth}-{i}")).px(8.0).py(3.0).radius(10.0).border(1.0, c.line)
+                .child(text(chip.clone()).font(fonts::small(400.0)).color(c.ink2))
+                .on_press_tx(move |s: &mut State, tx| look::chip_pressed(s, depth, i, tx)),
+        );
     }
     if item.check {
         r = r.child(text("✓").font(fonts::caption(400.0)).color(c.accent));
@@ -314,20 +271,32 @@ fn title_row(s: &State) -> El {
         .child(words)
 }
 
-/// The line under the writing: where the caret's `new:` line is, or what just happened. Not
-/// drawn when there is nothing to say.
+/// The line under the writing: a label in the state's color, one fact, and at most one action
+/// with its key, for the caret's `new:` line or what just happened. Not drawn when there is
+/// nothing to say.
 fn status(s: &State) -> Option<El> {
     let p = s.look.palette;
-    let (mark, words, tone) = draft::line(s)?;
-    let color = match tone {
+    let said = draft::line(s)?;
+    let color = match said.tone {
         draft::Tone::Dim => p.ink2,
+        draft::Tone::Ink => p.ink,
         draft::Tone::Accent => p.accent,
         draft::Tone::Warn => p.fail,
     };
-    Some(row().key("status").w_full().h(STATUS).gap(10.0).center_y().pl(22.0).pr(12.0)
+    let mut line = row().key("status").w_full().h(STATUS).gap(10.0).center_y().pl(22.0).pr(12.0)
         .fill(p.pane).border_sides([1.0, 0.0, 0.0, 0.0], p.line)
-        .child(text(mark.to_string()).key("status-label").font(fonts::caption(600.0)).color(color))
-        .child(text(words).key("status-words").font(fonts::caption(400.0)).color(p.ink2).shrink().truncate()))
+        .child(text(said.label).key("status-label").font(fonts::caption(600.0)).color(color))
+        .child(text(said.fact).key("status-words").font(fonts::caption(400.0)).color(p.ink2).shrink().truncate())
+        .child(el().grow(1.0));
+    if let Some((name, key)) = said.action {
+        line = line.child(
+            row().key("status-action").gap(6.0).center_y().px(6.0).py(2.0).radius(5.0).cursor(Cursor::Pointer)
+                .child(text(name).font(fonts::caption(500.0)).color(p.ink))
+                .child(row().px(5.0).py(2.0).radius(4.0).border(1.0, p.line).child(text(key.label()).font(fonts::key()).color(p.ink2)))
+                .on_press(|s: &mut State| draft::status_pressed(s)),
+        );
+    }
+    Some(line)
 }
 
 fn writing(s: &State) -> El {

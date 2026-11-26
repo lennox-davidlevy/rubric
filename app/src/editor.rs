@@ -75,20 +75,6 @@ fn fence_mark(t: &str) -> Option<(u8, usize)> {
     (n >= 3).then_some((ch, n))
 }
 
-/// The notes field's keys: Esc goes back to the reroll menu, and Tab stays in the field.
-/// (Return is the field's submit.)
-pub fn notes_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
-    match ev.key {
-        Key::Escape => {
-            crate::draft::back(s);
-            tx.focus("editor", false);
-            true
-        }
-        Key::Tab => true,
-        _ => false,
-    }
-}
-
 /// A panel's field: the panel's keys first, then the field's own editing.
 pub fn field_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
     use crate::panel::Taken;
@@ -114,27 +100,9 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
         crate::look::open_themes(s, tx);
         return true;
     }
-    // An open menu takes its keys first; any other key closes it and is the editor's.
-    if let Some(menu) = &mut s.menu {
-        use crate::menu::Taken;
-        let before = menu.active;
-        match crate::menu::key(menu, ev) {
-            Taken::Moved => {
-                if menu.active != before {
-                    crate::draft::looked(s);
-                }
-                return true;
-            }
-            Taken::Chose(id) => {
-                crate::draft::chose(s, &id, tx);
-                return true;
-            }
-            Taken::Closed => {
-                crate::draft::back(s);
-                return true;
-            }
-            Taken::Passed => crate::draft::close(s),
-        }
+    // On a `new:` line, the status line's action has its key.
+    if crate::draft::status_key(s, ev) {
+        return true;
     }
     if ev.key == Key::Tab {
         crate::state::tab(s, tx);

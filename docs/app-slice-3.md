@@ -205,7 +205,13 @@ The `new:` line's menus as panels, from the design's `menu`, `draft-running`, `d
 
 **Tests.** `bun test` with the stub resolver: a `::: quote size=large` line answers `size` with value `large` and `shadow` with its default; `set` to the default drops the setting and keeps the others in place; an unknown value is refused; `rubric/parts` with no words lists own parts first and calls no resolver.
 
-### Task 5: a placed part
+### Before task 5: what the review of sitting 2 found
+
+Sitting 3 starts by committing sitting 2 if `git status` still shows it (`Fix the theme list's review findings, draw the draft menus as panels, and add the server's part and parts requests.`, one sentence, nothing else), then these two, each with a test:
+
+1. **A tool that is not installed cannot be chosen.** In the drafter's panel its row keeps "Not installed", takes no focus from the keys and does nothing on a press. Now it can be chosen and the draft fails.
+2. **`rubric/part` with `set` takes a text and a number setting**, and refuses a number that is none: `test/part-request.test.ts` sets choices only.
+
 
 **Files.** `app/src/part.rs` (new), `app/src/draft.rs`, `app/src/state.rs`, `app/src/ghost.rs`.
 
@@ -262,3 +268,20 @@ One line each: what was chosen, and why the plan did not settle it.
   - The panel's field is drawn as a field only in the top panel; a panel under a second one shows its text without a field, so there are never two fields keyed alike.
   - `panel::key` answers `Typing` besides the plan's seven, for a key the field's own editing takes.
   - A debug build draws the list of themes headless: `rubric-app <post> --scene themes --snap out.png --at 1`.
+- Sitting 2 (2026-11-25):
+  - A resting pointer did take a row (the headless test reproduced it: the list opened on Fjord). Rows now follow `on_pointer_move`, which Rune sends only when the pointer moves, in place of hover; the plan's "acts only after the pointer has moved" without a flag to keep.
+  - `RUBRIC_APP_MODE` takes `light` as well as `dark`, so one run can be light over a kept dark.
+  - Return on the list's `Mode` row keeps the theme drawn, as Return on its row does.
+  - Left and Right do what the plan names (Left back from a second panel, Right on a `more` row) and otherwise still close the panels; Right on a row with a chip opens the chip's panel (`Taken::Chip`), and so does a press on the chip.
+  - Only the roles the tokens read are resolved: `background`, `backgroundPanel`, `backgroundElement`, `text`, `textMuted`, `textFaint`, `line`, `borderSubtle`, `border`, `hover`, `primary`, `accent`, `onAccent`, `error`.
+  - The `new:` line's state is the status line's, as sitting 1 left it, so "Not started" is drawn there too, with `Draft Ctrl+Enter`. The status line's action key works on the line with no panel open (Cmd+Enter drafts or keeps, Cmd+R rerolls, Cmd+. stops), and a press on the action does it; only the action shown has its key.
+  - The not-started menu has no Cancel (the design draws none). Reroll and Reroll with changes… on a failed line send `reroll`, which drafts another take as `build` would.
+  - Takes: each row's note is its drafter and the change asked for; the server gives no draft's length, which the design's notes show.
+  - The drafting panel's heading reads the seconds and the chip; the menu is drawn again each second while it shows, and when the server's word for the line changes (a draft finishing shows Keep in place of Stop).
+  - A drafter choice belongs to the line's text and stays until the app closes; Esc in its panel keeps what was chosen there and sends nothing.
+  - The server's diagnostic for a failed draft now carries its `message`, so the status line can say why without asking (`workspace.ts`).
+  - Kept says "<Name>, added to Own parts" as the design does. Cancel says nothing; Removed is for task 5. An error answer says "Failed" and the error.
+  - `rubric/part`'s `uses` counts every block drawing the part, this one with them; its settings leave out Rubric's `variant`, which the variant rows handle.
+  - `rubric/parts` lists the catalog's parts in the order of a new top-level `groups` list in `catalog.yaml`, which `src/core/catalog.ts` reads and checks (a file task 4 did not name; without it `group` was dropped). The version stays 13: nothing in a question reads `group`.
+  - A press on a panel row gives the keys back to the writing (Rune moved the focus off the editor on a press).
+  - The test of "Every theme" (`every_theme_sends_global`) went with the Keep menu it tested; Keep asks nothing now.

@@ -209,6 +209,8 @@ pub enum Taken {
     /// Esc on a second panel: it closed and the first has the focus.
     Back,
     Closed,
+    /// Right on an item with a chip: the chip's panel.
+    Chip(String),
     /// The field's own editing takes it.
     Typing,
     /// Not the panel's key: it closes and the editor takes it.
@@ -221,6 +223,7 @@ pub enum Taken {
 /// closes; typing in a `Field` stays there; any other key closes the panels and is the
 /// editor's.
 pub fn key(stack: &mut Vec<Panel>, ev: &KeyEvent, text: &str) -> Taken {
+    let depth = stack.len();
     let Some(panel) = stack.last_mut() else { return Taken::Passed };
     let in_field = matches!(panel.row(), Some(Row::Field { .. }));
     if ev.mods.cmd {
@@ -263,6 +266,15 @@ pub fn key(stack: &mut Vec<Panel>, ev: &KeyEvent, text: &str) -> Taken {
                     *on = next;
                     Taken::Set(id.clone(), next)
                 }
+                // Left on a second panel goes back to the first.
+                _ if !right && depth > 1 => {
+                    stack.pop();
+                    Taken::Back
+                }
+                // Right on a row that opens another panel opens it.
+                Row::Item(i) if right && i.more => Taken::Chose(i.id.clone()),
+                // Right on a row with a chip opens the chip's panel.
+                Row::Item(i) if right && i.chip.is_some() => Taken::Chip(i.id.clone()),
                 _ => {
                     stack.clear();
                     Taken::Passed
@@ -420,6 +432,17 @@ mod tests {
         assert_eq!(s.len(), 1);
         assert_eq!(key(&mut s, &ev(Key::Escape), ""), Taken::Closed);
         assert!(s.is_empty());
+    }
+
+    #[test]
+    fn left_on_a_second_panel_goes_back_and_right_on_more_opens() {
+        let more = Panel::new("first", "First", 200.0, vec![Row::Item(Item::new("plain", "Plain")), Row::Item(Item::new("deeper", "Deeper").more())]);
+        let mut s = vec![more.clone(), Panel::new("second", "Second", 200.0, vec![Row::Item(Item::new("a", "A"))])];
+        assert_eq!(key(&mut s, &ev(Key::Left), ""), Taken::Back);
+        assert_eq!(s.len(), 1);
+        s[0].focus("deeper");
+        assert_eq!(key(&mut s, &ev(Key::Right), ""), Taken::Chose("deeper".into()));
+        assert_eq!(s.len(), 1, "the owner opens what comes next");
     }
 
     const PANE: [f32; 4] = [0.0, 40.0, 700.0, 660.0];

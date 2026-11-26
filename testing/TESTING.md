@@ -100,7 +100,20 @@ The third slice: the design's look, one panel for every menu, and the menus in i
 | C5 | Ctrl+, move to Ink, Return; quit and start again | Ink stays, and is there after the restart. |
 | C6 | Copy `app/themes/nord.json` to `~/.config/rubric/themes/mine.json`, restart, Ctrl+, | `Mine` is last, with `Own`. The pointer over a row draws that theme; a click keeps it. `RUBRIC_APP_THEME=fjord` before the command starts in Fjord for that run only. |
 
-**After C5 and C6, undo what they wrote:** `rm ~/.config/rubric/app.json ~/.config/rubric/themes/mine.json`.
+| C7 | Ctrl+, then Up to `Mode`, Right, Down to Ink, Return; quit and start again | `Mode` is the first row. Right draws the app dark at once. Ink in dark after the restart. |
+| C8 | Ctrl+, Esc, leave the pointer where the list was; Ctrl+, again, then Down past the list's end | Nothing changes under the still pointer. Moving it over a row draws that theme. |
+| C9 | Ctrl+, twice | The list closes; the theme from before. |
+| C10 | Put a broken file in `~/.config/rubric/themes/` and start from a terminal | One line on stderr names the file and why it was skipped. |
+| C11 | On an empty line type `::: new: a tide clock`, then Tab | Under the writing: `Not started`, the words, `Draft Ctrl+Enter`. A panel with `Draft` and its chip. |
+| C12 | Click the chip, choose a model, Right on `Effort`, Esc | A second panel beside the first: tools, models, effort. The chip names the choice. |
+| C13 | Return on `Draft` | The status line counts the draft with `Stop Ctrl+.`, then reads `Ready` with `Keep Ctrl+Enter`. |
+| C14 | Tab, `Reroll with changes…`, type `name it tide-two`, Return; when ready, Tab, `Takes (2)`, Up and Down, Esc | The words go into the field, not the writing. Each move draws that take in the page; Esc draws the one shown before. |
+| C15 | Ctrl+Enter | The line becomes `::: tide-two`; `Kept` shows for 4 s. |
+| C16 | `::: new: a failing bell`, Ctrl+Enter, then Tab | The status line names the failure and its reason, with `Reroll Ctrl+R`. The panel shows both above `Reroll`. |
+
+C11 to C16 run with the stub, so nothing is paid for. A tool or model chosen in C12 is only checked, never run.
+
+**After C5 to C16, undo what they wrote:** `rm ~/.config/rubric/app.json ~/.config/rubric/themes/mine.json`, the broken file from C10, then `git checkout sites/app-slice/pages/posts/long.md && rm -rf sites/app-slice/parts sites/app-slice/.rubric/drafts/*`.
 
 ## Notes
 App starts well

@@ -40,7 +40,7 @@ fn main() {
     }
     println!("POST bytes={} words={} lines={}", text.len(), text.split_whitespace().count(), text.lines().count());
 
-    let theme = rubric_app::state::marks(&rubric_app::theme::Look::load(None, None, rubric_app::theme::Mode::Light).palette);
+    let theme = rubric_app::state::marks(&rubric_app::theme::Look::load(None, None, None).palette);
     let mut runs = Vec::new();
     for _ in 0..100 {
         let t = Instant::now();
@@ -110,7 +110,7 @@ fn main() {
         rt.update(|s, _| rubric_app::state::incoming(s, Incoming::Response { id, result: Ok(view) }));
         rt.frame(1.0 / 120.0);
         open.push(rune::thread_cpu_ms() - c0);
-        assert!(rt.find("menu-content").is_some(), "the menu is drawn");
+        assert!(rt.find("panel-0").is_some(), "the menu is drawn");
         // The entrance settles before the key is timed.
         let mut n = 0;
         while n < 240 && rt.frame(1.0 / 120.0) {

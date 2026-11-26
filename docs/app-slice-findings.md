@@ -262,3 +262,10 @@ The plan is [app-slice-3.md](app-slice-3.md), built on branch `slice-3`. Nothing
 - **Typing** (release, `src/bin/typing.rs`, with the fonts compiled in): p95 0.15 ms at the start, 0.32 ms in the middle, 0.14 ms at the end, against 4 ms.
 - **Not seen by anyone**: the app in a real window with the new look, the list of themes on screen, the pointer over its rows, and a writer's theme file. Those are rows C1 to C6 of `testing/TESTING.md`.
 - **A stub server test fails on `main` too**: `a_new_part_is_drafted_rerolled_kept_and_cancelled_with_the_stub` asserts that `sites/app-slice/parts` does not exist, and `sites/app-slice/parts/tide-clock/` is tracked (it came in with 499bfe5). Not changed here.
+
+### Sitting 2 (2026-11-25): the review's fixes, the draft menus, the server's two requests
+
+- **A still pointer took a row.** Rune refreshes hover on every build, so `on_hover_change` fired for the row a panel opened or scrolled under; the list of themes drew Fjord the moment it opened under a resting pointer. Rows now take the focus from `on_pointer_move`, which only a moving pointer sends (`a_still_pointer_under_the_theme_list_chooses_nothing`).
+- **A press in a panel took the keys from the writing.** Rune focuses on press; the panel hands the focus back unless the row is a field.
+- **The draft menus are panels**, and `menu.rs`, its `PopupList` and the separate notes field are gone. The tests drive every panel by keys and the chip by a press; nothing was seen on a screen.
+- **Not seen by anyone**: the panels on screen, the drafter's panel with real tools (the tests answer for the server), a real draft, the seconds counting in the panel's heading, and how `rubric/parts` with words feels against real Jev. Rows C7 to C16 of `testing/TESTING.md`.

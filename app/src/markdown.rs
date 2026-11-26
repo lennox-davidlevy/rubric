@@ -51,7 +51,7 @@ pub fn spans(text: &str, theme: &Theme, drafts: &[(u32, Tone)]) -> Vec<Span> {
             };
             let colons = start + lead + rest.bytes().take_while(|&b| b == b':').count();
             out.push(Span::new(start + lead, colons).color(match tone {
-                Tone::Dim => theme.dim,
+                Tone::Dim | Tone::Ink => theme.dim,
                 Tone::Accent => theme.accent,
                 Tone::Warn => theme.warn,
             }));

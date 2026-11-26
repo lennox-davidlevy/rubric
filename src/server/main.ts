@@ -336,6 +336,22 @@ export async function openSiteServer(root: string, opts: SiteServerOptions): Pro
       }
     });
 
+    // The part a line places, for the editor's menu on it: its settings with
+    // their values. With `set`, the line with one setting given, as `replace`.
+    connection.onRequest("rubric/part", async (params: { uri: string; line: number; set?: { name: string; value: string } }): Promise<object | null> => {
+      const f = file(params.uri);
+      if (!f || !workspace) return null;
+      return (await workspace.part(f, params.line, params.set)) ?? null;
+    });
+
+    // The parts a writer can put on a line: the site's own, then the
+    // catalog's in groups; with words, in Jev's order.
+    connection.onRequest("rubric/parts", async (params: { uri: string; words?: string }): Promise<object | null> => {
+      const f = file(params.uri);
+      if (!f || !workspace) return null;
+      return workspace.parts(f, params.words);
+    });
+
     // The tool and model that draft new parts, and what each tool offers, for
     // the editor's lists; and the writer's default from them, for the session.
     // With `harness`, that tool's models; with `model` too, the efforts that

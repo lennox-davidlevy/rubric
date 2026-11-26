@@ -143,7 +143,7 @@ fn a_new_part_is_drafted_rerolled_kept_and_cancelled_with_the_stub() {
     let clock = line_of(&edit.text, "::: new: a tide clock");
     let view = View::parse(&ask(None, clock, json!({}))).expect("a view");
     assert_eq!(view.words, "a tide clock");
-    assert!(draft::menu_for(&view).unwrap().rows.iter().any(|r| r.id == "build"));
+    assert!(ids(&view).contains(&"build".to_string()));
 
     // Drafted: the page's content draws it.
     ask(Some("build"), clock, json!({}));
@@ -157,6 +157,14 @@ fn a_new_part_is_drafted_rerolled_kept_and_cancelled_with_the_stub() {
     // Rerolled with notes: another take, named as the notes say.
     ask(Some("reroll"), clock, json!({ "change": "name it tide-two" }));
     assert_eq!(drafted("ready", "a tide clock")["name"], "tide-two");
+
+    // Two takes: the first back on screen, then the second again.
+    let view = View::parse(&ask(None, clock, json!({}))).unwrap();
+    assert_eq!((view.take, view.takes, view.list.len()), (Some(2), 2, 2));
+    assert!(ids(&view).contains(&"takes".to_string()));
+    let first = View::parse(&ask(Some("take"), clock, json!({ "to": 1 }))).unwrap();
+    assert_eq!((first.take, first.name.as_deref()), (Some(1), Some(name.as_str())));
+    assert_eq!(View::parse(&ask(Some("take"), clock, json!({ "to": 2 }))).unwrap().take, Some(2));
 
     // Kept for the site: the line is the part's, and the site has the part.
     let asked = Asked { line: clock, text: "::: new: a tide clock".into(), what: What::Act };
@@ -175,7 +183,7 @@ fn a_new_part_is_drafted_rerolled_kept_and_cancelled_with_the_stub() {
     drafted("failed", "a failing bell");
     let view = View::parse(&ask(None, bell, json!({}))).unwrap();
     assert_eq!(view.status.as_deref(), Some("failed"));
-    assert_eq!(draft::menu_for(&view).unwrap().rows[0].id, "build");
+    assert_eq!(ids(&view)[0], "reroll");
 
     // A draft cancelled: the line keeps its words, without `new:`.
     let brass = line_of(&edit.text, "::: new: a brass bell");
@@ -189,7 +197,7 @@ fn a_new_part_is_drafted_rerolled_kept_and_cancelled_with_the_stub() {
     let keeper = line_of(&edit.text, "::: new: a quote from the keeper");
     let view = View::parse(&ask(None, keeper, json!({}))).unwrap();
     assert!(view.near.iter().any(|n| n.name == "quote"), "{:?}", view.near);
-    assert_eq!(draft::menu_for(&view).unwrap().rows[0].id, "near");
+    assert!(ids(&view).contains(&"near".to_string()));
     client.notify("rubric/peek", json!({ "uri": uri, "line": keeper, "part": "quote" }));
     let asked = Asked { line: keeper, text: "::: new: a quote from the keeper".into(), what: What::Act };
     assert!(draft::replace(&mut edit, &asked, &ask(Some("use"), keeper, json!({ "part": "quote" }))));
@@ -200,6 +208,11 @@ fn a_new_part_is_drafted_rerolled_kept_and_cancelled_with_the_stub() {
 
     client.stop();
     wait_for("the server's process to end", || !alive(pid));
+}
+
+/// The ids of the rows of a line's menu.
+fn ids(view: &rubric_app::draft::View) -> Vec<String> {
+    rubric_app::draft::menu_rows(view, None, None).0.iter().filter(|r| r.takes_focus()).filter_map(|r| r.id().map(str::to_string)).collect()
 }
 
 struct Cleanup(PathBuf);

@@ -46,18 +46,14 @@ pub struct State {
     pub asked: Option<(i64, i32, u32)>,
     /// The window's height in points, for the menu's place.
     pub height: f32,
-    /// The menu at the caret, and the view and line it is about.
-    pub menu: Option<crate::menu::Menu>,
-    pub view: Option<(draft::View, draft::Asked)>,
-    /// Where the menu's anchor was last laid out, for when the notes field has the focus and
-    /// the editor reports no caret.
-    pub menu_at: Option<[f32; 4]>,
-    /// A reroll's notes, while `menu` is the notes field.
-    pub notes: TextEdit,
+    /// The `new:` line whose menu is open, and what the server said of it.
+    pub view: Option<draft::Open>,
+    /// A drafter chosen for one line (the line's text): it rides on that line's builds.
+    pub choice: Option<(String, draft::Choice)>,
     /// Each `new:` line's status, from the server's diagnostics: line, status.
     pub drafts: Vec<(u32, draft::Status)>,
     /// Something that just happened, said at the bottom of the writing until the time in ms.
-    pub flash: Option<(char, String, draft::Tone, u64)>,
+    pub flash: Option<(draft::Said, u64)>,
     /// The time the status line counts from, in ms; set by what changes it and by the ticker.
     pub now_ms: u64,
     /// `rubric/draft` requests not answered yet.
@@ -79,8 +75,8 @@ pub struct State {
     /// The line the panels hang from, for when a field has the focus and the editor reports no
     /// caret.
     pub panel_at: Option<[f32; 4]>,
-    /// The theme drawn when the list of themes opened, to go back to.
-    pub theme_before: Option<String>,
+    /// The theme and mode drawn when the list of themes opened, to go back to.
+    pub theme_before: Option<(String, crate::theme::Mode)>,
 }
 
 /// The thread that ticks: parked until `wake`, at rest again when nothing needs the time.
@@ -109,13 +105,13 @@ impl State {
         edit.focused = true;
         edit.set_caret(0);
         let uri = file_uri(&path);
-        let look = crate::theme::Look::load(None, None, crate::theme::Mode::Light);
+        let look = crate::theme::Look::load(None, None, None);
         let spans = markdown::spans(&text, &marks(&look.palette), &[]);
         let title = title_of(&path, &text);
         State {
             path, edit, version: 1, saved: text, split: 0.5, last_range: (0, 0), uri, spans, problem: None, page: None, width: 0.0,
-            bounds: None, client: None, cursor_line: None, page_url: None, ghost: None, asked: None, height: 0.0, menu: None,
-            view: None, menu_at: None, notes: TextEdit::new(""), drafts: Vec::new(), flash: None, now_ms: draft::now_ms(),
+            bounds: None, client: None, cursor_line: None, page_url: None, ghost: None, asked: None, height: 0.0,
+            view: None, choice: None, drafts: Vec::new(), flash: None, now_ms: draft::now_ms(),
             pending: HashMap::new(), looked: std::cell::Cell::new(None), ticker: None, look, title, pane: [0.0; 4],
             panels: Vec::new(), field: TextEdit::new(""), panel_at: None, theme_before: None,
         }
@@ -187,8 +183,8 @@ pub fn clean(s: &State) -> bool {
 pub fn changed(s: &mut State) {
     s.version += 1;
     s.ghost = None;
-    // Typing is not the menu's: it goes (a choice that changed the text closed it already).
-    draft::close(s);
+    // Typing is not the panels': they go (a choice that changed the text closed them already).
+    crate::look::close_panels(s);
     s.spans = spans(s);
     s.title = title_of(&s.path, &s.edit.text);
     if let Some(c) = &s.client {
@@ -209,8 +205,7 @@ pub fn moved(s: &mut State) -> bool {
         return false;
     }
     s.last_range = range;
-    // The caret went elsewhere: the menu and the panels were for where it was.
-    draft::close(s);
+    // The caret went elsewhere: the panels were for where it was.
     crate::look::close_panels(s);
     let line = position::line_char(&s.edit.text, s.edit.focus).0;
     if s.cursor_line != Some(line)

@@ -22,9 +22,17 @@ impl Mode {
         }
     }
 
-    /// `RUBRIC_APP_MODE=dark` draws a theme that has both in its dark colors; anything else, light.
-    pub fn from_env() -> Mode {
-        if std::env::var("RUBRIC_APP_MODE").as_deref() == Ok("dark") { Mode::Dark } else { Mode::Light }
+    fn named(name: &str) -> Option<Mode> {
+        match name {
+            "light" => Some(Mode::Light),
+            "dark" => Some(Mode::Dark),
+            _ => None,
+        }
+    }
+
+    /// `RUBRIC_APP_MODE=dark` or `light` for one run, over the mode kept with the theme.
+    pub fn from_env() -> Option<Mode> {
+        Mode::named(std::env::var("RUBRIC_APP_MODE").ok()?.trim())
     }
 }
 
@@ -117,9 +125,20 @@ impl File {
     }
 }
 
+/// The roles `tokens` reads: only these are resolved for the app, so a role it never uses (a
+/// number that is no color, a key OpenCode adds later) does not cost the writer the theme.
+const USED: &[&str] = &[
+    "background", "backgroundPanel", "backgroundElement", "text", "textMuted", "textFaint", "line", "borderSubtle",
+    "border", "hover", "primary", "accent", "onAccent", "error",
+];
+
 /// Every role of a theme for one mode; `None` is transparent. A color with an alpha channel
 /// (`#rrggbbaa`) is laid over the theme's background.
 pub fn resolve_roles(file: &File, mode: Mode) -> Result<HashMap<String, Option<Rgb>>, String> {
+    resolve_some(file, mode, |_| true)
+}
+
+fn resolve_some(file: &File, mode: Mode, wanted: impl Fn(&str) -> bool) -> Result<HashMap<String, Option<Rgb>>, String> {
     let mut canvas = if mode == Mode::Dark { Rgb([0; 3]) } else { Rgb([255; 3]) };
     fn resolve(file: &File, mode: Mode, canvas: Rgb, value: &Value, chain: &mut Vec<String>) -> Result<Option<Rgb>, String> {
         match value {
@@ -163,7 +182,7 @@ pub fn resolve_roles(file: &File, mode: Mode) -> Result<HashMap<String, Option<R
     let mut roles = HashMap::new();
     for (name, value) in &file.theme {
         // OpenCode's files carry `$schema` and other strings beside the roles only at the top.
-        if value.is_null() {
+        if value.is_null() || !wanted(name) {
             continue;
         }
         roles.insert(name.clone(), resolve(file, mode, canvas, value, &mut Vec::new())?);
@@ -264,7 +283,7 @@ impl Entry {
     }
 
     pub fn tokens(&self, mode: Mode) -> Result<Tokens, String> {
-        Ok(tokens(&resolve_roles(&self.file, mode)?, mode))
+        Ok(tokens(&resolve_some(&self.file, mode, |r| USED.contains(&r))?, mode))
     }
 }
 
@@ -286,29 +305,49 @@ pub const DEFAULT: &str = "paper";
 
 /// The bundled themes, then the writer's own from `<config>/themes/*.json` in name order, a
 /// writer's file replacing a bundled one of its name in place. A file that does not parse, or
-/// does not resolve in both modes, is skipped.
+/// does not resolve in both modes, is skipped, and why is said once on stderr.
 pub fn load(config: Option<&Path>) -> Vec<Entry> {
+    let (out, skipped) = load_all(config);
+    for why in skipped {
+        eprintln!("{why}");
+    }
+    out
+}
+
+/// `load`, and why each skipped file was skipped (`theme mine.json: …`).
+pub fn load_all(config: Option<&Path>) -> (Vec<Entry>, Vec<String>) {
     let mut out: Vec<Entry> = BUNDLED.iter()
         .map(|(name, json)| Entry { name: name.to_string(), file: File::parse(json).expect("a bundled theme parses"), own: false })
         .collect();
-    let Some(dir) = config.map(|c| c.join("themes")) else { return out };
-    let Ok(read) = std::fs::read_dir(&dir) else { return out };
+    let mut skipped = Vec::new();
+    let Some(dir) = config.map(|c| c.join("themes")) else { return (out, skipped) };
+    let Ok(read) = std::fs::read_dir(&dir) else { return (out, skipped) };
     let mut files: Vec<PathBuf> = read.filter_map(|e| e.ok()).map(|e| e.path())
         .filter(|p| p.extension().is_some_and(|x| x == "json") && p.is_file()).collect();
     files.sort();
     for path in files {
         let Some(name) = path.file_stem().map(|s| s.to_string_lossy().into_owned()) else { continue };
-        let Some(file) = std::fs::read_to_string(&path).ok().and_then(|t| File::parse(&t).ok()) else { continue };
-        let entry = Entry { name, file, own: true };
-        if entry.tokens(Mode::Light).is_err() || entry.tokens(Mode::Dark).is_err() {
-            continue;
-        }
+        let shown = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let parsed = std::fs::read_to_string(&path).map_err(|e| e.to_string()).and_then(|t| File::parse(&t));
+        let entry = parsed.and_then(|file| {
+            let entry = Entry { name, file, own: true };
+            entry.tokens(Mode::Light)?;
+            entry.tokens(Mode::Dark)?;
+            Ok(entry)
+        });
+        let entry = match entry {
+            Ok(e) => e,
+            Err(why) => {
+                skipped.push(format!("theme {shown}: {why}"));
+                continue;
+            }
+        };
         match out.iter_mut().find(|e| e.name == entry.name) {
             Some(e) => *e = entry,
             None => out.push(entry),
         }
     }
-    out
+    (out, skipped)
 }
 
 /// `$XDG_CONFIG_HOME/rubric`, or `~/.config/rubric`.
@@ -318,20 +357,24 @@ pub fn config_dir() -> Option<PathBuf> {
     Some(base.join("rubric"))
 }
 
-/// The theme kept in `<config>/app.json`, if any.
-pub fn saved(config: &Path) -> Option<String> {
-    let text = std::fs::read_to_string(config.join("app.json")).ok()?;
-    serde_json::from_str::<Value>(&text).ok()?.get("theme")?.as_str().map(str::to_string)
+/// The theme kept in `<config>/app.json`, if any, and the mode kept with it.
+pub fn saved(config: &Path) -> (Option<String>, Option<Mode>) {
+    let Some(v) = std::fs::read_to_string(config.join("app.json")).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()) else {
+        return (None, None);
+    };
+    let text = |k: &str| v.get(k).and_then(Value::as_str);
+    (text("theme").map(str::to_string), text("mode").and_then(Mode::named))
 }
 
-/// Keeps `name` in `<config>/app.json`, every other key as it was; written whole.
-pub fn save(config: &Path, name: &str) -> std::io::Result<()> {
+/// Keeps `name` and `mode` in `<config>/app.json`, every other key as it was; written whole.
+pub fn save(config: &Path, name: &str, mode: Mode) -> std::io::Result<()> {
     let path = config.join("app.json");
     let mut settings = std::fs::read_to_string(&path).ok()
         .and_then(|t| serde_json::from_str::<Value>(&t).ok())
         .and_then(|v| v.as_object().cloned())
         .unwrap_or_default();
     settings.insert("theme".into(), Value::String(name.into()));
+    settings.insert("mode".into(), Value::String(mode.key().into()));
     std::fs::create_dir_all(config)?;
     let text = serde_json::to_string_pretty(&Value::Object(settings)).expect("json") + "\n";
     crate::markdown::save(&path, &text)
@@ -351,10 +394,12 @@ pub struct Look {
 
 impl Look {
     /// The theme from `wanted` (`RUBRIC_APP_THEME`), else the one kept in `config`, else Paper;
-    /// a name that is not there is Paper too.
-    pub fn load(config: Option<PathBuf>, wanted: Option<String>, mode: Mode) -> Look {
+    /// a name that is not there is Paper too. The mode is `mode` (`RUBRIC_APP_MODE`), else the
+    /// one kept with the theme, else light.
+    pub fn load(config: Option<PathBuf>, wanted: Option<String>, mode: Option<Mode>) -> Look {
         let themes = load(config.as_deref());
-        let kept = config.as_deref().and_then(saved);
+        let (kept, kept_mode) = config.as_deref().map(saved).unwrap_or_default();
+        let mode = mode.or(kept_mode).unwrap_or(Mode::Light);
         let mut look = Look { themes, name: String::new(), mode, palette: Palette::from(paper(mode)), config };
         for name in [wanted, kept, Some(DEFAULT.to_string())].into_iter().flatten() {
             if look.show(&name) {
@@ -372,10 +417,20 @@ impl Look {
         true
     }
 
-    /// Keeps the theme drawn now.
+    /// Draws the theme shown now in `mode`.
+    pub fn set_mode(&mut self, mode: Mode) {
+        let old = self.mode;
+        self.mode = mode;
+        let name = self.name.clone();
+        if !self.show(&name) {
+            self.mode = old;
+        }
+    }
+
+    /// Keeps the theme drawn now, and its mode.
     pub fn keep(&self) -> std::io::Result<()> {
         match &self.config {
-            Some(c) => save(c, &self.name),
+            Some(c) => save(c, &self.name, self.mode),
             None => Ok(()),
         }
     }
@@ -487,7 +542,13 @@ mod tests {
         std::fs::write(d.join("themes/mine.json"), r##"{ "theme": { "background": "#111111", "text": "#eeeeee" } }"##).unwrap();
         std::fs::write(d.join("themes/broken.json"), "{ nope").unwrap();
         std::fs::write(d.join("themes/loop.json"), r#"{ "theme": { "text": "a", "a": "text" } }"#).unwrap();
-        let all = load(Some(&d));
+        std::fs::write(d.join("themes/later.json"), r##"{ "theme": { "background": "#222222", "text": "#eeeeee", "diffAdded": "nowhere", "opacity": 0.5 } }"##).unwrap();
+        std::fs::write(d.join("themes/missing.json"), r##"{ "theme": { "background": "x", "text": "#eeeeee" } }"##).unwrap();
+        let (all, skipped) = load_all(Some(&d));
+        assert!(all.iter().any(|e| e.name == "later"), "roles the app never reads cost nothing");
+        assert_eq!(skipped.len(), 3, "{skipped:?}");
+        assert!(skipped.iter().any(|w| w.contains("missing.json") && w.contains("\"x\"")), "{skipped:?}");
+        assert!(skipped.iter().any(|w| w.contains("broken.json")) && skipped.iter().any(|w| w.contains("loop.json")), "{skipped:?}");
         let nord = all.iter().find(|e| e.name == "nord").unwrap();
         assert!(nord.own);
         assert_eq!(nord.tokens(Mode::Dark).unwrap().pane.hex(), "#010203");
@@ -502,15 +563,22 @@ mod tests {
     fn the_kept_theme_is_read_back_and_other_settings_stay() {
         let d = temp("kept");
         std::fs::write(d.join("app.json"), r#"{ "other": 1 }"#).unwrap();
-        let mut look = Look::load(Some(d.clone()), None, Mode::Light);
+        let mut look = Look::load(Some(d.clone()), None, None);
         assert_eq!(look.name, DEFAULT);
         assert!(look.show("sepia"));
         look.keep().unwrap();
-        assert_eq!(Look::load(Some(d.clone()), None, Mode::Light).name, "sepia");
+        assert_eq!(Look::load(Some(d.clone()), None, None).name, "sepia");
         let v: Value = serde_json::from_str(&std::fs::read_to_string(d.join("app.json")).unwrap()).unwrap();
         assert_eq!(v["other"], 1);
-        assert_eq!(Look::load(Some(d.clone()), Some("fjord".into()), Mode::Light).name, "fjord", "the environment's for one run");
-        assert_eq!(Look::load(Some(d.clone()), Some("nothing".into()), Mode::Light).name, "sepia");
+        assert_eq!(Look::load(Some(d.clone()), Some("fjord".into()), None).name, "fjord", "the environment's for one run");
+        assert_eq!(Look::load(Some(d.clone()), Some("nothing".into()), None).name, "sepia");
+        assert_eq!(Look::load(Some(d.clone()), None, None).mode, Mode::Light, "light until a mode is kept");
+        look.set_mode(Mode::Dark);
+        look.keep().unwrap();
+        let back = Look::load(Some(d.clone()), None, None);
+        assert_eq!((back.name.as_str(), back.mode), ("sepia", Mode::Dark), "the mode is kept with the theme");
+        assert_eq!(back.palette, Palette::from(bundled("sepia", Mode::Dark)));
+        assert_eq!(Look::load(Some(d.clone()), None, Some(Mode::Light)).mode, Mode::Light, "the environment's for one run");
         std::fs::remove_dir_all(&d).unwrap();
     }
 
