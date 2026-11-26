@@ -227,7 +227,73 @@ Ok i recreated the behavior, i restarted the app, when to `C17` saw the menu, an
 
 And i lost the keyboard strokes again!
 
+## pre move revision of rune to current
+
+do we have dark/light mode for every theme? it doesnt seem like we do. Paper and speia only have light and ink only has dark i didnt test more. i am just making sure this is by design. if a theme does not have a built in dark/light mode, depending on the `mode` grey out and skip the themes that dont have that mode ie if dark paper is not selectable
 
 
+for theme menus make it so if you click down on the last item it goes back to the top and up on the top it goes to do the bottom. this behavior MAYBE for all menus, so dont make it too specific yet, just do it for theme menu first
+
+C49 when i hit return, it instantly said ready (probably a test thing), and created the take, i was able to go back to the menu and `go back to quote`
+
+also rewrite the `go back to <component>` for originals, and just say `revert to original` or something like that? lets discuss this.
+
+Same with `Own` on drafted components.  its not clear what `own` means. maybe `custom`? i dunno, not `own`. again lets discuss
+
+Insert part works great, the menu can be a bit more clear, i am not sure how tho, i like the vertial menu, but `writing 7` and then 7 options is ok, but i wonder if there is a better way? lets discuss. 
+
+Also, so some components show prefilled template stuff like `lead` and `glossary` and some dont like `quote` and some others but as i was testing it crashed:
 
 
+```sh 
+A process crashed on this Omarchy machine and I want to know why.
+
+What systemd-coredump recorded:
+  process:  WebKitWebProcess
+  PID:      3169970
+  binary:   /usr/lib/webkit2gtk-4.1/WebKitWebProcess
+  signal:   SIGABRT
+  time:     Wed 2026-11-25 23:04:14 EST
+
+Use the diagnose-crash skill: it covers how to investigate, what to report, and
+when a crash is worth reporting upstream to Omarchy. If your harness has no skill
+mechanism, read the skill files directly and follow them instead:
+
+  /usr/share/omarchy/default/agents/skills/diagnose-crash/SKILL.md
+```
+
+and from the rust cli:
+
+```sh
+(rubric-app:3169868): Gdk-CRITICAL **: 22:38:25.077: _gdk_frame_clock_freeze: assertion 'GDK_IS_FRAME_CLOCK (clock)' failed
+page loaded http://127.0.0.1:1415/ 254 ms
+page loaded http://127.0.0.1:1415/posts/long/ 308 ms
+menu drawn 3.1 ms: draft, server 1.8 ms
+menu drawn 1.8 ms: draft, server 0.9 ms
+menu drawn 1.3 ms: draft, server 0.9 ms
+menu drawn 1.0 ms: draft, server 0.6 ms
+menu drawn 1.1 ms: draft, server 0.7 ms
+menu drawn 53.0 ms: draft, server 52.0 ms
+menu drawn 1.5 ms: draft, server 0.7 ms
+menu drawn 3.3 ms: part, server 2.0 ms
+menu drawn 1.7 ms: part, server 1.2 ms
+menu drawn 1.6 ms: part, server 1.2 ms
+menu drawn 2.0 ms: part, server 1.5 ms
+menu drawn 2.1 ms: part, server 1.2 ms
+menu drawn 1.9 ms: part, server 1.2 ms
+menu drawn 1.9 ms: part, server 1.0 ms
+menu drawn 1.9 ms: part, server 1.2 ms
+menu drawn 1.9 ms: part, server 1.4 ms
+menu drawn 1.9 ms: part, server 1.1 ms
+menu drawn 1.8 ms: part, server 1.2 ms
+menu drawn 53.3 ms: words-menu, server 52.4 ms
+GStreamer element autoaudiosink not found. Please install it
+
+(WebKitWebProcess:3169970): GLib-GObject-CRITICAL **: 23:04:12.544: invalid (NULL) pointer instance
+
+(WebKitWebProcess:3169970): GLib-GObject-CRITICAL **: 23:04:12.544: g_signal_connect_data: assertion 'G_TYPE_CHECK_INSTANCE (instance)' failed
+```
+```
+```
+
+So we got pretty far, but found another crash. most of this is ExCELLENT. 
