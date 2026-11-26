@@ -17,12 +17,40 @@
   const meta = (name) => document.querySelector(`meta[name="${name}"]`)?.content;
   const source = meta("rubric-source");
   const relay = meta("rubric-relay");
+  const warn = (why) => {
+    console.warn(`rubric-live: ${why}`);
+    try { window.ipc?.postMessage(`live: ${why}`); } catch {}
+  };
   const parse = (html) => new DOMParser().parseFromString(html, "text/html");
-  const fetchPage = async () => parse(await (await fetch(location.href, { cache: "no-store" })).text());
+  // Bound every fetch so a stalled WebKitGTK/libsoup3 request can never wedge
+  // `running = true` forever; cache-bust alongside `no-store` as belt-and-suspenders.
+  const FETCH_MS = window.__rubricFetchMs ?? 3000;
+  let fetchSeq = 0;
+  const fetchPage = async () => {
+    const url = new URL(location.href);
+    url.searchParams.set("_rubric", String(++fetchSeq));
+    const ac = new AbortController();
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => { ac.abort(); reject(new Error("fetch timed out")); }, FETCH_MS);
+    });
+    try {
+      const html = await Promise.race([
+        fetch(url.href, { cache: "no-store", signal: ac.signal }).then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.text();
+        }),
+        timeout,
+      ]);
+      return parse(html);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
 
   // The page as Hugo last sent it, before any script changed it. A node the
   // new page has unchanged from this one is left alone in the live page.
-  let sent = fetchPage().catch(() => undefined);
+  let sent = fetchPage().catch((err) => { warn(`initial fetch failed (${err?.message ?? err})`); return undefined; });
 
   // Changes `live` to match `next`, where `live` started as `was` and only
   // scripts may have changed it since. The longest run of nodes unchanged
@@ -129,17 +157,27 @@
         again = false;
         const was = await sent;
         const next = await fetchPage();
-        if (!was || !head(next) || !morph(document.body, was.body, next.body)) return location.reload();
+        if (!was) { warn("reloading: no baseline"); return location.reload(); }
+        if (!head(next)) { warn("reloading: head changed"); return location.reload(); }
+        if (!morph(document.body, was.body, next.body)) { warn("reloading: body mismatch"); return location.reload(); }
         sent = Promise.resolve(next);
         document.dispatchEvent(new CustomEvent("rubric:drawn"));
         if (cursor) follow(cursor.line);
       } while (again);
-    } catch {
+    } catch (err) {
+      warn(`reloading: ${err?.message ?? err}`);
       location.reload();
     } finally {
       running = false;
     }
   };
+
+  // Both the SSE relay (`{ built: rev }`) and Hugo's LiveReload trigger a
+  // redraw. When SSE is healthy it drives rebuilds directly and suppresses the
+  // duplicate LiveReload fetch; if either channel stalls, the other still runs.
+  let seenBuilt;
+  let builtAt = 0;
+  let lrTimer;
 
   window.LiveReloadPluginRubric = class {
     static identifier = "rubric";
@@ -150,7 +188,9 @@
       // page loads, are its to handle.
       const asset = path !== "/x.js" && /\.(css|js|map|png|jpe?g|gif|svg|webp|avif|woff2?)$/i.test(path);
       if (path.startsWith("__hugo_navigate") || asset) return false;
-      redraw();
+      if (Date.now() - builtAt < 250) return true;
+      clearTimeout(lrTimer);
+      lrTimer = setTimeout(() => { lrTimer = undefined; redraw(); }, seenBuilt === undefined ? 0 : 60);
       return true;
     }
     analyze() { return {}; }
@@ -186,6 +226,18 @@
     events.onmessage = (e) => {
       let c;
       try { c = JSON.parse(e.data); } catch { return; }
+      if (typeof c.built === "number") {
+        if (seenBuilt === undefined) {
+          seenBuilt = c.built;
+        } else if (c.built !== seenBuilt) {
+          seenBuilt = c.built;
+          builtAt = Date.now();
+          clearTimeout(lrTimer);
+          lrTimer = undefined;
+          redraw();
+        }
+        return;
+      }
       if (c.source === source) {
         cursor = c;
         follow(c.line);

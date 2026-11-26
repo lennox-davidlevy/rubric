@@ -128,6 +128,11 @@ mod linux {
                             position: PhysicalPosition::new(0, 0).into(),
                             size: PhysicalSize::new(1u32, 1u32).into(),
                         })
+                        .with_ipc_handler(|req| {
+                            if let Some(rest) = req.body().strip_prefix("live: ") {
+                                eprintln!("page: {rest}");
+                            }
+                        })
                         .with_on_page_load_handler(move |event, url| {
                             if matches!(event, PageLoadEvent::Finished) {
                                 loaded(url);
