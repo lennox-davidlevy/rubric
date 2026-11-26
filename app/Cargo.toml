@@ -5,8 +5,8 @@ edition = "2024"
 publish = false
 
 [dependencies]
-rune = { git = "https://github.com/anomalyco/rune", rev = "0ca075619d116f8f6e0e3bc8ff815c72c636cac8" }
-rune-kit = { git = "https://github.com/anomalyco/rune", rev = "0ca075619d116f8f6e0e3bc8ff815c72c636cac8" }
+rune = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
+rune-kit = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 wry = "0.57.2"
@@ -32,10 +32,14 @@ path = "src/bin/typing.rs"
 required-features = ["bench"]
 
 [patch.crates-io]
-winit = { git = "https://github.com/anomalyco/rune", rev = "0ca075619d116f8f6e0e3bc8ff815c72c636cac8" }
-parley_engine = { git = "https://github.com/anomalyco/rune", rev = "0ca075619d116f8f6e0e3bc8ff815c72c636cac8" }
-wgpu-hal = { git = "https://github.com/anomalyco/rune", rev = "0ca075619d116f8f6e0e3bc8ff815c72c636cac8" }
-accesskit_windows = { git = "https://github.com/anomalyco/rune", rev = "0ca075619d116f8f6e0e3bc8ff815c72c636cac8" }
+winit = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
+sctk-adwaita = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
+parley_engine = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
+wgpu-hal = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
+naga = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
+accesskit_windows = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
+accesskit_macos = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
+accesskit_atspi_common = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
 
 [profile.dev]
 debug = "line-tables-only"
