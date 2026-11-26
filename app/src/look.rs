@@ -83,8 +83,30 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> Taken {
     } else {
         act(s, &top, taken.clone(), tx);
     }
+    if taken != Taken::Typing {
+        sync_field(s);
+    }
     follow(s, was_field, tx);
     taken
+}
+
+/// The field typed in is the top panel's row with the focus: a field taking the focus starts
+/// from its row's value, and one left goes back to it.
+pub fn sync_field(s: &mut State) {
+    let at = s.panels.last().and_then(|p| match p.row() {
+        Some(Row::Field { id, value, .. }) => Some(((p.id.clone(), id.clone()), value.clone())),
+        _ => None,
+    });
+    match at {
+        Some((key, value)) if s.field_of.as_ref() != Some(&key) => {
+            s.field = rune::TextEdit::new(value);
+            let end = s.field.text.len();
+            s.field.set_caret(end);
+            s.field_of = Some(key);
+        }
+        Some(_) => {}
+        None => s.field_of = None,
+    }
 }
 
 fn in_field(s: &State) -> bool {
@@ -157,9 +179,14 @@ fn restore(s: &mut State) {
 pub fn close_panels(s: &mut State) {
     let Some(id) = s.panels.first().map(|p| p.id.clone()) else { return };
     let peeking = s.panels.iter().any(|p| p.id == crate::draft::NEAR);
+    let looking = s.panels.iter().any(|p| p.id == crate::insert::LIST || p.id == crate::insert::SIMILAR);
     s.panels.clear();
+    s.field_of = None;
     if id == THEMES {
         restore(s);
+    } else if crate::insert::owns(&id) {
+        crate::insert::closed(s, looking);
+        crate::draft::closed(s, false);
     } else {
         crate::draft::closed(s, peeking);
     }
@@ -175,13 +202,20 @@ pub fn hovered(s: &mut State, depth: usize, i: usize, tx: &mut Tx) {
     p.active = i;
     let id = p.id.clone();
     if depth + 1 == s.panels.len() {
+        let was_field = in_field(s);
         moved(s, &id);
+        sync_field(s);
+        follow(s, was_field, tx);
     }
 }
 
 /// A press on a row: an item is chosen, a segment set.
 pub fn pressed(s: &mut State, depth: usize, i: usize, segment: Option<usize>, tx: &mut Tx) {
     tx.color_motion(Spring::NONE);
+    // A row that cannot be chosen does nothing.
+    if !s.panels.get(depth).and_then(|p| p.rows.get(i)).is_some_and(Row::takes_focus) {
+        return;
+    }
     let was_field = in_field(s);
     // A second panel open beside: a press on the first goes back to it.
     while s.panels.len() > depth + 1 {
@@ -197,12 +231,14 @@ pub fn pressed(s: &mut State, depth: usize, i: usize, segment: Option<usize>, tx
             Taken::Set(id.clone(), n)
         }
         (Row::Field { .. }, _) => {
+            sync_field(s);
             tx.focus("panel-field", false);
             return;
         }
         _ => return,
     };
     act(s, &id, taken, tx);
+    sync_field(s);
     follow(s, was_field, tx);
     keys_home(s, tx);
 }

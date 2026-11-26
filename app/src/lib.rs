@@ -4,11 +4,13 @@ pub mod draft;
 pub mod editor;
 pub mod fonts;
 pub mod ghost;
+pub mod insert;
 pub mod look;
 pub mod lsp;
 pub mod markdown;
 pub mod page;
 pub mod panel;
+pub mod part;
 pub mod position;
 pub mod split;
 pub mod state;
@@ -188,12 +190,16 @@ fn row_view(s: &State, p: &Panel, depth: usize, i: usize, r: &Row) -> El {
                 .child(segs)
                 .on_pointer_move_local(hover)
         }
-        Row::Field { label, placeholder, .. } if depth + 1 < s.panels.len() => {
-            // Under a second panel: the text as it was, not a field.
-            let shown = if s.field.text.is_empty() { (placeholder.clone(), c.ink3) } else { (s.field.text.clone(), c.ink) };
+        Row::Field { label, placeholder, value, .. } if depth + 1 < s.panels.len() || !on => {
+            // Not the one typed in (under a second panel, or another row has the focus): its
+            // text, not a field.
+            let shown = if value.is_empty() { (placeholder.clone(), c.ink3) } else { (value.clone(), c.ink) };
             let boxed = row().grow(1.0).h(30.0).px(9.0).center_y().radius(6.0).fill(c.pane).border(1.0, c.line)
                 .child(text(shown.0).font(fonts::ui(400.0)).color(shown.1).truncate().shrink());
             let mut line = row().w_full().h(panel::FIELD).py(3.0).px(2.0).gap(8.0).center_y();
+            if depth + 1 == s.panels.len() {
+                line = line.on_pointer_move_local(hover).on_press_tx(move |s: &mut State, tx| look::pressed(s, depth, i, None, tx));
+            }
             if let Some(l) = label {
                 line = line.pl(10.0).child(text(l.clone()).font(fonts::caption(400.0)).color(c.ink2).w(56.0));
             }
@@ -208,6 +214,7 @@ fn row_view(s: &State, p: &Panel, depth: usize, i: usize, r: &Row) -> El {
                 .caret(c.accent, c.accent.alpha(0.25))
                 .placeholder(placeholder.clone(), c.ink3)
                 .on_edit(|s: &mut State| &mut s.field)
+                .on_input_change(|s: &mut State, tx| insert::typed(s, tx))
                 .on_input_key(editor::field_key);
             let mut boxed = row().grow(1.0).h(30.0).px(9.0).center_y().radius(6.0).fill(c.pane).border(1.0, c.line).child(input);
             if on {
@@ -234,7 +241,7 @@ fn row_view(s: &State, p: &Panel, depth: usize, i: usize, r: &Row) -> El {
 /// An item's row: its label, then any note, chip, check, key and "more" mark.
 fn item_view(c: &Palette, item: &Item, depth: usize, i: usize) -> El {
     let mut r = row().w_full().h(panel::ITEM).pl(10.0).pr(8.0).gap(8.0).center_y().radius(5.0)
-        .child(text(item.label.clone()).font(fonts::ui(400.0)).color(if item.danger { c.fail } else { c.ink }));
+        .child(text(item.label.clone()).font(fonts::ui(400.0)).color(if item.off { c.ink3 } else if item.danger { c.fail } else { c.ink }));
     r = r.child(el().grow(1.0));
     if let Some(n) = &item.note {
         r = r.child(text(n.clone()).font(fonts::caption(400.0)).color(c.ink2).truncate().shrink());

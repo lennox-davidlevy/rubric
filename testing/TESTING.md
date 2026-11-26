@@ -99,7 +99,6 @@ The third slice: the design's look, one panel for every menu, and the menus in i
 | C4 | Esc; then Ctrl+, again and type a letter | Esc: the theme from before, nothing kept. The letter: the list closes, the theme from before, the letter in the writing. |
 | C5 | Ctrl+, move to Ink, Return; quit and start again | Ink stays, and is there after the restart. |
 | C6 | Copy `app/themes/nord.json` to `~/.config/rubric/themes/mine.json`, restart, Ctrl+, | `Mine` is last, with `Own`. The pointer over a row draws that theme; a click keeps it. `RUBRIC_APP_THEME=fjord` before the command starts in Fjord for that run only. |
-
 | C7 | Ctrl+, then Up to `Mode`, Right, Down to Ink, Return; quit and start again | `Mode` is the first row. Right draws the app dark at once. Ink in dark after the restart. |
 | C8 | Ctrl+, Esc, leave the pointer where the list was; Ctrl+, again, then Down past the list's end | Nothing changes under the still pointer. Moving it over a row draws that theme. |
 | C9 | Ctrl+, twice | The list closes; the theme from before. |
@@ -111,9 +110,21 @@ The third slice: the design's look, one panel for every menu, and the menus in i
 | C15 | Ctrl+Enter | The line becomes `::: tide-two`; `Kept` shows for 4 s. |
 | C16 | `::: new: a failing bell`, Ctrl+Enter, then Tab | The status line names the failure and its reason, with `Reroll Ctrl+R`. The panel shows both above `Reroll`. |
 
-C11 to C16 run with the stub, so nothing is paid for. A tool or model chosen in C12 is only checked, never run.
+| C17 | Type a quote block (`::: quote`, a line of words, `:::`), caret on its first line, Tab | A panel headed `Quote`: `Size` and `Align` as segments, `Cite` as a field, `Look`, a field for words, `Change…`, `Remove` in red. The page draws the quote. |
+| C18 | Right on `Size`; then Ctrl+Z | The line reads `::: quote size=large` at once and the page follows; the panel stays. Ctrl+Z puts the line back and closes the panel. |
+| C19 | Tab, Down to `Cite`, type `A. Keeper`, Return | The letters go into the field. Return: the line gains `cite="A. Keeper"`. |
+| C20 | Tab, Down to the words field, type `bigger`, Return | The line ends ` : bigger`, the caret after it, the pick showing; Tab takes it. |
+| C21 | Tab, `Change…`, type `torn edge`, Return; Tab while it drafts; Tab when ready, `Keep` | The line ends ` : torn edge`. While drafting: `Stop` and `Back to quote`. Keep: the line reads `::: quote variant=…`. |
+| C22 | Tab on that line, then `Back to quote` | Rows `Every quote as …` and `Back to quote`. The line reads `::: quote` again. |
+| C23 | Tab, Ctrl+Delete; then Ctrl+Z | The `:::` lines go, the words inside stay, `Removed` shows. Ctrl+Z brings both lines back. |
+| C24 | Tab on `::: tide-two` (from C15), Ctrl+Delete, `Keep`; Ctrl+Delete, `Remove from site` | `Own` in the heading; `Reroll`, `Add to every site` and `Remove…`. Remove… opens a second panel titled with the blocks using it. Keep goes back. Remove from site: `Removed`, and `sites/app-slice/parts/tide-two` is gone. Do not choose `Add to every site`: it writes the catalog. |
+| C25 | On an empty line, Tab, `Insert part…`, then Down a few times, Esc | A menu: `Insert part…`, `New part…`, `Cut` and `Copy` dimmed, `Paste`. The list is under its groups. Each move draws that part in the page at the line; Esc leaves text and page as they were. |
+| C26 | Tab, `Insert part…`, type `quote`, wait, Return | The list turns flat a moment after typing stops. Return writes `::: quote` and its closer. |
+| C27 | Type `::: three numbered steps`, caret back inside the words, Tab | `Steps` first, `Similar parts (N)`, `Draft new part`. Return on `Steps`: the line reads `::: steps`. |
 
-**After C5 to C16, undo what they wrote:** `rm ~/.config/rubric/app.json ~/.config/rubric/themes/mine.json`, the broken file from C10, then `git checkout sites/app-slice/pages/posts/long.md && rm -rf sites/app-slice/parts sites/app-slice/.rubric/drafts/*`.
+C11 to C27 run with the stub, so nothing is paid for. A tool or model chosen in C12 is only checked, never run. The menus open with Tab; a right-click is still the editor's own menu.
+
+**After C5 to C27, undo what they wrote:** `rm ~/.config/rubric/app.json ~/.config/rubric/themes/mine.json`, the broken file from C10, then `git checkout sites/app-slice/pages/posts/long.md && rm -rf sites/app-slice/parts sites/app-slice/.rubric/drafts/* sites/app-slice/.rubric/logs/removed`.
 
 ## Notes
 App starts well

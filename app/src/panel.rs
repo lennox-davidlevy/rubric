@@ -57,6 +57,8 @@ pub struct Item {
     pub more: bool,
     /// Removes something: drawn in the failed color.
     pub danger: bool,
+    /// Cannot be chosen: drawn dim, passed over by the keys and the pointer.
+    pub off: bool,
 }
 
 impl Item {
@@ -87,6 +89,10 @@ impl Item {
         self.danger = true;
         self
     }
+    pub fn off(mut self) -> Item {
+        self.off = true;
+        self
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -98,8 +104,9 @@ pub enum Row {
     Head { name: String, note: String },
     /// A choice of a few: Left and Right change it.
     Seg { id: String, label: String, choices: Vec<String>, on: usize },
-    /// A line of text, typed in `State::field`.
-    Field { id: String, label: Option<String>, placeholder: String },
+    /// A line of text, typed in `State::field` while it has the focus; `value` is what it
+    /// shows otherwise, and what the field starts with.
+    Field { id: String, label: Option<String>, placeholder: String, value: String },
     Title(String),
     Text(String),
 }
@@ -119,7 +126,11 @@ impl Row {
 
     /// Rows the keys and the pointer stop on.
     pub fn takes_focus(&self) -> bool {
-        matches!(self, Row::Item(_) | Row::Seg { .. } | Row::Field { .. })
+        match self {
+            Row::Item(i) => !i.off,
+            Row::Seg { .. } | Row::Field { .. } => true,
+            _ => false,
+        }
     }
 
     pub fn id(&self) -> Option<&str> {
@@ -228,7 +239,7 @@ pub fn key(stack: &mut Vec<Panel>, ev: &KeyEvent, text: &str) -> Taken {
     let in_field = matches!(panel.row(), Some(Row::Field { .. }));
     if ev.mods.cmd {
         let chosen = panel.rows.iter().find_map(|r| match r {
-            Row::Item(i) if i.key.as_ref().is_some_and(|k| k.matches(ev)) => Some(i.id.clone()),
+            Row::Item(i) if !i.off && i.key.as_ref().is_some_and(|k| k.matches(ev)) => Some(i.id.clone()),
             _ => None,
         });
         if let Some(id) = chosen {
@@ -350,7 +361,7 @@ mod tests {
             Row::Sep,
             Row::Head { name: "Look".into(), note: String::new() },
             Row::Seg { id: "size".into(), label: "Size".into(), choices: vec!["Normal".into(), "Large".into()], on: 0 },
-            Row::Field { id: "words".into(), label: None, placeholder: "words".into() },
+            Row::Field { id: "words".into(), label: None, placeholder: "words".into(), value: String::new() },
             Row::Item(Item::new("remove", "Remove").danger()),
         ])
     }
@@ -380,6 +391,20 @@ mod tests {
             key(&mut s, &ev(Key::Up), "");
         }
         assert_eq!(active(&s).as_deref(), Some("keep"));
+    }
+
+    #[test]
+    fn an_item_that_is_off_takes_no_focus() {
+        let mut s = vec![Panel::new("p", "P", 200.0, vec![
+            Row::Item(Item::new("a", "A").off()),
+            Row::Item(Item::new("b", "B")),
+            Row::Item(Item::new("c", "C").off()),
+        ])];
+        assert_eq!(active(&s).as_deref(), Some("b"), "the first that can be chosen");
+        key(&mut s, &ev(Key::Down), "");
+        key(&mut s, &ev(Key::Up), "");
+        assert_eq!(active(&s).as_deref(), Some("b"));
+        assert!(!s[0].focus("c"));
     }
 
     #[test]

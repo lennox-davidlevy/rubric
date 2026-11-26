@@ -17,6 +17,7 @@ An Opus session builds from this plan; the session that wrote it reviews. The sl
 | 1 | 1 and 2: the look, the panel | The app themed, the theme list opening with Ctrl+, |
 | 2 | The review's fixes ("Before task 3"), then 3 and 4: the draft menus, the server's two requests | Every draft menu in the panel; `bun test` passing |
 | 3 | 5, 6 and 7: a placed part, insert, the write-up | Section C of `testing/TESTING.md` ready for David |
+| 4 | What the review of sitting 3 found ("Sitting 4", after task 7) | The slice ready to merge |
 
 A sitting stops at its end, says what it built, what it could not check and the commit message, and does not start the next. Where this plan says "find out", the answer goes in the findings before the code that depends on it. Where the plan and the code disagree (a line number, a field's name), the code is right: say so and go on. Where a decision is missing, take the smaller choice, write it under "Decisions the build made" at the end of this file, and go on; stop only for something that would change what the writer sees in a way the design does not show.
 
@@ -241,6 +242,16 @@ Tab or a right-click on a part's line asks `rubric/part` and `rubric/draft` (no 
 
 `docs/app-slice-findings.md` gains "Slice 3": slice 2's budgets rerun (typing p95 4 ms, Tab to menu 50 ms, a menu key one frame, idle under 1%), a segment's press to the line's change, what the panel needed that Rune lacked, each "untested" above answered, and what no one saw. `testing/TESTING.md` gains section C, one row a test and few of them, started natively, with the line that undoes what the rows write. `CLAUDE.md`'s State and `docs/plan.md`'s "Order of work" say where the app stands.
 
+### Sitting 4: what the review of sitting 3 found
+
+Commit sitting 3 first if `git status` still shows it (`Fix the drafter's uninstalled tools, add the menu on a placed part, Insert part… and the words menu, and measure and write up slice 3.`, one sentence, nothing else). Then, each with a test that fails without it:
+
+1. **A part looked at on a line does not outlive the look.** `#lineAs` in `workspace.ts` is a line number, set and cleared only by `rubric/peek`. An app that quits with Insert part… open, or another editor changing the file, leaves the server drawing a part over whatever is on that line now. It is dropped when its file's text changes or the file closes, and it draws only while the line is still empty or still a line of words.
+2. **The status line follows a variant and a part's take.** On a part's line whose variant or take is drafting, ready or failed, it says so as it does for a `new:` line (the design's `variant-drafting` and `variant-ready`), with the same one action and key.
+3. **`Kept` and `Removed` are said when the server has answered**, not when the request is sent: "Add to every site" and "Remove from site" now say it at once and say `Failed` after.
+
+The right-click is David's to decide and is not part of this sitting.
+
 ## Rules for the session
 
 - No call to Jev, no real drafts, no bench runs, no probes. Never pass `--live` or set `LIVE`. Never read `.env`. Real drafts are David's rows.
@@ -285,3 +296,18 @@ One line each: what was chosen, and why the plan did not settle it.
   - `rubric/parts` lists the catalog's parts in the order of a new top-level `groups` list in `catalog.yaml`, which `src/core/catalog.ts` reads and checks (a file task 4 did not name; without it `group` was dropped). The version stays 13: nothing in a question reads `group`.
   - A press on a panel row gives the keys back to the writing (Rune moved the focus off the editor on a press).
   - The test of "Every theme" (`every_theme_sends_global`) went with the Keep menu it tested; Keep asks nothing now.
+- Sitting 3 (2026-11-25):
+  - The menus open with Tab only. Rune lets the app take a right-click before the field's own menu, but gives no text position for it and does not move the caret, so it could only act on the caret's line wherever pressed (see the findings). The right-click stays Rune's Cut, Copy, Paste.
+  - Tab on a `:::` line that names something asks `rubric/part`, then the line's drafts: the first answer decides between the part's menu and the words menu, so they go one after the other.
+  - The server gained three things the plan did not name: `close` in `rubric/part` (Remove takes the closer), `empty` in `rubric/parts` (Insert writes no closer for such a part), and `rubric/peek` on an empty line or a line of words, which keeps the notes and starters of the text while it draws.
+  - An `Item` can be `off`: drawn dim, passed over, dead to a press. It serves the uninstalled tool and Cut and Copy with nothing selected.
+  - A `Field` row carries its `value`; only the focused one is a field, the others show their value. Text typed in a field and left without Return is dropped.
+  - A setting's change is sent one at a time; one made while another is on its way is sent after its answer, from the line as that left it.
+  - A site's own part being rerolled draws the same rows as a variant drafting: Stop or Keep, Reroll, Reroll with changes…, Takes, and "Back to <part>", which sends `cancel`.
+  - `Kept` with "added to Own parts" is said for a `new:` line only. Add to every site says `Kept`, "<Name>, in every site"; Remove and Remove from this block say `Removed`, "<Name>, from this block"; Remove from site, "from this site".
+  - A pick whose pin has `change` opens the part's menu with Change… beside it, its field holding the words after `:`, with the keys in it.
+  - Insert part…'s field reads "Search parts" (the design's "Search 59 parts" has a number the writer does not act on). Insert and New part… on an empty line write the closer too, unless the part takes nothing inside.
+  - The words menu's first row is the first part `rubric/parts` ranks for the words, not the ghost text; "Similar parts (N)" shows from two. Choosing a part puts it in place of the words. Its "Draft new part" chip shows once the server has named the default drafter in this run: it asks no `rubric/drafter`, which may start a drafting tool.
+  - Cut, Copy and Paste in the menu send their key to the writing (`Tx::send_key`).
+  - The menu with Remove… has no key on Keep: Esc goes back already, and a row's key must take Cmd.
+  - The status line follows `new:` lines only; a variant or a part's take drafting says nothing there.

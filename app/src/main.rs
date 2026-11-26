@@ -85,6 +85,8 @@ fn main() {
         families: rubric_app::fonts::FAMILIES,
         // For `--snap out.png --scene themes` in a debug build: the list of themes, drawn headless.
         scenes: &[("themes", rubric_app::look::show_themes)],
+        // Insert part…'s list, asked again a pause after the last key.
+        poll: Some(rubric_app::insert::poll),
         ..AppSpec::new("Rubric", SIZE, init, rubric_app::view)
     });
 
@@ -95,7 +97,10 @@ fn main() {
             std::thread::spawn(move || {
                 let repo = Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("app/ is in the repo").to_path_buf();
                 let to_ui = handle.clone();
-                let started = Client::start(&repo, &site, !live, move |m| to_ui.update(move |s, _| state::incoming(s, m)));
+                let started = Client::start(&repo, &site, !live, move |m| to_ui.update(move |s, tx| {
+                    state::incoming(s, m);
+                    state::follow_up(s, tx);
+                }));
                 match started {
                     Ok(client) => handle.update(move |s, _| state::connected(s, client)),
                     Err(e) => eprintln!("server: {e}"),

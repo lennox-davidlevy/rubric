@@ -72,6 +72,20 @@ pub struct State {
     pub panels: Vec<crate::panel::Panel>,
     /// The text of a panel's field (one at a time).
     pub field: TextEdit,
+    /// Whose text `field` holds: the panel's id and the row's.
+    pub field_of: Option<(String, String)>,
+    /// The part a line places, while its drafts are asked about, before its menu opens.
+    pub part_wait: Option<crate::part::Part>,
+    /// A setting changed while another change was on its way: sent once that one is answered.
+    pub set_next: Option<(String, String)>,
+    /// A setting's change is on its way.
+    pub setting: bool,
+    /// The line Insert part… or a line of words' menu is for, and the parts it lists.
+    pub insert: Option<crate::insert::Insert>,
+    /// The writer's default drafter, as the server last named it.
+    pub drafter: Option<String>,
+    /// A panel opened by an answer has a field with the focus: the keys go to it.
+    pub focus_field: bool,
     /// The line the panels hang from, for when a field has the focus and the editor reports no
     /// caret.
     pub panel_at: Option<[f32; 4]>,
@@ -113,7 +127,7 @@ impl State {
             bounds: None, client: None, cursor_line: None, page_url: None, ghost: None, asked: None, height: 0.0,
             view: None, choice: None, drafts: Vec::new(), flash: None, now_ms: draft::now_ms(),
             pending: HashMap::new(), looked: std::cell::Cell::new(None), ticker: None, look, title, pane: [0.0; 4],
-            panels: Vec::new(), field: TextEdit::new(""), panel_at: None, theme_before: None,
+            panels: Vec::new(), field: TextEdit::new(""), field_of: None, part_wait: None, set_next: None, setting: false, insert: None, drafter: None, focus_field: false, panel_at: None, theme_before: None,
         }
     }
 }
@@ -181,10 +195,23 @@ pub fn clean(s: &State) -> bool {
 
 /// The text changed: a new version, new styles, and the whole text to the server.
 pub fn changed(s: &mut State) {
-    s.version += 1;
-    s.ghost = None;
     // Typing is not the panels': they go (a choice that changed the text closed them already).
     crate::look::close_panels(s);
+    sent(s);
+    moved(s);
+    ask(s);
+}
+
+/// A panel rewrote its line (a setting changed): as `changed`, with the panels left open.
+pub fn rewritten(s: &mut State) {
+    sent(s);
+    s.last_range = s.edit.range();
+    ask(s);
+}
+
+fn sent(s: &mut State) {
+    s.version += 1;
+    s.ghost = None;
     s.spans = spans(s);
     s.title = title_of(&s.path, &s.edit.text);
     if let Some(c) = &s.client {
@@ -193,8 +220,13 @@ pub fn changed(s: &mut State) {
             "contentChanges": [{ "text": s.edit.text }],
         }));
     }
-    moved(s);
-    ask(s);
+}
+
+/// After a message from the server: a field a panel opened with takes the keys.
+pub fn follow_up(s: &mut State, tx: &mut Tx) {
+    if std::mem::take(&mut s.focus_field) {
+        tx.focus("panel-field", false);
+    }
 }
 
 /// Run after each drawn frame (`App::on_frame_drawn`) and after each change: a caret that
@@ -313,17 +345,26 @@ pub fn shut(s: &mut State) {
 }
 
 /// Tab: takes a pick showing whose pin acts, or the offer of a new part, which makes the line
-/// a `new:` line; on a `new:` line it asks for the line's menu. Otherwise nothing. Always
-/// consumed.
+/// a `new:` line; on a `new:` line it asks for the line's menu, on a part's line for the
+/// part's, on a line of words for theirs, and on an empty line it offers to put a part there.
+/// Always consumed.
 pub fn tab(s: &mut State, _tx: &mut Tx) {
-    if let Some(g) = showing(s).filter(|g| g.pick.pin.as_ref().is_some_and(|p| p.acts || p.build)).cloned() {
-        ghost::accept(&mut s.edit, &g);
-        changed(s);
-        if g.pick.pin.is_some_and(|p| p.acts) {
+    if let Some(g) = showing(s).filter(|g| g.pick.pin.is_some()).cloned() {
+        let pin = g.pick.pin.clone().unwrap();
+        // Words after a part's ":" that set nothing: its Change….
+        if pin.change {
+            crate::part::tab(s, true);
             return;
         }
+        if pin.acts || pin.build {
+            ghost::accept(&mut s.edit, &g);
+            changed(s);
+            if pin.acts {
+                return;
+            }
+        }
     }
-    draft::tab(s);
+    let _ = draft::tab(s) || crate::part::tab(s, false) || crate::insert::tab(s);
 }
 
 /// Ctrl+S writes the file whole.

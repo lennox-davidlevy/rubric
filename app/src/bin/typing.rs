@@ -125,4 +125,106 @@ fn main() {
     println!("METRIC case=menu_open metric=cpu_ms median={m:.4} p95={p:.4} max={x:.4} n={samples}");
     let (m, p, x) = stats(moved);
     println!("METRIC case=menu_key metric=cpu_ms median={m:.4} p95={p:.4} max={x:.4} n={samples}");
+
+    // Slice 3. A placed part's menu: both answers in and the frame that draws it; then a
+    // segment's key, the server's line put in place, and its frame.
+    let quote = format!("{text}\n::: quote\nWords.\n:::\n");
+    let at = quote.find("::: quote").unwrap() + "::: quote".len();
+    let part = serde_json::json!({ "name": "quote", "kind": "catalog", "uses": { "blocks": 1, "pages": 1 }, "close": 3,
+        "settings": [{ "name": "size", "type": "choice", "values": ["normal", "large"], "default": "normal" }, { "name": "cite", "type": "text" }],
+        "look": [{ "name": "shadow", "type": "choice", "values": ["none", "soft", "deep"], "default": "none" }] });
+    let (mut open, mut set) = (Vec::new(), Vec::new());
+    for _ in 0..samples {
+        let mut rt = runtime(&quote, at);
+        let (client, sent) = rubric_app::lsp::Client::recording();
+        rt.update(|s, _| rubric_app::state::connected(s, client));
+        rt.frame(1.0 / 120.0);
+        while sent.try_recv().is_ok() {}
+        rt.key(KeyEvent { key: Key::Tab, mods: Mods::default() });
+        rt.frame(1.0 / 120.0);
+        let id = |method: &str, step: &str| std::iter::from_fn(|| sent.try_recv().ok()).find(|m| m["method"] == method).unwrap_or_else(|| panic!("{step}: no {method}"))["id"].as_i64().unwrap();
+        let asked = id("rubric/part", "Tab");
+        let c0 = rune::thread_cpu_ms();
+        let answer = part.clone();
+        rt.update(|s, _| rubric_app::state::incoming(s, Incoming::Response { id: asked, result: Ok(answer) }));
+        let look = id("rubric/draft", "the part answered");
+        rt.update(|s, _| rubric_app::state::incoming(s, Incoming::Response { id: look, result: Ok(serde_json::json!({ "words": "A quote", "of": "quote", "catalog": true })) }));
+        rt.frame(1.0 / 120.0);
+        open.push(rune::thread_cpu_ms() - c0);
+        assert!(rt.find("panel-0").is_some(), "the part's menu is drawn");
+        let mut n = 0;
+        while n < 240 && rt.frame(1.0 / 120.0) {
+            n += 1;
+        }
+        let c0 = rune::thread_cpu_ms();
+        rt.key(KeyEvent { key: Key::Right, mods: Mods::default() });
+        rt.frame(1.0 / 120.0);
+        let asked = id("rubric/part", "Right");
+        let line = "::: quote size=large";
+        rt.update(|s, _| rubric_app::state::incoming(s, Incoming::Response { id: asked, result: Ok(serde_json::json!({ "replace": line })) }));
+        rt.frame(1.0 / 120.0);
+        set.push(rune::thread_cpu_ms() - c0);
+        assert!(rt.state.edit.text.contains(line), "the line changed");
+    }
+    let (m, p, x) = stats(open);
+    println!("METRIC case=part_menu_open metric=cpu_ms median={m:.4} p95={p:.4} max={x:.4} n={samples}");
+    let (m, p, x) = stats(set);
+    println!("METRIC case=part_segment_to_line metric=cpu_ms median={m:.4} p95={p:.4} max={x:.4} n={samples}");
+
+    if args.iter().any(|a| a == "--server") {
+        server(&text, samples);
+    }
+}
+
+/// Against the real server with the stub resolver, on a copy of `sites/app-slice` in a temporary
+/// folder: Tab on a part's line to both answers (`rubric/part`, then `rubric/draft`), and a
+/// setting's change to its answer. The app's own part is the numbers above.
+fn server(text: &str, samples: usize) {
+    use rubric_app::lsp::{Client, Incoming};
+    use serde_json::json;
+    use std::sync::mpsc;
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf();
+    let site = std::env::temp_dir().join(format!("rubric-measure-{}", std::process::id()));
+    std::fs::create_dir_all(site.join("pages/posts")).unwrap();
+    for f in ["rubric.md", "hugo.toml"] {
+        std::fs::copy(repo.join("sites/app-slice").join(f), site.join(f)).unwrap();
+    }
+    let post = site.join("pages/posts/long.md");
+    let body = format!("{text}\n::: quote\nWords.\n:::\n");
+    std::fs::write(&post, &body).unwrap();
+    let uri = rubric_app::state::file_uri(&post);
+    let (tx, rx) = mpsc::channel::<Incoming>();
+    let client = Client::start(&repo, &site, true, move |m| {
+        let _ = tx.send(m);
+    })
+    .expect("the server starts");
+    client.notify("textDocument/didOpen", json!({ "textDocument": { "uri": uri, "languageId": "markdown", "version": 1, "text": body } }));
+    let line = body.lines().position(|l| l == "::: quote").unwrap() as u32;
+    let call = |method: &str, p: serde_json::Value| {
+        let id = client.request(method, p);
+        loop {
+            match rx.recv_timeout(std::time::Duration::from_secs(20)).expect("an answer") {
+                Incoming::Response { id: got, result } if got == id => return result.unwrap(),
+                _ => {}
+            }
+        }
+    };
+    let (mut tab, mut set) = (Vec::new(), Vec::new());
+    for i in 0..samples {
+        let t = Instant::now();
+        call("rubric/part", json!({ "uri": uri, "line": line }));
+        call("rubric/draft", json!({ "uri": uri, "line": line }));
+        tab.push(t.elapsed().as_secs_f64() * 1000.0);
+        let t = Instant::now();
+        let value = if i % 2 == 0 { "large" } else { "normal" };
+        call("rubric/part", json!({ "uri": uri, "line": line, "set": { "name": "size", "value": value } }));
+        set.push(t.elapsed().as_secs_f64() * 1000.0);
+    }
+    let (m, p, x) = stats(tab);
+    println!("METRIC case=server_tab_to_answers metric=wall_ms median={m:.4} p95={p:.4} max={x:.4} n={samples}");
+    let (m, p, x) = stats(set);
+    println!("METRIC case=server_set metric=wall_ms median={m:.4} p95={p:.4} max={x:.4} n={samples}");
+    client.stop();
+    let _ = std::process::Command::new("bun").arg(repo.join("src/cli.ts")).arg("stop").arg(&site).current_dir(&repo).output();
+    let _ = std::fs::remove_dir_all(&site);
 }

@@ -38,6 +38,8 @@ beforeAll(async () => {
     "::: boulder-list",                                             // 6
     ":::",
     "Plain writing.",                                               // 8
+    "::: post-list style=titles",                                   // 9
+    "",                                                             // 10
     "",
   ].join("\n"));
 });
@@ -57,6 +59,7 @@ test("a placed part answers its settings with the line's values, then the look's
   expect(shadow.value).toBeUndefined();
   expect(shadow.values).toContain(shadow.default!);
   expect(view.settings.some((s) => s.name === "shadow")).toBe(false);
+  expect(view.close).toBe(5);
   expect(((await ws.part(page, 6)) as PartView).kind).toBe("own");
   expect(await ws.part(page, 8)).toBeUndefined();
 });
@@ -73,6 +76,16 @@ test("a value or a setting the part does not have is refused", async () => {
   expect(await ws.part(page, 3, { name: "colour", value: "blue" })).toHaveProperty("error");
 });
 
+test("a text and a number setting are set, and a number that is none is refused", async () => {
+  const text = (await ws.part(page, 9, { name: "tag", value: "travel notes" })) as { replace: string };
+  expect(text.replace).toBe('::: post-list style=titles tag="travel notes"');
+  const number = (await ws.part(page, 9, { name: "count", value: "5" })) as { replace: string };
+  expect(number.replace).toBe("::: post-list style=titles count=5");
+  expect(await ws.part(page, 9, { name: "count", value: "five" })).toHaveProperty("error");
+  const cleared = (await ws.part(page, 3, { name: "cite", value: "" })) as { replace: string };
+  expect(cleared.replace).toBe("::: quote size=large align=center : bigger");
+});
+
 test("the parts with no words list the site's own first, then the catalog's by group, asking nothing", async () => {
   asked = [];
   const { parts } = (await ws.parts(page)) as { parts: { name: string; own?: true; group?: string }[] };
@@ -84,6 +97,27 @@ test("the parts with no words list the site's own first, then the catalog's by g
   const groups = parts.slice(firstCatalog).map((p) => p.group);
   expect(new Set(groups).size).toBe(groups.filter((g, i) => g !== groups[i - 1]).length);
   expect(asked).toEqual([]);
+});
+
+test("a part looked at on an empty line is drawn there, and goes when the look ends", async () => {
+  const content = join(dir, "content/posts/part-request.md");
+  const drawn = async (want: boolean) => {
+    for (let i = 0; i < 100; i++) {
+      await Bun.sleep(10);
+      if (readFileSync(content, "utf8").includes("{{< divider") === want) return true;
+    }
+    return false;
+  };
+  ws.peek(page, 10, "divider");
+  expect(await drawn(true)).toBe(true);
+  ws.peek(page, 10);
+  expect(await drawn(false)).toBe(true);
+});
+
+test("the parts say which take nothing inside", async () => {
+  const { parts } = (await ws.parts(page)) as { parts: { name: string; empty?: true }[] };
+  expect(parts.find((p) => p.name === "divider")?.empty).toBe(true);
+  expect(parts.find((p) => p.name === "quote")?.empty).toBeUndefined();
 });
 
 test("with words the parts come in Jev's order", async () => {

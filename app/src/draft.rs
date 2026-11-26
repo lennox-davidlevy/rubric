@@ -154,6 +154,12 @@ pub struct View {
     pub takes: u32,
     /// Each take, oldest first, when there are two or more.
     pub list: Vec<Take>,
+    /// On a placed part's line: the part whose takes these are.
+    pub of: Option<String>,
+    /// The takes are of a new variant of this part.
+    pub new_variant: Option<String>,
+    /// The words after the line's `:`.
+    pub change: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -194,6 +200,9 @@ impl View {
                 by: t.get("by").and_then(Value::as_str).map(str::to_string),
                 change: t.get("change").and_then(Value::as_str).filter(|c| !c.is_empty()).map(str::to_string),
             }).collect()).unwrap_or_default(),
+            of: text("of"),
+            new_variant: text("newVariant"),
+            change: v.get("change").and_then(|c| c.get("words")).and_then(Value::as_str).map(str::to_string),
         })
     }
 }
@@ -229,7 +238,7 @@ impl Choice {
 }
 
 /// The server's short name for its default drafter ("opus, low, tools") as a chip.
-fn chip_of(short: &str) -> String {
+pub fn chip_of(short: &str) -> String {
     readable(&short.split(", ").collect::<Vec<_>>().join(" · "))
 }
 
@@ -272,6 +281,8 @@ pub struct Open {
     /// `rubric/harnesses`: each tool and whether it is installed.
     pub tools: Option<Vec<(String, bool)>>,
     pub offer: Option<Offer>,
+    /// On a placed part's line: the part, its settings and values.
+    pub part: Option<crate::part::Part>,
 }
 
 /// What a request was about: the line as it read when it was sent, so its answer goes to the
@@ -296,6 +307,15 @@ pub enum What {
     /// `rubric/harnesses` and `rubric/drafter`, for the drafter's panel.
     Tools,
     Offer,
+    /// `rubric/part` for Tab on a `:::` line: the part it places, or none. True when Tab took
+    /// a pick that asks for a change, which opens Change… at once.
+    Part(bool),
+    /// The drafts of a placed part's line, to open its menu.
+    PartLook(bool),
+    /// A setting's change: answered with the line.
+    Set,
+    /// `rubric/parts`, for Insert part…: the words the list is for.
+    Parts,
 }
 
 pub fn params(action: Option<&str>, uri: &str, line: u32) -> Value {
@@ -361,13 +381,13 @@ pub fn now_ms() -> u64 {
 }
 
 /// The caret's line and its text.
-fn caret_line(s: &State) -> (u32, &str) {
+pub fn caret_line(s: &State) -> (u32, &str) {
     let line = position::line_char(&s.edit.text, s.edit.focus).0;
     (line, &s.edit.text[position::line_range(&s.edit.text, line)])
 }
 
 /// The status of the `new:` line at `line`, as the server last said.
-fn status_of(s: &State, line: u32) -> Status {
+pub fn status_of(s: &State, line: u32) -> Status {
     s.drafts.iter().find(|(l, _)| *l == line).map_or(Status::None { earlier: 0 }, |(_, st)| st.clone())
 }
 
@@ -388,13 +408,13 @@ pub fn line(s: &State) -> Option<Said> {
     caret_status(s).map(|(_, _, said, _)| said)
 }
 
-fn flash(s: &mut State, label: impl Into<String>, tone: Tone, fact: impl Into<String>) {
+pub fn flash(s: &mut State, label: impl Into<String>, tone: Tone, fact: impl Into<String>) {
     s.now_ms = now_ms();
     s.flash = Some((Said { label: label.into(), tone, fact: fact.into(), action: None }, s.now_ms + FLASH_MS));
     state::wake(s);
 }
 
-fn failed(s: &mut State, why: impl Into<String>) {
+pub fn failed(s: &mut State, why: impl Into<String>) {
     flash(s, "Failed", Tone::Warn, readable(&why.into()));
 }
 
@@ -467,7 +487,7 @@ pub fn drafted(s: &mut State, params: &Value) {
     }
 }
 
-fn send(s: &mut State, method: &str, what: What, line: u32, text: String, params: Value) {
+pub fn send(s: &mut State, method: &str, what: What, line: u32, text: String, params: Value) {
     let Some(c) = &s.client else { return };
     let id = c.request(method, params);
     s.pending.insert(id, Asked { line, text, what });
@@ -487,12 +507,12 @@ pub fn tab(s: &mut State) -> bool {
 }
 
 /// The drafter chosen for the line that reads `text`, if one was.
-fn choice_for<'a>(s: &'a State, text: &str) -> Option<&'a Choice> {
+pub fn choice_for<'a>(s: &'a State, text: &str) -> Option<&'a Choice> {
     s.choice.as_ref().filter(|(t, _)| t == text).map(|(_, c)| c)
 }
 
 /// The chip for the line: the drafter chosen for it, else the writer's default.
-fn chip(s: &State, open: &Open) -> Option<String> {
+pub fn chip(s: &State, open: &Open) -> Option<String> {
     choice_for(s, &open.asked.text).map(Choice::chip).or_else(|| open.view.drafter.as_deref().map(chip_of))
 }
 
@@ -540,6 +560,9 @@ pub fn menu_rows(view: &View, chip: Option<&str>, elapsed: Option<u64>) -> (Vec<
 }
 
 fn menu_panel(s: &State, open: &Open) -> Option<Panel> {
+    if open.part.is_some() {
+        return crate::part::panel(s, open);
+    }
     if open.view.words.is_empty() {
         return None;
     }
@@ -553,9 +576,21 @@ fn menu_panel(s: &State, open: &Open) -> Option<Panel> {
 }
 
 /// The line's menu drawn again from what is known now, its focus kept on the same row.
-fn refresh_menu(s: &mut State) {
+pub fn refresh_menu(s: &mut State) {
     let Some(open) = &s.view else { return };
-    if s.panels.first().map(|p| p.id.as_str()) != Some(MENU) {
+    // A line of words' menu: only its chip changes.
+    if s.panels.first().is_some_and(|p| p.id == crate::insert::WORDS) {
+        let chip = chip(s, open);
+        for r in &mut s.panels[0].rows {
+            if let Row::Item(i) = r
+                && i.id == "draft"
+            {
+                i.chip = chip.clone();
+            }
+        }
+        return;
+    }
+    if !s.panels.first().is_some_and(|p| p.id == MENU || p.id == crate::part::PART) {
         return;
     }
     let Some(mut fresh) = menu_panel(s, open) else { return };
@@ -577,6 +612,14 @@ fn refresh_menu(s: &mut State) {
 
 /// An answer to a request this module sent.
 pub fn answered(s: &mut State, asked: Asked, result: Result<Value, String>) {
+    answer(s, asked, result);
+    crate::look::sync_field(s);
+}
+
+fn answer(s: &mut State, asked: Asked, result: Result<Value, String>) {
+    if asked.what == What::Set {
+        s.setting = false;
+    }
     let answer = match result {
         Ok(v) => v,
         Err(e) => return failed(s, e),
@@ -592,7 +635,8 @@ pub fn answered(s: &mut State, asked: Asked, result: Result<Value, String>) {
                 return;
             }
             let Some(view) = View::parse(&answer) else { return };
-            let open = Open { view, asked, take_before: None, tools: None, offer: None };
+            s.drafter = view.drafter.clone().or(s.drafter.take());
+            let open = Open { view, asked, take_before: None, tools: None, offer: None, part: None };
             crate::look::close_panels(s);
             if let Some(p) = menu_panel(s, &open) {
                 s.panels = vec![p];
@@ -604,11 +648,14 @@ pub fn answered(s: &mut State, asked: Asked, result: Result<Value, String>) {
             if replace(&mut s.edit, &asked, &answer) {
                 state::changed(s);
             }
-            // A kept part: its name, and that the site has it now.
-            if let Some(name) = answer.get("part").and_then(|p| p.get("name")).and_then(Value::as_str) {
+            // A new part kept: its name, and that the site has it now.
+            if is_new_line(&asked.text)
+                && let Some(name) = answer.get("part").and_then(|p| p.get("name")).and_then(Value::as_str)
+            {
                 flash(s, "Kept", Tone::Ink, format!("{}, added to Own parts", readable(name)));
             }
         }
+        What::Part(_) | What::PartLook(_) | What::Set | What::Parts => crate::part::answered(s, asked, answer),
         What::Take => {
             let Some(open) = s.view.as_mut().filter(|o| o.asked.text == asked.text) else { return };
             let Some(view) = View::parse(&answer) else { return };
@@ -646,7 +693,7 @@ pub fn closed(s: &mut State, peeking: bool) {
 }
 
 /// The page draws `part` on the menu's line, or with none, the line as it is.
-fn peek(s: &State, part: Option<&str>) {
+pub fn peek(s: &State, part: Option<&str>) {
     let (Some(c), Some(open)) = (&s.client, &s.view) else { return };
     let line = find(&s.edit.text, open.asked.line, &open.asked.text).unwrap_or(open.asked.line);
     c.notify("rubric/peek", json!({ "uri": s.uri, "line": line, "part": part }));
@@ -663,7 +710,7 @@ pub fn moved(s: &mut State, id: &str) {
                 ask_take(s, n);
             }
         }
-        _ => {}
+        _ => crate::insert::moved(s, id),
     }
 }
 
@@ -678,7 +725,7 @@ fn ask_take(s: &mut State, to: u32) {
 
 /// Sends `action` for the line that read `text` at `line`, with `extra` beside it; build and
 /// reroll carry the drafter chosen for the line.
-fn ask(s: &mut State, action: &str, what: What, line: u32, text: String, extra: Value) {
+pub fn ask(s: &mut State, action: &str, what: What, line: u32, text: String, extra: Value) {
     let mut p = params(Some(action), &s.uri, line);
     if let (Some(p), Some(e)) = (p.as_object_mut(), extra.as_object()) {
         p.extend(e.clone());
@@ -729,6 +776,12 @@ pub fn status_pressed(s: &mut State) {
 
 /// What a draft panel (`id`) answered.
 pub fn act(s: &mut State, id: &str, taken: Taken, tx: &mut Tx) {
+    if crate::part::owns(id) {
+        return crate::part::act(s, id, taken, tx);
+    }
+    if crate::insert::owns(id) {
+        return crate::insert::act(s, id, taken, tx);
+    }
     let Some(open) = s.view.clone() else { return };
     let Some(line) = find(&s.edit.text, open.asked.line, &open.asked.text) else {
         s.panels.clear();
@@ -762,7 +815,7 @@ pub fn act(s: &mut State, id: &str, taken: Taken, tx: &mut Tx) {
                 };
                 let rows = vec![
                     Row::Head { name: "Reroll with changes".into(), note: String::new() },
-                    Row::Field { id: "notes".into(), label: None, placeholder: "What to change".into() },
+                    Row::Field { id: "notes".into(), label: None, placeholder: "What to change".into(), value: String::new() },
                     Row::Sep,
                     Row::Item(reroll),
                 ];
@@ -865,7 +918,7 @@ pub fn act(s: &mut State, id: &str, taken: Taken, tx: &mut Tx) {
 }
 
 /// Opens `p` beside the menu at the row `from`, in place of any second panel.
-fn second(s: &mut State, mut p: Panel, from: &str) {
+pub fn second(s: &mut State, mut p: Panel, from: &str) {
     s.panels.truncate(1);
     p.from = s.panels[0].rows.iter().position(|r| r.id() == Some(from));
     s.panels.push(p);
@@ -873,7 +926,7 @@ fn second(s: &mut State, mut p: Panel, from: &str) {
 
 /// The chip was pressed, or Right on its row: the drafter's panel, once the server said what
 /// it offers.
-fn open_drafter(s: &mut State) {
+pub fn open_drafter(s: &mut State) {
     let Some(open) = &s.view else { return };
     let Some(line) = find(&s.edit.text, open.asked.line, &open.asked.text) else { return };
     let text = open.asked.text.clone();
@@ -902,14 +955,14 @@ fn ask_offer(s: &mut State, c: &Choice, line: u32, text: &str) {
 fn drafter_panel(s: &mut State) {
     let Some(open) = &s.view else { return };
     let (Some(tools), Some(offer)) = (&open.tools, &open.offer) else { return };
-    if s.panels.first().map(|p| p.id.as_str()) != Some(MENU) {
+    if !s.panels.first().is_some_and(|p| p.id == MENU || p.id == crate::part::PART || p.id == crate::insert::WORDS) {
         return;
     }
     let c = choice_for(s, &open.asked.text).cloned().unwrap_or_else(|| offer.default.clone());
     let mut rows = vec![Row::Head { name: "Tool".into(), note: String::new() }];
     for (name, installed) in tools {
         let item = Item::new(format!("tool:{name}"), tool_name(name)).check(*name == c.harness);
-        rows.push(Row::Item(if *installed { item } else { item.note("Not installed") }));
+        rows.push(Row::Item(if *installed { item } else { item.note("Not installed").off() }));
     }
     if !offer.models.is_empty() {
         rows.extend([Row::Sep, Row::Head { name: "Model".into(), note: String::new() }]);

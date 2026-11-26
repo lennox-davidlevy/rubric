@@ -866,13 +866,27 @@ export class Workspace {
   // The part the writer is looking at for a `new:` line, from the list of
   // near ones: the preview draws it where the line is. No part: back to the
   // line as it was.
+  // On an empty line, or a line of words placing no part, the part is drawn
+  // there with its closer (`#lineAs`), for the app's Insert part… and the
+  // menu on a line of words.
   #peek: { words: string; part: string } | undefined;
+  #lineAs: { file: string; line: number; part: string } | undefined;
   peek(file: string, line: number, part?: string): void {
     const at = this.#newLine(file, line);
-    const next = at && part && Object.hasOwn(this.site.catalog.parts, part) ? { words: at.d.words!, part } : undefined;
-    if (this.#peek?.words === next?.words && this.#peek?.part === next?.part) return;
+    const known = part !== undefined && Object.hasOwn(this.site.catalog.parts, part);
+    const next = at && known ? { words: at.d.words!, part: part! } : undefined;
+    const doc = this.#docs.get(file);
+    const d = doc && !at ? this.#directiveAt(doc, line) : undefined;
+    const blank = doc && (splitLines(doc.text)[line] ?? "").trim() === "";
+    const lineAs = !at && known && doc && (blank || d?.kind === "words") ? { file, line, part: part! } : undefined;
+    const same = this.#peek?.words === next?.words && this.#peek?.part === next?.part;
+    const sameLine = this.#lineAs?.file === lineAs?.file && this.#lineAs?.line === lineAs?.line && this.#lineAs?.part === lineAs?.part;
+    if (same && sameLine) return;
+    const was = this.#lineAs?.file;
     this.#peek = next;
-    for (const f of this.#docs.keys()) this.#drawSoon(f);
+    this.#lineAs = lineAs;
+    if (!same) for (const f of this.#docs.keys()) this.#drawSoon(f);
+    else for (const f of new Set([was, lineAs?.file])) if (f) this.#drawSoon(f);
   }
 
   // The part a line places, for the editor's menu on it: its name, whose it
@@ -923,6 +937,7 @@ export class Workspace {
       uses,
       settings: own.map(([k, x]) => view(k, x)),
       look: look.map(([k, x]) => view(k, x)),
+      ...(d.close !== undefined ? { close: d.close } : {}),
     };
   }
 
@@ -935,8 +950,8 @@ export class Workspace {
     const page: PageKind = doc?.page ?? pageKind(relative(this.site.pages, file));
     const catalog = atPlace(this.site.catalog, page === "site" ? "site" : "writing");
     const entry = ([name, p]: [string, Part]): PartEntry => p.origin === "site"
-      ? { name, description: p.description, own: true }
-      : { name, description: p.description, ...(p.group ? { group: p.group } : {}) };
+      ? { name, description: p.description, own: true, ...(p.empty ? { empty: true as const } : {}) }
+      : { name, description: p.description, ...(p.group ? { group: p.group } : {}), ...(p.empty ? { empty: true as const } : {}) };
     const all = Object.entries(catalog.parts);
     const wanted = words?.trim();
     if (!wanted) {
@@ -1748,6 +1763,20 @@ export class Workspace {
     // The text drawn, which the starters are read against: the writer may
     // type on while it's written.
     const text = doc.text;
+    // A part looked at on an empty line or a line of words: drawn there, its
+    // closer added, while the notes and starters stay those of the text.
+    const as = this.#lineAs?.file === file ? this.#lineAs : undefined;
+    if (as) {
+      const lines = splitLines(text);
+      const was = lines[as.line];
+      if (was !== undefined) {
+        const head = `${was.trim() === "" ? ":::" : opener(was)} ${as.part}`;
+        const block = this.site.catalog.parts[as.part]?.empty || was.trim() !== "" ? [head] : [head, ":::"];
+        lines.splice(as.line, 1, ...block);
+        await this.#write(doc.rel, doc.page, lines.join("\n"), doc.chosen, doc.cancelled);
+        return;
+      }
+    }
     const { entries, diagnostics } = await this.#write(doc.rel, doc.page, text, doc.chosen, doc.cancelled);
     this.#sendStarters(file, { ...doc, text }, entries);
     this.#publish(file, [
@@ -2115,6 +2144,9 @@ export interface PartView {
   uses: { blocks: number; pages: number };
   settings: PartSetting[];
   look: PartSetting[];
+  // The block's closing line, when it has one: removing the part takes it
+  // with the opening line and leaves the writing between.
+  close?: number;
 }
 
 // A part to put on a line (`rubric/parts`): a site's own has no group.
@@ -2123,6 +2155,8 @@ export interface PartEntry {
   description: string;
   own?: true;
   group?: string;
+  // Takes nothing inside: placed without a closer.
+  empty?: true;
 }
 
 // The values a choice, level or flag takes; none for the rest.

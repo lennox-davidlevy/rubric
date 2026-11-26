@@ -269,3 +269,27 @@ The plan is [app-slice-3.md](app-slice-3.md), built on branch `slice-3`. Nothing
 - **A press in a panel took the keys from the writing.** Rune focuses on press; the panel hands the focus back unless the row is a field.
 - **The draft menus are panels**, and `menu.rs`, its `PopupList` and the separate notes field are gone. The tests drive every panel by keys and the chip by a press; nothing was seen on a screen.
 - **Not seen by anyone**: the panels on screen, the drafter's panel with real tools (the tests answer for the server), a real draft, the seconds counting in the panel's heading, and how `rubric/parts` with words feels against real Jev. Rows C7 to C16 of `testing/TESTING.md`.
+
+### Sitting 3 (2026-11-25): the review's fixes, a placed part, insert
+
+- **The review's two fixes.** A tool that is not installed is drawn dim, passed over by the keys and dead to a press (`Item::off`, `a_tool_that_is_not_installed_cannot_be_chosen`, which fails without it). `rubric/part` with `set` already took a text and a number setting and refused a number that is none; the new test (`a text and a number setting are set…` in `test/part-request.test.ts`) pins it and needed no change to the server.
+- **The editor's right-click.** An app's `on_secondary_press` on the field comes before Rune's own field menu (`runtime/input/secondary.rs`: "a field with its own `on_secondary_press` shows that instead"), so the menu could be turned off. But Rune gives the app no way to know where in the text the press landed: the press does not move the caret, and nothing maps a point to a byte (`field_menu` does it with a private `hit`). A right-click could only open the caret's line's menu, wherever it was pressed. So the menus open with Tab only, and the right-click is still Rune's Cut, Copy, Paste. What Rune needs: the text position under a secondary press, or the press placing the caret first, as its own menu does.
+- **The server, three additions** (`workspace.ts`): `rubric/part` answers the block's `close`, so Remove takes the closer and keeps the writing; `rubric/parts` marks a part that takes nothing inside (`empty`), so Insert writes no closer for it; and `rubric/peek` also draws a part on an empty line (with its closer) and on a line of words, for Insert part… and the words menu. While such a part is drawn, the notes and starters stay those of the text, so no line moves under the writer.
+- **One field at a time.** Rune's `text_input` edits one `&mut TextEdit`, so a panel with several fields (Cite and the words) draws only the focused row as a field; the others show their value as text. A field taking the focus starts from its row's value, and text typed and left without Return is dropped.
+- **A setting's change is sent one at a time**: a second while the first is on its way waits for its answer, so it is asked of the line as the first left it.
+- **Insert part…'s pause is the window's clock.** The field's change sets a due time and `Tx::wake_after`; `AppSpec::poll` sends `rubric/parts` once it passes. The headless tests drive the same clock.
+
+| Budget | Limit | Measured (release, headless; `cargo run --release --features bench --bin typing -- --server`) | |
+|---|---|---|---|
+| One typed character | p95 4 ms | p95 0.17 ms at the start, 0.24 ms in the middle, 0.13 ms at the end; 0.17 ms on a `new:` line | met |
+| A key in an open menu to its frame | one frame | p95 0.08 ms | met |
+| A `new:` line's menu: the answer to its frame | | p95 0.29 ms | |
+| A part's menu: both answers to its frame | | p95 0.49 ms | |
+| A segment's key, the server's line put in place, and the frame | one frame | p95 0.55 ms in the app; the stub server answers a `set` in 0.05 ms (p95 0.14 ms) | met |
+| Tab to the menu: the stub server's two answers | 50 ms | 0.16 ms median, 0.31 ms p95, 4.2 ms the first time | met, without the window's frame |
+| Tab to the menu drawn in a window | 50 ms | not measured | |
+| Idle | under 1% CPU | not measured | |
+
+The last two need a window. This machine has no Xvfb, and the session opens none on David's display. Started from a terminal, the release app prints `menu drawn N ms` for each Tab, the part's menu included.
+
+- **Not seen by anyone**: every new panel on screen, the page drawing a part on an empty line, a real variant draft, `Add to every site` (never sent; it writes the catalog), Remove from site on anything but a temporary copy, and Cut, Copy and Paste from the menu (they send the key to the writing, untested). While a variant or a part's take drafts, the status line says nothing: it follows `new:` lines only. Rows C17 to C27 of `testing/TESTING.md`.

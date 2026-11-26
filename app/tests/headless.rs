@@ -627,6 +627,21 @@ fn esc_in_the_drafters_panel_sends_nothing() {
 }
 
 #[test]
+fn a_tool_that_is_not_installed_cannot_be_chosen() {
+    let (mut rt, sent) = with_menu(NEW, 1, json!({ "words": "a tide clock", "drafter": "opus, low" }));
+    press(&mut rt, Key::Right);
+    offer(&mut rt, &sent, "claude", &["opus", "sonnet"], &["low"]);
+    assert_eq!(rt.state.panels[1].active_id(), Some("tool:claude"));
+    press(&mut rt, Key::Down);
+    assert_eq!(rt.state.panels[1].active_id(), Some("model:opus"), "the keys pass over it");
+    click(&mut rt, "row-drafter-tool:opencode");
+    let after: Vec<Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+    assert!(after.is_empty(), "{after:?}");
+    assert!(rt.state.choice.is_none());
+    assert_eq!(top(&rt).as_deref(), Some("drafter"));
+}
+
+#[test]
 fn the_status_lines_key_acts_without_the_menu() {
     let (mut rt, sent) = on_line(NEW, 1);
     diagnostics(&mut rt, json!([{ "source": "rubric", "code": "drafting", "range": { "start": { "line": 1, "character": 0 } }, "data": { "started": 0 } }]));
@@ -810,7 +825,7 @@ fn a_typed_letter_closes_the_theme_list_restores_the_theme_and_lands_in_the_text
 
 fn controls() -> Panel {
     Panel::new("test", "Test", 260.0, vec![
-        Row::Field { id: "words".into(), label: None, placeholder: "words".into() },
+        Row::Field { id: "words".into(), label: None, placeholder: "words".into(), value: String::new() },
         Row::Seg { id: "size".into(), label: "Size".into(), choices: vec!["Normal".into(), "Large".into(), "Huge".into()], on: 0 },
         Row::Item(Item::new("keep", "Keep")),
     ])
@@ -969,4 +984,234 @@ fn the_key_that_opens_the_theme_list_closes_it() {
     assert!(rt.state.panels.is_empty());
     assert_eq!(rt.state.look.name, "paper", "the theme before comes back");
     std::fs::remove_dir_all(&dir).unwrap();
+}
+
+// A placed part's menu (task 5).
+
+fn sent_to(sent: &std::sync::mpsc::Receiver<Value>, method: &str) -> Vec<Value> {
+    std::iter::from_fn(|| sent.try_recv().ok()).filter(|m| m["method"] == method).collect()
+}
+
+const QUOTE: &str = "before\n::: quote\nWords inside.\n:::\nafter";
+
+fn quote(kind: &str) -> Value {
+    json!({ "name": "quote", "kind": kind, "uses": { "blocks": 3, "pages": 2 }, "close": 3,
+        "settings": [
+            { "name": "size", "type": "choice", "values": ["normal", "large"], "default": "normal" },
+            { "name": "cite", "type": "text" } ],
+        "look": [ { "name": "shadow", "type": "choice", "values": ["none", "soft", "deep"], "default": "none" } ] })
+}
+
+/// Tab on the part's line, the server's part and its drafts answered: its menu is open.
+fn part_menu(text: &str, line: u32, part: Value, view: Value) -> (Runtime<State>, std::sync::mpsc::Receiver<Value>) {
+    let (mut rt, sent) = on_line(text, line);
+    press(&mut rt, Key::Tab);
+    let asked = sent_to(&sent, "rubric/part");
+    assert_eq!(asked.len(), 1, "Tab asks what the part is");
+    answer(&mut rt, &asked[0], part);
+    let look = drafts(&sent);
+    assert_eq!(look.len(), 1, "then what its drafts are");
+    answer(&mut rt, &look[0], view);
+    assert_eq!(top(&rt).as_deref(), Some("part"));
+    (rt, sent)
+}
+
+#[test]
+fn a_part_menu_segment_sends_set_with_its_name_and_value_and_nothing_else() {
+    let (mut rt, sent) = part_menu(QUOTE, 1, quote("catalog"), json!({ "words": "A quote", "of": "quote", "catalog": true }));
+    assert_eq!(rows(&rt)[0], "set:size");
+    press(&mut rt, Key::Right);
+    let all: Vec<Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+    assert_eq!(all.len(), 1, "{all:?}");
+    assert_eq!(all[0]["method"], "rubric/part");
+    assert_eq!(all[0]["params"]["set"], json!({ "name": "size", "value": "large" }));
+    assert_eq!(all[0]["params"]["line"], 1);
+    // The server's line goes in place, and the menu stays.
+    answer(&mut rt, &all[0], json!({ "replace": "::: quote size=large" }));
+    assert_eq!(rt.state.edit.text, "before\n::: quote size=large\nWords inside.\n:::\nafter");
+    assert_eq!(top(&rt).as_deref(), Some("part"));
+    let change = sent_to(&sent, "textDocument/didChange");
+    assert_eq!(change.len(), 1, "the server hears of it");
+    // A second change goes from the line as it reads now.
+    press(&mut rt, Key::Left);
+    let next = sent_to(&sent, "rubric/part");
+    assert_eq!(next[0]["params"]["set"]["value"], "normal");
+}
+
+#[test]
+fn undo_after_a_setting_restores_the_line() {
+    let (mut rt, sent) = part_menu(QUOTE, 1, quote("catalog"), json!({ "words": "A quote", "of": "quote", "catalog": true }));
+    press(&mut rt, Key::Right);
+    let set = sent_to(&sent, "rubric/part");
+    answer(&mut rt, &set[0], json!({ "replace": "::: quote size=large" }));
+    cmd(&mut rt, Key::Command('z'));
+    assert_eq!(rt.state.edit.text, QUOTE);
+    assert!(rt.state.panels.is_empty(), "undo is the writing's: the menu closes");
+}
+
+#[test]
+fn a_text_setting_is_typed_in_its_field_and_sent_on_return() {
+    let (mut rt, sent) = part_menu(QUOTE, 1, quote("catalog"), json!({ "words": "A quote", "of": "quote", "catalog": true }));
+    press(&mut rt, Key::Down);
+    assert_eq!(rt.state.panels[0].active_id(), Some("set:cite"));
+    rt.ime(Ime::Commit("A. Keeper".into()));
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.edit.text, QUOTE, "typed in the field, not the writing");
+    press(&mut rt, Key::Enter);
+    let set = sent_to(&sent, "rubric/part");
+    assert_eq!(set[0]["params"]["set"], json!({ "name": "cite", "value": "A. Keeper" }));
+}
+
+#[test]
+fn remove_on_a_catalog_part_keeps_the_blocks_writing() {
+    let (mut rt, sent) = part_menu(QUOTE, 1, quote("catalog"), json!({ "words": "A quote", "of": "quote", "catalog": true }));
+    let del = if cfg!(target_os = "macos") { Key::Backspace } else { Key::Delete };
+    cmd(&mut rt, del);
+    assert_eq!(rt.state.edit.text, "before\nWords inside.\nafter");
+    assert!(drafts(&sent).is_empty(), "the server is asked nothing");
+    cmd(&mut rt, Key::Command('z'));
+    assert_eq!(rt.state.edit.text, QUOTE, "one undo");
+}
+
+#[test]
+fn remove_on_an_own_part_sends_nothing_until_the_second_panels_choice() {
+    let tide = "::: tide-table\n:::";
+    let own = json!({ "name": "tide-table", "kind": "own", "uses": { "blocks": 3, "pages": 2 }, "close": 1, "settings": [], "look": [] });
+    let (mut rt, sent) = part_menu(tide, 0, own, json!({ "words": "Tides", "of": "tide-table" }));
+    let del = if cfg!(target_os = "macos") { Key::Backspace } else { Key::Delete };
+    cmd(&mut rt, del.clone());
+    assert_eq!(top(&rt).as_deref(), Some("remove"));
+    assert!(std::iter::from_fn(|| sent.try_recv().ok()).next().is_none(), "nothing sent yet");
+    assert_eq!(rows(&rt), ["keep", "unwrap", "remove-site"]);
+    press(&mut rt, Key::Enter);
+    assert_eq!(top(&rt).as_deref(), Some("part"), "Keep goes back");
+    assert!(std::iter::from_fn(|| sent.try_recv().ok()).next().is_none());
+    cmd(&mut rt, del);
+    rt.update(|s, _| { s.panels[1].focus("remove-site"); });
+    press(&mut rt, Key::Enter);
+    let removed = drafts(&sent);
+    assert_eq!(removed.len(), 1);
+    assert_eq!(removed[0]["params"]["action"], "remove");
+}
+
+#[test]
+fn change_writes_the_words_after_the_colon_and_drafts_a_variant() {
+    let (mut rt, sent) = part_menu(QUOTE, 1, quote("catalog"), json!({ "words": "A quote", "of": "quote", "catalog": true, "drafter": "opus, low" }));
+    rt.update(|s, _| { s.panels[0].focus("change"); });
+    press(&mut rt, Key::Enter);
+    assert_eq!(top(&rt).as_deref(), Some("change"));
+    rt.ime(Ime::Commit("torn edge".into()));
+    rt.frame(1.0 / 60.0);
+    press(&mut rt, Key::Enter);
+    assert_eq!(rt.state.edit.text.lines().nth(1), Some("::: quote : torn edge"));
+    let built = drafts(&sent);
+    assert_eq!(built.len(), 1);
+    assert_eq!((built[0]["params"]["action"].as_str(), built[0]["params"]["variant"].as_bool()), (Some("build"), Some(true)));
+    assert!(rt.state.panels.is_empty());
+}
+
+// Insert part… and a line of words (task 6).
+
+fn poll(rt: &mut Runtime<State>) {
+    rt.poll = Some(rubric_app::insert::poll);
+}
+
+/// Tab on the empty line 1, then Insert part…, its list answered with `parts`.
+fn insert_list(parts: Value) -> (Runtime<State>, std::sync::mpsc::Receiver<Value>) {
+    let (mut rt, sent) = on_line("a\n\nb", 1);
+    poll(&mut rt);
+    press(&mut rt, Key::Tab);
+    assert_eq!(top(&rt).as_deref(), Some("insert-menu"));
+    press(&mut rt, Key::Enter);
+    assert_eq!(top(&rt).as_deref(), Some("insert"));
+    let asked = sent_to(&sent, "rubric/parts");
+    assert_eq!(asked.len(), 1);
+    assert!(asked[0]["params"].get("words").is_none(), "no words: the whole catalog");
+    answer(&mut rt, &asked[0], json!({ "parts": parts }));
+    (rt, sent)
+}
+
+fn catalog() -> Value {
+    json!([{ "name": "steps", "description": "Steps", "group": "Lists and steps" }, { "name": "quote", "description": "A quote", "group": "Writing" },
+        { "name": "divider", "description": "A rule", "group": "Writing", "empty": true }])
+}
+
+#[test]
+fn typing_in_insert_part_asks_once_after_the_pause_and_drops_older_answers() {
+    let (mut rt, sent) = insert_list(catalog());
+    for ch in ["s", "t", "e"] {
+        rt.ime(Ime::Commit(ch.into()));
+        rt.frame(0.05);
+    }
+    assert!(sent_to(&sent, "rubric/parts").is_empty(), "not one a key");
+    for _ in 0..20 {
+        rt.frame(0.05);
+    }
+    let asked = sent_to(&sent, "rubric/parts");
+    assert_eq!(asked.len(), 1, "{asked:?}");
+    assert_eq!(asked[0]["params"]["words"], "ste");
+    // More typed before the answer: the answer for "ste" changes nothing.
+    rt.ime(Ime::Commit("p".into()));
+    rt.frame(0.05);
+    for _ in 0..20 {
+        rt.frame(0.05);
+    }
+    let newer = sent_to(&sent, "rubric/parts");
+    assert_eq!(newer[0]["params"]["words"], "step");
+    let before = rt.state.panels.last().unwrap().rows.clone();
+    answer(&mut rt, &asked[0], json!({ "parts": [{ "name": "timeline", "description": "x" }] }));
+    assert_eq!(rt.state.panels.last().unwrap().rows, before);
+    answer(&mut rt, &newer[0], json!({ "parts": [{ "name": "steps", "description": "Steps" }] }));
+    assert!(rows(&rt).contains(&"part:steps".to_string()));
+    assert_eq!(rt.state.field.text, "step", "the field keeps what was typed");
+}
+
+#[test]
+fn moving_in_insert_part_draws_the_part_and_esc_takes_it_away() {
+    let (mut rt, sent) = insert_list(catalog());
+    press(&mut rt, Key::Down);
+    assert_eq!(peeks(&sent), [json!("steps")]);
+    press(&mut rt, Key::Down);
+    assert_eq!(peeks(&sent), [json!("quote")]);
+    press(&mut rt, Key::Escape);
+    assert_eq!(peeks(&sent), [Value::Null]);
+    assert_eq!(rt.state.edit.text, "a\n\nb");
+}
+
+#[test]
+fn return_in_insert_part_writes_the_part_as_one_undo() {
+    let (mut rt, _sent) = insert_list(catalog());
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Enter);
+    assert_eq!(rt.state.edit.text, "a\n::: quote\n:::\nb");
+    assert!(rt.state.panels.is_empty());
+    cmd(&mut rt, Key::Command('z'));
+    assert_eq!(rt.state.edit.text, "a\n\nb");
+}
+
+#[test]
+fn draft_new_part_in_insert_part_writes_the_new_line_and_drafts() {
+    let (mut rt, sent) = insert_list(catalog());
+    rt.ime(Ime::Commit("a tide clock".into()));
+    rt.frame(1.0 / 60.0);
+    cmd(&mut rt, Key::Enter);
+    assert_eq!(rt.state.edit.text, "a\n::: new: a tide clock\n:::\nb");
+    let built = drafts(&sent);
+    assert_eq!((built[0]["params"]["action"].as_str(), built[0]["params"]["line"].as_u64()), (Some("build"), Some(1)));
+}
+
+#[test]
+fn a_line_of_words_that_is_no_part_offers_the_best_part_and_a_new_one() {
+    let (mut rt, sent) = on_line("::: three steps\n:::", 0);
+    rt.update(|s, _| s.edit.set_caret(3));
+    press(&mut rt, Key::Tab);
+    let asked = sent_to(&sent, "rubric/part");
+    answer(&mut rt, &asked[0], Value::Null);
+    let parts = sent_to(&sent, "rubric/parts");
+    assert_eq!(parts[0]["params"]["words"], "three steps");
+    answer(&mut rt, &parts[0], json!({ "parts": [{ "name": "steps", "description": "Steps" }, { "name": "timeline", "description": "x" }] }));
+    assert_eq!(rows(&rt), ["part:steps", "similar", "draft"]);
+    press(&mut rt, Key::Enter);
+    assert_eq!(rt.state.edit.text, "::: steps\n:::");
 }
