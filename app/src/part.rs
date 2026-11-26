@@ -289,8 +289,8 @@ pub fn rows(part: &Part, view: &View, chip: Option<&str>) -> (Vec<Row>, f32) {
     };
     let reroll = || Row::Item(with_chip(Item::new("reroll", "Reroll").key(Key::Command('r'))));
     let notes = || Row::Item(Item::new("notes", "Reroll with changes…").more());
-    let base = view.new_variant.as_deref().or(view.of.as_deref()).unwrap_or(&part.name);
-    let back = || Row::Item(Item::new("cancel", format!("Back to {base}")));
+    // Throws away the take or variant drafting, ready or failed, as a `new:` line's Cancel does.
+    let back = || Row::Item(Item::new("cancel", "Cancel"));
     let title = part.title();
     match view.status.as_deref() {
         Some("drafting") => {
@@ -317,7 +317,7 @@ pub fn rows(part: &Part, view: &View, chip: Option<&str>) -> (Vec<Row>, f32) {
     }
     let note = match (&part.variant, part.kind.as_str()) {
         (Some(v), _) if v.everywhere => format!("Every {}", v.of),
-        (None, "own") => "Own".into(),
+        (None, "own") => draft::CUSTOM.into(),
         _ => String::new(),
     };
     let mut rows = vec![Row::Head { name: title, note }];
@@ -346,7 +346,7 @@ pub fn rows(part: &Part, view: &View, chip: Option<&str>) -> (Vec<Row>, f32) {
             rows.push(Row::Sep);
             let every = if v.everywhere { format!("Every {} plain", v.of) } else { format!("Every {} as {}", v.of, v.name) };
             rows.push(Row::Item(Item::new("everywhere", every)));
-            rows.push(Row::Item(Item::new("plain", format!("Back to {}", v.of))));
+            rows.push(Row::Item(Item::new("plain", "Revert to original")));
         }
         None if part.kind == "own" => rows.push(Row::Item(Item::new("global", "Add to every site"))),
         None => {}
@@ -591,6 +591,34 @@ mod tests {
         }).unwrap();
         assert!(label(&off).ends_with("as torn-edge"));
         assert!(label(&part("variant", v(true))).ends_with("plain"));
+    }
+
+    fn label_of(part: &Part, view: &View, id: &str) -> String {
+        rows(part, view, None).0.iter().find_map(|r| match r {
+            Row::Item(i) if i.id == id => Some(i.label.clone()),
+            _ => None,
+        }).unwrap_or_else(|| panic!("no {id}"))
+    }
+
+    #[test]
+    fn a_sites_own_part_is_headed_custom() {
+        let r = rows(&part("own", None), &changeable(), None).0;
+        assert!(matches!(&r[0], Row::Head { note, .. } if note == draft::CUSTOM), "{:?}", r[0]);
+    }
+
+    #[test]
+    fn throwing_a_draft_away_and_going_back_to_the_catalogs_part_are_named_apart() {
+        let drafting = View { status: Some("drafting".into()), new_variant: Some("quote".into()), ..changeable() };
+        let new_line = draft::menu_rows(&View { status: Some("ready".into()), ..View::default() }, None, None).0;
+        let cancel = new_line.iter().find_map(|r| match r {
+            Row::Item(i) if i.id == "cancel" => Some(i.label.clone()),
+            _ => None,
+        }).unwrap();
+        assert_eq!(label_of(&part("catalog", None), &drafting, "cancel"), cancel, "as a new: line's");
+        let kept = part("variant", Some(Variant { of: "quote".into(), name: "torn-edge".into(), everywhere: false }));
+        let plain = label_of(&kept, &changeable(), "plain");
+        assert_ne!(plain, cancel);
+        assert!(!plain.contains("quote"), "{plain}");
     }
 
     #[test]

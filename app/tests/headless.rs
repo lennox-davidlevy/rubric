@@ -812,11 +812,12 @@ fn moving_in_the_theme_list_draws_the_app_in_that_theme_and_esc_goes_back() {
     cmd(&mut rt, Key::Command(','));
     assert_eq!(rt.state.panels.len(), 1);
     assert!(rt.find("panel-0").is_some(), "the list is drawn");
+    // Ink, which has no light, is passed over.
     press(&mut rt, Key::Down);
-    assert_eq!(rt.state.look.name, "ink");
-    let ink = fill_of(&rt, "writing-pane");
-    assert_ne!(ink, paper);
-    assert_eq!(ink, Look::load(None, Some("ink".into()), None).palette.pane);
+    assert_eq!(rt.state.look.name, "sepia");
+    let sepia = fill_of(&rt, "writing-pane");
+    assert_ne!(sepia, paper);
+    assert_eq!(sepia, Look::load(None, Some("sepia".into()), None).palette.pane);
     press(&mut rt, Key::Escape);
     assert!(rt.state.panels.is_empty());
     assert_eq!(fill_of(&rt, "writing-pane"), paper);
@@ -830,12 +831,70 @@ fn return_in_the_theme_list_keeps_the_theme_for_the_next_start() {
     let mut rt = themed(&dir);
     cmd(&mut rt, Key::Command('t'));
     press(&mut rt, Key::Down);
-    press(&mut rt, Key::Down);
     press(&mut rt, Key::Enter);
     assert!(rt.state.panels.is_empty());
     assert_eq!(rt.state.look.name, "sepia");
     assert_eq!(Look::load(Some(dir.clone()), None, None).name, "sepia", "a new start reads it");
     assert_eq!(rt.state.edit.text, "# Hi\n\nbody", "Return went to the list");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+fn off(rt: &Runtime<State>, id: &str) -> bool {
+    rt.state.panels[0].rows.iter().any(|r| matches!(r, Row::Item(i) if i.id == id && i.off))
+}
+
+#[test]
+fn a_theme_with_one_mode_is_dimmed_in_the_other_and_passed_over() {
+    let dir = config("themes-modes");
+    let mut rt = themed(&dir);
+    cmd(&mut rt, Key::Command('t'));
+    assert!(!off(&rt, "paper") && off(&rt, "ink"), "light: the dark-only themes are dimmed");
+    // Up from Paper to Mode, then Right: dark.
+    press(&mut rt, Key::Up);
+    assert_eq!(rt.state.panels[0].active_id(), Some("mode"));
+    let paper = fill_of(&rt, "writing-pane");
+    press(&mut rt, Key::Right);
+    assert_eq!(rt.state.look.mode, Mode::Dark);
+    assert!(off(&rt, "paper") && off(&rt, "sepia") && !off(&rt, "ink") && !off(&rt, "fjord"));
+    assert_eq!(rt.state.look.name, "paper", "the theme drawn stays");
+    assert_eq!(fill_of(&rt, "writing-pane"), paper);
+    // Down passes over Paper and Sepia.
+    press(&mut rt, Key::Down);
+    assert_eq!(rt.state.panels[0].active_id(), Some("ink"));
+    press(&mut rt, Key::Down);
+    assert_eq!(rt.state.panels[0].active_id(), Some("fjord"));
+    // A press on a dimmed row does nothing.
+    click(&mut rt, "row-themes-sepia");
+    assert_eq!((rt.state.look.name.as_str(), rt.state.panels.len()), ("fjord", 1));
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn a_writers_own_theme_is_noted_custom() {
+    let dir = config("themes-custom");
+    std::fs::create_dir_all(dir.join("themes")).unwrap();
+    std::fs::write(dir.join("themes/mine.json"), r##"{ "theme": { "background": "#ffffff", "text": "#111111" } }"##).unwrap();
+    let mut rt = themed(&dir);
+    cmd(&mut rt, Key::Command('t'));
+    let note = rt.state.panels[0].rows.iter().find_map(|r| match r {
+        Row::Item(i) if i.id == "mine" => i.note.clone(),
+        _ => None,
+    });
+    assert_eq!(note.as_deref(), Some(rubric_app::draft::CUSTOM));
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn the_theme_list_wraps() {
+    let dir = config("themes-wrap");
+    let mut rt = themed(&dir);
+    cmd(&mut rt, Key::Command('t'));
+    press(&mut rt, Key::Up);
+    press(&mut rt, Key::Up);
+    let last = rt.state.look.themes.iter().rev().find(|e| e.has(Mode::Light)).unwrap().name.clone();
+    assert_eq!(rt.state.panels[0].active_id(), Some(last.as_str()), "Up on the first row goes to the last");
+    press(&mut rt, Key::Down);
+    assert_eq!(rt.state.panels[0].active_id(), Some("mode"), "Down on the last goes to the first");
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
@@ -949,7 +1008,7 @@ fn a_still_pointer_under_the_theme_list_chooses_nothing() {
     for _ in 0..20 {
         rt.frame(1.0 / 60.0);
     }
-    let (x, y) = rt.find(&rubric_app::look::row_key("themes", "fjord")).expect("drawn");
+    let (x, y) = rt.find(&rubric_app::look::row_key("themes", "aura")).expect("drawn");
     press(&mut rt, Key::Escape);
     rt.pointer_move(x, y);
     rt.frame(1.0 / 60.0);
@@ -959,20 +1018,23 @@ fn a_still_pointer_under_the_theme_list_chooses_nothing() {
     }
     assert_eq!(rt.state.look.name, "paper", "opened under a resting pointer");
     assert_eq!(rt.state.panels[0].active_id(), Some("paper"));
-    for _ in 0..40 {
-        press(&mut rt, Key::Down);
+    // Up past the first row wraps to the last, scrolling the list under the pointer.
+    for _ in 0..2 {
+        press(&mut rt, Key::Up);
         rt.frame(1.0 / 60.0);
     }
     for _ in 0..20 {
         rt.frame(1.0 / 60.0);
     }
-    let last = rt.state.look.themes.last().unwrap().name.clone();
+    let last = rt.state.look.themes.iter().rev().find(|e| e.has(Mode::Light)).unwrap().name.clone();
     assert_eq!(rt.state.panels[0].active_id(), Some(last.as_str()), "scrolled past a resting pointer");
     assert_eq!(rt.state.look.name, last);
     // The pointer moving onto a row does take it.
-    rt.pointer_move(x + 1.0, y + 1.0);
+    let near = rt.state.look.themes.iter().rev().filter(|e| e.has(Mode::Light)).nth(1).unwrap().name.clone();
+    let (x, y) = rt.find(&rubric_app::look::row_key("themes", &near)).expect("drawn");
+    rt.pointer_move(x, y);
     rt.frame(1.0 / 60.0);
-    assert_ne!(rt.state.look.name, last);
+    assert_eq!(rt.state.look.name, near);
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
@@ -995,7 +1057,6 @@ fn the_mode_in_the_theme_list_redraws_at_once_is_kept_with_return_and_restored_b
     cmd(&mut rt, Key::Command(','));
     press(&mut rt, Key::Up);
     press(&mut rt, Key::Right);
-    press(&mut rt, Key::Down);
     press(&mut rt, Key::Down);
     assert_eq!((rt.state.look.name.as_str(), rt.state.look.mode), ("ink", Mode::Dark));
     press(&mut rt, Key::Enter);
@@ -1307,27 +1368,63 @@ fn typing_in_insert_part_asks_once_after_the_pause_and_drops_older_answers() {
 }
 
 #[test]
-fn moving_in_insert_part_draws_the_part_and_esc_takes_it_away() {
+fn a_group_opens_its_parts_beside_and_moving_there_draws_them() {
     let (mut rt, sent) = insert_list(catalog());
     press(&mut rt, Key::Down);
-    assert_eq!(peeks(&sent), [json!("steps")]);
     press(&mut rt, Key::Down);
-    assert_eq!(peeks(&sent), [json!("quote")]);
+    assert_eq!(rt.state.panels[0].active_id(), Some("group:Writing"));
+    let _ = peeks(&sent);
+    press(&mut rt, Key::Right);
+    assert_eq!((top(&rt).as_deref(), rt.state.panels.len()), (Some("insert-group"), 2), "beside the list");
+    assert_eq!(rows(&rt), ["part:quote", "part:divider"]);
+    assert_eq!(peeks(&sent).last(), Some(&json!("quote")), "the part with the focus is drawn");
+    press(&mut rt, Key::Down);
+    assert_eq!(peeks(&sent), [json!("divider")]);
     press(&mut rt, Key::Escape);
+    assert_eq!(top(&rt).as_deref(), Some("insert"));
     assert_eq!(peeks(&sent), [Value::Null]);
+    press(&mut rt, Key::Escape);
+    assert!(rt.state.panels.is_empty());
     assert_eq!(rt.state.edit.text, "a\n\nb");
 }
 
 #[test]
-fn return_in_insert_part_writes_the_part_as_one_undo() {
+fn return_on_a_groups_part_writes_it_as_one_undo() {
     let (mut rt, _sent) = insert_list(catalog());
     press(&mut rt, Key::Down);
     press(&mut rt, Key::Down);
+    press(&mut rt, Key::Enter);
+    assert_eq!(top(&rt).as_deref(), Some("insert-group"), "Return opens the group too");
     press(&mut rt, Key::Enter);
     assert_eq!(rt.state.edit.text, "a\n::: quote\n:::\nb");
     assert!(rt.state.panels.is_empty());
     cmd(&mut rt, Key::Command('z'));
     assert_eq!(rt.state.edit.text, "a\n\nb");
+}
+
+#[test]
+fn a_long_list_keeps_its_field_in_place_while_its_rows_scroll() {
+    let many: Vec<Value> = (0..40).map(|i| json!({ "name": format!("part-{i}"), "description": "x" })).collect();
+    let (mut rt, sent) = insert_list(catalog());
+    rt.ime(Ime::Commit("p".into()));
+    for _ in 0..20 {
+        rt.frame(0.05);
+    }
+    let asked = sent_to(&sent, "rubric/parts");
+    answer(&mut rt, &asked[0], json!({ "parts": many }));
+    settle(&mut rt);
+    let rect = |rt: &Runtime<State>, key: &str| rt.elements().into_iter().find(|e| e.key.as_deref() == Some(key)).unwrap_or_else(|| panic!("no {key}")).rect;
+    let panel = rect(&rt, "panel-0");
+    assert!(panel[3] <= rubric_app::panel::FIELD + rubric_app::panel::SEP + 12.0 * rubric_app::panel::ITEM + 12.0, "at most twelve rows: {panel:?}");
+    let field = rect(&rt, "row-insert-find");
+    for _ in 0..30 {
+        press(&mut rt, Key::Down);
+    }
+    settle(&mut rt);
+    assert_eq!(rt.state.panels[0].active_id(), Some("part:part-29"));
+    assert_eq!(rect(&rt, "row-insert-find"), field, "the field stays put");
+    let row = rect(&rt, "row-insert-part:part-29");
+    assert!(row[1] >= panel[1] && row[1] + row[3] <= panel[1] + panel[3] + 0.5, "the row is scrolled into view: {row:?} in {panel:?}");
 }
 
 #[test]

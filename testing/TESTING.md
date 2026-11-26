@@ -4,7 +4,7 @@ What changed in the plan's "Before the app" list (docs/plan.md, under step 8), i
 
 Write what you find in **Notes** at the bottom, by test number.
 
-Last updated: 2026-11-19 (section B, the app's menu and a new part).
+Last updated: 2026-11-26 (section C, sitting 6 of slice 3).
 
 ## Set up
 
@@ -101,16 +101,16 @@ The third slice: the design's look, one panel for every menu, and the menus in i
 | C6 | Esc | The theme from before. |
 | C7 | With the list open, type a letter | The list closes, the theme from before, the letter in the writing. |
 | C8 | Ctrl+T twice | The list opens and closes; the theme from before. |
-| C9 | With the list open, Return on Ink | The app is Ink; the list closes. |
-| C10 | With the list open, Right on `Mode` (the first row) | The app turns dark at once. |
-| C11 | Return | The list closes; still dark. |
+| C9 | With the list open, Right on `Mode` (the first row) | Paper and Sepia dim; the app stays Paper. |
+| C10 | Down | Ink, drawn at once. |
+| C11 | Return | The list closes; Ink. |
 | C12 | Quit and start again | Ink, dark. |
 | C13 | Start again with `app/themes/nord.json` copied to `~/.config/rubric/themes/mine.json` | The app starts as before. |
-| C14 | Ctrl+T | `Mine` is last, noted `Own`. |
+| C14 | Ctrl+T | `Mine` is last, noted `Custom`. |
 | C15 | Move the pointer over a row | That theme is drawn. |
 | C16 | Click a row | That theme is kept; the list closes. |
 | C17 | With the pointer resting where the list opens, Ctrl+T | The checked theme has the focus; nothing changes under the still pointer. |
-| C18 | Down past the list's end, the pointer still | Nothing changes under the pointer. |
+| C18 | Up twice, the pointer still | The highlight is on the last theme; nothing changes under the pointer. |
 | C19 | Start once with `RUBRIC_APP_THEME=fjord` before the command | Fjord. |
 | C20 | Start from a terminal with these in `~/.config/rubric/themes/`: `a.json` reading `not json`, `b.json` reading `{}`, `c.json` reading `{ "theme": {} }`, and `d.txt` | Four lines on stderr, one for each file, each saying why it was skipped. |
 | C21 | On a line reading `::: new: a tide clock`, Tab | Under the writing: `Not started`, the words, `Draft Ctrl+Enter`. A panel with `Draft` and its chip. |
@@ -142,25 +142,25 @@ The third slice: the design's look, one panel for every menu, and the menus in i
 | C47 | In the quote's menu, Return on `Change…` | A second panel with a field and `Draft variant`. |
 | C48 | Type `torn edge` | The letters go into the field. |
 | C49 | Return | The line ends ` : torn edge`; the status line reads `Drafting` with `Stop Ctrl+.`. |
-| C50 | Tab | `Stop` and `Back to quote`. |
+| C50 | Tab | `Stop` and `Cancel`. |
 | C51 | Once the status line reads `Ready`, Ctrl+Enter | The line reads `::: quote variant=…`. |
-| C52 | Tab | Rows `Every quote as …` and `Back to quote`. |
-| C53 | Return on `Back to quote` | The line reads `::: quote` again. |
+| C52 | Tab | Rows `Every quote as …` and `Revert to original`. |
+| C53 | Return on `Revert to original` | The line reads `::: quote` again. |
 | C54 | In the quote's menu, Ctrl+Delete | The `:::` lines go, the words inside stay; `Removed` shows. |
 | C55 | Ctrl+Z | Both lines come back. |
-| C56 | Tab on `::: tide-two` (from C33) | `Own` in the heading; `Reroll`, `Add to every site` and `Remove…`. |
+| C56 | Tab on `::: tide-two` (from C33) | `Custom` in the heading; `Reroll`, `Add to every site` and `Remove…`. |
 | C57 | Ctrl+Delete | A second panel titled with the blocks that use it. |
 | C58 | Return on `Keep` | The second panel closes. |
 | C59 | In `Remove…` (Ctrl+Delete), Return on `Remove from site` | `Removed` once the server has done it; `sites/app-slice/parts/tide-two` is gone. |
 | C60 | On an empty line, Tab | `Insert part…`, `New part…`, `Cut` and `Copy` dimmed, `Paste`. |
-| C61 | Return on `Insert part…` | The parts under their groups. |
-| C62 | Down, a few times | Each move draws that part in the page at the line. |
-| C63 | Esc | The text and the page as they were. |
+| C61 | Return on `Insert part…` | The list takes the menu's place: a field, then each group with its count. |
+| C62 | Down to `Writing (7)`, then Right | Its parts in a panel beside, each with its description; the page draws `Lead` at the line. |
+| C63 | Esc, then Esc | The text and the page as they were. |
 | C64 | In `Insert part…`, type `quote` | The list turns flat a moment after typing stops. |
 | C65 | Return | `::: quote` and its closer. |
 | C66 | On a line reading `::: three numbered steps`, the caret inside the words, Tab | `Steps` first, `Similar parts (N)`, `Draft new part`. |
 | C67 | Return on `Steps` | The line reads `::: steps`. |
-| C68 | In `Insert part…`, Down to `Audio` | `Page restarted`, `audio and video off` for 4 s; the page comes back. |
+| C68 | In `Insert part…`, Right on `Media (7)`, Down to `Audio` | `Page restarted`, `audio and video off` for 4 s; the page comes back. |
 | C69 | Down to `Video` | The page stays drawn. |
 | C70 | Esc | The page as it was. |
 | C71 | On an empty line, type `::: audio`, Return, `:::` | The page draws the audio part. |
@@ -169,8 +169,28 @@ The third slice: the design's look, one panel for every menu, and the menus in i
 | C74 | From another terminal, `pkill -P "$(pgrep -x rubric-app)" -f WebKitWebProcess` | `Page restarted`, `audio and video off`; the page comes back. |
 | C75 | The same again within 10 s | `Page stopped` in red with `Reload Ctrl+Shift+R`. |
 | C76 | Ctrl+Shift+R | The page comes back; `Page stopped` goes. |
+| C77 | Start with `RUBRIC_APP_THEME=paper RUBRIC_APP_MODE=light` before the command | Paper. |
+| C78 | Ctrl+T | Ink, Fjord and the other themes with only a dark half are dim. |
+| C79 | Down | Sepia; Ink is passed over. |
+| C80 | Click `Ink` | Nothing changes. |
+| C81 | Up twice | `Mode` has the highlight. |
+| C82 | Right | Paper and Sepia dim, Ink and Fjord not; the app stays Sepia. |
+| C83 | Up | The highlight goes to the last theme that is not dim. |
+| C84 | Down | The highlight is back on `Mode`. |
+| C85 | Esc | Paper, light. |
+| C86 | On an empty line, Tab, then Return on `Insert part…`, Right on `Writing (7)` | The parts beside the groups. |
+| C87 | Left | Back to the groups; the page as it was. |
+| C88 | Type `a` | The list turns flat with no groups, at most twelve rows tall, with a scroll bar. |
+| C89 | Down twenty times | The rows scroll under the field; the field stays where it is. |
+| C90 | Esc | The text and the page as they were. |
+| C91 | Drag the divider until the writing pane is about 400 wide, then Tab on an empty line, `Insert part…`, Right on a group | The parts in the groups' place, with `‹ Insert part` on top. |
+| C92 | Click `‹ Insert part` | The groups again. |
+| C93 | Esc, drag the divider back, then Tab on an empty line near the bottom of the window, `Insert part…`, type `a` | The list opens above the line, twelve rows tall. |
+| C94 | Esc. On an empty line with a blank line above it, Tab, `Insert part…`, Right on `Writing (7)`, Down to `Callout` | The page draws a callout holding faded sample text. |
+| C95 | Down to `Sidenote`, then Up to `Quote` | Each drawn with faded sample text. |
+| C96 | Esc twice, then type `::: section ` (with the space) | A closer appears; the page draws a section holding faded sample text. |
 
-C68 to C73 are for a machine without `gst-plugins-base` and `gst-plugins-good`; C74 to C76 work on any. C21 to C67 run with the stub, so nothing is paid for. A tool or model chosen in C24 is only checked, never run. The menus open with Tab; a right-click is still the editor's own menu. Delete is ⌫ on the Mac. Never choose `Add to every site` (C56): it writes the catalog.
+C68 to C73 are for a machine without `gst-plugins-base` and `gst-plugins-good`; C74 to C76 work on any. C77 to C96 are sitting 6: themes with one mode, the list that wraps, Insert part…'s groups, lists of at most twelve rows and the starters. C21 to C67 run with the stub, so nothing is paid for. A tool or model chosen in C24 is only checked, never run. The menus open with Tab; a right-click is still the editor's own menu. Delete is ⌫ on the Mac. Never choose `Add to every site` (C56): it writes the catalog.
 
 **After the rows, undo what they wrote:** `rm ~/.config/rubric/app.json ~/.config/rubric/themes/{mine.json,a.json,b.json,c.json,d.txt}`, then close the app and run `app/scripts/clean-test.sh`, which puts the site back.
 

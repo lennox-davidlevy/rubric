@@ -98,6 +98,8 @@ parts:
     group: Layout
     description: A box or a band across the page that sets the writing inside it apart from the rest of the page.
     children: true
+    body: |
+      Writing set apart from the rest of the page.
     settings:
       tone:
         type: choice
@@ -158,6 +160,8 @@ parts:
     group: Writing
     description: A quotation of words someone said or wrote.
     children: true
+    body: |
+      The words, as they were said or written.
     settings:
       size:
         type: choice
@@ -191,6 +195,8 @@ parts:
     group: Writing
     description: A short note for the reader, set off from the main prose, such as a tip or a warning.
     children: true
+    body: |
+      Something worth knowing before going on.
     settings:
       kind:
         type: choice
@@ -218,6 +224,8 @@ parts:
     group: Writing
     description: A note beside the writing, in the margin, about the sentence next to it.
     children: true
+    body: |
+      A word about the sentence beside it.
 
   glossary:
     group: Writing

@@ -35,9 +35,12 @@ pub fn show_themes(s: &mut State) {
     };
     let rows = std::iter::once(mode).chain(s.look.themes.iter().map(|e| {
         let item = Item::new(e.name.clone(), e.label()).check(e.name == s.look.name);
-        Row::Item(if e.own { item.note("Own") } else { item })
+        let item = if e.own { item.note(crate::draft::CUSTOM) } else { item };
+        // A theme with one mode is dimmed in the other.
+        Row::Item(if e.has(s.look.mode) { item } else { item.off() })
     }));
-    let mut p = Panel::new(THEMES, "Themes", WIDTH, rows.collect());
+    let mut p = Panel::new(THEMES, "Themes", WIDTH, rows.collect()).as_list();
+    p.wraps = true;
     p.focus(&s.look.name);
     s.theme_before = Some((s.look.name.clone(), s.look.mode));
     s.panels = vec![p];
@@ -247,11 +250,21 @@ fn moved(s: &mut State, id: &str) {
 fn themes(s: &mut State, taken: Taken) {
     match taken {
         Taken::Set(id, on) if id == MODE => {
-            s.look.set_mode(if on == 1 { Mode::Dark } else { Mode::Light });
+            let mode = if on == 1 { Mode::Dark } else { Mode::Light };
+            // A theme drawn that lacks the mode stays drawn until another is chosen.
+            match s.look.themes.iter().find(|e| e.name == s.look.name).is_none_or(|e| e.has(mode)) {
+                true => s.look.set_mode(mode),
+                false => s.look.mode = mode,
+            }
             s.spans = state::spans(s);
+            mark_modes(s);
         }
         Taken::Chose(name) => {
             state::show_theme(s, &name);
+            // Kept with the mode it is drawn in.
+            if let Some(m) = s.look.themes.iter().find(|e| e.name == name).and_then(|e| e.only()) {
+                s.look.mode = m;
+            }
             if let Err(e) = s.look.keep() {
                 eprintln!("theme not kept: {e}");
             }
@@ -260,6 +273,21 @@ fn themes(s: &mut State, taken: Taken) {
         }
         Taken::Closed | Taken::Passed => restore(s),
         _ => {}
+    }
+}
+
+/// The list's rows after the mode changed: a theme without it dimmed, and the focus on the
+/// first row that can be chosen if its own cannot.
+fn mark_modes(s: &mut State) {
+    let mode = s.look.mode;
+    let Some(p) = s.panels.iter_mut().find(|p| p.id == THEMES) else { return };
+    for r in &mut p.rows {
+        if let Row::Item(i) = r {
+            i.off = !s.look.themes.iter().find(|e| e.name == i.id).is_none_or(|e| e.has(mode));
+        }
+    }
+    if !p.rows.get(p.active).is_some_and(Row::takes_focus) {
+        p.active = p.rows.iter().position(Row::takes_focus).unwrap_or(0);
     }
 }
 
@@ -277,7 +305,7 @@ pub fn close_panels(s: &mut State) {
     s.anchor = None;
     let Some(id) = s.panels.first().map(|p| p.id.clone()) else { return };
     let peeking = s.panels.iter().any(|p| p.id == crate::draft::NEAR);
-    let looking = s.panels.iter().any(|p| p.id == crate::insert::LIST || p.id == crate::insert::SIMILAR);
+    let looking = s.panels.iter().any(|p| matches!(p.id.as_str(), crate::insert::LIST | crate::insert::SIMILAR | crate::insert::GROUP));
     s.panels.clear();
     s.field_of = None;
     s.field_live = false;

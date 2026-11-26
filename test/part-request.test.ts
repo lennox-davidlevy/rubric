@@ -116,6 +116,33 @@ test("a part looked at on an empty line is drawn there, and goes when the look e
   expect(await drawn(false)).toBe(true);
 });
 
+test("a part looked at on an empty line shows its starter, as a placed empty one does", async () => {
+  const other = join(dir, "pages/posts/starter.md");
+  const content = join(dir, "content/posts/starter.md");
+  const starter = ws.site.catalog.parts.quote!.body!.trim();
+  await ws.open(other, ["---", "title: Starter", "---", "Before.", "", "", "", "After."].join("\n"));
+  const shows = async (want: boolean) => {
+    for (let i = 0; i < 100; i++) {
+      await Bun.sleep(10);
+      const c = readFileSync(content, "utf8");
+      if (c.includes("{{< quote") && c.includes(starter) === want) return true;
+    }
+    return false;
+  };
+  ws.peek(other, 5, "quote");
+  expect(await shows(true)).toBe(true);
+  ws.peek(other, 5);
+  await ws.change(other, ["---", "title: Starter", "---", "Before.", "", "::: quote", ":::", "After."].join("\n"));
+  expect(await shows(true)).toBe(true);
+  await ws.close(other);
+});
+
+test("every part for the writing that holds writing has a starter", () => {
+  const parts = Object.entries(ws.site.catalog.parts).filter(([, p]) => p.group && !p.empty);
+  expect(parts.length).toBeGreaterThan(30);
+  expect(parts.filter(([, p]) => !p.body?.trim()).map(([n]) => n)).toEqual([]);
+});
+
 test("a part looked at on a line goes when the text changes or the file closes", async () => {
   const content = join(dir, "content/posts/part-request.md");
   const drawn = async (want: boolean) => {

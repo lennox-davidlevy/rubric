@@ -28,7 +28,7 @@ A sitting stops at its end, says what it built, what it could not check and the 
 Sittings 1 to 5 are committed on `slice-3`. What is open, in order:
 
 1. **Sitting 5 held.** David's run of 2026-11-26 (10:23), without the plugins: one core dump, the handler fired (`page: the web view's process ended (Crashed)`), media went off, a new web process loaded the page, and nothing died after it. The abort is WebKit's own assertion in `MediaPlayerPrivateGStreamer::createAudioSink` (read from the core by another agent's disassembly; not checked again here). The restart is the net for a death nobody foresaw, not the answer to missing plugins: the shipped app brings them (David, 2026-11-26; "After this slice"). David has them installed from here on, so C68 to C73 can no longer be run on his machine; C74 to C76 are still unseen.
-2. **Sitting 6 is planned and not built** ("Sitting 6" below): the answers David gave to his second live test.
+2. **Sitting 6 is built and reviewed** (2026-11-26; nothing to fix). Unseen: rows C77 to C96 and the rewritten ones. To watch in C86: a letter typed while a group's parts are open closes both panels and lands in the writing, since the field is the first panel's; if that reads wrong, the letter goes to the field and the parts close.
 3. Then David runs section C whole, and the slice is merged.
 4. **After the merge, Rune is moved to today's `dev`** in one step (the app pins `0ca0756` of 2026-11-13; `dev` was 1,102 commits on by 2026-11-26): every Rune line in `app/Cargo.toml` to one revision, the `[patch.crates-io]` list copied from Rune's own `Cargo.toml` at that revision (their README lists more than the app has: `sctk-adwaita`, `naga`, `accesskit_macos`, `accesskit_atspi_common`), what no longer compiles fixed, the tests run. Then, with `RUBRIC_IME=1`, the keyboard is tried again (in and out of a part's Cite field twenty times): if it is still lost, an issue goes to github.com/anomalyco/rune against that revision (none there covers it as of 2026-11-26; the findings' "After sitting 4" has the cause and the wording), and if not, `XMODIFIERS=@im=none` comes out of `main.rs`. And what Rune lacked is looked for again: the text position under a right-click (David's first ask, still not built), a line's rectangle other than the caret's, a font family for a span.
 
@@ -381,3 +381,15 @@ One line each: what was chosen, and why the plan did not settle it.
   - Reload loads the view's own address again (`WebView::reload`), which is the page's address or wherever the page went since.
   - `Chord` gained Shift, and a chord without it no longer matches with Shift held, so Ctrl+Shift+R is not Ctrl+R's Reroll.
   - `webkit2gtk` is a dependency of its own on Linux, at wry's pinned version, for the view's settings and its `web-process-terminated`.
+- Sitting 6 (2026-11-26):
+  - Nothing was waiting in `git status`, so no commit opened the sitting.
+  - A theme has one mode when its tokens are the same in light and dark, whatever its file looks like; the plan's "the same in light and dark" read on the tokens, which are what the writer sees.
+  - The focus stays on `Mode` when the mode changes (the row the writer is on); it moves to the first row that can be chosen only when its row became dim, which `Mode` never does.
+  - Return on `Mode`, or on the theme drawn, keeps that theme with the mode it is drawn in: Paper drawn while `Mode` reads dark is kept as Paper, light. Keeping a mode a theme cannot show would open the list next time with the drawn theme dimmed.
+  - Insert part…'s list takes the first menu's place rather than opening beside it, so a group's parts can open beside the list without a third panel. Esc from the list closes it; it no longer goes back to the first menu.
+  - A group is a row reading `<Group> (N)`, the count in the label as `Similar parts (N)` has it; the parts' panel is headed with the group's name and is 300 points wide.
+  - Return in Insert part…'s empty field does nothing; before, it put the first part of the catalog on the line, which the groups no longer show.
+  - A list's leading rows (a field and its rule, a heading, the list of themes' `Mode`) stay put over the scrolling rows; the twelve rows are counted under them. The rows after the list (`Draft new part`) scroll with it.
+  - The narrow pane's row back is drawn over the scrolling rows, not among them, in every panel.
+  - The starters: quote "The words, as they were said or written.", callout "Something worth knowing before going on.", sidenote "A word about the sentence beside it.", section "Writing set apart from the rest of the page."
+  - Moving onto a group row in Insert part… sends `rubric/peek` with no part, as moving onto `Draft new part` does, so the page shows the line as it is.

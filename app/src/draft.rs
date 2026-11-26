@@ -89,6 +89,9 @@ pub fn is_new_line(line: &str) -> bool {
     new_words(line).is_some()
 }
 
+/// What the writer sees for a site's own part, or a theme file of their own: the server's `own`.
+pub const CUSTOM: &str = "Custom";
+
 /// "tide-table" reads "Tide table"; words read with a capital.
 pub fn readable(name: &str) -> String {
     let words = name.replace(['-', '_'], " ");
@@ -694,7 +697,7 @@ fn answer(s: &mut State, asked: Asked, result: Result<Value, String>) {
             if is_new_line(&asked.text)
                 && let Some(name) = answer.get("part").and_then(|p| p.get("name")).and_then(Value::as_str)
             {
-                flash(s, "Kept", Tone::Ink, format!("{}, added to Own parts", readable(name)));
+                flash(s, "Kept", Tone::Ink, format!("{}, added to {CUSTOM} parts", readable(name)));
             }
         }
         What::Part(_) | What::PartLook(_) | What::Set | What::Parts => crate::part::answered(s, asked, answer),
@@ -856,11 +859,11 @@ pub fn act(s: &mut State, id: &str, taken: Taken, tx: &mut Tx) {
             "near" => {
                 let rows = std::iter::once(Row::Head { name: "Similar parts".into(), note: open.view.near.len().to_string() })
                     .chain(open.view.near.iter().map(|n| {
-                        let note = if n.own { format!("Own · {}", n.description) } else { n.description.clone() };
+                        let note = if n.own { format!("{CUSTOM} · {}", n.description) } else { n.description.clone() };
                         Row::Item(Item::new(n.name.clone(), readable(&n.name)).note(note))
                     }))
                     .collect();
-                second(s, Panel::new(NEAR, "Similar parts", 264.0, rows), "near");
+                second(s, Panel::new(NEAR, "Similar parts", 264.0, rows).as_list(), "near");
                 moved(s, NEAR);
             }
             "notes" => {
@@ -895,7 +898,7 @@ pub fn act(s: &mut State, id: &str, taken: Taken, tx: &mut Tx) {
                 if let Some(o) = &mut s.view {
                     o.take_before = shown;
                 }
-                second(s, Panel::new(TAKES, "Takes", 250.0, rows), "takes");
+                second(s, Panel::new(TAKES, "Takes", 250.0, rows).as_list(), "takes");
                 if let Some(n) = shown {
                     s.panels[1].focus(&format!("take-{n}"));
                 }

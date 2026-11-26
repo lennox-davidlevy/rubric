@@ -19,6 +19,8 @@ pub const PAD: f32 = 4.0;
 pub const BORDER: f32 = 1.0;
 pub const GAP: f32 = 6.0;
 pub const MARGIN: f32 = 8.0;
+/// The most rows a list shows at once, under its field or heading; the rest scroll.
+pub const LIST_ROWS: f32 = 12.0;
 
 /// A key held with Cmd (Ctrl off the Mac), and Shift when `shift`, that chooses a row from
 /// anywhere in its panel.
@@ -171,12 +173,32 @@ pub struct Panel {
     pub width: f32,
     /// The row of the panel under it that opened this one.
     pub from: Option<usize>,
+    /// Down on the last row goes to the first, Up on the first to the last.
+    pub wraps: bool,
+    /// A list: at most `LIST_ROWS` rows tall under its leading rows (a field, a heading), the
+    /// rest scrolling.
+    pub list: bool,
 }
 
 impl Panel {
     pub fn new(id: impl Into<String>, name: impl Into<String>, width: f32, rows: Vec<Row>) -> Panel {
         let active = rows.iter().position(Row::takes_focus).unwrap_or(0);
-        Panel { id: id.into(), name: name.into(), rows, active, width, from: None }
+        Panel { id: id.into(), name: name.into(), rows, active, width, from: None, wraps: false, list: false }
+    }
+
+    /// A list: at most `LIST_ROWS` rows tall under its leading rows, the rest scrolling.
+    pub fn as_list(mut self) -> Panel {
+        self.list = true;
+        self
+    }
+
+    /// How many rows stay put over a list's scrolling rows: those before its first item (a
+    /// field, a heading, the list of themes' mode). None for a panel that is no list.
+    pub fn lead(&self) -> usize {
+        if !self.list {
+            return 0;
+        }
+        self.rows.iter().position(|r| matches!(r, Row::Item(_))).unwrap_or(self.rows.len())
     }
 
     /// The row with the focus, if it takes it.
@@ -199,9 +221,16 @@ impl Panel {
         self.row().and_then(Row::id)
     }
 
-    /// The rows' heights, the padding and the border.
+    /// The rows' heights, the padding and the border; a list's rows under its lead at most
+    /// `LIST_ROWS` items tall.
     pub fn height(&self) -> f32 {
-        self.rows.iter().map(Row::height).sum::<f32>() + 2.0 * (PAD + BORDER)
+        let lead = self.lead();
+        let fixed: f32 = self.rows[..lead].iter().map(Row::height).sum();
+        let mut rest: f32 = self.rows[lead..].iter().map(Row::height).sum();
+        if self.list {
+            rest = rest.min(LIST_ROWS * ITEM);
+        }
+        fixed + rest + 2.0 * (PAD + BORDER)
     }
 
     /// The top of row `i`, from the panel's top.
@@ -210,10 +239,11 @@ impl Panel {
     }
 
     fn step(&mut self, down: bool) -> bool {
+        let takes = |&i: &usize| self.rows[i].takes_focus();
         let found = if down {
-            (self.active + 1..self.rows.len()).find(|&i| self.rows[i].takes_focus())
+            (self.active + 1..self.rows.len()).find(takes).or_else(|| self.wraps.then(|| (0..self.active).find(takes)).flatten())
         } else {
-            (0..self.active).rev().find(|&i| self.rows[i].takes_focus())
+            (0..self.active).rev().find(takes).or_else(|| self.wraps.then(|| (self.active + 1..self.rows.len()).rev().find(takes)).flatten())
         };
         match found {
             Some(i) => {
@@ -418,6 +448,21 @@ mod tests {
     }
 
     #[test]
+    fn a_panel_that_wraps_goes_from_its_last_row_to_its_first_and_back() {
+        let mut s = vec![panel()];
+        s[0].wraps = true;
+        s[0].focus("remove");
+        assert_eq!(key(&mut s, &ev(Key::Down), "", false), Taken::Moved);
+        assert_eq!(active(&s).as_deref(), Some("keep"), "the title is passed over");
+        key(&mut s, &ev(Key::Up), "", false);
+        assert_eq!(active(&s).as_deref(), Some("remove"));
+        let mut one = vec![Panel::new("p", "P", 200.0, vec![Row::Item(Item::new("a", "A")), Row::Item(Item::new("b", "B").off())])];
+        one[0].wraps = true;
+        key(&mut one, &ev(Key::Down), "", false);
+        assert_eq!(active(&one).as_deref(), Some("a"), "a row that is off is passed over");
+    }
+
+    #[test]
     fn tab_moves_as_down_and_shift_tab_as_up_and_neither_chooses() {
         let mut s = vec![panel()];
         assert_eq!(key(&mut s, &ev(Key::Tab), "", false), Taken::Moved);
@@ -542,6 +587,31 @@ mod tests {
         let long = Panel::new("l", "Long", 250.0, (0..40).map(|i| Row::Item(Item::new(i.to_string(), "x"))).collect());
         let r = place([100.0, 300.0, 2.0, 29.0], PANE, &[long]).rects[0];
         assert!(r[3] < 40.0 * ITEM && inside(r, PANE), "{r:?}");
+    }
+
+    fn long(n: usize) -> Panel {
+        let rows = std::iter::once(Row::Field { id: "find".into(), label: None, placeholder: String::new(), value: String::new() })
+            .chain((0..n).map(|i| Row::Item(Item::new(i.to_string(), "x"))));
+        Panel::new("l", "Long", 250.0, rows.collect()).as_list()
+    }
+
+    #[test]
+    fn a_list_is_at_most_twelve_rows_under_its_field() {
+        assert_eq!(long(40).height(), FIELD + 12.0 * ITEM + 2.0 * (PAD + BORDER));
+        assert_eq!(long(3).height(), FIELD + 3.0 * ITEM + 2.0 * (PAD + BORDER), "a short one is as tall as its rows");
+        let mut menu = long(40);
+        menu.list = false;
+        assert_eq!(menu.height(), FIELD + 40.0 * ITEM + 2.0 * (PAD + BORDER), "a menu is as tall as its rows");
+    }
+
+    #[test]
+    fn a_list_with_too_little_room_under_its_line_goes_above_it_whole() {
+        let h = long(40).height();
+        // 157 points under the line, 446 above.
+        let r = place([100.0, 500.0, 2.0, 29.0], PANE, &[long(40)]).rects[0];
+        assert_eq!(r[3], h, "not made shorter");
+        assert_eq!(r[1] + r[3], 500.0 - GAP, "above the line");
+        assert!(inside(r, PANE), "{r:?}");
     }
 
     #[test]

@@ -143,20 +143,34 @@ fn opening() -> Transition {
 /// One panel at `rect`; `back` names the panel it replaced, drawn as a first row that goes back.
 fn panel_view(s: &State, p: &Panel, depth: usize, rect: [f32; 4], back: Option<&str>) -> El {
     let c = s.look.palette;
-    let mut rows = col().w_full();
+    let kit = kit(&c);
+    // What stays put: the row back, and a list's field or heading.
+    let mut fixed = col().w_full();
     if let Some(name) = back {
-        rows = rows.child(
+        fixed = fixed.child(
             row().key("panel-back").w_full().h(panel::ITEM).pl(10.0).pr(8.0).gap(8.0).center_y().radius(5.0)
                 .child(text(format!("‹ {name}")).font(fonts::ui(400.0)).color(c.ink2))
                 .on_press_tx(|s: &mut State, tx| look::back(s, tx)),
         );
     }
+    let lead = p.lead();
+    let mut rows = col().w_full();
     for (i, r) in p.rows.iter().enumerate() {
-        rows = rows.child(row_view(s, p, depth, i, r));
+        let drawn = row_view(s, p, depth, i, r);
+        if i < lead {
+            fixed = fixed.child(drawn);
+        } else {
+            rows = rows.child(drawn);
+        }
     }
     let inner = rect[3] - 2.0 * (panel::PAD + panel::BORDER);
-    let body = col().w_full().h(inner).min_h(0.0).child(popover::fit_scroll(rows));
-    let kit = kit(&c);
+    // A list's rows scroll with a scroll bar that shows; a menu's only when the pane cuts it.
+    let scroll = if p.list {
+        rune_kit::scroll_bar(&kit, &format!("panel-{depth}-list"), "scroll", popover::fit_scroll(rows)).w_full().shrink().min_h(0.0)
+    } else {
+        popover::fit_scroll(rows)
+    };
+    let body = col().w_full().h(inner).min_h(0.0).child(fixed).child(scroll);
     popover::raised(&kit, col().key(format!("panel-{depth}")).padding(panel::PAD).child(body), 8.0)
         .fill(c.pop)
         .border(panel::BORDER, c.line)

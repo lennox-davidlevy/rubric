@@ -285,6 +285,18 @@ impl Entry {
     pub fn tokens(&self, mode: Mode) -> Result<Tokens, String> {
         Ok(tokens(&resolve_some(&self.file, mode, |r| USED.contains(&r))?, mode))
     }
+
+    /// The one mode of a theme whose tokens are the same in light and dark: light when its
+    /// background is more light than dark. None for a theme with both.
+    pub fn only(&self) -> Option<Mode> {
+        let (light, dark) = (self.tokens(Mode::Light).ok()?, self.tokens(Mode::Dark).ok()?);
+        (light == dark).then(|| if light.pane.luminance() > 0.5 { Mode::Light } else { Mode::Dark })
+    }
+
+    /// Can be drawn in `mode`.
+    pub fn has(&self, mode: Mode) -> bool {
+        self.only().is_none_or(|m| m == mode)
+    }
 }
 
 macro_rules! bundled {
@@ -535,6 +547,17 @@ mod tests {
         assert_eq!(t.line.hex(), "#e3e3e3");
         assert_eq!(t.pop, t.pane, "in light the popover is the pane");
         assert_eq!(t.on.hex(), "#111111", "a light accent takes dark text");
+    }
+
+    #[test]
+    fn a_theme_the_same_in_both_modes_has_the_one_its_background_says() {
+        let all = load(None);
+        let only = |n: &str| all.iter().find(|e| e.name == n).unwrap().only();
+        assert_eq!((only("paper"), only("sepia")), (Some(Mode::Light), Some(Mode::Light)));
+        assert_eq!((only("ink"), only("fjord")), (Some(Mode::Dark), Some(Mode::Dark)));
+        assert_eq!(only("dracula"), None, "a theme with both");
+        let paper = all.iter().find(|e| e.name == "paper").unwrap();
+        assert!(paper.has(Mode::Light) && !paper.has(Mode::Dark));
     }
 
     fn temp(name: &str) -> PathBuf {

@@ -17,12 +17,14 @@ pub const LIST: &str = "insert";
 pub const NEW: &str = "new-part";
 pub const WORDS: &str = "words-menu";
 pub const SIMILAR: &str = "similar";
+/// A group's parts, beside Insert part…'s list of groups.
+pub const GROUP: &str = "insert-group";
 
 /// How long after the last key the list is asked for again, in seconds.
 pub const PAUSE: f64 = 0.25;
 
 pub fn owns(id: &str) -> bool {
-    matches!(id, MENU | LIST | NEW | WORDS | SIMILAR)
+    matches!(id, MENU | LIST | NEW | WORDS | SIMILAR | GROUP)
 }
 
 /// A part to put on a line, from `rubric/parts`.
@@ -157,26 +159,31 @@ pub fn parts_answered(s: &mut State, asked: Asked, answer: Value) {
     }
 }
 
-/// Insert part…'s rows: the field, the parts (under their groups, the site's own first, when
-/// there are no words; in Jev's order with words), and Draft new part.
+/// The parts by group: the site's own first, as Custom, then the catalog's groups in the order
+/// the server lists them.
+pub fn groups(parts: &[Entry]) -> Vec<(String, Vec<&Entry>)> {
+    let own: Vec<&Entry> = parts.iter().filter(|e| e.own).collect();
+    let mut groups: Vec<(String, Vec<&Entry>)> = Vec::new();
+    if !own.is_empty() {
+        groups.push((draft::CUSTOM.into(), own));
+    }
+    for e in parts.iter().filter(|e| !e.own) {
+        let g = e.group.clone().unwrap_or_else(|| "Other".into());
+        match groups.iter_mut().find(|(n, _)| *n == g) {
+            Some((_, list)) => list.push(e),
+            None => groups.push((g, vec![e])),
+        }
+    }
+    groups
+}
+
+/// Insert part…'s rows: the field, then with no words each group with its count, which opens
+/// its parts beside; with words the parts in Jev's order; and Draft new part.
 pub fn list_rows(ins: &Insert) -> Vec<Row> {
     let mut rows = vec![Row::Field { id: "find".into(), label: None, placeholder: "Search parts".into(), value: ins.words.clone() }, Row::Sep];
     if ins.words.is_empty() {
-        let own: Vec<&Entry> = ins.parts.iter().filter(|e| e.own).collect();
-        let mut groups: Vec<(String, Vec<&Entry>)> = Vec::new();
-        if !own.is_empty() {
-            groups.push(("Own".into(), own));
-        }
-        for e in ins.parts.iter().filter(|e| !e.own) {
-            let g = e.group.clone().unwrap_or_else(|| "Other".into());
-            match groups.iter_mut().find(|(n, _)| *n == g) {
-                Some((_, list)) => list.push(e),
-                None => groups.push((g, vec![e])),
-            }
-        }
-        for (name, list) in groups {
-            rows.push(Row::Head { name, note: list.len().to_string() });
-            rows.extend(list.into_iter().map(Entry::row));
+        for (name, list) in groups(&ins.parts) {
+            rows.push(Row::Item(Item::new(format!("group:{name}"), format!("{name} ({})", list.len())).more()));
         }
     } else {
         rows.extend(ins.parts.iter().map(Entry::row));
@@ -189,7 +196,7 @@ pub fn list_rows(ins: &Insert) -> Vec<Row> {
 
 /// The focus moved in a panel of this module: the page draws the part under it on the line.
 pub fn moved(s: &mut State, id: &str) {
-    if !matches!(id, LIST | SIMILAR) {
+    if !matches!(id, LIST | SIMILAR | GROUP) {
         return;
     }
     let part = s.panels.last().and_then(Panel::active_id).and_then(|r| r.strip_prefix("part:")).map(str::to_string);
@@ -247,8 +254,9 @@ pub fn act(s: &mut State, id: &str, taken: Taken, tx: &mut Tx) {
     match (id, taken) {
         (MENU, Taken::Chose(row)) => match row.as_str() {
             "insert" => {
+                // The list takes the menu's place, so a group's parts open beside it.
                 let rows = list_rows(&Insert { words: String::new(), ..ins.clone() });
-                draft::second(s, Panel::new(LIST, "Insert part", 320.0, rows), "insert");
+                s.panels = vec![Panel::new(LIST, "Insert part", 320.0, rows).as_list()];
                 ask_list(s, String::new());
             }
             "new" => {
@@ -270,15 +278,24 @@ pub fn act(s: &mut State, id: &str, taken: Taken, tx: &mut Tx) {
             }
             _ => {}
         },
-        (LIST | SIMILAR | WORDS, Taken::Chose(row)) if row.starts_with("part:") => {
+        (LIST, Taken::Chose(row)) if row.starts_with("group:") => {
+            let name = &row["group:".len()..];
+            let Some((_, list)) = groups(&ins.parts).into_iter().find(|(n, _)| n == name) else { return };
+            let rows = std::iter::once(Row::Head { name: name.to_string(), note: String::new() })
+                .chain(list.into_iter().map(Entry::row))
+                .collect();
+            draft::second(s, Panel::new(GROUP, name, 300.0, rows).as_list(), &row);
+            moved(s, GROUP);
+        }
+        (LIST | SIMILAR | WORDS | GROUP, Taken::Chose(row)) if row.starts_with("part:") => {
             let Some(e) = ins.parts.iter().find(|e| row[5..] == e.name).cloned() else { return };
             close(s, true);
             place(&mut s.edit, line, &e);
             state::changed(s);
         }
         (LIST, Taken::Submitted(..)) => {
-            // Return in the field: the first part listed.
-            if let Some(e) = ins.parts.first().cloned().filter(|_| ins.words == s.field.text.trim()) {
+            // Return in the field: the first part listed for its words.
+            if let Some(e) = ins.parts.first().cloned().filter(|_| !ins.words.is_empty() && ins.words == s.field.text.trim()) {
                 close(s, true);
                 place(&mut s.edit, line, &e);
                 state::changed(s);
@@ -306,7 +323,7 @@ pub fn act(s: &mut State, id: &str, taken: Taken, tx: &mut Tx) {
                 let rows = std::iter::once(Row::Head { name: "Similar parts".into(), note: ins.parts.len().to_string() })
                     .chain(ins.parts.iter().map(Entry::row))
                     .collect();
-                draft::second(s, Panel::new(SIMILAR, "Similar parts", 264.0, rows), "similar");
+                draft::second(s, Panel::new(SIMILAR, "Similar parts", 264.0, rows).as_list(), "similar");
                 moved(s, SIMILAR);
             }
             "draft" => {
@@ -325,8 +342,8 @@ pub fn act(s: &mut State, id: &str, taken: Taken, tx: &mut Tx) {
             _ => {}
         },
         (WORDS, Taken::Chip(row)) => draft::act(s, draft::MENU, Taken::Chip(row), tx),
-        (LIST | SIMILAR, Taken::Back) => peek(s, None),
-        (_, Taken::Closed | Taken::Passed) => close(s, matches!(id, LIST | SIMILAR)),
+        (SIMILAR | GROUP, Taken::Back) => peek(s, None),
+        (_, Taken::Closed | Taken::Passed) => close(s, matches!(id, LIST | SIMILAR | GROUP)),
         _ => {}
     }
 }
@@ -406,18 +423,23 @@ mod tests {
     }
 
     #[test]
-    fn with_no_words_the_list_is_under_its_groups_own_first() {
+    fn with_no_words_the_list_is_its_groups_custom_first_each_opening_its_parts() {
         let ins = Insert {
             parts: vec![entry("tide-table", true, None, false), entry("steps", false, Some("Lists and steps"), false), entry("quote", false, Some("Writing"), false), entry("timeline", false, Some("Lists and steps"), false)],
             ..Insert::default()
         };
-        let heads: Vec<String> = list_rows(&ins).iter().filter_map(|r| match r {
-            Row::Head { name, .. } => Some(name.clone()),
+        let rows = list_rows(&ins);
+        let items: Vec<&Item> = rows.iter().filter_map(|r| match r {
+            Row::Item(i) => Some(i),
             _ => None,
         }).collect();
-        assert_eq!(heads, ["Own", "Lists and steps", "Writing"]);
+        let ids: Vec<&str> = items.iter().map(|i| i.id.as_str()).collect();
+        assert_eq!(ids, [format!("group:{}", draft::CUSTOM).as_str(), "group:Lists and steps", "group:Writing", "draft"]);
+        assert!(items[..3].iter().all(|i| i.more), "a group opens its parts");
+        assert!(items[1].label.contains('2'), "with its count: {}", items[1].label);
         let with_words = Insert { words: "steps".into(), ..ins };
-        assert!(!list_rows(&with_words).iter().any(|r| matches!(r, Row::Head { .. })), "a ranked list has no headings");
+        let ranked: Vec<String> = list_rows(&with_words).iter().filter_map(|r| r.id().map(str::to_string)).collect();
+        assert_eq!(ranked, ["find", "part:tide-table", "part:steps", "part:quote", "part:timeline", "draft"], "a ranked list is flat");
     }
 
     #[test]
