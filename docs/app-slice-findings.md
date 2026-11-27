@@ -344,3 +344,173 @@ The last two need a window. This machine has no Xvfb, and the session opens none
 - **Two earlier headless tests updated.** `typing_in_insert_part_asks_once_after_the_pause_and_drops_older_answers` and `a_long_list_keeps_its_field_in_place_while_its_rows_scroll` typed `"ste"`/`"step"` and `"p"` against `catalog()`, which now match `steps` locally without asking the server; both now type words not in `catalog()` (`"xyz"`/`"xyzw"` and `"z"`) so they continue to exercise debounce, stale-answer dropping, and scrolling on server answers.
 - **Not seen by anyone**: both changes in a real window — one-line ghost text on `::: three numbered steps` above a paragraph, instant name and description matching in `Insert part…`, and the server fallback on unfound words (C64 and C97 to C100 of `testing/TESTING.md`).
 
+## The move to Rune `41cfc07`
+
+Built 2026-11-26 on branch `rune-move` off `main`, from [app-rune-move.md](app-rune-move.md). Moved `app/Cargo.toml` from Rune `0ca075619d116f8f6e0e3bc8ff815c72c636cac8` (2026-11-13) to `41cfc073ca5845f1d689a41535d796f37a8f7eba` (2026-11-26) with all eight `[patch.crates-io]` entries from Rune's root `Cargo.toml` (`winit`, `sctk-adwaita`, `parley_engine`, `wgpu-hal`, `naga`, `accesskit_windows`, `accesskit_macos`, `accesskit_atspi_common`). After tracing the ~30× typing regression to Rune commit `09569ff2` and filing the issue on `github.com/anomalyco/rune`, the pin was pointed to fork `https://github.com/lennox-davidlevy/rune` at `ac6b4825f51e13f35628759255f644a8b411e9dc` (branch `rubric-41cfc07-fix`, which is `41cfc07` plus the one-line revert of `09569ff2` at `crates/rune-text/src/paragraphs.rs:912`) so `main` runs at full speed until upstream merges a fix. Nothing in `app/src/` or `app/tests/` changed; no new features were built.
+
+### What changed in Rune that the app met
+
+- **Zero code changes in `app/src/` or `app/tests/`.** Although Rune split internal crates (`rune-core`, `rune-edit`, `rune-text`, `rune-gpu`, `rune-motion`, `rune-image`, `rune-media`, `rune-spell`, `rune-highlights`, `rune-tiny-skia-path`) and reorganized files, every public name and signature `rubric-app` uses from `rune` and `rune-kit` remained compatible. Both `cargo check --tests --features bench` and the full test suite compiled and passed without editing any Rust source file or test.
+- **`naga` and `wgpu` versions in `Cargo.lock`.** On the first `cargo fetch`, Cargo warned that `patch naga v30.0.1` was unused because `app/Cargo.lock` still held `wgpu`/`naga` `30.0.2` from crates.io. Updating `naga` and the `wgpu` crates (`wgpu`, `wgpu-core`, `wgpu-core-deps-windows-linux-android`, `wgpu-naga-bridge`, `wgpu-types`, `naga-types`) to `30.0.1` aligns the whole graphics stack with Rune's `Cargo.lock` and clears the unused-patch warning.
+- **Pin verification.** Rune's `scripts/check_rune_pins.py --rune-manifest <rune>/Cargo.toml --manifest app/Cargo.toml --lock app/Cargo.lock` exited 0 and reported `Rune pins agree`.
+- **Tests.** Before and after: `cargo test` passed 160 tests (89 unit in `src/lib.rs`, 71 headless in `tests/headless.rs`, 3 ignored); `cargo test -- --ignored` passed all 3 stub-server tests in `tests/server.rs`; `bun run typecheck` and `bun test test/part-request.test.ts test/site-process.test.ts test/live.test.ts` (21 tests) passed.
+
+### Numbers before and after
+
+Release builds on a quiet machine (`cargo clean && cargo build --release`, then `./target/release/typing --server`, post `sites/app-slice/pages/posts/long.md`, 19,937 bytes, 3,933 words, 218 lines).
+
+| Metric | Budget | Before (`0ca0756`) | Stock `41cfc07` | Fork `ac6b4825` (1-line revert) | Status |
+|---|---|---|---|---|---|
+| `cargo test` / `-- --ignored` | all pass | 160 passed / 3 passed | 160 passed / 3 passed | 160 passed / 3 passed | met |
+| Clean release build time | recorded | 46.8 s | 48.8 s | 48.8 s | +2.0 s |
+| Release binary size (`rubric-app`) | recorded | 44,116,944 B (42.1 MiB) | 49,567,520 B (47.3 MiB) | 49,516,072 B (47.2 MiB) | +5.1 MiB |
+| `markdown::spans` (100 runs, wall) | median 1 ms | median 0.0070 ms, p95 0.0072 ms | median 0.0066 ms, p95 0.0069 ms | median 0.0066 ms, p95 0.0069 ms | met |
+| One typed char at start (`type_start`, CPU) | p95 4 ms | median 0.14 ms, p95 0.15 ms | median 4.87 ms, p95 5.02 ms | median 0.15 ms, p95 0.16 ms | **met** (was 33× slower) |
+| One typed char in middle (`type_mid`, CPU) | p95 4 ms | median 0.24 ms, p95 0.29 ms | median 4.08 ms, p95 4.18 ms | median 0.25 ms, p95 0.26 ms | **met** (was 14× slower) |
+| One typed char at end (`type_end`, CPU) | p95 4 ms | median 0.13 ms, p95 0.14 ms | median 5.14 ms, p95 5.37 ms | median 0.13 ms, p95 0.14 ms | **met** (was 39× slower) |
+| One typed char on `new:` line (`type_new_line`, CPU) | p95 4 ms | median 0.16 ms, p95 0.21 ms | median 5.18 ms, p95 5.32 ms | median 0.17 ms, p95 0.18 ms | **met** (was 25× slower) |
+| `new:` menu: answer to frame (`menu_open`, CPU) | recorded | median 0.29 ms, p95 0.33 ms | median 0.33 ms, p95 0.35 ms | median 0.33 ms, p95 0.35 ms | +0.02 ms |
+| Key in open menu to frame (`menu_key`, CPU) | one frame | median 0.08 ms, p95 0.10 ms | median 0.11 ms, p95 0.13 ms | median 0.11 ms, p95 0.14 ms | met |
+| Part menu: both answers to frame (`part_menu_open`, CPU) | recorded | median 0.49 ms, p95 0.50 ms | median 0.54 ms, p95 0.56 ms | median 0.54 ms, p95 0.55 ms | +0.05 ms |
+| Segment key → server line → frame (`part_segment_to_line`, CPU) | one frame | median 0.43 ms, p95 0.45 ms | median 5.43 ms, p95 5.59 ms | median 0.55 ms, p95 0.59 ms | **met** (was 12× slower) |
+| Tab to menu: stub server's two answers (`server_tab_to_answers`, wall) | 50 ms | median 0.15 ms, p95 0.44 ms (max 4.92 ms) | median 0.20 ms, p95 0.38 ms (max 5.84 ms) | median 0.17 ms, p95 0.46 ms (max 5.09 ms) | met |
+| Stub server `set` answer (`server_set`, wall) | recorded | median 0.05 ms, p95 0.16 ms | median 0.06 ms, p95 0.20 ms | median 0.06 ms, p95 0.27 ms | unchanged |
+
+**Typing budget regression (root cause proved, not tuned):** every path that mutates the long spanned `text_input` (`type_start`, `type_mid`, `type_end`, `type_new_line`, and `part_segment_to_line`) regressed from 0.14–0.45 ms p95 to 4.18–5.59 ms p95, missing the 4 ms typing budget across all four typing cases. Non-editing frames (`menu_open`, `menu_key`, `part_menu_open`) stayed within ~0.06 ms of baseline, and `markdown::spans` stayed at 7 µs.
+
+- **Cause (proved via Rune's `frame-profile` + isolated `/tmp` build):** Rune commit `09569ff2aea78d15702346b267ac9a981f15d02d` (*"perf(rune-text): keep deferring plain ASCII paragraphs when other paragraphs have layout spans (#1900)"*, 2026-11-24). Running `rubric-app --features bench --script …` with `RUNE_FRAME_LOG` showed every keystroke reshaping **`shaped: 173`** paragraphs (`text_cpu: 4.64 ms`) instead of `1`. In `crates/rune-text/src/paragraphs.rs:912`, `09569ff2` changed `let can_defer = plain && ...` to `let can_defer = no_pills_or_blocks && ...`, while `reuse_keys` (line 902) stayed gated on `plain` (`layout_spans.is_empty()`). On any multi-paragraph (`> 64` lines) `text_input` with layout-affecting spans (headings, bold, italic), `plain` is `false`, so `reuse_keys` returns `None` and `edited` covers the whole document; `can_defer == true` then bundles plain ASCII lines into multi-line waiting-run keys (`"run"`) on every keystroke, which never match the individual shaped paragraphs in `prev.paragraphs`, breaking `before`/`after` prefix/suffix reuse and reshaping all 173 non-empty paragraphs on every key.
+- **Resolution (fork pinned at `ac6b4825`, issue filed upstream):** reverting just that line (`can_defer = plain && ...`) on fork `lennox-davidlevy/rune` (`rubric-41cfc07-fix`, `ac6b4825f51e13f35628759255f644a8b411e9dc`) restored every metric to baseline (`type_start` 0.16 ms, `type_mid` 0.26 ms, `type_end` 0.14 ms, `type_new_line` 0.18 ms, `part_segment_to_line` 0.59 ms p95) while keeping `Tx::text_offset_at`, `Tx::text_line`, and `LineFill`. `scripts/check_rune_pins.py` reports `Rune pins agree`. Once `anomalyco/rune` fixes the issue, `app/Cargo.toml` returns to mainline `anomalyco/rune`.
+
+#### Ready-to-file issue for `github.com/anomalyco/rune` (typing regression in `09569ff2`)
+
+> **Title:** `rune-text`: commit `09569ff2` (#1900) breaks paragraph reuse in spanned multi-line `text_input`, reshaping every paragraph on each keystroke (~30× slower)
+>
+> **Environment**
+> - Rune rev: `41cfc073ca5845f1d689a41535d796f37a8f7eba` (regressed in `09569ff2aea78d15702346b267ac9a981f15d02d`, #1900)
+> - Reproducer: multi-line `text_input` with `> 64` lines (218 lines, ~20 KB Markdown post) and layout-affecting `Span`s (`size`, `weight`, `italic` on headings/bold/italic).
+>
+> **What happens**
+> Every single keystroke reshapes all 173 non-empty paragraphs (`shaped: 173`, `text_cpu: ~4.6 ms` per keystroke in release headless `Runtime::frame`) instead of only the edited paragraph (`~0.15 ms` before `09569ff2`).
+>
+> **Why (`crates/rune-text/src/paragraphs.rs:895-937`)**
+> 1. Because `layout_spans` is non-empty, `plain` is `false` (line 898), so `reuse_keys` (line 902) is skipped and `edited` spans the entire document (`count_newlines > LAZY_MIN` = 64).
+> 2. Commit `09569ff2` changed `can_defer` (line 912) from `plain && ...` to `no_pills_or_blocks && ...`, so `runs` (`Runs { edit: true, ... }`) is `Some(...)` on every keystroke.
+> 3. `key_paragraphs` groups plain ASCII lines between line `EAGER_START` (4) and `lines - EAGER_END` (24) into multi-line waiting-run records keyed with `"run"`, while `prev.paragraphs` holds the already-shaped individual paragraphs (one record per line).
+> 4. Because the waiting-run keys never match `old`'s per-paragraph keys, `before` stops at the first run and `after` stops at the last run; every paragraph in between gets `kept = None` and reshapes from scratch on every keystroke.
+>
+> **Verification**
+> Changing line 912 back to `let can_defer = plain && ...` on `41cfc07` drops p95 per-keystroke CPU on the same 218-line Markdown post from 4.18–5.37 ms back to 0.13–0.29 ms (and single-line replacement from 5.59 ms to 0.58 ms).
+>
+> **Suggested fix**
+> Do not defer lines into waiting runs when `prev` is already shaped and `reuse_keys` did not run (or extend `reuse_keys` to handle spanned text / match individual lines against `prev` before bundling runs), so editing a spanned multi-line field preserves `before`/`after` paragraph reuse.
+
+### Pictures compared
+
+Debug headless snapshots (`rubric-app sites/app-slice/pages/posts/long.md [--scene themes] --snap <file> --at 1`, 2800×1800 at 2× scale) kept outside the repo in scratch storage:
+
+- **Layout and geometry:** identical. Both `themes` (892 instances, 141 layout nodes, 876 glyphs) and writing-only (778 instances, 15 layout nodes, 770 glyphs) draw the exact same Literata serif writing, Instrument Sans title bar and theme list, line spacing, colors, caret position, and panel placement.
+- **Panel corners and shadow:** identical to the eye; pixel comparison over the panel border/shadow band found 156 pixels differing by at most 1/255.
+- **Text antialiasing (the only visible/measurable difference):** 0.174% of pixels in `themes` (8,778 of 5,040,000) and 0.175% in writing-only (8,841 of 5,040,000) changed, all on text glyph edges across the title bar, panel labels, and writing (0 changed pixels in the right pane). Changed pixels skew lighter (6,992 lighter vs 1,786 darker in `themes`; 7,432 lighter vs 1,409 darker in writing-only), matching Rune's Linux text rasterizer update (`FontSmoothing::WindfoilChromium` default and Linux text gamma curve). Visually indistinguishable at normal viewing distance.
+
+### What Rune lacked, looked for again (Task 4)
+
+1. **The text position under a right-click.**
+   - **Yes.** `Tx::text_offset_at(key, x, y, f)` (`crates/rune/src/el/tx/pick.rs:43`, backed by `Runtime::text_offset_at` in `crates/rune/src/runtime/api.rs`) maps a window point (`PointerPress::x`/`y` from `El::on_secondary_press`, `crates/rune/src/el/handlers.rs:406`) to `Option<usize>` (UTF-8 byte offset) in any mounted, non-exiting, non-secure text or `text_input` (including `"editor"`), running `f(&mut S, Option<usize>, &mut Tx)` after the handler and before the view commit.
+   - **Handler precedence is preserved.** In `crates/rune/src/runtime/input/secondary.rs:111-116`, `secondary_target` checks `n.handlers.on_secondary_press.is_some()` before `editable_field_menu(index)`, and `queue_field_menu` (`secondary.rs:464-469`) declines whenever `on_secondary_press` is set, dispatching `Action::SecondaryPress` (`secondary.rs:378-380`) ahead of Rune's built-in Cut/Copy/Paste menu.
+   - **How the right-click menu would be built:**
+     1. Attach `.on_secondary_press(|_, p, tx| tx.text_offset_at("editor", p.x, p.y, ...))` to the `"editor"` `text_input` in `app/src/lib.rs`.
+     2. In the callback, on `Some(byte)`, place the caret at `byte` (unless `byte` lies inside an active selection), update `last_range` / cursor line, and open that line's menu through the same path Tab uses.
+     3. Anchor the panel to the clicked line with `Tx::text_line("editor", byte, ...)` (or the moved caret), keeping Cut/Copy/Paste rows available on plain lines or selections.
+
+2. **A line's rectangle other than the caret's.**
+   - **Yes, both a line-box query and a built-in left bar/fill now exist.**
+   - `Runtime::text_line(key, byte)` (`crates/rune/src/runtime/api.rs:580`, `crates/rune/src/runtime/selection/field_lines.rs:71`) and `Tx::text_line(key, byte, f)` (`crates/rune/src/el/tx/pick.rs:89`) return `Option<TextLine>` (`field_lines.rs:10`) for any byte in a `text_input` (focused or not): `TextLine { rect: [x, y, w, h], start, prev, next }` in window points after scrolling (`x`/`w` span the field's laid-out text, `y`/`h` are that visual line's). That gives both a panel's anchor on any line and the right-edge placement for a `new:` line's status label.
+   - For the `new:` line's left edge itself, `LineFill::new(start, end).left_bar(width, color)` (`crates/rune/src/el/text_spec.rs:590`) attached via `El::line_fill` / `El::line_fills` (`crates/rune/src/el/text.rs:288`) draws display-only full-width backgrounds and left vertical bars over the visual lines intersecting `start..end` of a `text_input` without touching `TextEdit` or undo history (mapped across active IME preedits).
+
+3. **Lines drawn in the field that are not in its text.**
+   - **No.** Neither `InputSpec` (`crates/rune/src/el/input.rs`) nor `TextEdit` (`crates/rune-edit/src/lib.rs`) supports virtual/phantom lines or inlay text injected between lines of `edit.text`. `El::inline` (`crates/rune/src/el/pills.rs:207-210`) explicitly returns early as a no-op on any `text_input` (static text only); `El::placeholder` draws only when the entire field is empty; `Span`, `TextHighlight`, `LineFill`, `strike`, and `overline` only decorate existing bytes of `edit.text` without inserting vertical room or unbacked lines. Drawing a part's starter between its fences without mutating `TextEdit` is still not supported by `text_input`.
+
+4. **A font family for a span.**
+   - **No.** `Span` (`crates/rune-text/src/layout/span.rs:12-25`) still has only `start`, `end`, `weight`, `mono: bool`, `size`, `color`, `bg`, `bg_pad`, `underline`, and `italic` — no `family: Option<Family>` field. A span can switch to the mono slot (`.mono()`), not to another named or sans family inside a Literata field.
+
+5. **The input method on a focus move.**
+   - **Still resets the same way on both field-to-field focus moves and window focus gain.**
+   - Every `FocusEffect::Moved` sets `self.ime_area = None` and `self.edit.ime_reset = true` (`crates/rune/src/runtime/input/focus.rs:557-561`).
+   - `ime_sync_state` / `ime_sync_step` (`crates/rune/src/input/host_events.rs:657-661, 698-701`) passes `reset` to `ImeSync::step` (`host_events.rs:605-628`), which sets `set_allowed = Some(allowed)` whenever `reset || allowed != self.is_enabled()` (line 614).
+   - `sync_ime` (`host_events.rs:723-746`) then runs `crate::platform::ime::cancel(window)` (a no-op on Linux/X11: `crates/rune/src/platform/ime.rs:187-188`) and executes:
+     ```rust
+     if let Some(allowed) = step.set_allowed {
+         window.set_ime_allowed(false);
+         if allowed { window.set_ime_allowed(true); }
+     }
+     ```
+     So moving focus from one text input to another still calls `set_ime_allowed(false)` immediately followed by `set_ime_allowed(true)`.
+   - On window focus loss (`crates/rune/src/window/host/events.rs:600-604`), `WindowEvent::Focused(false)` calls `l.window.set_ime_allowed(false)` and `self.ime.clear()`. On `WindowEvent::Focused(true)` (`events.rs:608-613`), it either sets `rt.edit.ime_reset = true` (when `rt.stale()`) or calls `sync_ime` immediately while `self.ime` is `Disabled`; in both paths `sync_ime` calls `set_ime_allowed(false)` and then `set_ime_allowed(true)` again. Window creation (`crates/rune/src/window/host/create.rs:180-182`) also calls `set_ime_allowed(false)` and sets `ime_reset = true`.
+   - **Changelog check:** nothing in `CHANGELOG.md` or `changelog/unreleased/` mentions fcitx or the X11/XWayland lost-keyboard issue. Recent IME changes cover Wayland `zwp_text_input_v3` cursor-area deduplication (`2026-11-23-ime-cursor-area-dedup.md`), `App::on_ime` / `El::ime_cursor` and `Ime::Disabled` (`2026-11-23-app-ime-disabled-ends-composition.md`, `2026-11-23-empty-ime-commit-outside-composition.md`, `2026-11-23-empty-ime-preedit-caret-follow.md`), macOS `OptionAsAlt` and full-width punctuation (`2026-11-13-ime-option-as-alt.md`, `2026-11-23-macos-ime-fullwidth-punctuation.md`, `2026-11-25-option-as-alt-mode.md`), Wayland layer-shell IME (`2026-11-24-wayland-layer-shell-ime.md`), and XWayland overlay/global-shortcut items (`2026-11-23-xwayland-prewarm-hidden-input.md`, `2026-11-24-xwayland-global-shortcuts-portal.md`).
+
+6. **Changelog entries that answer workarounds in the app (named only; nothing changed).**
+   - **Focus taken by a press on a panel row** (`look::keys_home` restoring `"editor"` focus after clicks): directly answered by **`El::preserve_focus_on_press(true)`** (`crates/rune/src/el/focus.rs:266`, `changelog/unreleased/2026-11-23-preserve-focus-on-press-focusable.md`), which runs `on_press` while leaving the currently focused text field focused instead of blurring it. Also **`El::keyboard_focus_only()`** (`2026-11-25-focus-ring-radius-keyboard-focus-only.md`) keeps a focusable control out of pointer focus.
+   - **Hover refreshed on every build under a still pointer** (`lib.rs` using `on_pointer_move_local` instead of `on_hover_change`): partially answered by **hover hold during layout motion and app glides** (`CHANGELOG.md`, "Hover waits while layout moves content under a still pointer" / "A glide the app asked for holds a still pointer's hover until it stops", plus `2026-11-23-hover-ancestor-resize.md`), **`El::hover_delays(enter, leave)`** (`CHANGELOG.md`), and **`El::focus_highlight`** (`crates/rune/src/el/focus.rs:281`). Note that once motion settles (or on an instant mount), hover still lands under a resting pointer, so `on_pointer_move_local` remains stricter for a panel opening under a stationary pointer.
+   - **Colors changing on springs** (`look.rs` passing `tx.color_motion(Spring::NONE)`): colors still spring by default (`El::instant_changes()` leaves colors animating), so `Tx::color_motion(Spring::NONE)` is still needed, and **`Spring::NONE`** is now `Curve::Instant` (no longer stretched into a fade under Reduce Motion, `CHANGELOG.md`) with text colors landing on the same frame instead of hitting the 0.1 s floor (`2026-11-08-text-color-instant.md`).
+   - **Other app workarounds now directly answered by Rune `41cfc07`:**
+     - **Caret move polled in `App::on_frame_drawn`** (`main.rs:156`): answered by **`El::on_input_selection`** (`2026-11-25-pill-press-and-input-selection.md`), firing in the same turn before view rebuild whenever runtime input changes `(edit.anchor, edit.focus)`.
+     - **Keeping panels inside the writing pane** (`panel::place` instead of `anchored_fit`): answered by **`El::anchored_in(boundary_key)`** and `anchor_rect_in(...)` (`2026-11-24-anchor-placement-and-boundary.md`), clamping and flipping overlays inside a named boundary element intersected with the window, plus `Cx::anchor_placement(key)`.
+     - **Default white caret/placeholder/selection on `text_input`**: **`2026-11-24-text-input-caret-color.md`** inherits `El::color(c)` for uninked caret, placeholder (`alpha(0.4)`), and selection (`alpha(0.2)`).
+     - **Ancestor key interception before a focused field**: **`El::on_key_preview`** (`2026-11-25-on-key-preview.md`).
+
+### Keyboard follow-up: both texts ready for after David's row D3
+
+#### A. If the keyboard is still lost with `RUBRIC_IME=1` — issue for `github.com/anomalyco/rune`
+
+> **Title:** X11/XWayland + fcitx5: toggling `set_ime_allowed(false)` then `set_ime_allowed(true)` on every focus move drops all subsequent keyboard events
+>
+> **Environment**
+> - Rune rev: `41cfc073ca5845f1d689a41535d796f37a8f7eba` (vendored `winit 0.30.13`)
+> - OS / desktop: Omarchy (Arch Linux), Hyprland 0.56.2 on Wayland, XWayland 24.1.14, NVIDIA RTX 5090 (open driver 615.78.08)
+> - Input method: fcitx5 via XIM (`XMODIFIERS` set for fcitx5)
+> - Window runs on X11 through XWayland (`WAYLAND_DISPLAY` unset, `GDK_BACKEND=x11`)
+>
+> **Steps to reproduce**
+> 1. Run a Rune app with two `text_input` elements on X11/XWayland with fcitx5 active (e.g., a main multi-line `text_input` and a second `text_input` in an overlay/panel).
+> 2. Repeatedly move focus from the first `text_input` to the second (`Tx::focus`) and back to the first, typing a character in each (in our trace, moving focus into and out of the second field ~6–20 times).
+> 3. Continue typing in the focused `text_input`.
+>
+> **What happens**
+> After several focus transitions between text inputs (intermittently, ~1 in 6 in a traced run), the window stops receiving keyboard input completely (neither `KeyboardInput` nor `Ime::Commit` arrives). Pointer events continue to work normally, and Rune's focus state still reports the `text_input` as focused. Running the same app with `XMODIFIERS=@im=none` never reproduces the loss.
+>
+> **Where Rune does it**
+> 1. `crates/rune/src/runtime/input/focus.rs:557-561`: every `FocusEffect::Moved` sets `self.ime_area = None` and `self.edit.ime_reset = true`.
+> 2. `crates/rune/src/input/host_events.rs:614-616` (`ImeSync::step`): whenever `reset` is `true`, it sets `set_allowed = Some(allowed)` even when IME was already enabled and remains enabled (moving from one non-secure `text_input` to another).
+> 3. `crates/rune/src/input/host_events.rs:727-730` (`sync_ime`): whenever `step.set_allowed` is `Some(allowed)`, it unconditionally calls `window.set_ime_allowed(false)` and then (if `allowed`) `window.set_ime_allowed(true)` back-to-back in the same frame.
+> 4. `crates/rune/src/window/host/events.rs:603, 609-611`: `WindowEvent::Focused(false)` calls `set_ime_allowed(false)` and clears `self.ime`, and `WindowEvent::Focused(true)` triggers `sync_ime` again (which also calls `set_ime_allowed(false)` then `set_ime_allowed(true)`).
+>
+> On X11/XIM (`winit`), each `set_ime_allowed(false)` / `set_ime_allowed(true)` pair appears to trigger an XIM state transition under fcitx5; doing that repeatedly on focus transitions between two text inputs intermittently leaves the window receiving no keyboard events.
+>
+> **Suggested fix**
+> - When focus moves from one enabled text input to another (and especially when no IME preedit composition was active), keep IME enabled instead of toggling `set_ime_allowed(false)` + `set_ime_allowed(true)`: only update the cursor area (`set_ime_cursor_area`) and cancel any active composition if one was in progress.
+> - In `sync_ime` (`host_events.rs:727-730`), avoid calling `window.set_ime_allowed(false)` before `window.set_ime_allowed(true)` when IME is already disabled (`!was_enabled && allowed`, e.g., on `WindowEvent::Focused(true)` after `Focused(false)` already disabled it).
+
+#### B. If the keyboard is NOT lost with `RUBRIC_IME=1` — exact lines to remove from `app/src/main.rs`
+
+1. In the doc comment on `x11_session` (`app/src/main.rs:14-15`), remove `The X11 input method is off too (below).`
+2. In `x11_session` (`app/src/main.rs:29-35`), remove:
+   ```rust
+           // No X11 input method: Rune turns the window's input method off and on at every focus
+           // move between text inputs, and under fcitx5 through XWayland that now and then leaves
+           // the app with no keys at all (the findings, slice 3, sitting 4). Composing (Chinese,
+           // Japanese, Korean) is lost with it until Rune is fixed; RUBRIC_IME=1 keeps it.
+           if std::env::var_os("RUBRIC_IME").is_none() {
+               std::env::set_var("XMODIFIERS", "@im=none");
+           }
+   ```
+
+### Native run of section D (David, 2026-11-26)
+
+- **Window & page (`D1`):** opens natively on Omarchy/Hyprland through XWayland with the writing on the left, live page on the right (`page loaded … 126 ms`, post `180 ms`), and no second title bar or client-side window frame.
+- **Typing & latency (`D2`, `D3`, `D11`):** on stock `41cfc07`, typing latency felt noticeably worse on screen (matching the `09569ff2` 5 ms/keystroke regression; fixed by the `ac6b4825` fork pin above). For `D11` (`Tab` on `::: quote`), 11 of 15 Tabs drew in 1.5–4.3 ms (server 0.9–3.2 ms), while 4 spiked to `34.3 ms` (`server 17.1 ms`) and `50.8–51.0 ms` (`server 33.6–33.7 ms`) — exact ~17 ms (60 Hz frame) multiples across the two sequential `rubric/part` → `rubric/draft` UI-thread round trips plus `on_frame_drawn`.
+- **Right-click (`D9`):** right-clicking in the editor showed no menu at all on Linux — **not a regression**. Rune's built-in `field_menu` uses native OS popups (`NSMenu` on macOS, `TrackPopupMenuEx` on Windows); on Linux, `popup_menu_supported()` is `false` on both `0ca0756` and `41cfc07` (`crates/rune/src/popup_menu/mod.rs:47-67`), so `field_menu` shows nothing unless an app hooks the new opt-in `App::on_field_menu` fallback (#2025) or handles right-click itself via `El::on_secondary_press` (which Rubric will do in slice 4).
+- **Idle CPU (`D10`):** under 1%.
+- **Keyboard with `RUBRIC_IME=1` (`D12`–`D15`):** passed all 20 rounds in and out of `Cite` with zero lost keys. (Note: `ime_reset` still toggles `set_ime_allowed(false)`/`true` in `41cfc07`, so whether the intermittent loss is truly gone or only rarer should be watched if `XMODIFIERS=@im=none` is removed.)
+- **Pre-existing slice-3 bug reproduced during D (`⇒ change quote` + Tab):** on `::: quote cite=a : <something>` with ghost pick `⇒ change quote`, Tab opened the panel at the top-left of the pane and sprang it horizontally to the middle-top. Diagnosed (not changed here): `part::answered` (`app/src/part.rs:240-248`) clears `s.anchor = None`, pushes both `part` and `change`, and sets `s.focus_field = true` (the only place in `app/` that sets it), so `state::follow_up` calls `tx.focus("panel-field", false)` in the same turn. Rune's `commit()` (`commit.rs:550-555`) moves focus to `"panel-field"` and discards Pass 1 before `panel-anchor`'s `on_layout` runs; Pass 2 then sees `s.anchor == None` and `cx.caret("editor") == None`, falling back to `[s.pane[0] + PAD, s.pane[1] + TOP]` (`x = 24, y = 96`), which Frame 1 locks into `s.anchor` and Frame 2 then springs rightward to `ed[0]` while keeping `y = 96`.
+- **Still unseen:** macOS build and runtime.
+

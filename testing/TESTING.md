@@ -4,7 +4,7 @@ What changed in the plan's "Before the app" list (docs/plan.md, under step 8), i
 
 Write what you find in **Notes** at the bottom, by test number.
 
-Last updated: 2026-11-26 (section C, sitting 7 of slice 3).
+Last updated: 2026-11-26 (section D, move to Rune `41cfc07`).
 
 ## Set up
 
@@ -192,6 +192,32 @@ Run every row. There is no C68 to C73: they needed a machine without `gst-plugin
 
 **After the rows, undo what they wrote:** `rm ~/.config/rubric/app.json ~/.config/rubric/themes/{mine.json,a.json,b.json,c.json,d.txt}`, then close the app and run `app/scripts/clean-test.sh`, which puts the site back.
 
+## D. The move to Rune `41cfc07` (branch `rune-move`)
+
+Move of Rune's pin from `0ca0756` to `41cfc073ca5845f1d689a41535d796f37a8f7eba` with its eight patches; no new app features. Findings and before/after numbers are under "The move to Rune `41cfc07`" in [docs/app-slice-findings.md](../docs/app-slice-findings.md). Start natively from a terminal: `cd app && cargo build --release`, then `app/target/release/rubric-app sites/app-slice/pages/posts/long.md`.
+
+| # | Do this | Expect |
+|---|---|---|
+| D1 | Start the app as above | The writing on the left, the page on the right, and no second title bar or frame around the window. |
+| D2 | Type a sentence | Each letter shows at once, as it did before the move. |
+| D3 | Hold a letter key down for five seconds in the middle of the post | The letters keep pace with the key; no stutter. |
+| D4 | Ctrl+T, Down, Return | The theme is kept. |
+| D5 | On `::: quote`, Tab, then Right on `Size` | The line gains `size=large`; the page follows. |
+| D6 | On an empty line, Tab, Return on `Insert part…`, type `callout`, Return | `::: callout` and its closer. |
+| D7 | On a line reading `::: new: a brass clock`, Tab, Return on `Draft` | The status line reads `Ready`. |
+| D8 | Ctrl+Enter | The line becomes the part's; `Kept` shows. |
+| D9 | Right-click in the writing | The editor's own menu, as before. |
+| D10 | Leave the window untouched for 30 s and watch `top` for `rubric-app` | Under 1% CPU. |
+| D11 | On `::: quote`, Tab then Esc, ten times | Ten `menu drawn` lines in the terminal, none over 50 ms. |
+| D12 | Quit. Start again with `RUBRIC_IME=1` before the command | The app starts as before. |
+| D13 | On `::: quote`, Tab, Down to `Cite`, Return, type a letter, Return | The letter is in `cite=`. |
+| D14 | Type a letter in the writing | The letter lands in the writing. |
+| D15 | D13 and D14 again, twenty times in all | No key is ever lost. If the keys stop, note which round. |
+
+D2 and D3 matter most: measured without a window, a typed letter costs about 5 ms on this Rune against 0.2 ms before.
+
+**After section D, put the site back:** close the app, `rm -f ~/.config/rubric/app.json`, and run `app/scripts/clean-test.sh`.
+
 ## Notes
 App starts well
 A2 - so there is a bit of a delay in the typing, and if we can get it instant or as close to that woudl be a priority.
@@ -332,3 +358,7 @@ C61/62 So for this search parts input box, we should hook up jev to this as well
 C64 - insert step prefill preview malformed in app. look at `reference/screenshots/instert-steps-malformed.png` to see. It probably should be placed in between the fences `:::`, very similar to how we do it in neovim.
 
 Otherwise things look fantastic!
+
+
+## D Notes
+D9 - right click does not show menu.
