@@ -788,7 +788,7 @@ fn text_of(rt: &Runtime<State>, key: &str) -> Option<String> {
 }
 
 #[test]
-fn the_title_row_says_saved_only_while_the_text_is_as_written() {
+fn the_title_row_tracks_saved_and_edited_states() {
     let dir = std::env::temp_dir().join(format!("rubric-app-title-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("walk.md");
@@ -799,13 +799,17 @@ fn the_title_row_says_saved_only_while_the_text_is_as_written() {
     let mut rt = Runtime::with_text(s, rubric_app::view, (1000.0, 700.0), Env::new(false, 1.0), rubric_app::fonts::text_system());
     rt.frame(0.0);
     assert_eq!(text_of(&rt, "title").as_deref(), Some("The long walk"));
-    assert!(rt.find("saved").is_some());
+    assert_eq!(rubric_app::state::save_state(&rt.state), rubric_app::state::SaveState::Saved);
+    let saved_text = text_of(&rt, "saved").expect("saved state drawn");
     rt.ime(Ime::Commit("x".into()));
     rt.frame(1.0 / 60.0);
-    assert!(rt.find("saved").is_none(), "changed since it was written");
+    assert_eq!(rubric_app::state::save_state(&rt.state), rubric_app::state::SaveState::Edited);
+    let edited_text = text_of(&rt, "saved").expect("edited state drawn");
+    assert_ne!(edited_text, saved_text, "changed since it was written");
     rt.key(KeyEvent { key: Key::Command('s'), mods: Mods { cmd: true, ..Mods::default() } });
     rt.frame(1.0 / 60.0);
-    assert!(rt.find("saved").is_some(), "written again");
+    assert_eq!(rubric_app::state::save_state(&rt.state), rubric_app::state::SaveState::Saved);
+    assert_eq!(text_of(&rt, "saved"), Some(saved_text), "written again");
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "# The long walk\n\nbodyx");
     std::fs::remove_dir_all(&dir).unwrap();
 }
@@ -2212,13 +2216,18 @@ fn in_page_only_view_the_page_gives_way_to_the_view_popover_and_returns_when_clo
     let resting = rect_of(&rt, "page");
     assert_eq!(resting[0], rubric_app::DIVIDER);
 
-    // Open View popover: page gives way so its left edge is at 300 points (and right of popover).
+    // Open View popover: page gives way so its left edge is at 300 points (and right of popover),
+    // and the yielded column is filled in the pane's color from x=0 to x=300.
     let (bx, by) = rt.find("toolbar-view").unwrap();
     rt.pointer_down(bx, by);
     rt.pointer_up(bx, by);
     settle(&mut rt);
     let pop = rect_of(&rt, "panel-0");
+    let cover = rect_of(&rt, "page-cover");
     let shifted = rect_of(&rt, "page");
+    assert_eq!(cover[0], 0.0, "yielded column starts at left edge in page-only view");
+    assert!((cover[2] - 300.0).abs() < 0.5, "yielded column width {} != 300.0", cover[2]);
+    assert_eq!(fill_of(&rt, "page-cover"), rt.state.look.palette.pane, "yielded column uses pane color");
     assert!((shifted[0] - 300.0).abs() < 0.5, "page left {} != 300.0", shifted[0]);
     assert!(shifted[0] >= pop[0] + pop[2], "page left {} < popover right {}", shifted[0], pop[0] + pop[2]);
     assert_eq!(rt.state.bounds.unwrap().0, 300);
@@ -2391,4 +2400,183 @@ fn keys_forwarded_via_send_key_type_and_switch_panes_and_app_press_takes_keys_ba
     rt.pointer_up(vx, vy);
     rt.frame(1.0 / 60.0);
     assert!(!rt.state.page_has_keys, "press on toolbar takes keys back from the page");
+}
+
+// Sitting 2: autosave, failed save status, save on close, and folder startup.
+
+fn temp_runtime(name: &str, text: &str, caret: usize) -> (Runtime<State>, PathBuf, PathBuf) {
+    let dir = std::env::temp_dir().join(format!("rubric-app-s2-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("post.md");
+    std::fs::write(&path, text).unwrap();
+    let mut s = State::open(path.clone(), text.into());
+    s.edit.set_caret(caret);
+    s.width = 1000.0;
+    s.height = 700.0;
+    let mut rt = Runtime::with_text(s, rubric_app::view, (1000.0, 700.0), Env::new(false, 1.0), rubric_app::fonts::text_system());
+    rt.poll = Some(rubric_app::state::poll);
+    rt.on_key = Some(rubric_app::editor::window_key);
+    rt.frame(0.0);
+    (rt, dir, path)
+}
+
+#[test]
+fn autosave_writes_after_one_second_and_a_second_change_resets_the_timer() {
+    use rubric_app::state::{SaveState, save_state};
+    let (mut rt, dir, path) = temp_runtime("autosave", "# Walk\n\nStart", 13);
+    assert_eq!(save_state(&rt.state), SaveState::Saved);
+
+    // First edit: not written before 1 s.
+    rt.ime(Ime::Commit(" one".into()));
+    rt.frame(1.0 / 60.0);
+    assert_eq!(save_state(&rt.state), SaveState::Edited);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Walk\n\nStart");
+
+    rt.frame(0.6);
+    assert_eq!(save_state(&rt.state), SaveState::Edited);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Walk\n\nStart", "not written at 0.6 s");
+
+    // Second edit before 1 s moves the write deadline forward by another second.
+    rt.ime(Ime::Commit(" two".into()));
+    rt.frame(1.0 / 60.0);
+    rt.frame(0.6);
+    assert_eq!(save_state(&rt.state), SaveState::Edited);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Walk\n\nStart", "still not written 0.6 s after second edit");
+
+    // Past 1 s from the second edit: written, toolbar returns to Saved, no timer left.
+    rt.frame(0.5);
+    assert_eq!(save_state(&rt.state), SaveState::Saved);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Walk\n\nStart one two");
+    assert_eq!(rt.state.save_due, None);
+    assert!(!rt.state.save_arm);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn a_failed_save_shows_status_overrides_new_line_and_retry_clears_both() {
+    use rubric_app::state::{SaveState, save_state};
+    let dir = std::env::temp_dir().join(format!("rubric-app-s2-fail-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let missing_dir = dir.join("missing");
+    let path = missing_dir.join("post.md");
+    let initial = "# Walk\n\n::: new: a tide clock\n:::\n";
+    let mut s = State::open(path.clone(), initial.into());
+    let line_end = initial.find("clock").unwrap() + 5;
+    s.edit.set_caret(line_end);
+    s.width = 1000.0;
+    s.height = 700.0;
+    let mut rt = Runtime::with_text(s, rubric_app::view, (1000.0, 700.0), Env::new(false, 1.0), rubric_app::fonts::text_system());
+    rt.poll = Some(rubric_app::state::poll);
+    rt.on_key = Some(rubric_app::editor::window_key);
+    rt.frame(0.0);
+
+    // Caret is on a `new:` line, so its draft status shows first.
+    let draft_line = rubric_app::draft::line(&rt.state).expect("new: line status");
+    assert_eq!(draft_line.tone, rubric_app::draft::Tone::Dim);
+    assert!(rt.find("status-action").is_some());
+
+    // Edit and wait past 1 s: save fails because the folder does not exist.
+    rt.ime(Ime::Commit("!".into()));
+    rt.frame(1.0 / 60.0);
+    rt.frame(1.1);
+    assert_eq!(save_state(&rt.state), SaveState::Failed);
+    assert!(rt.state.save_error.is_some());
+
+    // The `new:` line's status gives way to the failed save status with Retry (Ctrl+S).
+    let fail_line = rubric_app::draft::line(&rt.state).expect("failed save status");
+    assert_eq!(fail_line.tone, rubric_app::draft::Tone::Warn);
+    let (_, chord) = fail_line.action.expect("Retry action");
+    assert_eq!(chord, rubric_app::toolbar::chord(rubric_app::toolbar::Shortcut::Save));
+    assert!(rt.find("status-action").is_some());
+
+    // In page-only view, the failed save status takes a 34-point strip at the window's foot and
+    // the page yields 34 points at the bottom.
+    cmd_key(&mut rt, '3', false);
+    rt.frame(1.0 / 60.0);
+    let status_rect = rect_of(&rt, "status");
+    let page_rect = rect_of(&rt, "page");
+    assert!((status_rect[2] - 1000.0).abs() < 1.0, "wide status strip: {status_rect:?}");
+    assert!((status_rect[3] - rubric_app::STATUS).abs() < 1.0);
+    assert!((page_rect[1] + page_rect[3] - status_rect[1]).abs() < 1.0, "page yields foot strip: {page_rect:?} vs {status_rect:?}");
+    cmd_key(&mut rt, '1', false);
+    rt.frame(1.0 / 60.0);
+
+    // Make the folder exist, then click Retry: file writes, failed state clears, and `new:` line
+    // status returns.
+    std::fs::create_dir_all(&missing_dir).unwrap();
+    let (ax, ay) = rt.find("status-action").unwrap();
+    rt.pointer_down(ax, ay);
+    rt.pointer_up(ax, ay);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(save_state(&rt.state), SaveState::Saved);
+    assert!(rt.state.save_error.is_none());
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Walk\n\n::: new: a tide clock!\n:::\n");
+    let after = rubric_app::draft::line(&rt.state).expect("new: line status returns");
+    assert_eq!(after.tone, rubric_app::draft::Tone::Dim);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn closing_saves_unsaved_writing_and_folder_startup_opens_newest_post_or_home() {
+    let (mut rt, dir, path) = temp_runtime("close", "# Walk\n\nBefore", 14);
+    rt.ime(Ime::Commit(" after".into()));
+    rt.frame(1.0 / 60.0);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Walk\n\nBefore");
+    rubric_app::state::shut(&mut rt.state);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Walk\n\nBefore after");
+    std::fs::remove_dir_all(&dir).unwrap();
+
+    // Folder startup: asks `rubric/pages` on connect, then opens the first post; with no posts,
+    // opens the home page.
+    let site = std::env::temp_dir().join(format!("rubric-app-s2-folder-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&site);
+    std::fs::create_dir_all(site.join("pages/posts")).unwrap();
+    let home = site.join("pages/_index.md");
+    let newest = site.join("pages/posts/new.md");
+    std::fs::write(&home, "---\ntitle: Harbour\n---\nHome.\n").unwrap();
+    std::fs::write(&newest, "---\ntitle: Newest post\ndate: 2026-11-20\n---\nBody.\n").unwrap();
+
+    let (client, rx) = rubric_app::lsp::Client::recording();
+    let mut s = State::open_folder(site.clone());
+    rubric_app::state::connected(&mut s, client);
+    let req = rx.try_recv().expect("rubric/pages request");
+    assert_eq!(req["method"], "rubric/pages");
+    let id = req["id"].as_i64().unwrap();
+    let resp = Incoming::Response {
+        id,
+        result: Ok(json!({
+            "site": "Harbour",
+            "pages": [
+                { "uri": rubric_app::state::file_uri(&home), "kind": "home", "title": "Harbour", "draft": false },
+                { "uri": rubric_app::state::file_uri(&newest), "kind": "post", "title": "Newest post", "date": "2026-11-20", "draft": false }
+            ]
+        })),
+    };
+    assert!(rubric_app::state::incoming(&mut s, resp));
+    assert_eq!(s.path, newest);
+    assert_eq!(s.title, "Newest post");
+    assert!(!s.waiting_for_page);
+    let sent: Vec<_> = std::iter::from_fn(|| rx.try_recv().ok()).collect();
+    assert!(sent.iter().any(|m| m["method"] == "textDocument/didOpen" && m["params"]["textDocument"]["uri"] == rubric_app::state::file_uri(&newest)));
+    assert!(sent.iter().any(|m| m["method"] == "rubric/cursor" && m["params"]["uri"] == rubric_app::state::file_uri(&newest)));
+
+    // Without posts: opens the home page.
+    let (client2, rx2) = rubric_app::lsp::Client::recording();
+    let mut s2 = State::open_folder(site.clone());
+    rubric_app::state::connected(&mut s2, client2);
+    let req2 = rx2.try_recv().expect("rubric/pages request");
+    let resp2 = Incoming::Response {
+        id: req2["id"].as_i64().unwrap(),
+        result: Ok(json!({
+            "site": "Harbour",
+            "pages": [
+                { "uri": rubric_app::state::file_uri(&home), "kind": "home", "title": "Harbour", "draft": false }
+            ]
+        })),
+    };
+    assert!(rubric_app::state::incoming(&mut s2, resp2));
+    assert_eq!(s2.path, home);
+    assert_eq!(s2.title, "Harbour");
+    std::fs::remove_dir_all(&site).unwrap();
 }

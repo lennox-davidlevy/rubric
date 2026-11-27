@@ -429,9 +429,17 @@ fn caret_status(s: &State) -> Option<(u32, String, Said, &'static str)> {
     Some((line, text.to_string(), said, id))
 }
 
-/// What the bottom of the writing pane says: something that just happened, or where the
-/// caret's `new:` line or part's draft is.
+/// What the bottom of the writing pane (or the window's foot in page-only view) says: a failed
+/// save takes precedence over drafts, flashes, and page status.
 pub fn line(s: &State) -> Option<Said> {
+    if let Some(msg) = &s.save_error {
+        return Some(Said {
+            label: "Post not saved".into(),
+            tone: Tone::Warn,
+            fact: msg.clone(),
+            action: Some(("Retry".into(), crate::toolbar::chord(crate::toolbar::Shortcut::Save))),
+        });
+    }
     if let Some((said, _)) = &s.flash {
         return Some(said.clone());
     }
@@ -441,9 +449,14 @@ pub fn line(s: &State) -> Option<Said> {
     caret_status(s).map(|(_, _, said, _)| said)
 }
 
-/// Reload on a stopped page: Cmd+Shift+R.
+/// Whether the status line claims a full-width strip at the window's foot in page-only view.
+pub fn wide_status(s: &State) -> bool {
+    s.save_error.is_some() || s.page_life.stopped
+}
+
+/// Reload on a stopped page: Cmd+Shift+R (read from `toolbar::SHORTCUTS`).
 fn reload_chord() -> Chord {
-    Chord::cmd_shift(Key::Command('r'))
+    crate::toolbar::chord(crate::toolbar::Shortcut::ReloadPage)
 }
 
 pub fn flash(s: &mut State, label: impl Into<String>, tone: Tone, fact: impl Into<String>) {
@@ -912,14 +925,18 @@ fn perform(s: &mut State, id: &str, line: u32, text: String) {
     };
 }
 
-/// The status line's key, on a `new:` line with no panel open: Cmd+Enter drafts or keeps,
-/// Cmd+R rerolls, Cmd+. stops. True when it was taken.
+/// The status line's key: Retry on a failed save, Reload on a stopped page, or on a `new:` line
+/// with no panel open: Cmd+Enter drafts or keeps, Cmd+R rerolls, Cmd+. stops.
 pub fn status_key(s: &mut State, ev: &KeyEvent) -> bool {
-    if s.page_life.stopped && reload_chord().matches(ev) {
+    if s.save_error.is_some() && crate::toolbar::shortcut(ev) == Some(crate::toolbar::Shortcut::Save) {
+        state::save(s);
+        return true;
+    }
+    if s.page_life.stopped && crate::toolbar::shortcut(ev) == Some(crate::toolbar::Shortcut::ReloadPage) {
         state::reload_page(s);
         return true;
     }
-    if !s.panels.is_empty() {
+    if s.save_error.is_some() || !s.panels.is_empty() {
         return false;
     }
     let Some((line, text, said, id)) = caret_status(s) else { return false };
@@ -932,6 +949,10 @@ pub fn status_key(s: &mut State, ev: &KeyEvent) -> bool {
 
 /// A press on the status line's action.
 pub fn status_pressed(s: &mut State) {
+    if s.save_error.is_some() {
+        state::save(s);
+        return;
+    }
     if s.flash.is_some() {
         return;
     }

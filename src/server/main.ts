@@ -366,6 +366,12 @@ export async function openSiteServer(root: string, opts: SiteServerOptions): Pro
       return workspace.parts(f, params.words);
     });
 
+    // The site's pages: home first, pages by title, posts newest first.
+    connection.onRequest("rubric/pages", async (): Promise<object | null> => {
+      if (!workspace) return null;
+      return workspace.pages();
+    });
+
     // The tool and model that draft new parts, and what each tool offers, for
     // the editor's lists; and the writer's default from them, for the session.
     // With `harness`, that tool's models; with `model` too, the efforts that

@@ -18,6 +18,7 @@ import { LOG, newDraft, runDraft, saveState, type Harness } from "./draft.ts";
 import { brief as shortDrafter, type Drafter, type HarnessName, type Mode } from "./harness.ts";
 import { themeList, type ThemeList, type ThemeRanker } from "./themes.ts";
 import { fileExists, isSiteAddress, pictures } from "./files.ts";
+import { listSitePages, type SitePages } from "./pages.ts";
 
 export type Resolver = (directive: string, page: PageKind) => Promise<{ resolution: Resolution; model: string }>;
 
@@ -942,6 +943,12 @@ export class Workspace {
       look: look.map(([k, x]) => view(k, x)),
       ...(d.close !== undefined ? { close: d.close } : {}),
     };
+  }
+
+  // Every `.md` under `pages/`, reading open documents from the editor's
+  // unsaved text and the rest from disk on each call.
+  async pages(): Promise<SitePages> {
+    return listSitePages(this.site, (file) => this.#docs.get(file)?.text);
   }
 
   // The parts a writer can put on a line of the page: the site's own first,

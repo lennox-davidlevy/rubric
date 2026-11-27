@@ -76,24 +76,65 @@ pub struct Layout {
     pub title_max: f32,
 }
 
+/// Every window-wide shortcut the app binds, listed once so key dispatch, tooltips, panels,
+/// and WebKitGTK key-forwarding (`window_chord`) never drift apart.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Shortcut {
+    BothPanes,
+    WritingOnly,
+    PageOnly,
+    OpenInBrowser,
+    CloseWindow,
+    Drawer,
+    Save,
+    Themes,
+    ThemesComma,
+    ReloadPage,
+}
+
+/// The single source of truth for window-wide shortcuts: `(action, key, shift)`.
+pub const SHORTCUTS: &[(Shortcut, char, bool)] = &[
+    (Shortcut::BothPanes, '1', false),
+    (Shortcut::WritingOnly, '2', false),
+    (Shortcut::PageOnly, '3', false),
+    (Shortcut::OpenInBrowser, 'b', true),
+    (Shortcut::CloseWindow, 'w', false),
+    (Shortcut::Drawer, 'o', false),
+    (Shortcut::Save, 's', false),
+    (Shortcut::Themes, 't', false),
+    (Shortcut::ThemesComma, ',', false),
+    (Shortcut::ReloadPage, 'r', true),
+];
+
+/// The `Chord` for a window-wide shortcut from `SHORTCUTS`.
+pub fn chord(action: Shortcut) -> Chord {
+    let &(_, ch, shift) = SHORTCUTS.iter().find(|(a, _, _)| *a == action).expect("every Shortcut is in SHORTCUTS");
+    if shift { Chord::cmd_shift(Key::Command(ch)) } else { Chord::cmd(Key::Command(ch)) }
+}
+
+/// Which window-wide shortcut `ev` matches, if any.
+pub fn shortcut(ev: &KeyEvent) -> Option<Shortcut> {
+    SHORTCUTS.iter().find_map(|&(action, ch, shift)| {
+        let c = if shift { Chord::cmd_shift(Key::Command(ch)) } else { Chord::cmd(Key::Command(ch)) };
+        c.matches(ev).then_some(action)
+    })
+}
+
 /// Computes whether Open in browser fits and the widest the centered title can grow without
-/// crossing any button.
-pub fn layout(width: f32, linux: bool, has_saved: bool) -> Layout {
+/// crossing any button. `title_max` shrinks smoothly as the window narrows, with no jump at 760.
+pub fn layout(width: f32, linux: bool) -> Layout {
     // Left controls: 12 pad + 28 drawer + 4 gap + 40 view = 84; plus 12 breathing room.
     let left_clear = 96.0f32;
     // Right controls: 12 pad + (24 close + 14 gap on Linux) + 28 open; plus 12 breathing room.
     let right_open = if linux { 78.0 } else { 40.0 } + 12.0;
     let right_narrow = if linux { 36.0 } else { 12.0 } + 12.0;
-    // Room reserved beside the title for the 10-point gap and the saved state word.
-    let saved_reserve = if has_saved { 56.0 } else { 0.0 };
+    // Room reserved beside the title for the 10-point gap and the widest saved state ("Not saved").
+    let saved_reserve = 74.0f32;
     let avail_open = (width - 2.0 * left_clear.max(right_open) - saved_reserve).max(0.0);
     let show_open = width > NARROW && avail_open >= TITLE_MIN;
-    let title_max = if show_open {
-        avail_open.min(TITLE_MAX)
-    } else {
-        let avail_narrow = (width - 2.0 * left_clear.max(right_narrow) - saved_reserve).max(0.0);
-        avail_narrow.min(TITLE_MIN)
-    };
+    let clear = left_clear.max(if show_open { right_open } else { right_narrow });
+    let avail = (width - 2.0 * clear - saved_reserve).max(0.0);
+    let title_max = avail.min(TITLE_MAX);
     Layout { show_open, title_max }
 }
 
@@ -140,15 +181,20 @@ pub fn view_open(s: &State) -> bool {
 /// when the toolbar is too narrow for Open in browser, it becomes the last item under a hairline.
 pub fn view_panel(s: &State) -> Panel {
     let cur = panes(s);
+    let item = |id: &str, label: &str, sc: Shortcut, on: bool| {
+        let mut i = Item::new(id, label).check(on);
+        i.key = Some(chord(sc));
+        Row::Item(i)
+    };
     let mut rows = vec![
-        Row::Item(Item::new("both", "Both panes").key(Key::Command('1')).check(cur == Panes::Both)),
-        Row::Item(Item::new("write", "Writing only").key(Key::Command('2')).check(cur == Panes::Write)),
-        Row::Item(Item::new("page", "Page only").key(Key::Command('3')).check(cur == Panes::Page)),
+        item("both", "Both panes", Shortcut::BothPanes, cur == Panes::Both),
+        item("write", "Writing only", Shortcut::WritingOnly, cur == Panes::Write),
+        item("page", "Page only", Shortcut::PageOnly, cur == Panes::Page),
     ];
-    let lay = layout(s.width, cfg!(target_os = "linux"), crate::state::clean(s));
+    let lay = layout(s.width, cfg!(target_os = "linux"));
     if !lay.show_open {
         let mut open = Item::new("open", "Open in browser");
-        open.key = Some(Chord::cmd_shift(Key::Command('b')));
+        open.key = Some(chord(Shortcut::OpenInBrowser));
         if browser_url(s).is_none() {
             open = open.off();
         }
@@ -253,45 +299,48 @@ pub fn open_in_browser(s: &State, tx: &mut Tx) -> bool {
     true
 }
 
-/// Window-wide chords the app handles even while the page holds keys: Ctrl+1/2/3, Ctrl+Shift+B,
-/// Ctrl+W, Ctrl+O, Ctrl+S, Ctrl+T, Ctrl+,, and Ctrl+Shift+R (Cmd on macOS).
+/// Window-wide chords the app handles even while the page holds keys, read from `SHORTCUTS`.
 pub fn window_chord(ev: &KeyEvent) -> bool {
-    Chord::cmd(Key::Command('1')).matches(ev)
-        || Chord::cmd(Key::Command('2')).matches(ev)
-        || Chord::cmd(Key::Command('3')).matches(ev)
-        || Chord::cmd_shift(Key::Command('b')).matches(ev)
-        || Chord::cmd(Key::Command('w')).matches(ev)
-        || Chord::cmd(Key::Command('o')).matches(ev)
-        || Chord::cmd(Key::Command('s')).matches(ev)
-        || Chord::cmd(Key::Command('t')).matches(ev)
-        || Chord::cmd(Key::Command(',')).matches(ev)
-        || Chord::cmd_shift(Key::Command('r')).matches(ev)
+    shortcut(ev).is_some()
 }
 
-/// Window-wide toolbar shortcuts: Ctrl+1/2/3 for panes, Ctrl+Shift+B for Open in browser,
-/// Ctrl+W to close the window.
+/// Handles every window-wide shortcut in `SHORTCUTS`.
 pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
-    if Chord::cmd(Key::Command('1')).matches(ev) {
-        set_panes(s, Panes::Both, tx);
-        return true;
+    match shortcut(ev) {
+        Some(Shortcut::BothPanes) => {
+            set_panes(s, Panes::Both, tx);
+            true
+        }
+        Some(Shortcut::WritingOnly) => {
+            set_panes(s, Panes::Write, tx);
+            true
+        }
+        Some(Shortcut::PageOnly) => {
+            set_panes(s, Panes::Page, tx);
+            true
+        }
+        Some(Shortcut::OpenInBrowser) => {
+            open_in_browser(s, tx);
+            true
+        }
+        Some(Shortcut::CloseWindow) => {
+            tx.close_window();
+            true
+        }
+        Some(Shortcut::Save) => {
+            crate::state::save(s);
+            true
+        }
+        Some(Shortcut::Themes | Shortcut::ThemesComma) if s.split > 0.0 => {
+            crate::look::open_themes(s, tx);
+            true
+        }
+        Some(Shortcut::ReloadPage) if s.page_life.stopped => {
+            crate::state::reload_page(s);
+            true
+        }
+        Some(Shortcut::Drawer | Shortcut::Themes | Shortcut::ThemesComma | Shortcut::ReloadPage) | None => false,
     }
-    if Chord::cmd(Key::Command('2')).matches(ev) {
-        set_panes(s, Panes::Write, tx);
-        return true;
-    }
-    if Chord::cmd(Key::Command('3')).matches(ev) {
-        set_panes(s, Panes::Page, tx);
-        return true;
-    }
-    if Chord::cmd_shift(Key::Command('b')).matches(ev) {
-        open_in_browser(s, tx);
-        return true;
-    }
-    if Chord::cmd(Key::Command('w')).matches(ev) {
-        tx.close_window();
-        return true;
-    }
-    false
 }
 
 /// Tooltip look styled to the app's theme tokens: a 26-point box sitting inside the toolbar
@@ -325,8 +374,7 @@ fn hover_handler(which: Hover) -> impl Fn(&mut State, bool, &mut Tx) + 'static {
 pub fn bar(s: &State) -> El {
     let p = s.look.palette;
     let linux = cfg!(target_os = "linux");
-    let clean = crate::state::clean(s);
-    let lay = layout(s.width, linux, clean);
+    let lay = layout(s.width, linux);
 
     // Drawer button (28×26, radius 6). Dimmed and without hover until sitting 3 builds the drawer;
     // tip sits inside the toolbar to its right.
@@ -335,7 +383,7 @@ pub fn bar(s: &State) -> El {
         .no_window_drag()
         .preserve_focus_on_press(true)
         .help("Posts and pages")
-        .help_keys([Chord::cmd(Key::Command('o')).label()])
+        .help_keys([chord(Shortcut::Drawer).label()])
         .help_side(Side::Right)
         .child(icon(&DRAWER_ICON, 16.0).color(p.ink3));
 
@@ -369,8 +417,13 @@ pub fn bar(s: &State) -> El {
     // Centered title and saved state, 10 points apart.
     let mut words = row().key("title-group").gap(10.0).items_end()
         .child(text(s.title.clone()).key("title").font(fonts::ui(500.0)).color(p.ink).max_w(lay.title_max).truncate().shrink());
-    if clean {
-        words = words.child(text("Saved").key("saved").font(fonts::caption(400.0)).color(p.ink2));
+    if !s.waiting_for_page {
+        let (label, weight, color) = match crate::state::save_state(s) {
+            crate::state::SaveState::Saved => ("Saved", 400.0, p.ink2),
+            crate::state::SaveState::Edited => ("Edited", 400.0, p.ink3),
+            crate::state::SaveState::Failed => ("Not saved", 600.0, p.fail),
+        };
+        words = words.child(text(label).key("saved").font(fonts::caption(weight)).color(color));
     }
     let center = row().key("title-center").absolute(0.0, 0.0).w_full().h_full().justify_center().center_y()
         .child(words);
@@ -386,7 +439,7 @@ pub fn bar(s: &State) -> El {
             .no_window_drag()
             .preserve_focus_on_press(true)
             .help("Open in browser")
-            .help_keys([Chord::cmd_shift(Key::Command('b')).label()])
+            .help_keys([chord(Shortcut::OpenInBrowser).label()])
             .help_side(Side::Left)
             .child(icon(&OPEN_ICON, 15.0).color(if ready { p.ink } else { p.ink3 }));
         if ready {
@@ -409,7 +462,7 @@ pub fn bar(s: &State) -> El {
             .on_hover_change(hover_handler(Hover::Close))
             .on_press_tx(|_: &mut State, tx| tx.close_window())
             .help("Close window")
-            .help_keys([Chord::cmd(Key::Command('w')).label()])
+            .help_keys([chord(Shortcut::CloseWindow).label()])
             .help_side(Side::Left)
             .child(icon(&CLOSE_ICON, 10.0).color(p.ink));
         right_group = right_group.child(close_btn);
@@ -478,18 +531,28 @@ mod tests {
     }
 
     #[test]
-    fn narrow_hides_open_in_browser_and_caps_title() {
-        let wide = layout(1400.0, true, true);
+    fn narrow_hides_open_in_browser_and_title_shrinks_smoothly_without_jump_at_760() {
+        let wide = layout(1400.0, true);
         assert!(wide.show_open);
         assert_eq!(wide.title_max, TITLE_MAX);
 
-        let mid = layout(760.0, true, true);
-        assert!(!mid.show_open);
-        assert_eq!(mid.title_max, TITLE_MIN);
+        let above = layout(761.0, true);
+        let at = layout(760.0, true);
+        let below = layout(759.0, true);
+        assert!(above.show_open);
+        assert!(!at.show_open);
+        assert!(!below.show_open);
+        assert!((above.title_max - at.title_max).abs() <= 1.01, "jump at 760: {} -> {}", above.title_max, at.title_max);
+        assert!((at.title_max - below.title_max).abs() <= 1.01, "jump below 760: {} -> {}", at.title_max, below.title_max);
 
-        let tight = layout(420.0, true, true);
-        assert!(!tight.show_open);
-        assert!(tight.title_max < TITLE_MIN && tight.title_max > 0.0, "title shrinks before crossing buttons: {:?}", tight);
+        // Monotonic and continuous across the whole range.
+        let mut prev = layout(1000.0, true).title_max;
+        for w in (360..1000).rev() {
+            let cur = layout(w as f32, true).title_max;
+            assert!(cur <= prev && prev - cur <= 1.01, "non-smooth at {w}: {prev} -> {cur}");
+            prev = cur;
+        }
+        assert!(prev < TITLE_MIN && prev > 0.0);
     }
 
     #[test]

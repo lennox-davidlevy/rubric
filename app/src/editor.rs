@@ -87,10 +87,12 @@ pub fn field_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
         // The panel closed; the key is not typed into a field that is gone.
         Taken::Passed => {
             tx.focus("editor", false);
+            crate::state::schedule_save(s, tx);
             crate::state::sync_draft_boxes(s, tx);
             true
         }
         _ => {
+            crate::state::schedule_save(s, tx);
             crate::state::sync_draft_boxes(s, tx);
             true
         }
@@ -101,21 +103,14 @@ pub fn field_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
 /// when the writing pane is hidden (page-only view) and no field has focus.
 pub fn window_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
     if crate::look::key(s, ev, tx) != crate::panel::Taken::Passed {
+        crate::state::schedule_save(s, tx);
         crate::state::sync_draft_boxes(s, tx);
         return true;
     }
     if crate::toolbar::key(s, ev, tx) {
         return true;
     }
-    if crate::look::themes_key(ev) && s.split > 0.0 {
-        crate::look::open_themes(s, tx);
-        return true;
-    }
     if crate::draft::status_key(s, ev) {
-        return true;
-    }
-    if ev.is_command('s') && !ev.mods.shift && !ev.mods.alt {
-        crate::state::save(s);
         return true;
     }
     false
@@ -127,31 +122,26 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
     crate::trace::say(|| format!("key    editor {:?} {:?}", ev.key, ev.mods));
     // An open panel takes its keys first; any other key closes it and is the editor's.
     if crate::look::key(s, ev, tx) != crate::panel::Taken::Passed {
+        crate::state::schedule_save(s, tx);
         crate::state::sync_draft_boxes(s, tx);
         return true;
     }
     if crate::toolbar::key(s, ev, tx) {
         return true;
     }
-    if crate::look::themes_key(ev) {
-        crate::look::open_themes(s, tx);
-        return true;
-    }
-    // The status line's action has its key: a `new:` line's, or Reload on a stopped page.
+    // The status line's action has its key (for a `new:` line).
     if crate::draft::status_key(s, ev) {
         return true;
     }
     if ev.key == Key::Tab {
         crate::state::tab(s, tx);
+        crate::state::schedule_save(s, tx);
         crate::state::sync_draft_boxes(s, tx);
-        return true;
-    }
-    if ev.is_command('s') && !ev.mods.shift && !ev.mods.alt {
-        crate::state::save(s);
         return true;
     }
     if !ev.mods.cmd && !ev.mods.ctrl && matches!(&ev.key, Key::Text(t) if t == " ") && closer(&mut s.edit) {
         crate::state::changed(s);
+        crate::state::schedule_save(s, tx);
         crate::state::sync_draft_boxes(s, tx);
         return true;
     }

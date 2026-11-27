@@ -15,7 +15,10 @@ const WIDTH: f32 = 250.0;
 
 /// The key that opens and closes the list of themes: Cmd+T or Cmd+, (Ctrl off the Mac).
 pub fn themes_key(ev: &KeyEvent) -> bool {
-    ev.is_command('t') || ev.is_command(',')
+    matches!(
+        crate::toolbar::shortcut(ev),
+        Some(crate::toolbar::Shortcut::Themes | crate::toolbar::Shortcut::ThemesComma)
+    )
 }
 
 /// Opens the list with the theme drawn now under the focus.
@@ -375,6 +378,7 @@ pub fn pressed(s: &mut State, depth: usize, i: usize, segment: Option<usize>, tx
     sync_field(s);
     follow(s, was_field, tx);
     keys_home(s, tx);
+    state::schedule_save(s, tx);
     state::sync_draft_boxes(s, tx);
 }
 

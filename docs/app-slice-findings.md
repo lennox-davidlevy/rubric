@@ -566,8 +566,23 @@ Built 2026-11-26 on branch `shell` off `slice-4`, from [app-shell.md](app-shell.
 
 #### What no one saw
 
-- Borderless window with the wry web view attached on Linux (could not run `app/scripts/run-nested.sh` without `Xephyr`, `i3`, and `xdotool`), dragging the toolbar to move a floating window, resizing from all 8 window edges and corners, the SVG toolbar icons and tooltips on screen, View popover over page-only view in a live web view, narrow-window toolbar behavior, `xdg-open` launching the browser on Ctrl+Shift+B / the Open in browser button, closing via the toolbar close button, keeping the page painted across `Ctrl+2` → `Ctrl+1`, and live X11/WebKitGTK key forwarding with the pointer over the page (including clicking in the page to copy with `Ctrl+C` and clicking back in the writing to paste with `Ctrl+V`). Those are section F of `testing/TESTING.md`.
-- macOS build and runtime.
+- **Seen on Xvfb (added in sitting 2's review cleanup; `app/scripts/run-nested.sh` now runs on Xvfb with Arch's `/usr/share/vulkan/icd.d/lvp_icd.json`):** borderless window on Linux with the wry WebKitGTK web view attached and rendering the post (`page loaded …/posts/long/ 148 ms`), the SVG toolbar icons and centered title/saved state, `Ctrl+3` page-only view with the View popover open over the 300-point pane-colored yielded column and its right-edge hairline (matching picture 93), `Esc` and `Ctrl+1` restoring both panes, and `Ctrl+W` closing the window cleanly with no lingering processes.
+- **Still unseen:** dragging the top row to move a floating window under Hyprland, resizing from all 8 window edges and corners under Hyprland, toolbar hover tooltips on screen, resizing through 760 points wide live, `xdg-open` launching the system browser on `Ctrl+Shift+B` / Open in browser, clicking the circular close button in a native window, live X11/WebKitGTK key forwarding with the pointer over the page (including clicking in the page to copy with `Ctrl+C` and clicking back in the writing to paste with `Ctrl+V`), native NVIDIA/XWayland rendering, and macOS build/runtime. Those are section F of `testing/TESTING.md`.
+
+### Sitting 2: saving, and the site's pages
+
+Built 2026-11-27 on branch `shell`, from [app-shell.md](app-shell.md), together with sitting 1's five review cleanups. No Jev calls, no real drafts, no window opened on David's display.
+
+#### What the sitting found out
+
+- **What wakes the app for autosave with zero idle CPU.** Rune's `Tx::wake_after` + `AppSpec::poll` (`state::poll`, sharing the poll hook with `insert::poll`) schedules a single deadline via winit's `ControlFlow::WaitUntil` with no extra timer thread. Every edit marks `s.save_arm`, `state::schedule_save` arms `s.save_due = Some(clock + 1.0)` and calls `tx.wake_after(1s)`, a second edit before the second moves `save_due` forward (an earlier wake simply reschedules the remainder without drawing), and once written `save_due` clears so nothing wakes while idle. Measured on Xvfb via `app/scripts/run-nested.sh` (release build, 6 s quiet window after autosave): **0.00% CPU**.
+- **Cold-start page race on a fresh site.** During Xvfb verification on a fresh temporary site, `src/server/site-process.ts` announced `rubric/serving` (`http://127.0.0.1:<port>/`) right after spawning `hugo server`, ~100–200 ms before Hugo finished its first build and bound port 1415; WebKit hit `Connection refused` at 107 ms and stayed on its connection error page because `rubric-live.js` never loaded. Pre-starting the site's stub server and waiting for HTTP 200 (as `app/scripts/measure-window.sh` does) lets the post load cleanly in ~148 ms. (`site-process.ts` was not modified, as it is outside sitting 2's file scope.)
+- **Bare Xvfb focus.** Without a window manager on Xvfb, X11 does not focus Rune's window automatically; `xdotool windowfocus --sync` hands keyboard input to the window for automated Xvfb checks.
+
+#### What was seen on Xvfb, and what no one saw
+
+- **Seen on Xvfb** (release binary against a temp copy of `sites/app-slice` with the live Hugo post drawn, every screenshot inspected): typing changes the top row to `Edited` and leaves the file unwritten at 0.2 s; after ~1.3 s the file is written, the page updates live, and the top row reads `Saved`; idle CPU over 6 s on a clean post is `0.00%`; making `pages/posts` read-only (`chmod 555`) and typing gives `Not saved` (red, weight 600) in the top row and `Post not saved` / `The site folder could not be written.` / `Retry Ctrl+S` under the writing (picture 99) and as a full-width 34-point foot strip in page-only view (picture 102); making the folder writable (`chmod 755`) and clicking `Retry` writes the file and clears both; typing and closing immediately with `Ctrl+W` saves the unsaved text before exit; starting on the site folder opens the newest post (`Harbour light at dusk`, `2026-11-26`) with its live page drawn.
+- **Still unseen:** native Hyprland/XWayland run (section G of `testing/TESTING.md`), and macOS build and runtime.
 
 
 

@@ -323,6 +323,59 @@ fn a_part_is_inserted_changed_into_a_variant_kept_rerolled_and_removed_with_the_
     wait_for("the server's process to end", || !alive(pid));
 }
 
+#[test]
+#[ignore = "starts Bun, a site process and Hugo"]
+fn the_app_started_on_a_site_folder_opens_its_newest_post() {
+    let site = std::env::temp_dir().join(format!("rubric-app-folder-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&site);
+    std::fs::create_dir_all(&site).unwrap();
+    let _cleanup = Cleanup(site.clone());
+    copy_site(&site);
+    let from = repo().join("sites/app-slice");
+    std::fs::copy(from.join("pages/_index.md"), site.join("pages/_index.md")).unwrap();
+    let older = site.join("pages/posts/older.md");
+    let newest = site.join("pages/posts/newest.md");
+    std::fs::write(&older, "---\ntitle: Older walk\ndate: 2026-10-01\n---\n\nOld.\n").unwrap();
+    std::fs::write(&newest, "---\ntitle: Newest coast walk\ndate: 2026-11-24\n---\n\nFresh.\n").unwrap();
+
+    let (tx, rx) = mpsc::channel::<Incoming>();
+    let client = Client::start(&repo(), &site, true, move |m| {
+        let _ = tx.send(m);
+    })
+    .expect("the server starts");
+    let pid = client.pid().unwrap();
+
+    let mut state = rubric_app::state::State::open_folder(site.clone());
+    rubric_app::state::connected(&mut state, client);
+    let req_id = state.pages_req.expect("connected asked rubric/pages");
+
+    let answer = next(&rx, "rubric/pages response", |m| match m {
+        Incoming::Response { id, .. } if *id == req_id => Some(m.clone()),
+        _ => None,
+    });
+    assert!(rubric_app::state::incoming(&mut state, answer));
+    assert_eq!(state.path, newest);
+    assert_eq!(state.title, "Newest coast walk");
+    assert_eq!(state.edit.text, "---\ntitle: Newest coast walk\ndate: 2026-11-24\n---\n\nFresh.\n");
+    assert!(!state.waiting_for_page);
+
+    // Server also notifies rubric/page for the newly opened post.
+    let newest_uri = rubric_app::state::file_uri(&newest);
+    let page_url = next(&rx, "rubric/page for newest post", |m| match m {
+        Incoming::Notification { method, params }
+            if method == "rubric/page"
+                && params["uri"].as_str().map(rubric_app::state::unescaped) == Some(rubric_app::state::unescaped(&newest_uri)) =>
+        {
+            params["url"].as_str().map(str::to_string)
+        }
+        _ => None,
+    });
+    assert!(page_url.contains("/posts/newest"), "unexpected page url: {page_url}");
+
+    rubric_app::state::shut(&mut state);
+    wait_for("the server's process to end", || !alive(pid));
+}
+
 /// The ids of the rows of a line's menu.
 fn ids(view: &rubric_app::draft::View) -> Vec<String> {
     rubric_app::draft::menu_rows(view, None, None).0.iter().filter(|r| r.takes_focus()).filter_map(|r| r.id().map(str::to_string)).collect()

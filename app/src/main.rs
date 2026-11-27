@@ -6,7 +6,12 @@ use rubric_app::lsp::Client;
 use rubric_app::page::Page;
 use rubric_app::state::{self, State};
 
-static OPENED: OnceLock<(PathBuf, String)> = OnceLock::new();
+enum Target {
+    File(PathBuf, String),
+    Folder(PathBuf),
+}
+
+static OPENED: OnceLock<Target> = OnceLock::new();
 const SIZE: (f32, f32) = (1400.0, 900.0);
 
 /// On Linux the page attaches to an X11 window only, so under Wayland the app runs through
@@ -37,8 +42,10 @@ fn x11_session() {
 }
 
 fn init() -> State {
-    let (path, text) = OPENED.get().expect("opened before run").clone();
-    let mut s = State::open(path, text);
+    let mut s = match OPENED.get().expect("opened before run") {
+        Target::File(path, text) => State::open(path.clone(), text.clone()),
+        Target::Folder(dir) => State::open_folder(dir.clone()),
+    };
     s.width = SIZE.0;
     // The app's theme: RUBRIC_APP_THEME for one run, else the one kept, else Paper.
     let wanted = std::env::var("RUBRIC_APP_THEME").ok().filter(|v| !v.is_empty());
@@ -65,36 +72,45 @@ fn site_of(file: &Path) -> Option<PathBuf> {
 fn main() {
     let begun = std::time::Instant::now();
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let Some(file) = args.iter().find(|a| !a.starts_with("--")) else {
-        eprintln!("usage: rubric-app <post.md>");
+    let Some(arg) = args.iter().find(|a| !a.starts_with("--")) else {
+        eprintln!("usage: rubric-app <post.md | site-folder>");
         std::process::exit(2);
     };
-    let path = match std::fs::canonicalize(file) {
+    let path = match std::fs::canonicalize(arg) {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("{file}: {e}");
-            std::process::exit(1);
-        }
-    };
-    let text = match std::fs::read_to_string(&path) {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!("{}: {e}", path.display());
+            eprintln!("{arg}: {e}");
             std::process::exit(1);
         }
     };
     let live = args.iter().any(|a| a == "--live");
     x11_session();
-    let site = site_of(&path);
-    let _ = OPENED.set((path, text));
+    let (target, site) = if path.is_dir() {
+        if !path.join("rubric.md").is_file() {
+            eprintln!("{}: not a Rubric site (no rubric.md)", path.display());
+            std::process::exit(1);
+        }
+        (Target::Folder(path.clone()), Some(path))
+    } else {
+        let text = match std::fs::read_to_string(&path) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("{}: {e}", path.display());
+                std::process::exit(1);
+            }
+        };
+        let site = site_of(&path);
+        (Target::File(path, text), site)
+    };
+    let _ = OPENED.set(target);
 
     let app = App::new(AppSpec::<State> {
         fonts: rubric_app::fonts::FONTS,
         families: rubric_app::fonts::FAMILIES,
         // For `--snap out.png --scene themes` in a debug build: the list of themes, drawn headless.
         scenes: &[("themes", rubric_app::look::show_themes)],
-        // Insert part…'s list, asked again a pause after the last key.
-        poll: Some(rubric_app::insert::poll),
+        // Insert part…'s list pause and autosave deadline.
+        poll: Some(rubric_app::state::poll),
         // Window-wide shortcuts and panel keys when the writing pane is hidden (page-only view).
         on_key: Some(rubric_app::editor::window_key),
         ..AppSpec::new("Rubric", SIZE, init, rubric_app::view)
