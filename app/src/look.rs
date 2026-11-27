@@ -309,11 +309,14 @@ pub fn close_panels(s: &mut State) {
     // The next panel to open hangs from its own line.
     s.anchor = None;
     s.anchor_wait = false;
-    s.left_cover = 0.0;
-    let Some(id) = s.panels.first().map(|p| p.id.clone()) else { return };
+    let Some(id) = s.panels.first().map(|p| p.id.clone()) else {
+        crate::toolbar::sync_cover(s);
+        return;
+    };
     let peeking = s.panels.iter().any(|p| p.id == crate::draft::NEAR);
     let looking = s.panels.iter().any(|p| matches!(p.id.as_str(), crate::insert::LIST | crate::insert::SIMILAR | crate::insert::GROUP));
     s.panels.clear();
+    crate::toolbar::sync_cover(s);
     s.field_of = None;
     s.field_live = false;
     s.held = None;

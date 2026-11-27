@@ -162,8 +162,22 @@ fn main() {
     let moves = app.handle();
     let handle = app.handle();
     app.on_frame_drawn(move |rt| {
-        // Tab to the menu on screen, for the measure in the findings.
+        // During a view switch or page-only drawer/popover slide, follow Rune's presented `"page"`
+        // rect with position-only moves, resizing once at rest when shrinking.
+        if let Some(slide) = rt.state.view_slide.get()
+            && let Some((rect, _)) = rt.presented("page")
+        {
+            let held = slide.holds_under();
+            state::page_presented(&rt.state, rect, rt.window_scale());
+            if held && rt.state.view_slide.get().is_none() {
+                moves.update(|_, tx| tx.instant());
+            }
+        }
+        // Tab to the menu on screen, and Return on a drawer row to post drawn, for the findings.
         if let Some(said) = state::menu_drawn(&rt.state) {
+            eprintln!("{said}");
+        }
+        if let Some(said) = state::switch_drawn(&rt.state) {
             eprintln!("{said}");
         }
         if rubric_app::trace::on() {
@@ -203,9 +217,10 @@ fn main() {
         };
         let press_handle = handle.clone();
         let pressed = move || {
-            press_handle.update_if(|s, _| {
-                state::page_pressed(s);
-                false
+            press_handle.update_if(|s, tx| {
+                let had_overlay = s.drawer.open || rubric_app::toolbar::view_open(s);
+                state::page_pressed_tx(s, tx);
+                had_overlay
             });
         };
         let key_handle = handle.clone();

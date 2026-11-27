@@ -6,6 +6,8 @@
 #[derive(Clone, Debug, PartialEq)]
 pub enum PageCmd {
     Bounds { x: i32, y: i32, w: u32, h: u32 },
+    /// Moves the child window without resizing or calling `size_allocate` (zero WebKit relayout).
+    Move { x: i32, y: i32 },
     Load(String),
     /// Audio and video off in the view's settings, for the rest of the run.
     MediaOff,
@@ -338,6 +340,18 @@ mod linux {
                                     position: PhysicalPosition::new(x, y).into(),
                                     size: PhysicalSize::new(w, h).into(),
                                 });
+                            }
+                        }
+                        PageCmd::Move { x, y } => {
+                            let webview = owned.view.webview();
+                            let scale = webview.scale_factor().max(1) as f64;
+                            let lx = (x as f64 / scale).round() as i32;
+                            let ly = (y as f64 / scale).round() as i32;
+                            if let Some(top) = webview.toplevel().and_then(|w| w.downcast::<gtk::Window>().ok()) {
+                                top.move_(lx, ly);
+                                if let Some(d) = gdk::Display::default() {
+                                    d.flush();
+                                }
                             }
                         }
                         PageCmd::Load(url) => {

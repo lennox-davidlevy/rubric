@@ -4,7 +4,7 @@ What changed in the plan's "Before the app" list (docs/plan.md, under step 8), i
 
 Write what you find in **Notes** at the bottom, by test number.
 
-Last updated: 2026-11-27 (section F cleanup and section G, shell sitting 2).
+Last updated: 2026-11-27 (section F updates and section H, shell sitting 3).
 
 ## Set up
 
@@ -254,7 +254,7 @@ Start the release build natively from the repo's root (stub, no Jev key needed):
 | F4 | Float the window in Hyprland and drag an empty spot of the top row | The window moves; dragging a button does not move the window. |
 | F5 | Drag from each of the 4-point window edges and corners | Each edge and corner shows a resize cursor and resizes the window without blocking the top row's controls. |
 | F6 | Edit `title:` in the post's front matter (`title: "Three days on the coast path"`) | The centered title in the top row updates live to `Three days on the coast path` (front matter `title:` beats the `#` heading). |
-| F7 | Hover over the Drawer button | Drawer stays dimmed with no hover fill; after a brief pause a 26-point tip reads `Posts and pages` `Ctrl+O` inside the top row to its right. |
+| F7 | Hover over the Drawer button | Drawer fills on hover with a pointer cursor; after a brief pause a 26-point tip reads `Posts and pages` `Ctrl+O` inside the top row to its right. |
 | F8 | Hover over the View button | View fills on hover; after a brief pause a tip reads `View` inside the top row to its right. |
 | F9 | Hover over Open in browser | Open in browser fills on hover; after a brief pause a tip reads `Open in browser` `Ctrl+Shift+B` inside the top row to its left. |
 | F10 | Hover over the circular close button | Close fills on hover; after a brief pause a tip reads `Close window` `Ctrl+W` inside the top row to its left. |
@@ -262,7 +262,7 @@ Start the release build natively from the repo's root (stub, no Jev key needed):
 | F12 | Press Esc | The View popover closes. |
 | F13 | Drag the divider to an uneven split (~35/65) | Both panes hold the ~35/65 split. |
 | F14 | Press `Ctrl+2` (writing only) | The page hides and the View button stays filled. |
-| F15 | Press `Ctrl+1` (both panes) | The ~35/65 split returns, the page draws immediately (not blank), and typing lands in the writing. |
+| F15 | Press `Ctrl+1` (both panes) | The divider returns to half and half (50/50), the page draws immediately (not blank), and typing lands in the writing. |
 | F16 | Press `Ctrl+3` (page only) | The writing hides and View stays filled. |
 | F17 | Hover Drawer and Close while in page-only view | Their tips still show cleanly inside the top row without overlapping the page. |
 | F18 | Click View while in page-only view | The page yields a 300-point column at the left in the pane's color with a hairline at its right edge, so none of the View popover is covered. |
@@ -310,6 +310,47 @@ Start the release build natively from the repo's root (stub, no Jev key needed):
 | G16 | Start the app on the site's folder: `app/target/release/rubric-app sites/app-slice` | Opens the site's newest post (`The long walk`) with its page drawn on the right. |
 
 **After section G, put the site back:** run `chmod 755 sites/app-slice/pages/posts`, close the app, and run `app/scripts/clean-test.sh`.
+
+## H. The shell, sitting 3: the drawer (branch `shell`)
+
+Before starting, add two extra posts to `sites/app-slice/pages/posts/` (or test on a copy with at least three posts, including one with `draft: true` and one from an earlier year, plus `pages/_index.md`), then start the release build natively: `cargo build --release --manifest-path app/Cargo.toml`, then `app/target/release/rubric-app sites/app-slice`.
+
+| # | Do | Expect |
+|---|---|---|
+| H1 | Hover over the Drawer button at the top left | The button is no longer dimmed; it fills on hover with a pointer cursor and shows the `Posts and pages` `Ctrl+O` tip inside the toolbar to its right. |
+| H2 | Click the Drawer button | A 300-point drawer slides in from the left over the writing (140 ms) without moving the writing behind it; the Drawer button stays filled. |
+| H3 | Inspect the drawer's rows | The site's name at the top, then `Pages` (`Home` first, then other pages; no `rubric.md`), then `Posts` newest first (`12 June` for this year, with year for earlier years, `· Draft` on drafts). The open post has a 2-point accent bar at its left and a bold title with no fill. |
+| H4 | Move the pointer over another row | That row gets the hover fill; moving away clears it. |
+| H5 | Press `Ctrl+O` | The drawer slides out to the left (140 ms); the page stays drawn and in place. |
+| H6 | Press `Ctrl+O` again, then type `abc` | Nothing is typed into the writing while the drawer is open. |
+| H7 | Press `Esc`, then type a word in the post's body | The drawer slides out, keys return to the writing, the word lands in the post, and the top row reads `Edited`. |
+| H8 | Within a second (before autosave writes), press `Ctrl+O`, press `Down`, and press `Return` | The first post's unsaved change is written to disk before switching; the drawer closes; the second post opens with its title in the top row (`Saved`), caret at the start, and the page navigates to it. |
+| H9 | Press `Ctrl+Z` right after switching | Nothing from the first post comes back. |
+| H10 | Press `Ctrl+O`, then click outside the drawer in the writing pane | The drawer slides closed and keys return to the writing. |
+| H11 | Press `Ctrl+O`, then click inside the live page pane | The drawer closes cleanly. |
+| H12 | Drag the divider to an uneven split (~35/65), then press `Ctrl+1` | The divider jumps to half and half (50/50). |
+| H13 | Drag the divider to ~65/35, open the View popover, and click `Both panes` | The popover closes and the divider jumps to half and half (50/50). |
+| H14 | Press `Ctrl+3` (page only), then press `Ctrl+O` | The page yields a 300-point column at the left so the drawer sits beside it without overlap or blanking. |
+| H15 | Press `Esc` while in page-only view | The drawer slides out and the page returns cleanly to the left edge beside the divider, neither blank nor misplaced. |
+| H16 | Press `Ctrl+1`, then drag the divider left so the writing pane is narrower than 300 points and press `Ctrl+O` | The page gives way so its left edge sits at 300 points while the drawer is open, and returns when closed. |
+| H17 | In another terminal, run `chmod 555 sites/app-slice/pages/posts`, type a word in the open post, press `Ctrl+O`, arrow to another post, and press `Return` | The switch is refused, the first post stays open with its unsaved text, the top row reads `Not saved`, and the status line reads `Post not saved` with `Retry`. |
+| H18 | Run `chmod 755 sites/app-slice/pages/posts` and click `Retry` | The post saves and the status line clears. |
+| H19 | Open the drawer, delete another post's file from disk in the other terminal, then click that deleted post in the drawer | The open post stays open and the status line says `Post not opened`. |
+| H20 | In the other terminal, edit and save the currently open post's file on disk, then type a word in the app and wait just over a second | The external change on disk is NOT overwritten; the top row reads `Not saved` and the status line reads `Post changed on disk`, `Another program changed this file.`, with `Reload` and `Overwrite` (neither with a key). |
+| H21 | Click `Reload` in the status line | The writing is replaced with the file's text from disk, the status line clears, the top row reads `Saved`, and the page updates to the reloaded text. |
+| H22 | From both panes, press `Ctrl+2` (writing only) | The writing pane and the page move together smoothly to the right in one motion, with no gap between them and no blank page, until the page slides out and writing fills the window. |
+| H23 | Press `Ctrl+1` (both panes) | The writing pane and the page move together smoothly back to half and half in one motion, with the page sliding in from the right flush against the divider and no blank frame. |
+| H24 | Press `Ctrl+3` (page only) | The page grows to full width and glides smoothly left over the writing pane to the left edge, with no bar of window ground color and no blank frame. |
+| H25 | From page only, press `Ctrl+1` (both panes) | The writing pane sits in its final place under the page from the first frame while the page glides smoothly right at full width to uncover it (no bar of window ground color on the left, middle, or right), then settles cleanly to half width. |
+| H26 | From page only (`Ctrl+3`), press `Ctrl+O` to open the drawer and `Ctrl+O` (or `Esc`) to close it | On open, the page glides smoothly right over 140 ms uncovering the drawer in place (no ground-color bar or blank cover gap) and settles to its narrower width; on close, the page grows and glides smoothly left over 140 ms covering the drawer back to the left edge. |
+| H27 | With the open post `Saved` and the caret on a middle line, switch focus to another window, edit and save the post on disk, then switch focus back to the app | The writing updates to the file's text by itself with no status message, the top row stays `Saved`, and the caret stays on that line (or the last line if shorter). |
+| H28 | With the open post `Saved`, edit and save it on disk from another terminal without unfocusing the app, then press `Ctrl+O` | The writing updates to the file's text by itself with no status message as the drawer opens. |
+| H29 | Press `Esc`, type a word in the open post, edit and save the post on disk from another terminal before autosave runs, and wait just over a second | The file on disk is not overwritten; the top row reads `Not saved` and the status line reads `Post changed on disk`, `Another program changed this file.`, with `Reload` and `Overwrite` (no keys). |
+| H30 | With `Post changed on disk` showing, press `Ctrl+O`, arrow to another post, and press `Return` | Switching is refused, the current post stays open with its unsaved writing, and `Post changed on disk` stays in the status line. |
+| H31 | Click `Overwrite` in the status line | The conflict clears, the top row reads `Saved`, and the file on disk holds the app's writing at once. |
+| H32 | Trigger `Post changed on disk` again (type a word, edit and save the post on disk from another terminal, wait just over a second), then press `Ctrl+W` | The window closes cleanly; the original post on disk keeps the external edit, `<site>/.rubric/unsaved/<path inside pages>.md` holds the app's writing (nothing new under `pages/`), and the terminal prints where it went. |
+
+**After section H, put the site back:** run `chmod 755 sites/app-slice/pages/posts`, remove any extra test posts you added and `sites/app-slice/.rubric/unsaved`, close the app, and run `app/scripts/clean-test.sh`.
 
 ## Notes
 App starts well

@@ -376,6 +376,93 @@ fn the_app_started_on_a_site_folder_opens_its_newest_post() {
     wait_for("the server's process to end", || !alive(pid));
 }
 
+/// Reads the initial SSE burst from the site's cursor relay (`/events`) and returns the last
+/// cursor event's `url` field, if present.
+fn relay_cursor_url(site: &Path) -> Option<String> {
+    use std::io::{Read, Write};
+    let serve: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(site.join(".rubric/serve.json")).ok()?).ok()?;
+    let port = serve["relay"].as_u64()? as u16;
+    let mut stream = std::net::TcpStream::connect(("127.0.0.1", port)).ok()?;
+    stream.set_read_timeout(Some(Duration::from_millis(250))).ok()?;
+    stream.write_all(b"GET /events HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n").ok()?;
+    let mut buf = [0u8; 4096];
+    let n = stream.read(&mut buf).ok()?;
+    let body = String::from_utf8_lossy(&buf[..n]);
+    body.lines()
+        .filter_map(|l| l.strip_prefix("data: "))
+        .filter_map(|d| serde_json::from_str::<serde_json::Value>(d).ok())
+        .filter_map(|v| v.get("url").and_then(|u| u.as_str()).map(str::to_string))
+        .last()
+}
+
+#[test]
+#[ignore = "starts Bun, a site process and Hugo"]
+fn switching_between_two_posts_moves_the_relays_page_address_to_the_second() {
+    let site = std::env::temp_dir().join(format!("rubric-app-switch-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&site);
+    std::fs::create_dir_all(&site).unwrap();
+    let _cleanup = Cleanup(site.clone());
+    copy_site(&site);
+    let from = repo().join("sites/app-slice");
+    std::fs::copy(from.join("pages/_index.md"), site.join("pages/_index.md")).unwrap();
+    let first = site.join("pages/posts/first-post.md");
+    let second = site.join("pages/posts/second-post.md");
+    std::fs::write(&first, "---\ntitle: First post\ndate: 2026-11-20\n---\n\nFirst body.\n").unwrap();
+    std::fs::write(&second, "---\ntitle: Second post\ndate: 2026-11-19\n---\n\nSecond body.\n").unwrap();
+
+    let (tx, rx) = mpsc::channel::<Incoming>();
+    let client = Client::start(&repo(), &site, true, move |m| {
+        let _ = tx.send(m);
+    })
+    .expect("the server starts");
+    let pid = client.pid().unwrap();
+
+    // Open the first post and wait for its page address on the relay.
+    let mut state = rubric_app::state::State::open(first.clone(), std::fs::read_to_string(&first).unwrap());
+    rubric_app::state::connected(&mut state, client);
+    let first_uri = rubric_app::state::file_uri(&first);
+    let first_url = next(&rx, "rubric/page for first post", |m| match m {
+        Incoming::Notification { method, params }
+            if method == "rubric/page"
+                && params["uri"].as_str().map(rubric_app::state::unescaped) == Some(rubric_app::state::unescaped(&first_uri)) =>
+        {
+            params["url"].as_str().map(str::to_string)
+        }
+        _ => None,
+    });
+    assert!(first_url.contains("/posts/first-post"), "unexpected first url: {first_url}");
+    wait_for("relay cursor on first post", || {
+        relay_cursor_url(&site).is_some_and(|u| u.contains("/posts/first-post"))
+    });
+
+    // Switch to the second post through the app's switch path (didClose + open_document + didOpen + rubric/cursor).
+    let mut rt = rune::Runtime::with_text(state, rubric_app::view, (1000.0, 700.0), rune::Env::new(false, 1.0), rubric_app::fonts::text_system());
+    let second_clone = second.clone();
+    rt.update(move |s, tx| {
+        assert!(rubric_app::state::switch_document(s, second_clone, tx));
+    });
+    assert_eq!(rt.state.path, second);
+    assert_eq!(rt.state.version, 1);
+
+    let second_uri = rubric_app::state::file_uri(&second);
+    let second_url = next(&rx, "rubric/page for second post", |m| match m {
+        Incoming::Notification { method, params }
+            if method == "rubric/page"
+                && params["uri"].as_str().map(rubric_app::state::unescaped) == Some(rubric_app::state::unescaped(&second_uri)) =>
+        {
+            params["url"].as_str().map(str::to_string)
+        }
+        _ => None,
+    });
+    assert!(second_url.contains("/posts/second-post"), "unexpected second url: {second_url}");
+    wait_for("relay cursor on second post", || {
+        relay_cursor_url(&site).is_some_and(|u| u.contains("/posts/second-post"))
+    });
+
+    rubric_app::state::shut(&mut rt.state);
+    wait_for("the server's process to end", || !alive(pid));
+}
+
 /// The ids of the rows of a line's menu.
 fn ids(view: &rubric_app::draft::View) -> Vec<String> {
     rubric_app::draft::menu_rows(view, None, None).0.iter().filter(|r| r.takes_focus()).filter_map(|r| r.id().map(str::to_string)).collect()

@@ -56,6 +56,7 @@ pub static CLOSE_ICON: Icon = Icon {
 /// Which toolbar button the pointer is over.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Hover {
+    Drawer,
     View,
     Open,
     Close,
@@ -149,26 +150,33 @@ pub fn panes(s: &State) -> Panes {
     }
 }
 
-/// Switches panes, remembering the last non-edge split before hiding a pane.
+/// Switches panes; `Both` always puts the divider at half and half, whatever the split was.
+/// Starts a smooth view-switch slide so writing and page move together without resizing the
+/// web view per frame.
 pub fn set_panes(s: &mut State, mode: Panes, tx: &mut Tx) {
-    if s.split > 0.0 && s.split < 1.0 {
-        s.last_split = s.split;
-    }
+    let old_split = s.split;
+    let prev_cover = s.left_cover;
     crate::look::close_panels(s);
+    let next = match mode {
+        Panes::Both => 0.5,
+        Panes::Write => 1.0,
+        Panes::Page => 0.0,
+    };
+    let changing = (old_split - next).abs() > 1e-4;
+    s.split = next;
     match mode {
-        Panes::Both => {
-            if s.split <= 0.0 || s.split >= 1.0 {
-                s.split = s.last_split.clamp(0.1, 0.9);
+        Panes::Both | Panes::Write => {
+            if !s.drawer.open {
+                tx.focus("editor", false);
             }
-            tx.focus("editor", false);
         }
-        Panes::Write => {
-            s.split = 1.0;
-            tx.focus("editor", false);
-        }
-        Panes::Page => {
-            s.split = 0.0;
-        }
+        Panes::Page => {}
+    }
+    sync_cover(s);
+    if changing {
+        crate::state::begin_view_slide(s, old_split, tx.scale());
+    } else if (s.left_cover - prev_cover).abs() > 0.5 {
+        crate::state::begin_cover_slide(s, tx.scale(), false, prev_cover);
     }
 }
 
@@ -221,10 +229,12 @@ pub fn view_rect(s: &State) -> [f32; 4] {
     [x, TITLE + 4.0, w, if max_h > 0.0 { h.min(max_h) } else { h }]
 }
 
-/// Keeps `s.left_cover` in sync with what is open at the left (at least 300 points while the View
-/// popover is open).
+/// Keeps `s.left_cover` in sync with what is open at the left (at least 300 points while the
+/// drawer or the View popover is open).
 pub fn sync_cover(s: &mut State) {
-    s.left_cover = if view_open(s) {
+    s.left_cover = if s.drawer.open {
+        crate::drawer::WIDTH
+    } else if view_open(s) {
         let r = view_rect(s);
         LEFT_COVER.max(r[0] + r[2])
     } else {
@@ -235,6 +245,13 @@ pub fn sync_cover(s: &mut State) {
 /// Opens or closes the View popover from the toolbar button.
 pub fn toggle_view(s: &mut State, tx: &mut Tx) {
     tx.color_motion(Spring::NONE);
+    let prev_cover = s.left_cover;
+    let had_drawer = s.drawer.open;
+    s.view_slide.set(None);
+    if s.drawer.open {
+        s.drawer.open = false;
+        s.drawer.hovered = None;
+    }
     if view_open(s) {
         crate::look::close_panels(s);
         if s.split > 0.0 {
@@ -245,6 +262,7 @@ pub fn toggle_view(s: &mut State, tx: &mut Tx) {
         s.panels = vec![view_panel(s)];
         sync_cover(s);
     }
+    crate::state::begin_cover_slide(s, tx.scale(), had_drawer, prev_cover);
 }
 
 /// Handles a choice or dismissal from the View popover.
@@ -255,7 +273,9 @@ pub fn act(s: &mut State, taken: Taken, tx: &mut Tx) {
             "write" => set_panes(s, Panes::Write, tx),
             "page" => set_panes(s, Panes::Page, tx),
             "open" => {
+                let prev_cover = s.left_cover;
                 crate::look::close_panels(s);
+                crate::state::begin_cover_slide(s, tx.scale(), false, prev_cover);
                 open_in_browser(s, tx);
                 if s.split > 0.0 {
                     tx.focus("editor", false);
@@ -264,7 +284,9 @@ pub fn act(s: &mut State, taken: Taken, tx: &mut Tx) {
             _ => {}
         },
         Taken::Closed | Taken::Passed => {
+            let prev_cover = s.left_cover;
             crate::look::close_panels(s);
+            crate::state::begin_cover_slide(s, tx.scale(), false, prev_cover);
             if s.split > 0.0 {
                 tx.focus("editor", false);
             }
@@ -327,6 +349,10 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
             tx.close_window();
             true
         }
+        Some(Shortcut::Drawer) => {
+            crate::drawer::toggle(s, tx);
+            true
+        }
         Some(Shortcut::Save) => {
             crate::state::save(s);
             true
@@ -339,7 +365,7 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
             crate::state::reload_page(s);
             true
         }
-        Some(Shortcut::Drawer | Shortcut::Themes | Shortcut::ThemesComma | Shortcut::ReloadPage) | None => false,
+        Some(Shortcut::Themes | Shortcut::ThemesComma | Shortcut::ReloadPage) | None => false,
     }
 }
 
@@ -376,16 +402,21 @@ pub fn bar(s: &State) -> El {
     let linux = cfg!(target_os = "linux");
     let lay = layout(s.width, linux);
 
-    // Drawer button (28×26, radius 6). Dimmed and without hover until sitting 3 builds the drawer;
-    // tip sits inside the toolbar to its right.
+    // Drawer button (28×26, radius 6). Filled while hovered or the drawer is open; tip sits
+    // inside the toolbar to its right.
+    let drawer_on = s.toolbar_hover == Some(Hover::Drawer) || s.drawer.open;
+    let drawer_bg = if drawer_on { p.hover } else { p.bg.alpha(0.0) };
     let drawer_btn = row().key("toolbar-drawer").w(28.0).h(26.0).radius(6.0).center()
-        .fill(p.bg.alpha(0.0))
+        .fill(drawer_bg)
+        .cursor(Cursor::Pointer)
         .no_window_drag()
         .preserve_focus_on_press(true)
+        .on_hover_change(hover_handler(Hover::Drawer))
+        .on_press_tx(|s: &mut State, tx| crate::drawer::toggle(s, tx))
         .help("Posts and pages")
         .help_keys([chord(Shortcut::Drawer).label()])
         .help_side(Side::Right)
-        .child(icon(&DRAWER_ICON, 16.0).color(p.ink3));
+        .child(icon(&DRAWER_ICON, 16.0).color(p.ink));
 
     // View button (height 26, 6 horizontal padding, icon + small chevron). Filled while hovered,
     // popover open, or one pane hidden. Tip sits inside the toolbar to its right.

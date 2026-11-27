@@ -99,9 +99,12 @@ pub fn field_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
     }
 }
 
-/// Window-wide key handler (`AppSpec::on_key`): handles open panels and window shortcuts even
-/// when the writing pane is hidden (page-only view) and no field has focus.
+/// Window-wide key handler (`AppSpec::on_key`): handles the open drawer, open panels, and window
+/// shortcuts even when the writing pane is hidden (page-only view) and no field has focus.
 pub fn window_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
+    if crate::drawer::key(s, ev, tx) {
+        return true;
+    }
     if crate::look::key(s, ev, tx) != crate::panel::Taken::Passed {
         crate::state::schedule_save(s, tx);
         crate::state::sync_draft_boxes(s, tx);
@@ -120,6 +123,9 @@ pub fn window_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
 /// always consumed, so focus never leaves the writing.
 pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
     crate::trace::say(|| format!("key    editor {:?} {:?}", ev.key, ev.mods));
+    if crate::drawer::key(s, ev, tx) {
+        return true;
+    }
     // An open panel takes its keys first; any other key closes it and is the editor's.
     if crate::look::key(s, ev, tx) != crate::panel::Taken::Passed {
         crate::state::schedule_save(s, tx);

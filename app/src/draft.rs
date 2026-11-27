@@ -105,17 +105,17 @@ pub fn clock(ms: u64) -> String {
     format!("{}:{:02}", s / 60, s % 60)
 }
 
-/// What the status line under the writing says: a label in the state's color, one fact, and at
-/// most one action with its key.
+/// What the status line under the writing says: a label in the state's color, one fact, and
+/// zero, one, or two actions (each optionally with a key).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Said {
     pub label: String,
     pub tone: Tone,
     pub fact: String,
-    pub action: Option<(String, Chord)>,
+    pub actions: Vec<(String, Option<Chord>)>,
 }
 
-fn action(id: &str) -> Option<(String, Chord)> {
+fn action(id: &str) -> Option<(String, Option<Chord>)> {
     let (label, key) = match id {
         "build" => ("Draft", Key::Enter),
         "stop" => ("Stop", Key::Command('.')),
@@ -123,7 +123,7 @@ fn action(id: &str) -> Option<(String, Chord)> {
         "reroll" => ("Reroll", Key::Command('r')),
         _ => return None,
     };
-    Some((label.into(), Chord::cmd(key)))
+    Some((label.into(), Some(Chord::cmd(key))))
 }
 
 /// What a `new:` line's status says, and the id of its action.
@@ -140,7 +140,7 @@ fn said(status: &Status, name: &str, fact: String, now_ms: u64) -> (Said, &'stat
         Status::Ready { .. } => ("Ready".into(), fact, "keep"),
         Status::Failed { message } => (format!("{name} failed"), message.as_deref().map_or_else(|| "No reason given".into(), readable), "reroll"),
     };
-    (Said { label, tone: status.tone(), fact, action: action(id) }, id)
+    (Said { label, tone: status.tone(), fact, actions: action(id).into_iter().collect() }, id)
 }
 
 /// What the status of a placed part's take or new variant says: the part, and the change
@@ -430,28 +430,39 @@ fn caret_status(s: &State) -> Option<(u32, String, Said, &'static str)> {
 }
 
 /// What the bottom of the writing pane (or the window's foot in page-only view) says: a failed
-/// save takes precedence over drafts, flashes, and page status.
+/// save or disk conflict takes precedence over drafts, flashes, and page status.
 pub fn line(s: &State) -> Option<Said> {
     if let Some(msg) = &s.save_error {
         return Some(Said {
             label: "Post not saved".into(),
             tone: Tone::Warn,
             fact: msg.clone(),
-            action: Some(("Retry".into(), crate::toolbar::chord(crate::toolbar::Shortcut::Save))),
+            actions: vec![("Retry".into(), Some(crate::toolbar::chord(crate::toolbar::Shortcut::Save)))],
+        });
+    }
+    if s.disk_conflict {
+        return Some(Said {
+            label: "Post changed on disk".into(),
+            tone: Tone::Warn,
+            fact: "Another program changed this file.".into(),
+            actions: vec![("Reload".into(), None), ("Overwrite".into(), None)],
         });
     }
     if let Some((said, _)) = &s.flash {
         return Some(said.clone());
     }
     if s.page_life.stopped {
-        return Some(Said { label: "Page stopped".into(), tone: Tone::Warn, fact: String::new(), action: Some(("Reload".into(), reload_chord())) });
+        return Some(Said { label: "Page stopped".into(), tone: Tone::Warn, fact: String::new(), actions: vec![("Reload".into(), Some(reload_chord()))] });
     }
     caret_status(s).map(|(_, _, said, _)| said)
 }
 
 /// Whether the status line claims a full-width strip at the window's foot in page-only view.
 pub fn wide_status(s: &State) -> bool {
-    s.save_error.is_some() || s.page_life.stopped
+    s.save_error.is_some()
+        || s.disk_conflict
+        || s.page_life.stopped
+        || s.flash.as_ref().is_some_and(|(said, _)| said.tone == Tone::Warn)
 }
 
 /// Reload on a stopped page: Cmd+Shift+R (read from `toolbar::SHORTCUTS`).
@@ -461,7 +472,7 @@ fn reload_chord() -> Chord {
 
 pub fn flash(s: &mut State, label: impl Into<String>, tone: Tone, fact: impl Into<String>) {
     s.now_ms = now_ms();
-    s.flash = Some((Said { label: label.into(), tone, fact: fact.into(), action: None }, s.now_ms + FLASH_MS));
+    s.flash = Some((Said { label: label.into(), tone, fact: fact.into(), actions: Vec::new() }, s.now_ms + FLASH_MS));
     state::wake(s);
 }
 
@@ -622,6 +633,11 @@ pub fn diagnostics(s: &mut State, params: &Value) {
 /// `rubric/drafted`: a draft finished or failed. Said for 4 s unless the caret's line is the
 /// one it is for, whose own status says it.
 pub fn drafted(s: &mut State, params: &Value) {
+    if let Some(uri) = params.get("uri").and_then(Value::as_str)
+        && state::unescaped(uri) != state::unescaped(&s.uri)
+    {
+        return;
+    }
     let words = params.get("words").and_then(Value::as_str).unwrap_or("");
     if new_words(caret_line(s).1) == Some(words) {
         return;
@@ -936,31 +952,51 @@ pub fn status_key(s: &mut State, ev: &KeyEvent) -> bool {
         state::reload_page(s);
         return true;
     }
-    if s.save_error.is_some() || !s.panels.is_empty() {
+    if s.save_error.is_some() || s.disk_conflict || !s.panels.is_empty() {
         return false;
     }
     let Some((line, text, said, id)) = caret_status(s) else { return false };
-    if s.flash.is_some() || !said.action.is_some_and(|(_, k)| k.matches(ev)) {
+    if s.flash.is_some() || !said.actions.first().and_then(|(_, k)| k.as_ref()).is_some_and(|k| k.matches(ev)) {
         return false;
     }
     perform(s, id, line, text);
     true
 }
 
-/// A press on the status line's action.
-pub fn status_pressed(s: &mut State) {
+/// A press on action `idx` of the status line.
+pub fn status_pressed(s: &mut State, idx: usize, tx: &mut Tx) {
     if s.save_error.is_some() {
-        state::save(s);
+        if idx == 0 {
+            state::save(s);
+        }
+        return;
+    }
+    if s.disk_conflict {
+        match idx {
+            0 => {
+                if state::reload_from_disk(s) {
+                    state::sync_draft_boxes(s, tx);
+                }
+            }
+            1 => {
+                state::overwrite_to_disk(s);
+            }
+            _ => {}
+        }
         return;
     }
     if s.flash.is_some() {
         return;
     }
     if s.page_life.stopped {
-        state::reload_page(s);
+        if idx == 0 {
+            state::reload_page(s);
+        }
         return;
     }
-    if let Some((line, text, _, id)) = caret_status(s) {
+    if idx == 0
+        && let Some((line, text, _, id)) = caret_status(s)
+    {
         perform(s, id, line, text);
     }
 }

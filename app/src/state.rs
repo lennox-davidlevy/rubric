@@ -13,12 +13,90 @@ use crate::{draft, ghost, markdown, position};
 /// How long after the last change the post saves by itself, in seconds.
 pub const AUTOSAVE_SECS: f64 = 1.0;
 
+/// Curve driving `"page"`'s horizontal glide during a `ViewSlide`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SlideCurve {
+    /// Rune's default layout spring (view switches: Ctrl+1 / Ctrl+2 / Ctrl+3 / View popover).
+    Spring,
+    /// Drawer's 140 ms ease-out (opening drawer or View popover over a yielding page).
+    DrawerOpen,
+    /// Drawer's 140 ms ease-in (closing drawer or View popover over a yielding page).
+    DrawerClose,
+}
+
+/// An in-flight slide of the native web view (a view switch between `Both`, `Write`, and `Page`,
+/// or opening/closing the drawer or View popover when it shifts the page).
+///
+/// The web view sits on top of everything, so it always slides at the larger of its old and new
+/// sizes (`slide_size`): when growing it is resized once before sliding; when shrinking it slides
+/// first and is resized once at rest (`final_size`). Meanwhile, what lies under the page stays in
+/// its place so no column of ground color ever shows beside or between the panes.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ViewSlide {
+    pub target_x: i32,
+    pub target_y: i32,
+    pub slide_size: (u32, u32),
+    pub final_size: (u32, u32),
+    pub leaving: bool,
+    pub curve: SlideCurve,
+    pub last_pos: Option<(i32, i32)>,
+    /// While covering the writing pane (e.g. Ctrl+1→Ctrl+3 or Ctrl+2→Ctrl+3), keep writing laid
+    /// out at this width underneath the sliding web view until rest.
+    pub under_left: Option<f32>,
+    /// Lay out writing and divider immediately at their final (or held) place from Frame 0.
+    pub instant_under: bool,
+    /// While the page slides back over a closing drawer in page-only view, keep the drawer drawn
+    /// underneath until rest.
+    pub hold_drawer: bool,
+    /// While the page slides back over a closing cover column, keep `page-cover` drawn underneath
+    /// until rest.
+    pub hold_cover: f32,
+}
+
+impl ViewSlide {
+    /// Whether clearing this slide at rest needs one instant view rebuild to unmount a held
+    /// writing pane, drawer, or cover column that sat underneath the closing page.
+    pub fn holds_under(&self) -> bool {
+        self.under_left.is_some() || self.hold_drawer || self.hold_cover > 0.0
+    }
+}
 /// What the top row shows beside the post's title.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SaveState {
     Saved,
     Edited,
     Failed,
+}
+
+/// File metadata recorded when the app last read or wrote the open post, used by `save` to skip
+/// reading the file when untouched on disk (one `stat(2)` call).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DiskStamp {
+    pub len: u64,
+    pub modified: Option<std::time::SystemTime>,
+    #[cfg(unix)]
+    pub ino: u64,
+    #[cfg(unix)]
+    pub ctime: (i64, i64),
+}
+
+impl DiskStamp {
+    pub fn of(path: &std::path::Path) -> Option<DiskStamp> {
+        std::fs::metadata(path).ok().map(|m| Self::from_meta(&m))
+    }
+
+    pub fn from_meta(meta: &std::fs::Metadata) -> DiskStamp {
+        #[cfg(unix)]
+        use std::os::unix::fs::MetadataExt;
+        DiskStamp {
+            len: meta.len(),
+            modified: meta.modified().ok(),
+            #[cfg(unix)]
+            ino: meta.ino(),
+            #[cfg(unix)]
+            ctime: (meta.ctime(), meta.ctime_nsec()),
+        }
+    }
 }
 
 /// One page returned by `rubric/pages`.
@@ -70,10 +148,13 @@ pub struct State {
     pub version: i32,
     /// The text as last written, to know whether it is dirty.
     pub saved: String,
+    /// Metadata of `path` as last read or written, to detect changes by another program before writing.
+    pub disk: Option<DiskStamp>,
+    /// Another program changed `path` on disk since the app last read or wrote it; nothing is
+    /// written until reloaded (or the file on disk matches `saved` again).
+    pub disk_conflict: bool,
     /// 0.0 = page only, 1.0 = writing only; starts 0.5.
     pub split: f32,
-    /// Last non-edge split remembered before hiding a pane (starts 0.5).
-    pub last_split: f32,
     /// Right edge of what is open at the left (the View popover, or the drawer in sitting 3),
     /// in window points: the page starts past this edge plus the divider.
     pub left_cover: f32,
@@ -97,12 +178,19 @@ pub struct State {
     pub pages_req: Option<i64>,
     /// Last `rubric/pages` response from the server.
     pub site_pages: Option<SitePages>,
+    /// The drawer's open/selection/hover state.
+    pub drawer: crate::drawer::Drawer,
+    /// When Return/click started switching to another post, until the frame that draws it.
+    pub switched: std::cell::Cell<Option<std::time::Instant>>,
     /// The web view, once the window exists (task 2).
     pub page: Option<crate::page::Page>,
     /// The window's width in points, for the divider.
     pub width: f32,
-    /// The page pane's last bounds sent, in physical pixels.
-    pub bounds: Option<(i32, i32, u32, u32)>,
+    /// The page pane's last bounds sent, in physical pixels (`Cell` so `on_frame_drawn` can
+    /// advance position-only slides without triggering a view rebuild).
+    pub bounds: std::cell::Cell<Option<(i32, i32, u32, u32)>>,
+    /// Active view-switch slide (between `Both`, `Write`, and `Page`), cleared once settled.
+    pub view_slide: std::cell::Cell<Option<ViewSlide>>,
     /// The language server, once it answered initialize (task 3).
     pub client: Option<crate::lsp::Client>,
     /// Last line sent as rubric/cursor.
@@ -259,14 +347,16 @@ impl State {
         edit.focused = true;
         edit.set_caret(0);
         let uri = file_uri(&path);
+        let disk = DiskStamp::of(&path);
         let look = crate::theme::Look::load(None, None, None);
         let spans = markdown::spans(&text, &marks(&look.palette), &[]);
         let title = title_of(&path, &text);
         let mut s = State {
-            path, edit, version: 1, saved: text, split: 0.5, last_split: 0.5, left_cover: 0.0, last_range: (0, 0), uri, spans,
+            path, edit, version: 1, saved: text, disk, disk_conflict: false, split: 0.5, left_cover: 0.0, last_range: (0, 0), uri, spans,
             save_error: None, save_arm: false, save_due: None, shut_done: false, waiting_for_page: false, pages_req: None, site_pages: None,
+            drawer: crate::drawer::Drawer::default(), switched: std::cell::Cell::new(None),
             page: None, width: 0.0,
-            bounds: None, client: None, cursor_line: None, page_url: None, page_path: None, ghost: None, asked: None, height: 0.0,
+            bounds: std::cell::Cell::new(None), view_slide: std::cell::Cell::new(None), client: None, cursor_line: None, page_url: None, page_path: None, ghost: None, asked: None, height: 0.0,
             view: None, choice: None, drafts: Vec::new(), flash: None, now_ms: draft::now_ms(),
             pending: HashMap::new(), looked: std::cell::Cell::new(None), looked_sent: None, looked_server_ms: 0.0, sent_at: HashMap::new(), ticker: None, look, title, pane: [0.0; 4],
             panels: Vec::new(), field: TextEdit::new(""), field_of: None, part_wait: None, set_next: None, setting: false, insert: None, drafter: None, focus_field: false, field_live: false, held: None, anchor: None, anchor_wait: false, editor_rect: [0.0; 4], draft_marks: Vec::new(), draft_boxes: HashMap::new(), draft_boxes_for: (0, 0, 0, 0), said_on: HashMap::new(), theme_before: None, page_life: crate::page::Life::default(), page_has_keys: false,
@@ -286,14 +376,19 @@ impl State {
     }
 }
 
-/// Loads `path` and `text` as the open document, resetting document state while keeping the
-/// window, server, page, look, and split. Opens it on the server when connected.
+/// Loads `path` and `text` as the open document, resetting every piece of document state as
+/// `State::open` makes it (text and undo, version at 1, pick, menus, drafts and marks, pending
+/// requests) while keeping window state (server, page, look, split, sizes). Opens it on the
+/// server when connected.
 pub fn open_document(s: &mut State, path: PathBuf, text: String) {
+    crate::look::close_panels(s);
     let mut edit = TextEdit::new(text.clone());
-    edit.focused = true;
+    edit.focused = s.split > 0.0 && !s.drawer.open;
     edit.set_caret(0);
     s.path = path;
     s.uri = file_uri(&s.path);
+    s.disk = DiskStamp::of(&s.path);
+    s.disk_conflict = false;
     s.edit = edit;
     s.version = 1;
     s.saved = text;
@@ -302,6 +397,27 @@ pub fn open_document(s: &mut State, path: PathBuf, text: String) {
     s.page_path = None;
     s.ghost = None;
     s.asked = None;
+    s.view = None;
+    s.choice = None;
+    s.drafts.clear();
+    s.flash = None;
+    s.pending.clear();
+    s.looked.set(None);
+    s.looked_sent = None;
+    s.looked_server_ms = 0.0;
+    s.sent_at.clear();
+    s.field = TextEdit::new("");
+    s.field_of = None;
+    s.field_live = false;
+    s.held = None;
+    s.anchor = None;
+    s.anchor_wait = false;
+    s.part_wait = None;
+    s.set_next = None;
+    s.setting = false;
+    s.insert = None;
+    s.said_on.clear();
+    s.theme_before = None;
     s.save_error = None;
     s.save_arm = false;
     s.save_due = None;
@@ -311,6 +427,9 @@ pub fn open_document(s: &mut State, path: PathBuf, text: String) {
     s.draft_boxes.clear();
     s.draft_boxes_for = (0, 0, 0, 0);
     s.title = title_of(&s.path, &s.edit.text);
+    if let Some(t) = &s.ticker {
+        t.rest();
+    }
     if let Some(c) = &s.client {
         c.notify("textDocument/didOpen", json!({
             "textDocument": { "uri": s.uri, "languageId": "markdown", "version": s.version, "text": s.edit.text },
@@ -319,6 +438,147 @@ pub fn open_document(s: &mut State, path: PathBuf, text: String) {
         s.cursor_line = Some(0);
     }
     ask(s);
+}
+
+/// Switches from the open post to `path`: syncs clean external disk edits first, saves any unsaved
+/// changes (stopping on failure or conflict so nothing is dropped), reads the new file before
+/// closing the old one (flashing `Post not opened` on a read error while leaving the current post
+/// open), then sends `didClose` and opens the new document with `open_document`.
+pub fn switch_document(s: &mut State, path: PathBuf, tx: &mut Tx) -> bool {
+    if !s.waiting_for_page && !s.uri.is_empty() && unescaped(&file_uri(&path)) == unescaped(&s.uri) {
+        sync_from_disk(s, Some(tx));
+        return true;
+    }
+    if !s.waiting_for_page {
+        sync_from_disk(s, Some(tx));
+        if (!clean(s) || s.save_error.is_some() || s.disk_conflict) && !save(s) {
+            return false;
+        }
+    }
+    let text = match std::fs::read_to_string(&path) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("open {}: {e}", path.display());
+            draft::flash(s, "Post not opened", draft::Tone::Warn, open_error_sentence(&e));
+            return false;
+        }
+    };
+    if let Some(c) = &s.client && !s.waiting_for_page && !s.uri.is_empty() {
+        c.notify("textDocument/didClose", json!({ "textDocument": { "uri": s.uri } }));
+    }
+    open_document(s, path, text);
+    tx.scroll_to_y("writing", 0.0);
+    sync_draft_boxes(s, tx);
+    true
+}
+
+/// Replaces the writing with `text` from disk, keeping the caret's line where it can when
+/// `keep_line` is true.
+fn apply_disk_text(s: &mut State, text: String, stamp: Option<DiskStamp>, keep_line: bool) {
+    let (target_line, caret) = if keep_line {
+        let (line, col) = position::line_char(&s.edit.text, s.edit.focus);
+        let max_line = text.bytes().filter(|&b| b == b'\n').count() as u32;
+        let target = line.min(max_line);
+        (target, position::byte_at(&text, target, col))
+    } else {
+        (0, 0)
+    };
+    crate::look::close_panels(s);
+    let mut edit = TextEdit::new(text.clone());
+    edit.focused = s.split > 0.0 && !s.drawer.open;
+    edit.set_caret(caret);
+    s.edit = edit;
+    s.saved = text;
+    s.disk = stamp.or_else(|| DiskStamp::of(&s.path));
+    s.disk_conflict = false;
+    s.save_error = None;
+    s.save_arm = false;
+    s.save_due = None;
+    s.version += 1;
+    s.last_range = s.edit.range();
+    s.ghost = None;
+    s.asked = None;
+    s.spans = spans(s);
+    s.draft_marks = draft::marks(s);
+    s.draft_boxes.clear();
+    s.draft_boxes_for = (0, 0, 0, 0);
+    s.title = title_of(&s.path, &s.edit.text);
+    if let Some(c) = &s.client && !s.waiting_for_page {
+        c.notify("textDocument/didChange", json!({
+            "textDocument": { "uri": s.uri, "version": s.version },
+            "contentChanges": [{ "text": s.edit.text }],
+        }));
+        c.notify("rubric/cursor", json!({ "uri": s.uri, "line": target_line }));
+        s.cursor_line = Some(target_line);
+    }
+    ask(s);
+}
+
+/// Replaces the writing with the file's text on disk after `Post changed on disk`.
+pub fn reload_from_disk(s: &mut State) -> bool {
+    let text = match std::fs::read_to_string(&s.path) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("reload {}: {e}", s.path.display());
+            draft::flash(s, "Post not opened", draft::Tone::Warn, open_error_sentence(&e));
+            return false;
+        }
+    };
+    apply_disk_text(s, text, None, false);
+    true
+}
+
+/// Checks whether the open post changed on disk: costs one `stat(2)` when untouched. If the app's
+/// writing is clean, silently takes the file's text while keeping the caret's line where it can.
+/// If the app has unsaved writing, flags `disk_conflict`. Returns whether state shown by the view
+/// changed.
+pub fn sync_from_disk(s: &mut State, tx: Option<&mut Tx>) -> bool {
+    if s.waiting_for_page || (s.disk_conflict && !clean(s)) {
+        return false;
+    }
+    match check_disk_change(&s.path, &mut s.disk, &s.saved) {
+        DiskChange::Same => false,
+        DiskChange::Changed(text, stamp) => {
+            if clean(s) {
+                apply_disk_text(s, text, Some(stamp), true);
+                if let Some(tx) = tx {
+                    sync_draft_boxes(s, tx);
+                }
+                true
+            } else {
+                let changed = !s.disk_conflict || s.save_error.is_some();
+                s.disk_conflict = true;
+                s.save_error = None;
+                s.save_arm = false;
+                s.save_due = None;
+                changed
+            }
+        }
+    }
+}
+
+/// Native window activation/deactivation (`El::on_window_focus`): on focus gain, checks disk in
+/// one `stat(2)` and skips view rebuild (`Tx::live_only`) when nothing changed.
+pub fn window_focused(s: &mut State, focused: bool, tx: &mut Tx) {
+    if !focused || !sync_from_disk(s, Some(tx)) {
+        tx.live_only();
+    }
+}
+
+/// Short writer-facing sentence for a file read error.
+pub fn open_error_sentence(e: &std::io::Error) -> String {
+    use std::io::ErrorKind;
+    match e.kind() {
+        ErrorKind::NotFound => "The post is no longer on disk.".into(),
+        ErrorKind::PermissionDenied => "The file could not be read.".into(),
+        _ => "The file could not be read.".into(),
+    }
+}
+
+/// Once a post switch finishes drawing its first frame: how long Return/click to drawn took.
+pub fn switch_drawn(s: &State) -> Option<String> {
+    let begun = s.switched.take()?;
+    Some(format!("post drawn {:.1} ms: {}", begun.elapsed().as_secs_f64() * 1000.0, s.title))
 }
 
 /// The Markdown's colors from the app's theme.
@@ -430,7 +690,7 @@ pub fn clean(s: &State) -> bool {
 
 /// The saved state shown in the top row.
 pub fn save_state(s: &State) -> SaveState {
-    if s.save_error.is_some() {
+    if s.save_error.is_some() || s.disk_conflict {
         SaveState::Failed
     } else if clean(s) {
         SaveState::Saved
@@ -494,7 +754,7 @@ fn sent(s: &mut State) {
     s.draft_marks = draft::marks(s);
     s.title = title_of(&s.path, &s.edit.text);
     if !s.waiting_for_page {
-        if clean(s) && s.save_error.is_none() {
+        if s.disk_conflict || (clean(s) && s.save_error.is_none()) {
             s.save_arm = false;
             s.save_due = None;
         } else {
@@ -670,6 +930,7 @@ pub fn incoming(s: &mut State, m: crate::lsp::Incoming) -> bool {
                                     s.waiting_for_page = false;
                                 }
                             }
+                            crate::drawer::sync_selection(s);
                             return true;
                         }
                     }
@@ -760,15 +1021,61 @@ pub fn menu_drawn(s: &State) -> Option<String> {
     Some(format!("menu drawn {:.1} ms: {id}, server {:.1} ms", asked.elapsed().as_secs_f64() * 1000.0, s.looked_server_ms))
 }
 
-/// The window is going: unsaved writing saves first (a failure is printed and closing still
-/// completes), then the document and server close, then the web view.
+/// The nearest folder above `path` that holds `rubric.md`.
+pub fn site_of(path: &std::path::Path) -> Option<PathBuf> {
+    path.ancestors().skip(1).find(|d| d.join("rubric.md").is_file()).map(std::path::Path::to_path_buf)
+}
+
+/// Ensures a file name ends with `.md`.
+fn ensure_md(path: PathBuf) -> PathBuf {
+    let ends_md = path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("md"));
+    if ends_md {
+        return path;
+    }
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).filter(|n| !n.is_empty()).unwrap_or_else(|| "post".into());
+    path.with_file_name(format!("{name}.md"))
+}
+
+/// Path where unsaved writing is rescued when closing with a disk conflict:
+/// `<site>/.rubric/unsaved/<path inside pages, with its name>.md` (never inside `pages/`, so it
+/// is never listed in the drawer, rendered by Hugo, or published). If no site root (`rubric.md`)
+/// can be found, falls back to the system's temp folder.
+pub fn unsaved_path(path: &std::path::Path) -> PathBuf {
+    if let Some(site) = site_of(path) {
+        let pages = site.join("pages");
+        let rel = if let Ok(r) = path.strip_prefix(&pages) {
+            r.to_path_buf()
+        } else if let Ok(r) = path.strip_prefix(&site) {
+            r.to_path_buf()
+        } else {
+            PathBuf::from(path.file_name().unwrap_or_else(|| std::ffi::OsStr::new("post.md")))
+        };
+        return ensure_md(site.join(".rubric").join("unsaved").join(rel));
+    }
+    let name = path.file_name().unwrap_or_else(|| std::ffi::OsStr::new("post.md"));
+    ensure_md(std::env::temp_dir().join("rubric-unsaved").join(name))
+}
+
+/// The window is going: unsaved writing saves first. If a disk conflict blocks saving, the app's
+/// writing is rescued to `unsaved_path(&s.path)` without overwriting the post, and its path is
+/// printed; other save failures are printed and closing still completes.
 pub fn shut(s: &mut State) {
     if s.shut_done {
         return;
     }
     s.shut_done = true;
-    if !s.waiting_for_page && (!clean(s) || s.save_error.is_some()) {
-        save(s);
+    if !s.waiting_for_page && (!clean(s) || s.save_error.is_some() || s.disk_conflict) {
+        if !save(s) && s.disk_conflict && !clean(s) {
+            let dest = unsaved_path(&s.path);
+            let res = dest.parent()
+                .map(std::fs::create_dir_all)
+                .transpose()
+                .and_then(|_| markdown::save(&dest, &s.edit.text));
+            match res {
+                Ok(()) => eprintln!("unsaved writing saved to {}", dest.display()),
+                Err(e) => eprintln!("could not write {}: {e}", dest.display()),
+            }
+        }
     }
     if let Some(c) = s.client.take() {
         if !s.waiting_for_page && !s.uri.is_empty() {
@@ -849,17 +1156,37 @@ pub fn keep_anchor(s: &State) -> Option<Anchor> {
     s.anchor.filter(|a| a.holds(at, start, s.editor_rect[2]))
 }
 
-/// Writes the file whole; clears any failed-save state on success, or records a short
-/// writer-facing sentence and prints the error on failure. Returns whether the file is saved.
-pub fn save(s: &mut State) -> bool {
-    if s.waiting_for_page {
-        return true;
+enum DiskChange {
+    Same,
+    Changed(String, DiskStamp),
+}
+
+/// Compares the file on disk against what the app last read or wrote: one `stat(2)` first, and
+/// reads the file only when size, mtime, ctime, or inode differs. When metadata changed without
+/// changing the file's text, refreshes `*expected` so later checks stay at one `stat(2)`.
+fn check_disk_change(path: &std::path::Path, expected: &mut Option<DiskStamp>, saved: &str) -> DiskChange {
+    let Some(exp) = expected.as_ref() else { return DiskChange::Same };
+    let Ok(meta) = std::fs::metadata(path) else { return DiskChange::Same };
+    let current = DiskStamp::from_meta(&meta);
+    if current == *exp {
+        return DiskChange::Same;
     }
-    s.save_arm = false;
-    s.save_due = None;
+    match std::fs::read_to_string(path) {
+        Ok(text) if text == saved => {
+            *expected = Some(current);
+            DiskChange::Same
+        }
+        Ok(text) => DiskChange::Changed(text, current),
+        Err(_) => DiskChange::Same,
+    }
+}
+
+fn write_to_disk(s: &mut State) -> bool {
     match markdown::save(&s.path, &s.edit.text) {
         Ok(()) => {
             s.saved = s.edit.text.clone();
+            s.disk = DiskStamp::of(&s.path);
+            s.disk_conflict = false;
             s.save_error = None;
             true
         }
@@ -869,6 +1196,48 @@ pub fn save(s: &mut State) -> bool {
             false
         }
     }
+}
+
+/// Writes the file whole; checks first whether another program changed it on disk (silently
+/// taking the file's text when the app is clean, or leaving the file untouched and flagging
+/// `disk_conflict` when the app has unsaved writing), clears any failed-save state on success,
+/// or records a short writer-facing sentence and prints the error on failure. Returns whether the
+/// file is saved.
+pub fn save(s: &mut State) -> bool {
+    if s.waiting_for_page {
+        return true;
+    }
+    s.save_arm = false;
+    s.save_due = None;
+    if s.disk_conflict && !clean(s) {
+        return false;
+    }
+    if let DiskChange::Changed(text, stamp) = check_disk_change(&s.path, &mut s.disk, &s.saved) {
+        if clean(s) {
+            apply_disk_text(s, text, Some(stamp), true);
+            return true;
+        }
+        s.disk_conflict = true;
+        s.save_error = None;
+        return false;
+    }
+    write_to_disk(s)
+}
+
+/// Clears a disk conflict and writes the app's text over the file on disk at once.
+pub fn overwrite_to_disk(s: &mut State) -> bool {
+    if s.waiting_for_page {
+        return true;
+    }
+    s.save_arm = false;
+    s.save_due = None;
+    s.disk_conflict = false;
+    let ok = write_to_disk(s);
+    if !ok {
+        // Record the current stamp so Retry writes over this version without re-raising the same conflict.
+        s.disk = DiskStamp::of(&s.path);
+    }
+    ok
 }
 
 /// Short writer-facing sentence for an I/O save error.
@@ -944,32 +1313,245 @@ pub fn unescaped(uri: &str) -> Vec<u8> {
     out
 }
 
-/// The page pane moved or resized: `rect` in points, `scale` pixels per point. When the page
-/// pane is hidden (writing only), keep the view's last size and park it fully outside the window
-/// instead of unmapping it, so WebKit repaints when it returns.
-pub fn page_laid_out(s: &mut State, rect: [f32; 4], scale: f32) {
+/// Computes the layout target rect `[x, y, w, h]` of `"page"` in window points (matching `lib.rs`).
+pub fn page_target_rect(s: &State) -> [f32; 4] {
+    let room = (s.width - crate::DIVIDER).max(0.0);
+    let left = (room * s.split).round();
+    let cover_page_only = left == 0.0 && s.left_cover > 0.0;
+    let cover_w = if cover_page_only {
+        s.left_cover.min(s.width)
+    } else {
+        (s.left_cover - left - crate::DIVIDER).max(0.0)
+    };
+    let (x, w) = if cover_page_only {
+        (cover_w, (s.width - cover_w).max(0.0))
+    } else {
+        (left + crate::DIVIDER + cover_w, (room - left - cover_w).max(0.0))
+    };
+    let wide_status = s.split <= 0.0 && crate::draft::wide_status(s);
+    let h = (s.height - crate::TITLE - if wide_status { crate::STATUS } else { 0.0 }).max(0.0);
+    [x, crate::TITLE, w, h]
+}
+
+/// Starts a view-switch slide synchronously when `s.split` changes from `old_split` to `s.split`:
+/// the web view slides at the larger of its old and new sizes (resized once at the start when
+/// growing or entering from off-window, or resized once at rest when shrinking; zero resizes when
+/// leaving or unchanged). Returns any initial command sent to the page.
+pub fn begin_view_slide(s: &mut State, old_split: f32, scale: f32) -> Option<crate::page::PageCmd> {
+    use crate::page::PageCmd;
+    let scale = if scale > 0.0 { scale } else { 1.0 };
+    let room = (s.width - crate::DIVIDER).max(0.0);
+    let old_left = (room * old_split).round();
+    let new_left = (room * s.split).round();
+    let rect = page_target_rect(s);
     let px = |v: f32| (v * scale).round();
+    let target_y = px(rect[1]) as i32;
+    let prev = s.bounds.get();
+    if s.split >= 1.0 || rect[2] < 1.0 || rect[3] < 1.0 {
+        let (w, h) = prev.map_or((1, 1), |(_, _, w, h)| (w.max(1), h.max(1)));
+        let target_x = px(s.width.max(rect[0])) as i32;
+        s.view_slide.set(Some(ViewSlide {
+            target_x,
+            target_y,
+            slide_size: (w, h),
+            final_size: (w, h),
+            leaving: true,
+            curve: SlideCurve::Spring,
+            last_pos: prev.map(|(x, y, _, _)| (x, y)),
+            under_left: None,
+            instant_under: old_left <= 0.0,
+            hold_drawer: false,
+            hold_cover: 0.0,
+        }));
+        return None;
+    }
+    let new_w = px(rect[2]) as u32;
+    let new_h = px(rect[3]) as u32;
+    let target_x = px(rect[0]) as i32;
+    let win_w = px(s.width) as i32;
+    let was_hidden = prev.is_none_or(|(old_x, _, _, _)| old_x >= win_w);
+    let start_x = if was_hidden { win_w } else { prev.unwrap().0 };
+    let (slide_w, slide_h) = if was_hidden {
+        (new_w, new_h)
+    } else {
+        let (_, _, old_w, old_h) = prev.unwrap();
+        (old_w.max(new_w), old_h.max(new_h))
+    };
+    let cmd = match prev {
+        Some((old_x, old_y, old_w, old_h)) if old_w == slide_w && old_h == slide_h => {
+            if old_x == start_x && old_y == target_y {
+                None
+            } else {
+                Some(PageCmd::Move { x: start_x, y: target_y })
+            }
+        }
+        _ => Some(PageCmd::Bounds { x: start_x, y: target_y, w: slide_w, h: slide_h }),
+    };
+    let under_left = (new_left <= 0.0 && old_left > 0.0).then_some(old_left);
+    let instant_under = old_left <= 0.0 || new_left <= 0.0;
+    s.bounds.set(Some((start_x, target_y, slide_w, slide_h)));
+    s.view_slide.set(Some(ViewSlide {
+        target_x,
+        target_y,
+        slide_size: (slide_w, slide_h),
+        final_size: (new_w, new_h),
+        leaving: false,
+        curve: SlideCurve::Spring,
+        last_pos: Some((start_x, target_y)),
+        under_left,
+        instant_under,
+        hold_drawer: false,
+        hold_cover: 0.0,
+    }));
+    if let Some(cmd) = &cmd && let Some(page) = &s.page {
+        page.send(cmd.clone());
+    }
+    cmd
+}
+
+/// Starts a 140 ms drawer-curve slide when opening or closing the drawer or View popover shifts
+/// the page (e.g. in page-only view or when the writing pane is narrower than 300 points).
+/// Does nothing when the page's target rect did not change.
+pub fn begin_cover_slide(s: &mut State, scale: f32, had_drawer: bool, prev_cover: f32) -> Option<crate::page::PageCmd> {
+    use crate::page::PageCmd;
+    let scale = if scale > 0.0 { scale } else { 1.0 };
+    let rect = page_target_rect(s);
+    if s.split >= 1.0 || rect[2] < 1.0 || rect[3] < 1.0 {
+        return None;
+    }
+    let Some((old_x, old_y, old_w, old_h)) = s.bounds.get() else {
+        return None;
+    };
+    let px = |v: f32| (v * scale).round();
+    let target_x = px(rect[0]) as i32;
+    let target_y = px(rect[1]) as i32;
+    let new_w = px(rect[2]) as u32;
+    let new_h = px(rect[3]) as u32;
+    if old_x == target_x && old_y == target_y && old_w == new_w && old_h == new_h {
+        return None;
+    }
+    let opening = s.left_cover > prev_cover;
+    let slide_w = old_w.max(new_w);
+    let slide_h = old_h.max(new_h);
+    let cmd = if slide_w != old_w || slide_h != old_h {
+        Some(PageCmd::Bounds { x: old_x, y: target_y, w: slide_w, h: slide_h })
+    } else if old_y != target_y {
+        Some(PageCmd::Move { x: old_x, y: target_y })
+    } else {
+        None
+    };
+    s.bounds.set(Some((old_x, target_y, slide_w, slide_h)));
+    s.view_slide.set(Some(ViewSlide {
+        target_x,
+        target_y,
+        slide_size: (slide_w, slide_h),
+        final_size: (new_w, new_h),
+        leaving: false,
+        curve: if opening { SlideCurve::DrawerOpen } else { SlideCurve::DrawerClose },
+        last_pos: Some((old_x, target_y)),
+        under_left: None,
+        instant_under: true,
+        hold_drawer: !opening && had_drawer && s.split <= 0.0,
+        hold_cover: if !opening && prev_cover > 0.0 { prev_cover } else { 0.0 },
+    }));
+    if let Some(cmd) = &cmd && let Some(page) = &s.page {
+        page.send(cmd.clone());
+    }
+    cmd
+}
+
+/// The page pane moved or resized: `rect` in points, `scale` pixels per point.
+///
+/// While a slide is active (`s.view_slide` is `Some`), `begin_view_slide` / `begin_cover_slide`
+/// and `page_presented` own the web view's bounds so `on_layout` does nothing. Outside a slide
+/// (divider drag, window resize, first layout), it updates bounds in one step. Returns any
+/// command sent to the page (for tests).
+pub fn page_laid_out(s: &mut State, rect: [f32; 4], scale: f32) -> Option<crate::page::PageCmd> {
+    use crate::page::PageCmd;
+    if s.view_slide.get().is_some() {
+        return None;
+    }
+    let px = |v: f32| (v * scale).round();
+
     let b = if s.split >= 1.0 || rect[2] < 1.0 || rect[3] < 1.0 {
-        let (w, h) = s.bounds.map_or((1, 1), |(_, _, w, h)| (w.max(1), h.max(1)));
+        let (w, h) = s.bounds.get().map_or((1, 1), |(_, _, w, h)| (w.max(1), h.max(1)));
         let off_x = px(s.width.max(rect[0])) as i32 + 64;
         let off_y = px(s.height.max(rect[1] + rect[3])) as i32 + 64;
         (off_x, off_y, w, h)
     } else {
         (px(rect[0]) as i32, px(rect[1]) as i32, px(rect[2]) as u32, px(rect[3]) as u32)
     };
-    if s.bounds == Some(b) {
-        return;
+    let prev = s.bounds.get();
+    if prev == Some(b) {
+        return None;
     }
-    s.bounds = Some(b);
+    s.bounds.set(Some(b));
+    let cmd = match prev {
+        Some((_, _, old_w, old_h)) if old_w == b.2 && old_h == b.3 => PageCmd::Move { x: b.0, y: b.1 },
+        _ => PageCmd::Bounds { x: b.0, y: b.1, w: b.2, h: b.3 },
+    };
     if let Some(page) = &s.page {
-        page.send(crate::page::PageCmd::Bounds { x: b.0, y: b.1, w: b.2, h: b.3 });
+        page.send(cmd.clone());
     }
+    Some(cmd)
+}
+
+/// Called from `App::on_frame_drawn` with `rt.presented("page")` on every frame while a slide is
+/// active: sends position-only `PageCmd::Move` updates at `slide_size` until `cur_x` reaches rest,
+/// then sends the one-time `PageCmd::Bounds` if the page shrank (`final_size != slide_size`) and
+/// clears `view_slide`.
+pub fn page_presented(s: &State, rect: [f32; 4], scale: f32) -> Option<crate::page::PageCmd> {
+    use crate::page::PageCmd;
+    let mut slide = s.view_slide.get()?;
+    let px = |v: f32| (v * scale).round();
+    let cur_x = px(rect[0]) as i32;
+    let cur_y = px(rect[1]) as i32;
+    let settled = if slide.leaving {
+        cur_x >= slide.target_x && cur_y == slide.target_y
+    } else {
+        cur_x == slide.target_x && cur_y == slide.target_y
+    };
+    if settled {
+        let (final_x, final_y) = if slide.leaving {
+            let off_x = px(s.width.max(rect[0])) as i32 + 64;
+            let off_y = px(s.height.max(rect[1] + rect[3])) as i32 + 64;
+            (off_x, off_y)
+        } else {
+            (slide.target_x, slide.target_y)
+        };
+        let (fw, fh) = slide.final_size;
+        let resized = !slide.leaving && slide.slide_size != slide.final_size;
+        s.view_slide.set(None);
+        s.bounds.set(Some((final_x, final_y, fw, fh)));
+        let cmd = if resized {
+            Some(PageCmd::Bounds { x: final_x, y: final_y, w: fw, h: fh })
+        } else if slide.last_pos != Some((final_x, final_y)) {
+            Some(PageCmd::Move { x: final_x, y: final_y })
+        } else {
+            None
+        };
+        if let Some(cmd) = &cmd && let Some(page) = &s.page {
+            page.send(cmd.clone());
+        }
+        return cmd;
+    }
+    if slide.last_pos == Some((cur_x, cur_y)) {
+        return None;
+    }
+    slide.last_pos = Some((cur_x, cur_y));
+    s.view_slide.set(Some(slide));
+    s.bounds.set(Some((cur_x, cur_y, slide.slide_size.0, slide.slide_size.1)));
+    let cmd = PageCmd::Move { x: cur_x, y: cur_y };
+    if let Some(page) = &s.page {
+        page.send(cmd.clone());
+    }
+    Some(cmd)
 }
 
 /// The web view exists: it takes the last bounds the pane had, and the page's address if the
 /// server gave it first.
 pub fn page_attached(s: &mut State, page: crate::page::Page) {
-    if let Some(b) = s.bounds {
+    if let Some(b) = s.bounds.get() {
         page.send(crate::page::PageCmd::Bounds { x: b.0, y: b.1, w: b.2, h: b.3 });
     }
     if let Some(url) = &s.page_url {
@@ -978,9 +1560,32 @@ pub fn page_attached(s: &mut State, page: crate::page::Page) {
     s.page = Some(page);
 }
 
-/// A press landed inside the page: it holds keys until the next press in the app.
+/// A press landed inside the page: it holds keys until the next press in the app, and closes
+/// an open drawer or View popover.
 pub fn page_pressed(s: &mut State) {
     s.page_has_keys = true;
+    if s.drawer.open {
+        s.drawer.open = false;
+        s.drawer.hovered = None;
+    }
+    if crate::toolbar::view_open(s) {
+        crate::look::close_panels(s);
+    }
+    crate::toolbar::sync_cover(s);
+}
+
+/// Like `page_pressed`, with `tx` so closing an open drawer or View popover over a yielding page
+/// slides the page back smoothly over 140 ms.
+pub fn page_pressed_tx(s: &mut State, tx: &mut Tx) {
+    let prev_cover = s.left_cover;
+    let had_drawer = s.drawer.open;
+    page_pressed(s);
+    if prev_cover > 0.0 && s.left_cover < prev_cover {
+        begin_cover_slide(s, tx.scale(), had_drawer, prev_cover);
+        if s.view_slide.get().is_some() {
+            tx.animated();
+        }
+    }
 }
 
 /// A press landed anywhere in the app: if the page held keys, take them back. Answers what was
@@ -1055,7 +1660,8 @@ mod tests {
         assert_eq!(page_died(&mut s, "Crashed"), [PageCmd::MediaOff, PageCmd::Reload]);
         assert!(s.page_life.media_off && !s.page_life.stopped);
         let said = draft::line(&s).expect("the status line says it");
-        assert_eq!((said.tone, said.action), (draft::Tone::Ink, None), "a flash, with nothing to do");
+        assert_eq!(said.tone, draft::Tone::Ink);
+        assert!(said.actions.is_empty(), "a flash, with nothing to do");
         assert!(!crate::draft::status_key(&mut s, &reload_key()), "nothing to reload while it runs");
     }
 
@@ -1067,7 +1673,8 @@ mod tests {
         assert!(s.page_life.stopped && s.page_life.media_off);
         let said = draft::line(&s).expect("the status line keeps it");
         assert_eq!(said.tone, draft::Tone::Warn);
-        assert!(said.action.as_ref().is_some_and(|(_, k)| k.matches(&reload_key())), "its one action has the key");
+        assert_eq!(said.actions.len(), 1);
+        assert!(said.actions[0].1.as_ref().is_some_and(|k| k.matches(&reload_key())), "its one action has the key");
         let mut plain_r = reload_key();
         plain_r.mods.shift = false;
         assert!(!crate::draft::status_key(&mut s, &plain_r), "Ctrl+R is not Reload");
@@ -1115,5 +1722,38 @@ mod tests {
         assert_eq!(uri_path(&file_uri(&p)), Some(p));
         let perm = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "permission denied");
         assert_eq!(save_error_sentence(&perm), "The site folder could not be written.");
+    }
+
+    #[test]
+    fn unsaved_path_uses_site_rubric_unsaved_or_temp_and_is_never_inside_pages() {
+        let dir = std::env::temp_dir().join(format!("rubric-app-unsaved-path-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let site = dir.join("site");
+        let pages = site.join("pages");
+        std::fs::create_dir_all(pages.join("posts")).unwrap();
+        std::fs::write(site.join("rubric.md"), "").unwrap();
+
+        let cases = [
+            (pages.join("posts/walk.md"), site.join(".rubric/unsaved/posts/walk.md")),
+            (pages.join("_index.md"), site.join(".rubric/unsaved/_index.md")),
+            (pages.join("posts/nested/my.post.md"), site.join(".rubric/unsaved/posts/nested/my.post.md")),
+            (pages.join("posts/no-ext"), site.join(".rubric/unsaved/posts/no-ext.md")),
+        ];
+        for (post, expected) in cases {
+            let rescue = unsaved_path(&post);
+            assert_eq!(rescue, expected);
+            assert!(!rescue.starts_with(&pages), "rescue path {} must never lie inside pages/", rescue.display());
+            assert!(!rescue.components().any(|c| c.as_os_str() == "pages"), "no pages/ segment in {}", rescue.display());
+        }
+
+        // Without a site root (no rubric.md), falls back to the system temp folder and stays outside pages/.
+        let orphan_pages = dir.join("orphan/pages");
+        let orphan_post = orphan_pages.join("posts/alone.md");
+        let fallback = unsaved_path(&orphan_post);
+        assert!(fallback.starts_with(std::env::temp_dir()), "fallback {} is under temp_dir", fallback.display());
+        assert!(!fallback.starts_with(&orphan_pages), "fallback {} must never lie inside pages/", fallback.display());
+        assert_eq!(fallback.file_name().and_then(|n| n.to_str()), Some("alone.md"));
+
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
