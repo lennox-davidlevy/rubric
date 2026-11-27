@@ -621,6 +621,14 @@ Release build (`cargo run --release --features bench --bin typing -- --server`, 
   - **View-switch & page-only drawer motion (20 KB `long.md` in Ink dark theme):** captured 66 fps (~15.15 ms/frame, 43 frames each = 344 frames total) across all 8 motions (`Ctrl+1→Ctrl+3`, `Ctrl+3→Ctrl+1`, `Ctrl+1→Ctrl+2`, `Ctrl+2→Ctrl+1`, `Ctrl+3→Ctrl+2`, `Ctrl+2→Ctrl+3`, and `Ctrl+O` open/close in page-only view) with an in-page `resize`/`ResizeObserver` IPC probe. Every frame was checked programmatically for Ink ground-color (`#141413`) columns, right-edge gaps, and blank pages, plus key mid-motion and settled frames were visually inspected: **0 ground-color bars**, **0 blank pages**, and the page was never drawn at any width other than its old or new width (`0` WebKit layouts on `Ctrl+1→2`, `2→1`, `3→2`, `2→3`; `1` layout on `Ctrl+1→3`, `3→1`, `Ctrl+O` open, and `Ctrl+O` close). On the single frame ~15 ms into `Ctrl+1→Ctrl+3` (`f_004.png`), an 8-px X11/WebKit resize seam appeared briefly near `x = 1333` before WebKit finished painting its newly grown 1394-px surface (gone by `f_005.png`, 15 ms later).
 - **Still unseen:** native Hyprland/XWayland run (section H of `testing/TESTING.md`), hovering drawer rows and clicking inside the native page to dismiss on Hyprland, and macOS build and runtime.
 
+## Back to Rune's own repository (2026-11-27)
 
+Rune merged the fix for the typing slowdown into `dev` as `9396dcb` (their pull request #2512). A trial on branch `rune-trial-2`, which is `main` with only the pins in `app/Cargo.toml` changed, found:
 
+- Nothing in `app/src/` or `app/tests/` had to change; `cargo test` (206) and the five tests against the real stub server pass as on the fork.
+- Typing, `cargo run --release --features bench --bin typing -- --server`, on the 20 KB post: p95 0.15 to 0.28 ms a letter (the fork: 0.17 to 0.36 ms; `41cfc07` unfixed: 4.1 to 5.4 ms). Switching posts and a frame of a view switch cost what they did.
+- On Xvfb with Hugo listening first, the builder ran sections F, G and H and found no row that differs, and captured 360 frames through the eight motions between views in Ink: no column of the ground, no blank page, no page at a width other than its old or new one. One frame of an 8-pixel seam at the right edge going from both panes to page only is there as before.
+- David ran it natively on Hyprland and found nothing changed.
+
+Not checked: the Mac, Windows, and composing input (fcitx5) on the new commit.
 

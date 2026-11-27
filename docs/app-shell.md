@@ -6,7 +6,7 @@ Written 2026-11-26 as the handover to the session that plans the shell; that ses
 
 - `main` has slices 1 to 3 and the move to the newer Rune (PRs #9, #12, #13). Slice 4 ([app-slice-4.md](app-slice-4.md)) is committed on branch `slice-4` (`2f224af`) and not merged.
 - David ran all of section E of `testing/TESTING.md`. Everything passed but E15: the failed bar was drawn one line above its `::: new:` line (`reference/screenshots/failed-bar-misplaced.png`). **Not reproduced.** `a_draft_edge_stays_on_its_line_through_edits_around_it` in `app/tests/headless.rs` (uncommitted) tries Return and typing under the line, a long word on the line split off with Return, edits on the line above, and the same in a long post that scrolls: all pass. One lead, unconfirmed: `state::sync_draft_boxes` asks for a line's box when a key is handled, before the text is laid out again, and asks again only when the writing's size changes. David will say how he got there when it happens again (`RUBRIC_APP_TRACE=app/target/trace.log` records the keys). Do not change the code before it is reproduced.
-- Rune is the fork `lennox-davidlevy/rune` at `ac6b482`: `41cfc07` with one line put back, which gives typing its speed again (0.15 to 0.28 ms a letter against 4 to 5 ms). The issue is filed with Rune; the pin goes back to `anomalyco/rune` once it is fixed there. The findings' "The move to Rune `41cfc07`" has all of it.
+- Rune was the fork `lennox-davidlevy/rune` at `ac6b482` while part 1 was built, and moved back to `anomalyco/rune` at `9396dcb` on 2026-11-27, once the typing fix was merged there (the findings, "Back to Rune's own repository").
 - The keyboard: `XMODIFIERS=@im=none` stays in `main.rs`. David runs with `RUBRIC_IME=1` for a week (from 2026-11-26); if no key is lost it comes out.
 - The order of the app's work is in [plan.md](plan.md), step 9, "The order from here": the whole app on Linux, then the Mac. The shell is next, then zoom.
 
@@ -70,7 +70,7 @@ Read in the source, not run, unless it says so.
 
 - **The design.** `reference/rubric-design/RubricWindow.dc.html`; the pictures are `reference/rubric-design/shots/`: the toolbar 51 to 64, the drawer 65 to 69 and 77, the View popover 89 and 93, saving 97 to 99 and 102. The values below are the design's.
 - **The window now** (`app/src/main.rs`): `AppSpec::new("Rubric", SIZE, init, view)` with no window options, so the system's frame. `lib.rs` `title_row` draws the title and `Saved` in a 40-point row (`TITLE`).
-- **Rune, at `ac6b482`** (`~/.cargo/git/checkouts/rune-*/ac6b482/`):
+- **Rune, at `ac6b482`** when this was checked (`~/.cargo/git/checkouts/rune-*/ac6b482/`; since 2026-11-27 the pin is `9396dcb`, with no API the app uses changed):
   - a window with no frame: `WindowOptions.borderless` (`crates/rune/src/window/spec.rs`), set with `App::window_options`; a row that moves the window: `El::window_drag()` and `El::no_window_drag()` (`crates/rune/src/el/layout.rs`); edges that resize it: `El::window_resize(ResizeEdge)`; `Tx::close_window()`. Rune's own `Titlebar` keeps the native frame on X11, so it is not the way here.
   - layers: the app's panels are its own (`panel.rs`, drawn in `rune_kit::root(window, layer)`); the kit has `popover::anchored(k, content, anchor_key, Placement, gap)`, `scrim`, and tips through `El::help(text)` with `HelpLook::delay`.
   - movement: `El::offset_motion(Anim::new(Curve::tween(seconds, Easing)))`, `opacity_motion`, and `Transition` presets (`crates/rune-motion/src/transition.rs`).
