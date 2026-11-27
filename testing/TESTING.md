@@ -386,3 +386,6 @@ Otherwise things look fantastic!
 
 ## D Notes
 D9 - right click does not show menu.
+
+## E Notes
+E15 i wrote text on the line of the new failed bell but the failed bar is now misplaced. please seee `reference/screenshots/failed-bar-misplaced.png`

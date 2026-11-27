@@ -372,8 +372,8 @@ Where each step stands, 2026-11-06: step 0 is built and merged to `main`. Step 1
    **What it has to reach first** (David, 2026-11-22): a real app that works on the Mac and on Linux, where all the writer needs beside it is a harness (Claude Code or OpenCode) and a Jev key. That comes before deep testing of any slice, and before polish. A model on the writer's own machine doing Jev's work would take the key away; it stays where it is, under Stretch.
 
    **The order from here** (David, 2026-11-26): the whole app on Linux first, every screen and everything it does, and only then the Mac, so the Mac gets a finished app to carry over and not a moving one. The design has all of it (`reference/rubric-design/`); until now each slice listed the rest as "not in this slice" and nothing said when. In order, each a slice with its own plan in `docs/`:
-   1. [app-slice-4.md](app-slice-4.md): the right-click menu, a draft's line marked at its edge, two fixes. Being built.
-   2. **The shell**: the toolbar, the drawer with the site's posts, opening, switching and making a post, autosave, Sites. Until this the app opens one file named on the command line.
+   1. [app-slice-4.md](app-slice-4.md): the right-click menu, a draft's line marked at its edge, two fixes. Built on branch `slice-4` (2026-11-26); its rows passed but one, not reproduced yet.
+   2. **The shell** ([app-shell.md](app-shell.md): the design round and the handover; the plan is written there once the round is reviewed): the toolbar, the drawer with the site's posts, opening, switching and making a post, autosave, Sites. Until this the app opens one file named on the command line.
    3. **Zoom**, for the writing and for the page, with the page's widths for a phone and a desktop, and the page opened in the writer's own browser (`app-slice-3.md`, "After this slice").
    4. **Problems** (the underline and the message with its one fix), an image setting's row, and the menu from a right-click on a part in the page.
    5. **Parts** (the catalog and the writer's own, with the writer's parts in the catalog), the site's theme picker, the Appearance window, Publish.

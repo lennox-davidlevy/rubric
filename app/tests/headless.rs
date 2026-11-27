@@ -1973,3 +1973,89 @@ fn a_draft_label_follows_scrolling_hides_offscreen_and_on_overlap_and_goes_on_ca
     settle(&mut rt);
     assert!(rt.find("draft-edge-8").is_none() && rt.find("draft-label-8").is_none(), "gone when canceled");
 }
+
+/// From David's row E15 (2026-11-26): the bar and label stay on their line when the text
+/// around it changes. Each edit is checked after the frames settle.
+#[test]
+fn a_draft_edge_stays_on_its_line_through_edits_around_it() {
+    // Only the frames the window would draw: one, then as many as the runtime asks for.
+    fn idle(rt: &mut Runtime<State>) {
+        let mut n = 0;
+        while rt.frame(1.0 / 60.0) && n < 240 {
+            n += 1;
+        }
+    }
+    let text = "plain line\n\n::: new: a failing bell\n:::\n\nanother line";
+    let on_line = |rt: &Runtime<State>, what: &str| {
+        let t = rt.state.edit.text.clone();
+        let n = t.split('\n').position(|l| l.starts_with("::: new:")).unwrap() as u32;
+        let line_box = rt.text_line("editor", rubric_app::position::line_range(&t, n).start).unwrap().rect;
+        let edge = rect_of(rt, &format!("draft-edge-{n}"));
+        assert!(edge[1] >= line_box[1] - 0.5 && edge[1] + edge[3] <= line_box[1] + line_box[3] + 0.5, "{what}: bar {edge:?} is not on line {n} at {line_box:?}");
+    };
+    // Return at the end of the `new:` line, then letters on the line it made.
+    let end = text.find("bell").unwrap() + 4;
+    let mut rt = runtime(text, end);
+    idle(&mut rt);
+    on_line(&rt, "at the start");
+    press(&mut rt, Key::Enter);
+    idle(&mut rt);
+    on_line(&rt, "Return after the line");
+    for ch in ["a", "h", "l"] {
+        rt.ime(Ime::Commit(ch.into()));
+    }
+    idle(&mut rt);
+    on_line(&rt, "letters under the line");
+    // Return on the empty line above it.
+    let mut rt = runtime(text, text.find("\n\n").unwrap() + 1);
+    idle(&mut rt);
+    press(&mut rt, Key::Enter);
+    idle(&mut rt);
+    on_line(&rt, "Return above the line");
+    // A long word typed at the line's end until it wraps, then Return before the word.
+    let mut rt = runtime(text, end);
+    idle(&mut rt);
+    let word = "ahlkjadfjsjdklfjkfkljlkasdjfkljadfjallsdfjasdfasdflkjasdflkjasdflkjadflkjasdflaksdjfasdf";
+    for (i, ch) in word.chars().enumerate() {
+        rt.ime(Ime::Commit(ch.to_string()));
+        if i % 20 == 19 {
+            idle(&mut rt);
+            on_line(&rt, "typing a long word on the line");
+        }
+    }
+    idle(&mut rt);
+    on_line(&rt, "a long word on the line");
+    caret_to(&mut rt, end);
+    press(&mut rt, Key::Enter);
+    idle(&mut rt);
+    on_line(&rt, "Return before the long word");
+    // In a long post, where an edit scrolls the writing to keep the caret in view.
+    for before in [20usize, 24, 28, 32, 36, 40] {
+        let long = format!("{}{text}\n\n{}", "Line before.\n\n".repeat(before), "Line after.\n\n".repeat(40));
+        let end = long.find("bell").unwrap() + 4;
+        let mut rt = runtime(&long, end);
+        idle(&mut rt);
+        caret_to(&mut rt, end);
+        idle(&mut rt);
+        for n in 0..6 {
+            press(&mut rt, Key::Enter);
+            idle(&mut rt);
+            on_line(&rt, &format!("{before} lines before, Return {n} in a long post"));
+            rt.ime(Ime::Commit("word".into()));
+            idle(&mut rt);
+            on_line(&rt, &format!("{before} lines before, a word after Return {n}"));
+        }
+    }
+    // A letter on the empty line above it.
+    let mut rt = runtime(text, text.find("\n\n").unwrap() + 1);
+    idle(&mut rt);
+    rt.ime(Ime::Commit("x".into()));
+    idle(&mut rt);
+    on_line(&rt, "a letter above the line");
+    // Backspace joining the two lines above it.
+    let mut rt = runtime(text, text.find("\n\n").unwrap() + 1);
+    idle(&mut rt);
+    press(&mut rt, Key::Backspace);
+    idle(&mut rt);
+    on_line(&rt, "a line taken away above");
+}
