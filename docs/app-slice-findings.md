@@ -346,7 +346,7 @@ The last two need a window. This machine has no Xvfb, and the session opens none
 
 ## The move to Rune `41cfc07`
 
-Built 2026-11-26 on branch `rune-move` off `main`, from [app-rune-move.md](app-rune-move.md). Moved `app/Cargo.toml` from Rune `0ca075619d116f8f6e0e3bc8ff815c72c636cac8` (2026-11-13) to `41cfc073ca5845f1d689a41535d796f37a8f7eba` (2026-11-26) with all eight `[patch.crates-io]` entries from Rune's root `Cargo.toml` (`winit`, `sctk-adwaita`, `parley_engine`, `wgpu-hal`, `naga`, `accesskit_windows`, `accesskit_macos`, `accesskit_atspi_common`). Nothing outside the pin changed; no new features were built.
+Built 2026-11-26 on branch `rune-move` off `main`, from [app-rune-move.md](app-rune-move.md). Moved `app/Cargo.toml` from Rune `0ca075619d116f8f6e0e3bc8ff815c72c636cac8` (2026-11-13) to `41cfc073ca5845f1d689a41535d796f37a8f7eba` (2026-11-26) with all eight `[patch.crates-io]` entries from Rune's root `Cargo.toml` (`winit`, `sctk-adwaita`, `parley_engine`, `wgpu-hal`, `naga`, `accesskit_windows`, `accesskit_macos`, `accesskit_atspi_common`). After tracing the ~30× typing regression to Rune commit `09569ff2` and filing the issue on `github.com/anomalyco/rune`, the pin was pointed to fork `https://github.com/lennox-davidlevy/rune` at `ac6b4825f51e13f35628759255f644a8b411e9dc` (branch `rubric-41cfc07-fix`, which is `41cfc07` plus the one-line revert of `09569ff2` at `crates/rune-text/src/paragraphs.rs:912`) so `main` runs at full speed until upstream merges a fix. Nothing in `app/src/` or `app/tests/` changed; no new features were built.
 
 ### What changed in Rune that the app met
 
@@ -359,27 +359,27 @@ Built 2026-11-26 on branch `rune-move` off `main`, from [app-rune-move.md](app-r
 
 Release builds on a quiet machine (`cargo clean && cargo build --release`, then `./target/release/typing --server`, post `sites/app-slice/pages/posts/long.md`, 19,937 bytes, 3,933 words, 218 lines).
 
-| Metric | Budget | Before (`0ca0756`) | After (`41cfc07`) | Status |
-|---|---|---|---|---|
-| `cargo test` / `-- --ignored` | all pass | 160 passed / 3 passed | 160 passed / 3 passed | met |
-| Clean release build time | recorded | 46.8 s | 48.8 s | +2.0 s |
-| Release binary size (`rubric-app`) | recorded | 44,116,944 B (42.1 MiB) | 49,567,520 B (47.3 MiB) | +5.2 MiB |
-| `markdown::spans` (100 runs, wall) | median 1 ms | median 0.0070 ms, p95 0.0072 ms | median 0.0066 ms, p95 0.0069 ms | met |
-| One typed char at start (`type_start`, CPU) | p95 4 ms | median 0.14 ms, p95 0.15 ms | median 4.87 ms, p95 5.02 ms | **missed (33× slower)** |
-| One typed char in middle (`type_mid`, CPU) | p95 4 ms | median 0.24 ms, p95 0.29 ms | median 4.08 ms, p95 4.18 ms | **missed (14× slower)** |
-| One typed char at end (`type_end`, CPU) | p95 4 ms | median 0.13 ms, p95 0.14 ms | median 5.14 ms, p95 5.37 ms | **missed (39× slower)** |
-| One typed char on `new:` line (`type_new_line`, CPU) | p95 4 ms | median 0.16 ms, p95 0.21 ms | median 5.18 ms, p95 5.32 ms | **missed (25× slower)** |
-| `new:` menu: answer to frame (`menu_open`, CPU) | recorded | median 0.29 ms, p95 0.33 ms | median 0.33 ms, p95 0.35 ms | +0.02 ms |
-| Key in open menu to frame (`menu_key`, CPU) | one frame | median 0.08 ms, p95 0.10 ms | median 0.11 ms, p95 0.13 ms | met |
-| Part menu: both answers to frame (`part_menu_open`, CPU) | recorded | median 0.49 ms, p95 0.50 ms | median 0.54 ms, p95 0.56 ms | +0.06 ms |
-| Segment key → server line → frame (`part_segment_to_line`, CPU) | one frame | median 0.43 ms, p95 0.45 ms | median 5.43 ms, p95 5.59 ms | **12× slower** (still < 16.7 ms) |
-| Tab to menu: stub server's two answers (`server_tab_to_answers`, wall) | 50 ms | median 0.15 ms, p95 0.44 ms (max 4.92 ms) | median 0.20 ms, p95 0.38 ms (max 5.84 ms) | met |
-| Stub server `set` answer (`server_set`, wall) | recorded | median 0.05 ms, p95 0.16 ms | median 0.06 ms, p95 0.20 ms | unchanged |
+| Metric | Budget | Before (`0ca0756`) | Stock `41cfc07` | Fork `ac6b4825` (1-line revert) | Status |
+|---|---|---|---|---|---|
+| `cargo test` / `-- --ignored` | all pass | 160 passed / 3 passed | 160 passed / 3 passed | 160 passed / 3 passed | met |
+| Clean release build time | recorded | 46.8 s | 48.8 s | 48.8 s | +2.0 s |
+| Release binary size (`rubric-app`) | recorded | 44,116,944 B (42.1 MiB) | 49,567,520 B (47.3 MiB) | 49,516,072 B (47.2 MiB) | +5.1 MiB |
+| `markdown::spans` (100 runs, wall) | median 1 ms | median 0.0070 ms, p95 0.0072 ms | median 0.0066 ms, p95 0.0069 ms | median 0.0066 ms, p95 0.0069 ms | met |
+| One typed char at start (`type_start`, CPU) | p95 4 ms | median 0.14 ms, p95 0.15 ms | median 4.87 ms, p95 5.02 ms | median 0.15 ms, p95 0.16 ms | **met** (was 33× slower) |
+| One typed char in middle (`type_mid`, CPU) | p95 4 ms | median 0.24 ms, p95 0.29 ms | median 4.08 ms, p95 4.18 ms | median 0.25 ms, p95 0.26 ms | **met** (was 14× slower) |
+| One typed char at end (`type_end`, CPU) | p95 4 ms | median 0.13 ms, p95 0.14 ms | median 5.14 ms, p95 5.37 ms | median 0.13 ms, p95 0.14 ms | **met** (was 39× slower) |
+| One typed char on `new:` line (`type_new_line`, CPU) | p95 4 ms | median 0.16 ms, p95 0.21 ms | median 5.18 ms, p95 5.32 ms | median 0.17 ms, p95 0.18 ms | **met** (was 25× slower) |
+| `new:` menu: answer to frame (`menu_open`, CPU) | recorded | median 0.29 ms, p95 0.33 ms | median 0.33 ms, p95 0.35 ms | median 0.33 ms, p95 0.35 ms | +0.02 ms |
+| Key in open menu to frame (`menu_key`, CPU) | one frame | median 0.08 ms, p95 0.10 ms | median 0.11 ms, p95 0.13 ms | median 0.11 ms, p95 0.14 ms | met |
+| Part menu: both answers to frame (`part_menu_open`, CPU) | recorded | median 0.49 ms, p95 0.50 ms | median 0.54 ms, p95 0.56 ms | median 0.54 ms, p95 0.55 ms | +0.05 ms |
+| Segment key → server line → frame (`part_segment_to_line`, CPU) | one frame | median 0.43 ms, p95 0.45 ms | median 5.43 ms, p95 5.59 ms | median 0.55 ms, p95 0.59 ms | **met** (was 12× slower) |
+| Tab to menu: stub server's two answers (`server_tab_to_answers`, wall) | 50 ms | median 0.15 ms, p95 0.44 ms (max 4.92 ms) | median 0.20 ms, p95 0.38 ms (max 5.84 ms) | median 0.17 ms, p95 0.46 ms (max 5.09 ms) | met |
+| Stub server `set` answer (`server_set`, wall) | recorded | median 0.05 ms, p95 0.16 ms | median 0.06 ms, p95 0.20 ms | median 0.06 ms, p95 0.27 ms | unchanged |
 
 **Typing budget regression (root cause proved, not tuned):** every path that mutates the long spanned `text_input` (`type_start`, `type_mid`, `type_end`, `type_new_line`, and `part_segment_to_line`) regressed from 0.14–0.45 ms p95 to 4.18–5.59 ms p95, missing the 4 ms typing budget across all four typing cases. Non-editing frames (`menu_open`, `menu_key`, `part_menu_open`) stayed within ~0.06 ms of baseline, and `markdown::spans` stayed at 7 µs.
 
 - **Cause (proved via Rune's `frame-profile` + isolated `/tmp` build):** Rune commit `09569ff2aea78d15702346b267ac9a981f15d02d` (*"perf(rune-text): keep deferring plain ASCII paragraphs when other paragraphs have layout spans (#1900)"*, 2026-11-24). Running `rubric-app --features bench --script …` with `RUNE_FRAME_LOG` showed every keystroke reshaping **`shaped: 173`** paragraphs (`text_cpu: 4.64 ms`) instead of `1`. In `crates/rune-text/src/paragraphs.rs:912`, `09569ff2` changed `let can_defer = plain && ...` to `let can_defer = no_pills_or_blocks && ...`, while `reuse_keys` (line 902) stayed gated on `plain` (`layout_spans.is_empty()`). On any multi-paragraph (`> 64` lines) `text_input` with layout-affecting spans (headings, bold, italic), `plain` is `false`, so `reuse_keys` returns `None` and `edited` covers the whole document; `can_defer == true` then bundles plain ASCII lines into multi-line waiting-run keys (`"run"`) on every keystroke, which never match the individual shaped paragraphs in `prev.paragraphs`, breaking `before`/`after` prefix/suffix reuse and reshaping all 173 non-empty paragraphs on every key.
-- **Verification (isolated `/tmp` copy of `41cfc07`, repo untouched):** reverting just that line (`can_defer = plain && ...`) restored every metric on `41cfc07` to baseline (`type_start` 0.16 ms, `type_mid` 0.29 ms, `type_end` 0.13 ms, `type_new_line` 0.22 ms, `part_segment_to_line` 0.58 ms p95). Because `Tx::text_offset_at` and `Tx::text_line` landed on 2026-11-25 (one day after `09569ff2`), pinning before `09569ff2` would lose right-click and line-rect support.
+- **Resolution (fork pinned at `ac6b4825`, issue filed upstream):** reverting just that line (`can_defer = plain && ...`) on fork `lennox-davidlevy/rune` (`rubric-41cfc07-fix`, `ac6b4825f51e13f35628759255f644a8b411e9dc`) restored every metric to baseline (`type_start` 0.16 ms, `type_mid` 0.26 ms, `type_end` 0.14 ms, `type_new_line` 0.18 ms, `part_segment_to_line` 0.59 ms p95) while keeping `Tx::text_offset_at`, `Tx::text_line`, and `LineFill`. `scripts/check_rune_pins.py` reports `Rune pins agree`. Once `anomalyco/rune` fixes the issue, `app/Cargo.toml` returns to mainline `anomalyco/rune`.
 
 #### Ready-to-file issue for `github.com/anomalyco/rune` (typing regression in `09569ff2`)
 
@@ -507,7 +507,8 @@ Debug headless snapshots (`rubric-app sites/app-slice/pages/posts/long.md [--sce
 ### Native run of section D (David, 2026-11-26)
 
 - **Window & page (`D1`):** opens natively on Omarchy/Hyprland through XWayland with the writing on the left, live page on the right (`page loaded … 126 ms`, post `180 ms`), and no second title bar or client-side window frame.
-- **Typing & latency (`D2`, `D3`, `D11`):** typing latency felt noticeably worse on screen (matching the `09569ff2` 5 ms/keystroke regression). For `D11` (`Tab` on `::: quote`), 11 of 15 Tabs drew in 1.5–4.3 ms (server 0.9–3.2 ms), while 4 spiked to `34.3 ms` (`server 17.1 ms`) and `50.8–51.0 ms` (`server 33.6–33.7 ms`) — exact ~17 ms (60 Hz frame) multiples across the two sequential `rubric/part` → `rubric/draft` UI-thread round trips plus `on_frame_drawn`.
+- **Typing & latency (`D2`, `D3`, `D11`):** on stock `41cfc07`, typing latency felt noticeably worse on screen (matching the `09569ff2` 5 ms/keystroke regression; fixed by the `ac6b4825` fork pin above). For `D11` (`Tab` on `::: quote`), 11 of 15 Tabs drew in 1.5–4.3 ms (server 0.9–3.2 ms), while 4 spiked to `34.3 ms` (`server 17.1 ms`) and `50.8–51.0 ms` (`server 33.6–33.7 ms`) — exact ~17 ms (60 Hz frame) multiples across the two sequential `rubric/part` → `rubric/draft` UI-thread round trips plus `on_frame_drawn`.
+- **Right-click (`D9`):** right-clicking in the editor showed no menu at all — not even Rune's built-in Cut/Copy/Paste menu. Unexplained so far; first thing to check when building the right-click menu in slice 4.
 - **Idle CPU (`D10`):** under 1%.
 - **Keyboard with `RUBRIC_IME=1` (`D12`–`D15`):** passed all 20 rounds in and out of `Cite` with zero lost keys. (Note: `ime_reset` still toggles `set_ime_allowed(false)`/`true` in `41cfc07`, so whether the intermittent loss is truly gone or only rarer should be watched if `XMODIFIERS=@im=none` is removed.)
 - **Pre-existing slice-3 bug reproduced during D (`⇒ change quote` + Tab):** on `::: quote cite=a : <something>` with ghost pick `⇒ change quote`, Tab opened the panel at the top-left of the pane and sprang it horizontally to the middle-top. Diagnosed (not changed here): `part::answered` (`app/src/part.rs:240-248`) clears `s.anchor = None`, pushes both `part` and `change`, and sets `s.focus_field = true` (the only place in `app/` that sets it), so `state::follow_up` calls `tx.focus("panel-field", false)` in the same turn. Rune's `commit()` (`commit.rs:550-555`) moves focus to `"panel-field"` and discards Pass 1 before `panel-anchor`'s `on_layout` runs; Pass 2 then sees `s.anchor == None` and `cx.caret("editor") == None`, falling back to `[s.pane[0] + PAD, s.pane[1] + TOP]` (`x = 24, y = 96`), which Frame 1 locks into `s.anchor` and Frame 2 then springs rightward to `ed[0]` while keeping `y = 96`.

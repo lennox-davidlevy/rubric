@@ -94,7 +94,8 @@ Not part of the sitting. Each is planned on its own once David has run section D
 
 One line each: what was chosen, and why the plan did not settle it.
 
-- Ran `cargo update -p naga --precise 30.0.1 --offline` so `app/Cargo.lock` uses Rune's patched `naga 30.0.1` instead of crates.io `30.0.2` (accepted by `wgpu-core 30.0.2` and `wgpu-naga-bridge 30.0.2`): clears the unused-patch warning while keeping Rune's full eight-patch list intact for `check_rune_pins.py`.
+- Aligned `naga` (patched `30.0.1`) and the `wgpu` crates (`wgpu`, `wgpu-core`, `wgpu-core-deps-windows-linux-android`, `wgpu-naga-bridge`, `wgpu-types`, `naga-types`) to `30.0.1` in `app/Cargo.lock` to match Rune's `Cargo.lock` and clear the unused-patch warning while keeping Rune's full eight-patch list intact for `check_rune_pins.py`.
+- Pinned `app/Cargo.toml` to fork `https://github.com/lennox-davidlevy/rune` at `ac6b4825f51e13f35628759255f644a8b411e9dc` (branch `rubric-41cfc07-fix`: `41cfc07` plus a one-line revert of `09569ff2` at `crates/rune-text/src/paragraphs.rs:912`) after filing the typing regression issue upstream, so `main` keeps every `41cfc07` API without the ~30× typing slowdown until `anomalyco/rune` merges a fix.
 - Measured clean release build time with `cargo clean && cargo build --release` before and after (rather than `cargo clean --release`): includes proc-macros and build scripts identically on both sides.
 - Kept before/after headless `--snap` PNGs in the session scratch directory outside the repository (`/home/david/.gemini/antigravity-cli/brain/bfea9946-27d5-4ffb-986f-d74731c1dc4c/scratch/snaps/`): the plan asked only for a folder outside the repository.
 - Noted where plan and code disagreed: none of the ~46 Rune uses across `app/` broke on `41cfc07` (public re-exports stayed compatible, so zero Rust source or test lines changed), and `tests/server.rs` has three ignored stub-server tests (all passing).

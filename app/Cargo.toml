@@ -5,8 +5,8 @@ edition = "2024"
 publish = false
 
 [dependencies]
-rune = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
-rune-kit = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
+rune = { git = "https://github.com/lennox-davidlevy/rune", rev = "ac6b4825f51e13f35628759255f644a8b411e9dc" }
+rune-kit = { git = "https://github.com/lennox-davidlevy/rune", rev = "ac6b4825f51e13f35628759255f644a8b411e9dc" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 wry = "0.57.2"
@@ -32,14 +32,14 @@ path = "src/bin/typing.rs"
 required-features = ["bench"]
 
 [patch.crates-io]
-winit = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
-sctk-adwaita = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
-parley_engine = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
-wgpu-hal = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
-naga = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
-accesskit_windows = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
-accesskit_macos = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
-accesskit_atspi_common = { git = "https://github.com/anomalyco/rune", rev = "41cfc073ca5845f1d689a41535d796f37a8f7eba" }
+winit = { git = "https://github.com/lennox-davidlevy/rune", rev = "ac6b4825f51e13f35628759255f644a8b411e9dc" }
+sctk-adwaita = { git = "https://github.com/lennox-davidlevy/rune", rev = "ac6b4825f51e13f35628759255f644a8b411e9dc" }
+parley_engine = { git = "https://github.com/lennox-davidlevy/rune", rev = "ac6b4825f51e13f35628759255f644a8b411e9dc" }
+wgpu-hal = { git = "https://github.com/lennox-davidlevy/rune", rev = "ac6b4825f51e13f35628759255f644a8b411e9dc" }
+naga = { git = "https://github.com/lennox-davidlevy/rune", rev = "ac6b4825f51e13f35628759255f644a8b411e9dc" }
+accesskit_windows = { git = "https://github.com/lennox-davidlevy/rune", rev = "ac6b4825f51e13f35628759255f644a8b411e9dc" }
+accesskit_macos = { git = "https://github.com/lennox-davidlevy/rune", rev = "ac6b4825f51e13f35628759255f644a8b411e9dc" }
+accesskit_atspi_common = { git = "https://github.com/lennox-davidlevy/rune", rev = "ac6b4825f51e13f35628759255f644a8b411e9dc" }
 
 [profile.dev]
 debug = "line-tables-only"
