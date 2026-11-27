@@ -92,6 +92,7 @@ pub fn open(s: &mut State, tx: &mut Tx) {
     s.drawer.open = true;
     s.drawer.hovered = None;
     s.drawer.moved = false;
+    state::sync_from_disk(s, Some(tx));
     sync_selection(s);
     crate::toolbar::sync_cover(s);
     state::begin_cover_slide(s, tx.scale(), false, prev_cover);

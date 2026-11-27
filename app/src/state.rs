@@ -440,16 +440,20 @@ pub fn open_document(s: &mut State, path: PathBuf, text: String) {
     ask(s);
 }
 
-/// Switches from the open post to `path`: saves any unsaved changes first (stopping on failure so
-/// nothing is dropped), reads the new file before closing the old one (flashing `Post not opened`
-/// on a read error while leaving the current post open), then sends `didClose` and opens the new
-/// document with `open_document`.
+/// Switches from the open post to `path`: syncs clean external disk edits first, saves any unsaved
+/// changes (stopping on failure or conflict so nothing is dropped), reads the new file before
+/// closing the old one (flashing `Post not opened` on a read error while leaving the current post
+/// open), then sends `didClose` and opens the new document with `open_document`.
 pub fn switch_document(s: &mut State, path: PathBuf, tx: &mut Tx) -> bool {
     if !s.waiting_for_page && !s.uri.is_empty() && unescaped(&file_uri(&path)) == unescaped(&s.uri) {
+        sync_from_disk(s, Some(tx));
         return true;
     }
-    if !s.waiting_for_page && (!clean(s) || s.save_error.is_some() || s.disk_conflict) && !save(s) {
-        return false;
+    if !s.waiting_for_page {
+        sync_from_disk(s, Some(tx));
+        if (!clean(s) || s.save_error.is_some() || s.disk_conflict) && !save(s) {
+            return false;
+        }
     }
     let text = match std::fs::read_to_string(&path) {
         Ok(t) => t,
@@ -468,29 +472,30 @@ pub fn switch_document(s: &mut State, path: PathBuf, tx: &mut Tx) -> bool {
     true
 }
 
-/// Replaces the writing with the file's text on disk after `Post changed on disk`.
-pub fn reload_from_disk(s: &mut State) -> bool {
-    let text = match std::fs::read_to_string(&s.path) {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!("reload {}: {e}", s.path.display());
-            draft::flash(s, "Post not opened", draft::Tone::Warn, open_error_sentence(&e));
-            return false;
-        }
+/// Replaces the writing with `text` from disk, keeping the caret's line where it can when
+/// `keep_line` is true.
+fn apply_disk_text(s: &mut State, text: String, stamp: Option<DiskStamp>, keep_line: bool) {
+    let (target_line, caret) = if keep_line {
+        let (line, col) = position::line_char(&s.edit.text, s.edit.focus);
+        let max_line = text.bytes().filter(|&b| b == b'\n').count() as u32;
+        let target = line.min(max_line);
+        (target, position::byte_at(&text, target, col))
+    } else {
+        (0, 0)
     };
     crate::look::close_panels(s);
     let mut edit = TextEdit::new(text.clone());
     edit.focused = s.split > 0.0 && !s.drawer.open;
-    edit.set_caret(0);
+    edit.set_caret(caret);
     s.edit = edit;
     s.saved = text;
-    s.disk = DiskStamp::of(&s.path);
+    s.disk = stamp.or_else(|| DiskStamp::of(&s.path));
     s.disk_conflict = false;
     s.save_error = None;
     s.save_arm = false;
     s.save_due = None;
     s.version += 1;
-    s.last_range = (0, 0);
+    s.last_range = s.edit.range();
     s.ghost = None;
     s.asked = None;
     s.spans = spans(s);
@@ -503,11 +508,61 @@ pub fn reload_from_disk(s: &mut State) -> bool {
             "textDocument": { "uri": s.uri, "version": s.version },
             "contentChanges": [{ "text": s.edit.text }],
         }));
-        c.notify("rubric/cursor", json!({ "uri": s.uri, "line": 0 }));
-        s.cursor_line = Some(0);
+        c.notify("rubric/cursor", json!({ "uri": s.uri, "line": target_line }));
+        s.cursor_line = Some(target_line);
     }
     ask(s);
+}
+
+/// Replaces the writing with the file's text on disk after `Post changed on disk`.
+pub fn reload_from_disk(s: &mut State) -> bool {
+    let text = match std::fs::read_to_string(&s.path) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("reload {}: {e}", s.path.display());
+            draft::flash(s, "Post not opened", draft::Tone::Warn, open_error_sentence(&e));
+            return false;
+        }
+    };
+    apply_disk_text(s, text, None, false);
     true
+}
+
+/// Checks whether the open post changed on disk: costs one `stat(2)` when untouched. If the app's
+/// writing is clean, silently takes the file's text while keeping the caret's line where it can.
+/// If the app has unsaved writing, flags `disk_conflict`. Returns whether state shown by the view
+/// changed.
+pub fn sync_from_disk(s: &mut State, tx: Option<&mut Tx>) -> bool {
+    if s.waiting_for_page || (s.disk_conflict && !clean(s)) {
+        return false;
+    }
+    match check_disk_change(&s.path, &mut s.disk, &s.saved) {
+        DiskChange::Same => false,
+        DiskChange::Changed(text, stamp) => {
+            if clean(s) {
+                apply_disk_text(s, text, Some(stamp), true);
+                if let Some(tx) = tx {
+                    sync_draft_boxes(s, tx);
+                }
+                true
+            } else {
+                let changed = !s.disk_conflict || s.save_error.is_some();
+                s.disk_conflict = true;
+                s.save_error = None;
+                s.save_arm = false;
+                s.save_due = None;
+                changed
+            }
+        }
+    }
+}
+
+/// Native window activation/deactivation (`El::on_window_focus`): on focus gain, checks disk in
+/// one `stat(2)` and skips view rebuild (`Tx::live_only`) when nothing changed.
+pub fn window_focused(s: &mut State, focused: bool, tx: &mut Tx) {
+    if !focused || !sync_from_disk(s, Some(tx)) {
+        tx.live_only();
+    }
 }
 
 /// Short writer-facing sentence for a file read error.
@@ -699,7 +754,7 @@ fn sent(s: &mut State) {
     s.draft_marks = draft::marks(s);
     s.title = title_of(&s.path, &s.edit.text);
     if !s.waiting_for_page {
-        if clean(s) && s.save_error.is_none() {
+        if s.disk_conflict || (clean(s) && s.save_error.is_none()) {
             s.save_arm = false;
             s.save_due = None;
         } else {
@@ -966,15 +1021,61 @@ pub fn menu_drawn(s: &State) -> Option<String> {
     Some(format!("menu drawn {:.1} ms: {id}, server {:.1} ms", asked.elapsed().as_secs_f64() * 1000.0, s.looked_server_ms))
 }
 
-/// The window is going: unsaved writing saves first (a failure is printed and closing still
-/// completes), then the document and server close, then the web view.
+/// The nearest folder above `path` that holds `rubric.md`.
+pub fn site_of(path: &std::path::Path) -> Option<PathBuf> {
+    path.ancestors().skip(1).find(|d| d.join("rubric.md").is_file()).map(std::path::Path::to_path_buf)
+}
+
+/// Ensures a file name ends with `.md`.
+fn ensure_md(path: PathBuf) -> PathBuf {
+    let ends_md = path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("md"));
+    if ends_md {
+        return path;
+    }
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).filter(|n| !n.is_empty()).unwrap_or_else(|| "post".into());
+    path.with_file_name(format!("{name}.md"))
+}
+
+/// Path where unsaved writing is rescued when closing with a disk conflict:
+/// `<site>/.rubric/unsaved/<path inside pages, with its name>.md` (never inside `pages/`, so it
+/// is never listed in the drawer, rendered by Hugo, or published). If no site root (`rubric.md`)
+/// can be found, falls back to the system's temp folder.
+pub fn unsaved_path(path: &std::path::Path) -> PathBuf {
+    if let Some(site) = site_of(path) {
+        let pages = site.join("pages");
+        let rel = if let Ok(r) = path.strip_prefix(&pages) {
+            r.to_path_buf()
+        } else if let Ok(r) = path.strip_prefix(&site) {
+            r.to_path_buf()
+        } else {
+            PathBuf::from(path.file_name().unwrap_or_else(|| std::ffi::OsStr::new("post.md")))
+        };
+        return ensure_md(site.join(".rubric").join("unsaved").join(rel));
+    }
+    let name = path.file_name().unwrap_or_else(|| std::ffi::OsStr::new("post.md"));
+    ensure_md(std::env::temp_dir().join("rubric-unsaved").join(name))
+}
+
+/// The window is going: unsaved writing saves first. If a disk conflict blocks saving, the app's
+/// writing is rescued to `unsaved_path(&s.path)` without overwriting the post, and its path is
+/// printed; other save failures are printed and closing still completes.
 pub fn shut(s: &mut State) {
     if s.shut_done {
         return;
     }
     s.shut_done = true;
-    if !s.waiting_for_page && (!clean(s) || s.save_error.is_some()) {
-        save(s);
+    if !s.waiting_for_page && (!clean(s) || s.save_error.is_some() || s.disk_conflict) {
+        if !save(s) && s.disk_conflict && !clean(s) {
+            let dest = unsaved_path(&s.path);
+            let res = dest.parent()
+                .map(std::fs::create_dir_all)
+                .transpose()
+                .and_then(|_| markdown::save(&dest, &s.edit.text));
+            match res {
+                Ok(()) => eprintln!("unsaved writing saved to {}", dest.display()),
+                Err(e) => eprintln!("could not write {}: {e}", dest.display()),
+            }
+        }
     }
     if let Some(c) = s.client.take() {
         if !s.waiting_for_page && !s.uri.is_empty() {
@@ -1055,36 +1156,32 @@ pub fn keep_anchor(s: &State) -> Option<Anchor> {
     s.anchor.filter(|a| a.holds(at, start, s.editor_rect[2]))
 }
 
+enum DiskChange {
+    Same,
+    Changed(String, DiskStamp),
+}
+
 /// Compares the file on disk against what the app last read or wrote: one `stat(2)` first, and
-/// reads the file only when size, mtime, ctime, or inode differs.
-fn changed_on_disk(path: &std::path::Path, expected: &Option<DiskStamp>, saved: &str) -> bool {
-    let Some(expected) = expected else { return false };
-    let Ok(meta) = std::fs::metadata(path) else { return false };
+/// reads the file only when size, mtime, ctime, or inode differs. When metadata changed without
+/// changing the file's text, refreshes `*expected` so later checks stay at one `stat(2)`.
+fn check_disk_change(path: &std::path::Path, expected: &mut Option<DiskStamp>, saved: &str) -> DiskChange {
+    let Some(exp) = expected.as_ref() else { return DiskChange::Same };
+    let Ok(meta) = std::fs::metadata(path) else { return DiskChange::Same };
     let current = DiskStamp::from_meta(&meta);
-    if current == *expected {
-        return false;
+    if current == *exp {
+        return DiskChange::Same;
     }
     match std::fs::read_to_string(path) {
-        Ok(text) => text != saved,
-        Err(_) => false,
+        Ok(text) if text == saved => {
+            *expected = Some(current);
+            DiskChange::Same
+        }
+        Ok(text) => DiskChange::Changed(text, current),
+        Err(_) => DiskChange::Same,
     }
 }
 
-/// Writes the file whole; checks first whether another program changed it on disk (leaving the
-/// file untouched and flagging `disk_conflict` if so), clears any failed-save state on success,
-/// or records a short writer-facing sentence and prints the error on failure. Returns whether the
-/// file is saved.
-pub fn save(s: &mut State) -> bool {
-    if s.waiting_for_page {
-        return true;
-    }
-    s.save_arm = false;
-    s.save_due = None;
-    if changed_on_disk(&s.path, &s.disk, &s.saved) {
-        s.disk_conflict = true;
-        s.save_error = None;
-        return false;
-    }
+fn write_to_disk(s: &mut State) -> bool {
     match markdown::save(&s.path, &s.edit.text) {
         Ok(()) => {
             s.saved = s.edit.text.clone();
@@ -1099,6 +1196,48 @@ pub fn save(s: &mut State) -> bool {
             false
         }
     }
+}
+
+/// Writes the file whole; checks first whether another program changed it on disk (silently
+/// taking the file's text when the app is clean, or leaving the file untouched and flagging
+/// `disk_conflict` when the app has unsaved writing), clears any failed-save state on success,
+/// or records a short writer-facing sentence and prints the error on failure. Returns whether the
+/// file is saved.
+pub fn save(s: &mut State) -> bool {
+    if s.waiting_for_page {
+        return true;
+    }
+    s.save_arm = false;
+    s.save_due = None;
+    if s.disk_conflict && !clean(s) {
+        return false;
+    }
+    if let DiskChange::Changed(text, stamp) = check_disk_change(&s.path, &mut s.disk, &s.saved) {
+        if clean(s) {
+            apply_disk_text(s, text, Some(stamp), true);
+            return true;
+        }
+        s.disk_conflict = true;
+        s.save_error = None;
+        return false;
+    }
+    write_to_disk(s)
+}
+
+/// Clears a disk conflict and writes the app's text over the file on disk at once.
+pub fn overwrite_to_disk(s: &mut State) -> bool {
+    if s.waiting_for_page {
+        return true;
+    }
+    s.save_arm = false;
+    s.save_due = None;
+    s.disk_conflict = false;
+    let ok = write_to_disk(s);
+    if !ok {
+        // Record the current stamp so Retry writes over this version without re-raising the same conflict.
+        s.disk = DiskStamp::of(&s.path);
+    }
+    ok
 }
 
 /// Short writer-facing sentence for an I/O save error.
@@ -1521,7 +1660,8 @@ mod tests {
         assert_eq!(page_died(&mut s, "Crashed"), [PageCmd::MediaOff, PageCmd::Reload]);
         assert!(s.page_life.media_off && !s.page_life.stopped);
         let said = draft::line(&s).expect("the status line says it");
-        assert_eq!((said.tone, said.action), (draft::Tone::Ink, None), "a flash, with nothing to do");
+        assert_eq!(said.tone, draft::Tone::Ink);
+        assert!(said.actions.is_empty(), "a flash, with nothing to do");
         assert!(!crate::draft::status_key(&mut s, &reload_key()), "nothing to reload while it runs");
     }
 
@@ -1533,7 +1673,8 @@ mod tests {
         assert!(s.page_life.stopped && s.page_life.media_off);
         let said = draft::line(&s).expect("the status line keeps it");
         assert_eq!(said.tone, draft::Tone::Warn);
-        assert!(said.action.as_ref().and_then(|(_, k)| k.as_ref()).is_some_and(|k| k.matches(&reload_key())), "its one action has the key");
+        assert_eq!(said.actions.len(), 1);
+        assert!(said.actions[0].1.as_ref().is_some_and(|k| k.matches(&reload_key())), "its one action has the key");
         let mut plain_r = reload_key();
         plain_r.mods.shift = false;
         assert!(!crate::draft::status_key(&mut s, &plain_r), "Ctrl+R is not Reload");
@@ -1581,5 +1722,38 @@ mod tests {
         assert_eq!(uri_path(&file_uri(&p)), Some(p));
         let perm = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "permission denied");
         assert_eq!(save_error_sentence(&perm), "The site folder could not be written.");
+    }
+
+    #[test]
+    fn unsaved_path_uses_site_rubric_unsaved_or_temp_and_is_never_inside_pages() {
+        let dir = std::env::temp_dir().join(format!("rubric-app-unsaved-path-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let site = dir.join("site");
+        let pages = site.join("pages");
+        std::fs::create_dir_all(pages.join("posts")).unwrap();
+        std::fs::write(site.join("rubric.md"), "").unwrap();
+
+        let cases = [
+            (pages.join("posts/walk.md"), site.join(".rubric/unsaved/posts/walk.md")),
+            (pages.join("_index.md"), site.join(".rubric/unsaved/_index.md")),
+            (pages.join("posts/nested/my.post.md"), site.join(".rubric/unsaved/posts/nested/my.post.md")),
+            (pages.join("posts/no-ext"), site.join(".rubric/unsaved/posts/no-ext.md")),
+        ];
+        for (post, expected) in cases {
+            let rescue = unsaved_path(&post);
+            assert_eq!(rescue, expected);
+            assert!(!rescue.starts_with(&pages), "rescue path {} must never lie inside pages/", rescue.display());
+            assert!(!rescue.components().any(|c| c.as_os_str() == "pages"), "no pages/ segment in {}", rescue.display());
+        }
+
+        // Without a site root (no rubric.md), falls back to the system temp folder and stays outside pages/.
+        let orphan_pages = dir.join("orphan/pages");
+        let orphan_post = orphan_pages.join("posts/alone.md");
+        let fallback = unsaved_path(&orphan_post);
+        assert!(fallback.starts_with(std::env::temp_dir()), "fallback {} is under temp_dir", fallback.display());
+        assert!(!fallback.starts_with(&orphan_pages), "fallback {} must never lie inside pages/", fallback.display());
+        assert_eq!(fallback.file_name().and_then(|n| n.to_str()), Some("alone.md"));
+
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

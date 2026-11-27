@@ -244,6 +244,7 @@ pub fn view(s: &State, cx: &mut Cx<State>) -> El {
         }
     }
     rune_kit::root(window, layer)
+        .on_window_focus(|s: &mut State, focused, tx| state::window_focused(s, focused, tx))
 }
 
 /// The design's spring for menus: fade, and scale from 0.98; a 60 ms fade out.
@@ -443,9 +444,9 @@ fn draft_edge(line: u32, status: &draft::Status, p: &Palette, x: f32, y: f32, h:
     }
 }
 
-/// The line under the writing: a label in the state's color, one fact, and at most one action
-/// with its key, for the caret's `new:` line or what just happened. Not drawn when there is
-/// nothing to say.
+/// The line under the writing: a label in the state's color, one fact, and zero, one, or two
+/// actions (with optional keys), for a failed save, disk conflict, stopped page, caret's `new:`
+/// line, or what just happened. Not drawn when there is nothing to say.
 fn status(s: &State) -> Option<El> {
     let p = s.look.palette;
     let said = draft::line(s)?;
@@ -460,15 +461,22 @@ fn status(s: &State) -> Option<El> {
         .child(text(said.label).key("status-label").font(fonts::caption(600.0)).color(color))
         .child(text(said.fact).key("status-words").font(fonts::caption(400.0)).color(p.ink2).shrink().truncate())
         .child(el().grow(1.0));
-    if let Some((name, key)) = said.action {
-        let mut btn = row().key("status-action").gap(6.0).center_y().px(6.0).py(2.0).radius(5.0).cursor(Cursor::Pointer)
-            .preserve_focus_on_press(true)
-            .child(text(name).font(fonts::caption(500.0)).color(p.ink))
-            .on_press(|s: &mut State| draft::status_pressed(s));
-        if let Some(key) = key {
-            btn = btn.child(row().px(5.0).py(2.0).radius(4.0).border(1.0, p.line).child(text(key.label()).font(fonts::key()).color(p.ink2)));
+    if !said.actions.is_empty() {
+        let mut actions = row().gap(6.0).center_y();
+        for (i, (name, key)) in said.actions.into_iter().enumerate() {
+            let elem_key = if i == 0 { "status-action".to_string() } else { format!("status-action-{i}") };
+            let mut btn = row().key(elem_key).gap(6.0).center_y().px(8.0).py(3.0).radius(5.0)
+                .border(1.0, p.line)
+                .cursor(Cursor::Pointer)
+                .preserve_focus_on_press(true)
+                .child(text(name).font(fonts::caption(500.0)).color(p.ink))
+                .on_press_tx(move |s: &mut State, tx| draft::status_pressed(s, i, tx));
+            if let Some(key) = key {
+                btn = btn.child(row().px(5.0).py(2.0).radius(4.0).border(1.0, p.line).child(text(key.label()).font(fonts::key()).color(p.ink2)));
+            }
+            actions = actions.child(btn);
         }
-        line = line.child(btn);
+        line = line.child(actions);
     }
     Some(line)
 }

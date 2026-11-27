@@ -761,7 +761,7 @@ fn a_draft_finished_on_another_line_is_said_for_a_while() {
     tell(&mut rt, Incoming::Notification { method: "rubric/drafted".into(), params: drafted.clone() });
     let (said, until) = rt.state.flash.clone().expect("said");
     assert!(said.fact.contains("Tide clock"));
-    assert!(said.action.is_none(), "nothing to press");
+    assert!(said.actions.is_empty(), "nothing to press");
     // It goes once its time has passed.
     rt.state.flash.as_mut().unwrap().1 = 0;
     rubric_app::draft::tick(&mut rt.state);
@@ -2690,8 +2690,9 @@ fn a_failed_save_shows_status_overrides_new_line_and_retry_clears_both() {
     // The `new:` line's status gives way to the failed save status with Retry (Ctrl+S).
     let fail_line = rubric_app::draft::line(&rt.state).expect("failed save status");
     assert_eq!(fail_line.tone, rubric_app::draft::Tone::Warn);
-    let (_, chord) = fail_line.action.expect("Retry action");
-    assert_eq!(chord, Some(rubric_app::toolbar::chord(rubric_app::toolbar::Shortcut::Save)));
+    assert_eq!(fail_line.actions.len(), 1);
+    let (_, chord) = &fail_line.actions[0];
+    assert_eq!(*chord, Some(rubric_app::toolbar::chord(rubric_app::toolbar::Shortcut::Save)));
     assert!(rt.find("status-action").is_some());
 
     // In page-only view, the failed save status takes a 34-point strip at the window's foot and
@@ -2791,6 +2792,7 @@ fn site_runtime(name: &str) -> (Runtime<State>, std::sync::mpsc::Receiver<Value>
     let dir = std::env::temp_dir().join(format!("rubric-app-s3-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("pages/posts")).unwrap();
+    std::fs::write(dir.join("rubric.md"), "").unwrap();
     let home = dir.join("pages/_index.md");
     let first = dir.join("pages/posts/first.md");
     let second = dir.join("pages/posts/second.md");
@@ -3092,7 +3094,10 @@ fn a_post_changed_on_disk_by_another_program_is_not_overwritten_and_reload_takes
     assert_eq!(save_state(&rt.state), SaveState::Failed);
     let said = rubric_app::draft::line(&rt.state).expect("status line shows conflict");
     assert_eq!(said.tone, rubric_app::draft::Tone::Warn);
-    assert!(said.action.is_some());
+    assert_eq!(said.actions.len(), 2);
+    assert!(said.actions.iter().all(|(_, k)| k.is_none()), "neither action has a key");
+    assert!(rt.find("status-action").is_some());
+    assert!(rt.find("status-action-1").is_some());
 
     // Ctrl+S also refuses to overwrite.
     cmd_key(&mut rt, 's', false);
@@ -3127,4 +3132,229 @@ fn a_post_changed_on_disk_by_another_program_is_not_overwritten_and_reload_takes
     assert!(std::fs::read_to_string(&first).unwrap().starts_with("More.\n"));
 
     std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn clean_post_takes_disk_changes_on_focus_drawer_and_switch_keeping_caret_line() {
+    use rubric_app::state::{SaveState, save_state};
+    let (mut rt, sent, dir, home, first, second) = site_runtime("clean-reload");
+    let initial = "---\ntitle: First walk\n---\n\nLine four.\nLine five.\nLine six.\n";
+    std::fs::write(&first, initial).unwrap();
+    rt.update(|s, _| {
+        rubric_app::state::open_document(s, first.clone(), initial.into());
+        // Put caret on line 5 ("Line five."), column 4.
+        let pos = rubric_app::position::byte_at(&s.edit.text, 5, 4);
+        s.edit.set_caret(pos);
+        s.last_range = s.edit.range();
+    });
+    rt.frame(1.0 / 60.0);
+    while sent.try_recv().is_ok() {}
+
+    // 1. Focus loss + gain when nothing changed on disk: no state change, no view rebuild.
+    let commits_before = rt.stats.commits;
+    rt.window_focus(false);
+    rt.frame(1.0 / 60.0);
+    rt.window_focus(true);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.stats.commits, commits_before, "unchanged focus gain skips view rebuild via live_only");
+    assert_eq!(rt.state.edit.text, initial);
+    assert!(rubric_app::draft::line(&rt.state).is_none());
+
+    // 2. External change while clean + window regains focus: takes disk text silently, keeps caret line 5.
+    let v2 = "---\ntitle: Updated outside\n---\n\nAlpha.\nBeta gamma.\nDelta.\n";
+    std::fs::write(&first, v2).unwrap();
+    rt.window_focus(false);
+    rt.frame(1.0 / 60.0);
+    rt.window_focus(true);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.edit.text, v2);
+    assert_eq!(std::fs::read_to_string(&first).unwrap(), v2);
+    assert_eq!(save_state(&rt.state), SaveState::Saved);
+    assert!(!rt.state.disk_conflict);
+    assert!(rubric_app::draft::line(&rt.state).is_none(), "no status message on clean reload");
+    assert_eq!(rubric_app::position::line_char(&rt.state.edit.text, rt.state.edit.focus).0, 5, "caret stays on line 5");
+    let msgs: Vec<Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+    assert!(msgs.iter().any(|m| m["method"] == "textDocument/didChange" && m["params"]["contentChanges"][0]["text"] == v2));
+
+    // 3. External change shrinks file to fewer lines + drawer opens: silently takes text, clamps caret to last line.
+    let v3 = "Short one.\nShort two.";
+    std::fs::write(&first, v3).unwrap();
+    cmd_key(&mut rt, 'o', false);
+    settle(&mut rt);
+    assert_eq!(rt.state.edit.text, v3);
+    assert_eq!(std::fs::read_to_string(&first).unwrap(), v3);
+    assert!(rubric_app::draft::line(&rt.state).is_none());
+    assert_eq!(rubric_app::position::line_char(&rt.state.edit.text, rt.state.edit.focus).0, 1, "caret clamps to last line");
+    let req = sent.try_recv().expect("didChange before rubric/pages");
+    let pages_req = if req["method"] == "rubric/pages" {
+        req
+    } else {
+        std::iter::from_fn(|| sent.try_recv().ok()).find(|m| m["method"] == "rubric/pages").expect("rubric/pages")
+    };
+    tell(&mut rt, Incoming::Response { id: pages_req["id"].as_i64().unwrap(), result: Ok(pages_reply(&home, &first, &second)) });
+    settle(&mut rt);
+
+    // 4. External change while clean + switching to an unreadable post: checks before switch and keeps updated disk text.
+    let v4 = "Before switch.\nSecond line.\n";
+    std::fs::write(&first, v4).unwrap();
+    std::fs::remove_file(&second).unwrap();
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Enter);
+    settle(&mut rt);
+    assert_eq!(rt.state.path, first);
+    assert_eq!(rt.state.edit.text, v4);
+    assert_eq!(std::fs::read_to_string(&first).unwrap(), v4);
+
+    // 5. Restore second post, external change while clean, switch succeeds without overwriting first.
+    let second_body = "---\ntitle: Second walk\n---\n\nSecond body.\n";
+    std::fs::write(&second, second_body).unwrap();
+    let v5 = "Final external.\n";
+    std::fs::write(&first, v5).unwrap();
+    rt.update(|s, tx| {
+        assert!(rubric_app::state::switch_document(s, second.clone(), tx));
+    });
+    assert_eq!(std::fs::read_to_string(&first).unwrap(), v5, "external edit preserved on clean switch");
+    assert_eq!(rt.state.path, second);
+    assert_eq!(rt.state.edit.text, second_body);
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn conflict_blocks_switching_and_overwrite_clears_conflict_and_saves_at_once() {
+    use rubric_app::state::{SaveState, save_state};
+    let (mut rt, sent, dir, home, first, second) = site_runtime("conflict-overwrite");
+    let external = "---\ntitle: Disk version\n---\n\nWritten elsewhere.\n";
+
+    // Make unsaved writing in the app, and change the file on disk.
+    rt.ime(Ime::Commit("App version.\n".into()));
+    rt.frame(1.0 / 60.0);
+    let app_text = rt.state.edit.text.clone();
+    std::fs::write(&first, external).unwrap();
+
+    // Window regains focus: flags conflict without dropping app text or overwriting disk.
+    rt.window_focus(false);
+    rt.frame(1.0 / 60.0);
+    rt.window_focus(true);
+    rt.frame(1.0 / 60.0);
+    assert!(rt.state.disk_conflict);
+    assert_eq!(save_state(&rt.state), SaveState::Failed);
+    assert_eq!(rt.state.edit.text, app_text);
+    assert_eq!(std::fs::read_to_string(&first).unwrap(), external);
+
+    // Switching posts stays refused while conflict is active.
+    while sent.try_recv().is_ok() {}
+    cmd_key(&mut rt, 'o', false);
+    settle(&mut rt);
+    let req = sent.try_recv().expect("rubric/pages");
+    tell(&mut rt, Incoming::Response { id: req["id"].as_i64().unwrap(), result: Ok(pages_reply(&home, &first, &second)) });
+    settle(&mut rt);
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Enter);
+    settle(&mut rt);
+
+    assert_eq!(rt.state.path, first, "switch refused during conflict");
+    assert!(rt.state.disk_conflict);
+    assert_eq!(rt.state.edit.text, app_text);
+    assert_eq!(std::fs::read_to_string(&first).unwrap(), external);
+    let msgs: Vec<Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+    assert!(!msgs.iter().any(|m| m["method"] == "textDocument/didClose"), "no didClose while conflicted");
+
+    // Clicking Overwrite (second action) clears conflict and writes the app's text over the file at once.
+    let (ox, oy) = rt.find("status-action-1").expect("Overwrite action");
+    rt.pointer_down(ox, oy);
+    rt.pointer_up(ox, oy);
+    rt.frame(1.0 / 60.0);
+
+    assert!(!rt.state.disk_conflict);
+    assert_eq!(save_state(&rt.state), SaveState::Saved);
+    assert_eq!(rt.state.edit.text, app_text);
+    assert_eq!(std::fs::read_to_string(&first).unwrap(), app_text);
+
+    // Switching posts now succeeds.
+    rt.update(|s, tx| {
+        assert!(rubric_app::state::switch_document(s, second.clone(), tx));
+    });
+    assert_eq!(rt.state.path, second);
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn closing_with_a_conflict_rescues_writing_outside_pages_without_overwriting_disk() {
+    // Case 1: conflict already flagged before closing, inside a site with rubric.md.
+    let (mut rt, _sent, dir, _home, first, _second) = site_runtime("close-conflict");
+    let external = "---\ntitle: External\n---\n\nFrom another program.\n";
+    rt.ime(Ime::Commit("Unsaved in app.\n".into()));
+    rt.frame(1.0 / 60.0);
+    let app_text = rt.state.edit.text.clone();
+    std::fs::write(&first, external).unwrap();
+    rt.frame(1.1);
+    assert!(rt.state.disk_conflict);
+    assert_eq!(std::fs::read_to_string(&first).unwrap(), external);
+
+    rubric_app::state::shut(&mut rt.state);
+
+    let pages_dir = dir.join("pages");
+    let unsaved = rubric_app::state::unsaved_path(&first);
+    assert_eq!(unsaved, dir.join(".rubric/unsaved/posts/first.md"));
+    assert!(!unsaved.starts_with(&pages_dir), "rescue file must never be inside pages/");
+    assert_eq!(std::fs::read_to_string(&first).unwrap(), external, "original post untouched on close");
+    assert_eq!(std::fs::read_to_string(&unsaved).unwrap(), app_text, "unsaved writing kept in .rubric/unsaved/");
+    let post_files: Vec<_> = std::fs::read_dir(dir.join("pages/posts")).unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert!(!post_files.iter().any(|n| n.contains("unsaved")), "no rescue file in pages/posts/: {post_files:?}");
+    std::fs::remove_dir_all(&dir).unwrap();
+
+    // Case 2: conflict not yet detected before immediate close (within 1 s autosave window).
+    let (mut rt2, _sent2, dir2, _home2, first2, _second2) = site_runtime("close-conflict-immediate");
+    rt2.ime(Ime::Commit("Immediate close.\n".into()));
+    rt2.frame(1.0 / 60.0);
+    let app_text2 = rt2.state.edit.text.clone();
+    std::fs::write(&first2, external).unwrap();
+    assert!(!rt2.state.disk_conflict);
+
+    rubric_app::state::shut(&mut rt2.state);
+
+    let unsaved2 = rubric_app::state::unsaved_path(&first2);
+    assert_eq!(unsaved2, dir2.join(".rubric/unsaved/posts/first.md"));
+    assert!(!unsaved2.starts_with(dir2.join("pages")));
+    assert_eq!(std::fs::read_to_string(&first2).unwrap(), external, "original post untouched on immediate close");
+    assert_eq!(std::fs::read_to_string(&unsaved2).unwrap(), app_text2, "unsaved writing kept on immediate close");
+    std::fs::remove_dir_all(&dir2).unwrap();
+
+    // Case 3: no site root (no rubric.md) falls back to system temp dir, never inside pages/.
+    let (mut rt3, _sent3, dir3, _home3, _first3, _second3) = site_runtime("close-conflict-no-site");
+    std::fs::remove_file(dir3.join("rubric.md")).unwrap();
+    let orphan = dir3.join(format!("pages/posts/orphan-{}.md", std::process::id()));
+    std::fs::write(&orphan, external).unwrap();
+    rt3.update(|s, _| {
+        rubric_app::state::open_document(s, orphan.clone(), external.into());
+    });
+    rt3.ime(Ime::Commit("Orphan unsaved.\n".into()));
+    rt3.frame(1.0 / 60.0);
+    let app_text3 = rt3.state.edit.text.clone();
+    let external_orphan = "---\ntitle: External orphan\n---\n\nChanged outside.\n";
+    std::fs::write(&orphan, external_orphan).unwrap();
+
+    rubric_app::state::shut(&mut rt3.state);
+
+    let unsaved3 = rubric_app::state::unsaved_path(&orphan);
+    assert!(unsaved3.starts_with(std::env::temp_dir()), "falls back to temp dir: {}", unsaved3.display());
+    assert!(!unsaved3.starts_with(dir3.join("pages")), "fallback must never be inside pages/");
+    assert_eq!(std::fs::read_to_string(&orphan).unwrap(), external_orphan);
+    assert_eq!(std::fs::read_to_string(&unsaved3).unwrap(), app_text3);
+    let _ = std::fs::remove_file(&unsaved3);
+    std::fs::remove_dir_all(&dir3).unwrap();
+
+    // Case 4: closing with no conflict writes the post and creates no rescue file.
+    let (mut rt4, _sent4, dir4, _home4, first4, _second4) = site_runtime("close-no-conflict");
+    rt4.ime(Ime::Commit("Normal edit.\n".into()));
+    rt4.frame(1.0 / 60.0);
+    let app_text4 = rt4.state.edit.text.clone();
+    rubric_app::state::shut(&mut rt4.state);
+    assert_eq!(std::fs::read_to_string(&first4).unwrap(), app_text4);
+    assert!(!rubric_app::state::unsaved_path(&first4).exists(), "no rescue file without conflict");
+    std::fs::remove_dir_all(&dir4).unwrap();
 }
