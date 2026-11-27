@@ -5,13 +5,19 @@ use std::path::PathBuf;
 use rune::{Env, Ime, Key, KeyEvent, Mods, Runtime};
 use rubric_app::state::State;
 
-pub fn runtime(text: &str, caret: usize) -> Runtime<State> {
+pub fn runtime_sized(text: &str, caret: usize, size: (f32, f32)) -> Runtime<State> {
     let mut s = State::open(PathBuf::from("/nonexistent/post.md"), text.to_string());
     s.edit.set_caret(caret);
-    s.width = 1000.0;
-    let mut rt = Runtime::with_text(s, rubric_app::view, (1000.0, 700.0), Env::new(false, 1.0), rubric_app::fonts::text_system());
+    s.width = size.0;
+    s.height = size.1;
+    let mut rt = Runtime::with_text(s, rubric_app::view, size, Env::new(false, 1.0), rubric_app::fonts::text_system());
+    rt.on_key = Some(rubric_app::editor::window_key);
     rt.frame(0.0);
     rt
+}
+
+pub fn runtime(text: &str, caret: usize) -> Runtime<State> {
+    runtime_sized(text, caret, (1000.0, 700.0))
 }
 
 fn press(rt: &mut Runtime<State>, key: Key) {
@@ -2058,4 +2064,331 @@ fn a_draft_edge_stays_on_its_line_through_edits_around_it() {
     press(&mut rt, Key::Backspace);
     idle(&mut rt);
     on_line(&rt, "a line taken away above");
+}
+
+fn cmd_key(rt: &mut Runtime<State>, ch: char, shift: bool) {
+    rt.key(KeyEvent { key: Key::Command(ch), mods: Mods { cmd: true, shift, ..Mods::default() } });
+    rt.frame(1.0 / 60.0);
+}
+
+#[test]
+fn the_toolbar_title_comes_from_front_matter_then_heading_then_file_name() {
+    let rt = runtime("---\ntitle: \"Three days on the coast path\"\n---\n\n# Different heading\n", 0);
+    assert_eq!(text_of(&rt, "title").as_deref(), Some("Three days on the coast path"));
+    let rt = runtime("---\ndate: 2026-06-12\n---\n\n# Only heading\n", 0);
+    assert_eq!(text_of(&rt, "title").as_deref(), Some("Only heading"));
+    let rt = runtime("Just prose.", 0);
+    assert_eq!(text_of(&rt, "title").as_deref(), Some("post.md"));
+}
+
+#[test]
+fn ctrl_2_hides_the_page_and_ctrl_1_restores_the_prior_split() {
+    let mut rt = runtime("# Walk\n\nBody.", 0);
+    rt.frame(1.0 / 60.0);
+    // Drag the divider to a custom split first.
+    let (dx, dy) = rt.find("divider").unwrap();
+    rt.pointer_down(dx, dy);
+    rt.frame(1.0 / 60.0);
+    rt.pointer_move(dx - 120.0, dy);
+    rt.frame(1.0 / 60.0);
+    rt.pointer_up(dx - 120.0, dy);
+    rt.frame(1.0 / 60.0);
+    let custom = rt.state.split;
+    assert!((custom - 0.5).abs() > 0.05 && custom > 0.1 && custom < 0.9, "custom split: {custom}");
+    let before = rt.state.bounds.unwrap();
+    assert!(before.0 > 0 && before.0 < 1000 && before.2 > 0 && before.3 > 0);
+
+    // Ctrl+2: writing only keeps the view's last size and moves it fully outside the window.
+    cmd_key(&mut rt, '2', false);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.split, 1.0);
+    let hidden = rt.state.bounds.unwrap();
+    assert!(hidden.0 >= 1000 && hidden.1 >= 700, "moved outside window: {hidden:?}");
+    assert_eq!((hidden.2, hidden.3), (before.2, before.3), "last size kept while off-window");
+
+    // Ctrl+1: brings back the split and moves the view back to its exact prior bounds.
+    cmd_key(&mut rt, '1', false);
+    rt.frame(1.0 / 60.0);
+    assert!((rt.state.split - custom).abs() < 1e-4, "restored {custom}, got {}", rt.state.split);
+    assert_eq!(rt.state.bounds, Some(before));
+    assert!(editor_focused(&rt));
+
+    // Ctrl+3: page only, then Ctrl+1 still works while writing is hidden and refocuses editor.
+    cmd_key(&mut rt, '3', false);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.split, 0.0);
+    cmd_key(&mut rt, '1', false);
+    rt.frame(1.0 / 60.0);
+    assert!((rt.state.split - custom).abs() < 1e-4);
+    assert!(editor_focused(&rt));
+}
+
+#[test]
+fn the_view_popover_opens_from_the_button_ticks_the_shown_pane_and_changes_the_split() {
+    let mut rt = runtime("# Walk\n\nBody.", 0);
+    rt.frame(1.0 / 60.0);
+    let btn = rect_of(&rt, "toolbar-view");
+    let (bx, by) = rt.find("toolbar-view").unwrap();
+    rt.pointer_down(bx, by);
+    rt.pointer_up(bx, by);
+    settle(&mut rt);
+
+    assert!(rubric_app::toolbar::view_open(&rt.state));
+    let pop = rect_of(&rt, "panel-0");
+    assert!((pop[0] - btn[0]).abs() < 1.0, "hung from button x: {pop:?} vs {btn:?}");
+    assert!((pop[1] - (rubric_app::TITLE + 4.0)).abs() < 1.0, "hung under toolbar: {pop:?}");
+    let checked = |rt: &Runtime<State>, id: &str| {
+        rt.state.panels[0].rows.iter().any(|r| matches!(r, rubric_app::panel::Row::Item(i) if i.id == id && i.check))
+    };
+    assert!(checked(&rt, "both") && !checked(&rt, "write") && !checked(&rt, "page"));
+
+    // Choosing "Writing only" closes the popover and sets split to 1.0.
+    let (wx, wy) = rt.find("row-view-write").unwrap();
+    rt.pointer_down(wx, wy);
+    rt.pointer_up(wx, wy);
+    rt.frame(1.0 / 60.0);
+    assert!(!rubric_app::toolbar::view_open(&rt.state));
+    assert_eq!(rt.state.split, 1.0);
+
+    // Reopen: "Writing only" is ticked; Esc closes it.
+    rt.pointer_down(bx, by);
+    rt.pointer_up(bx, by);
+    rt.frame(1.0 / 60.0);
+    assert!(checked(&rt, "write") && !checked(&rt, "both"));
+    press(&mut rt, Key::Escape);
+    assert!(!rubric_app::toolbar::view_open(&rt.state));
+
+    // Reopen and press elsewhere: scrim closes it.
+    rt.pointer_down(bx, by);
+    rt.pointer_up(bx, by);
+    rt.frame(1.0 / 60.0);
+    assert!(rubric_app::toolbar::view_open(&rt.state));
+    rt.pointer_down(600.0, 300.0);
+    rt.pointer_up(600.0, 300.0);
+    rt.frame(1.0 / 60.0);
+    assert!(!rubric_app::toolbar::view_open(&rt.state));
+}
+
+#[test]
+fn in_page_only_view_the_page_gives_way_to_the_view_popover_and_returns_when_closed() {
+    let mut rt = runtime("# Walk\n\nBody.", 0);
+    rt.frame(1.0 / 60.0);
+
+    // All four toolbar tips sit inside the toolbar beside their control (right for left controls,
+    // left for right controls), never beneath the toolbar over the page.
+    for (key, prefix, right_side) in [
+        ("toolbar-drawer", "Posts and pages", true),
+        ("toolbar-view", "View", true),
+        ("toolbar-open", "Open in browser", false),
+        ("toolbar-close", "Close window", false),
+    ] {
+        let btn = rect_of(&rt, key);
+        let (x, y) = rt.find(key).unwrap();
+        rt.pointer_move(x, y);
+        rt.frame(1.0 / 60.0);
+        rt.frame(0.5);
+        let (tip_text, tip_rect) = rt.help_tooltip().unwrap_or_else(|| panic!("no tooltip for {key}"));
+        assert!(tip_text.starts_with(prefix), "{key}: got {tip_text:?}");
+        if key == "toolbar-drawer" {
+            assert_eq!(rt.state.toolbar_hover, None, "drawer button has no hover fill until sitting 3");
+        }
+        assert!(tip_rect[1] >= 0.0 && tip_rect[1] + tip_rect[3] <= rubric_app::TITLE + 0.5, "{key}: tip {tip_rect:?} left the toolbar");
+        if right_side {
+            assert!(tip_rect[0] >= btn[0] + btn[2], "{key}: tip {tip_rect:?} not right of {btn:?}");
+        } else {
+            assert!(tip_rect[0] + tip_rect[2] <= btn[0] + 0.5, "{key}: tip {tip_rect:?} not left of {btn:?}");
+        }
+    }
+
+    // Page only: toolbar tips still show inside the toolbar; page rests right after the divider.
+    cmd_key(&mut rt, '3', false);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.split, 0.0);
+    let (dx, dy) = rt.find("toolbar-drawer").unwrap();
+    rt.pointer_move(dx, dy);
+    rt.frame(1.0 / 60.0);
+    rt.frame(0.5);
+    assert!(rt.help_tooltip().is_some_and(|(t, r)| t.starts_with("Posts and pages") && r[1] + r[3] <= rubric_app::TITLE + 0.5));
+    let resting = rect_of(&rt, "page");
+    assert_eq!(resting[0], rubric_app::DIVIDER);
+
+    // Open View popover: page gives way so its left edge is at 300 points (and right of popover).
+    let (bx, by) = rt.find("toolbar-view").unwrap();
+    rt.pointer_down(bx, by);
+    rt.pointer_up(bx, by);
+    settle(&mut rt);
+    let pop = rect_of(&rt, "panel-0");
+    let shifted = rect_of(&rt, "page");
+    assert!((shifted[0] - 300.0).abs() < 0.5, "page left {} != 300.0", shifted[0]);
+    assert!(shifted[0] >= pop[0] + pop[2], "page left {} < popover right {}", shifted[0], pop[0] + pop[2]);
+    assert_eq!(rt.state.bounds.unwrap().0, 300);
+
+    // Close with Esc: page goes back to its resting edge.
+    press(&mut rt, Key::Escape);
+    settle(&mut rt);
+    assert_eq!(rt.state.left_cover, 0.0);
+    assert_eq!(rect_of(&rt, "page")[0], resting[0]);
+}
+
+#[test]
+fn at_760_wide_open_in_browser_moves_to_view_popover_and_title_does_not_cross_any_button() {
+    let long_title = "---\ntitle: A very long post title about walking the entire coast path from north to south in the rain\n---\n\nBody.";
+    let mut rt = runtime_sized(long_title, 0, (760.0, 700.0));
+    rt.frame(1.0 / 60.0);
+    assert!(rt.find("toolbar-open").is_none(), "Open in browser is not drawn in the row at 760 wide");
+    let left_group = rect_of(&rt, "toolbar-left");
+    let title_group = rect_of(&rt, "title-group");
+    let right_group = rect_of(&rt, "toolbar-right");
+    assert!(title_group[0] >= left_group[0] + left_group[2], "title {title_group:?} crosses left buttons {left_group:?}");
+    assert!(title_group[0] + title_group[2] <= right_group[0] + 0.5, "title {title_group:?} crosses right buttons {right_group:?}");
+
+    // With a serving address and page path, Open in browser is the View panel's last item under
+    // a hairline, and choosing it opens the URL and closes the popover.
+    let uri = rt.state.uri.clone();
+    tell(&mut rt, Incoming::Notification { method: "rubric/serving".into(), params: json!({ "url": "http://127.0.0.1:1415/" }) });
+    tell(&mut rt, Incoming::Notification { method: "rubric/page".into(), params: json!({ "uri": uri, "url": "/posts/coast/" }) });
+    rt.frame(1.0 / 60.0);
+
+    let (vx, vy) = rt.find("toolbar-view").unwrap();
+    rt.pointer_down(vx, vy);
+    rt.pointer_up(vx, vy);
+    settle(&mut rt);
+    let rows = &rt.state.panels[0].rows;
+    assert_eq!(rows.len(), 5, "3 pane items + separator + Open in browser");
+    assert!(matches!(rows[3], rubric_app::panel::Row::Sep));
+    assert_eq!(rows[4].id(), Some("open"));
+
+    let (ox, oy) = rt.find("row-view-open").unwrap();
+    rt.pointer_down(ox, oy);
+    rt.pointer_up(ox, oy);
+    rt.frame(1.0 / 60.0);
+    assert!(!rubric_app::toolbar::view_open(&rt.state));
+    assert_eq!(rt.take_url_requests(), vec!["http://127.0.0.1:1415/posts/coast/"]);
+
+    // And Ctrl+Shift+B still opens the page with the popover closed.
+    cmd_key(&mut rt, 'b', true);
+    assert_eq!(rt.take_url_requests(), vec!["http://127.0.0.1:1415/posts/coast/"]);
+}
+
+#[test]
+fn open_in_browser_asks_to_open_only_when_an_address_is_known() {
+    let mut rt = runtime("# Walk\n", 0);
+    rt.frame(1.0 / 60.0);
+    assert!(rt.find("toolbar-open").is_some());
+
+    // Without a server address: neither Ctrl+Shift+B nor clicking the button opens anything.
+    cmd_key(&mut rt, 'b', true);
+    assert!(rt.take_url_requests().is_empty());
+    let (ox, oy) = rt.find("toolbar-open").unwrap();
+    rt.pointer_down(ox, oy);
+    rt.pointer_up(ox, oy);
+    rt.frame(1.0 / 60.0);
+    assert!(rt.take_url_requests().is_empty());
+
+    // With rubric/serving and rubric/page: both Ctrl+Shift+B and the button ask to open the post's URL.
+    let uri = rt.state.uri.clone();
+    tell(&mut rt, Incoming::Notification { method: "rubric/serving".into(), params: json!({ "url": "http://127.0.0.1:1415/" }) });
+    tell(&mut rt, Incoming::Notification { method: "rubric/page".into(), params: json!({ "uri": uri, "url": "/posts/long/" }) });
+    rt.frame(1.0 / 60.0);
+
+    cmd_key(&mut rt, 'b', true);
+    assert_eq!(rt.take_url_requests(), vec!["http://127.0.0.1:1415/posts/long/"]);
+
+    rt.pointer_down(ox, oy);
+    rt.pointer_up(ox, oy);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.take_url_requests(), vec!["http://127.0.0.1:1415/posts/long/"]);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn close_button_asks_window_to_close_and_edges_resize_without_blocking_controls() {
+    use rune::{ResizeEdge, Shell};
+    let mut rt = runtime("# Walk\n", 0);
+    rt.frame(1.0 / 60.0);
+
+    // Edge and corner resize strips emit their ResizeEdge.
+    for (x, y, want) in [
+        (1.0, 1.0, ResizeEdge::NorthWest),
+        (500.0, 1.0, ResizeEdge::North),
+        (999.0, 1.0, ResizeEdge::NorthEast),
+        (1.0, 300.0, ResizeEdge::West),
+        (999.0, 300.0, ResizeEdge::East),
+        (1.0, 699.0, ResizeEdge::SouthWest),
+        (500.0, 699.0, ResizeEdge::South),
+        (999.0, 699.0, ResizeEdge::SouthEast),
+    ] {
+        rt.pointer_down(x, y);
+        assert_eq!(rt.take_resize_action(), Some(want), "at ({x}, {y})");
+        rt.pointer_up(x, y);
+        rt.frame(1.0 / 60.0);
+    }
+
+    // Pressing the close button requests Shell::Close and no resize.
+    let (cx, cy) = rt.find("toolbar-close").unwrap();
+    rt.pointer_down(cx, cy);
+    assert_eq!(rt.take_resize_action(), None);
+    rt.pointer_up(cx, cy);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.shell_request, Some(Shell::Close));
+}
+
+#[test]
+fn ctrl_w_asks_the_window_to_close() {
+    let mut rt = runtime("# Walk\n", 0);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.shell_request, None);
+    cmd_key(&mut rt, 'w', false);
+    assert_eq!(rt.shell_request, Some(rune::Shell::Close));
+
+    // Also works in page-only view when the writing field has no focus.
+    let mut rt = runtime("# Walk\n", 0);
+    cmd_key(&mut rt, '3', false);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.split, 0.0);
+    cmd_key(&mut rt, 'w', false);
+    assert_eq!(rt.shell_request, Some(rune::Shell::Close));
+}
+
+#[test]
+fn keys_forwarded_via_send_key_type_and_switch_panes_and_app_press_takes_keys_back_from_page() {
+    let mut rt = runtime("hello ", 6);
+    rt.frame(1.0 / 60.0);
+
+    // Forwarded typing via Tx::send_key lands in the writing.
+    for ch in "world".chars() {
+        rt.update(move |_, tx| {
+            tx.send_key(KeyEvent { key: Key::Text(ch.to_string()), mods: Mods::default() });
+        });
+        rt.frame(1.0 / 60.0);
+    }
+    assert_eq!(rt.state.edit.text, "hello world");
+
+    // In page-only view, a forwarded Ctrl+1 restores both panes and refocuses the writing.
+    cmd_key(&mut rt, '3', false);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.split, 0.0);
+    rt.update(|_, tx| {
+        tx.send_key(KeyEvent { key: Key::Command('1'), mods: Mods { cmd: true, ctrl: true, ..Mods::default() } });
+    });
+    rt.frame(1.0 / 60.0);
+    assert!((rt.state.split - 0.5).abs() < 1e-4);
+    assert!(editor_focused(&rt));
+
+    // A press inside the page hands it keys; clicking in the editor or toolbar takes them back.
+    rt.update(|s, _| rubric_app::state::page_pressed(s));
+    assert!(rt.state.page_has_keys);
+    let (ex, ey) = rt.find("editor").unwrap();
+    rt.pointer_down(ex, ey);
+    rt.pointer_up(ex, ey);
+    rt.frame(1.0 / 60.0);
+    assert!(!rt.state.page_has_keys, "press in editor takes keys back from the page");
+
+    rt.update(|s, _| rubric_app::state::page_pressed(s));
+    assert!(rt.state.page_has_keys);
+    let (vx, vy) = rt.find("toolbar-view").unwrap();
+    rt.pointer_down(vx, vy);
+    rt.pointer_up(vx, vy);
+    rt.frame(1.0 / 60.0);
+    assert!(!rt.state.page_has_keys, "press on toolbar takes keys back from the page");
 }

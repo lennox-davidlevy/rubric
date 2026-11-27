@@ -20,6 +20,11 @@ pub struct State {
     pub saved: String,
     /// 0.0 = page only, 1.0 = writing only; starts 0.5.
     pub split: f32,
+    /// Last non-edge split remembered before hiding a pane (starts 0.5).
+    pub last_split: f32,
+    /// Right edge of what is open at the left (the View popover, or the drawer in sitting 3),
+    /// in window points: the page starts past this edge plus the divider.
+    pub left_cover: f32,
     /// To notice caret moves after each drawn frame.
     pub last_range: (usize, usize),
     /// file:// of `path`.
@@ -40,6 +45,8 @@ pub struct State {
     pub cursor_line: Option<u32>,
     /// The page's address from rubric/serving, loaded once.
     pub page_url: Option<String>,
+    /// The open post's URL path from rubric/page (e.g. "/posts/long/").
+    pub page_path: Option<String>,
     /// The pick shown after the caret (task 4).
     pub ghost: Option<crate::ghost::Ghost>,
     /// The inlineCompletion asked last: its id, the document version and the line.
@@ -115,6 +122,13 @@ pub struct State {
     pub theme_before: Option<(String, crate::theme::Mode)>,
     /// The page's process over the run: media off, restarted, stopped.
     pub page_life: crate::page::Life,
+    /// Whether the page currently holds keyboard input (after a press inside it, until the next
+    /// press in the app).
+    pub page_has_keys: bool,
+    /// The View toolbar button's rectangle in window points, for hanging its popover.
+    pub view_btn_rect: [f32; 4],
+    /// Which toolbar button the pointer is currently over.
+    pub toolbar_hover: Option<crate::toolbar::Hover>,
 }
 
 /// The line a panel hangs from, taken when it opens: which line, where it starts in the text,
@@ -185,11 +199,12 @@ impl State {
         let spans = markdown::spans(&text, &marks(&look.palette), &[]);
         let title = title_of(&path, &text);
         let mut s = State {
-            path, edit, version: 1, saved: text, split: 0.5, last_range: (0, 0), uri, spans, problem: None, page: None, width: 0.0,
-            bounds: None, client: None, cursor_line: None, page_url: None, ghost: None, asked: None, height: 0.0,
+            path, edit, version: 1, saved: text, split: 0.5, last_split: 0.5, left_cover: 0.0, last_range: (0, 0), uri, spans, problem: None, page: None, width: 0.0,
+            bounds: None, client: None, cursor_line: None, page_url: None, page_path: None, ghost: None, asked: None, height: 0.0,
             view: None, choice: None, drafts: Vec::new(), flash: None, now_ms: draft::now_ms(),
             pending: HashMap::new(), looked: std::cell::Cell::new(None), looked_sent: None, looked_server_ms: 0.0, sent_at: HashMap::new(), ticker: None, look, title, pane: [0.0; 4],
-            panels: Vec::new(), field: TextEdit::new(""), field_of: None, part_wait: None, set_next: None, setting: false, insert: None, drafter: None, focus_field: false, field_live: false, held: None, anchor: None, anchor_wait: false, editor_rect: [0.0; 4], draft_marks: Vec::new(), draft_boxes: HashMap::new(), draft_boxes_for: (0, 0, 0, 0), said_on: HashMap::new(), theme_before: None, page_life: crate::page::Life::default(),
+            panels: Vec::new(), field: TextEdit::new(""), field_of: None, part_wait: None, set_next: None, setting: false, insert: None, drafter: None, focus_field: false, field_live: false, held: None, anchor: None, anchor_wait: false, editor_rect: [0.0; 4], draft_marks: Vec::new(), draft_boxes: HashMap::new(), draft_boxes_for: (0, 0, 0, 0), said_on: HashMap::new(), theme_before: None, page_life: crate::page::Life::default(), page_has_keys: false,
+            view_btn_rect: [0.0; 4], toolbar_hover: None,
         };
         s.draft_marks = draft::marks(&s);
         s
@@ -220,14 +235,30 @@ pub fn show_theme(s: &mut State, name: &str) -> bool {
     shown
 }
 
-/// The post's first ATX heading, outside front matter and code fences, or its file's name.
+/// The post's title: front matter `title:` (plain or quoted), else the first ATX heading outside
+/// front matter and code fences, else its file's name.
 pub fn title_of(path: &std::path::Path, text: &str) -> String {
     let mut lines = text.split('\n').peekable();
     if lines.peek().is_some_and(|l| l.trim_end() == "---") {
         lines.next();
+        let mut fm = Vec::new();
+        let mut closed = false;
         for l in lines.by_ref() {
-            if l.trim_end() == "---" {
+            let trimmed = l.trim_end();
+            if trimmed == "---" || trimmed == "..." {
+                closed = true;
                 break;
+            }
+            fm.push(trimmed);
+        }
+        if closed {
+            for l in fm {
+                if let Some(rest) = l.strip_prefix("title:") {
+                    let val = unquote_yaml(rest.trim());
+                    if !val.is_empty() {
+                        return val;
+                    }
+                }
             }
         }
     }
@@ -250,6 +281,36 @@ pub fn title_of(path: &std::path::Path, text: &str) -> String {
         }
     }
     path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+}
+
+fn unquote_yaml(v: &str) -> String {
+    if v.len() >= 2 && v.starts_with('"') && v.ends_with('"') {
+        let inner = &v[1..v.len() - 1];
+        let mut out = String::with_capacity(inner.len());
+        let mut chars = inner.chars();
+        while let Some(c) = chars.next() {
+            if c == '\\' {
+                match chars.next() {
+                    Some('"') => out.push('"'),
+                    Some('\\') => out.push('\\'),
+                    Some('n') => out.push('\n'),
+                    Some('t') => out.push('\t'),
+                    Some(other) => {
+                        out.push('\\');
+                        out.push(other);
+                    }
+                    None => out.push('\\'),
+                }
+            } else {
+                out.push(c);
+            }
+        }
+        out.trim().to_string()
+    } else if v.len() >= 2 && v.starts_with('\'') && v.ends_with('\'') {
+        v[1..v.len() - 1].replace("''", "'").trim().to_string()
+    } else {
+        v.trim().to_string()
+    }
 }
 
 /// Whether the text is as last written.
@@ -452,6 +513,17 @@ pub fn incoming(s: &mut State, m: crate::lsp::Incoming) -> bool {
             }
             true
         }
+        Incoming::Notification { method, params } if method == "rubric/page" => {
+            let for_me = params.get("uri").and_then(|u| u.as_str()).is_none_or(|u| unescaped(u) == unescaped(&s.uri));
+            if for_me && let Some(url) = params.get("url").and_then(|u| u.as_str()) {
+                let next = Some(url.to_string());
+                if s.page_path != next {
+                    s.page_path = next;
+                    return true;
+                }
+            }
+            false
+        }
         Incoming::Notification { method, params } if method == "textDocument/publishDiagnostics" => {
             draft::diagnostics(s, &params);
             true
@@ -614,11 +686,16 @@ pub fn unescaped(uri: &str) -> Vec<u8> {
     out
 }
 
-/// The page pane moved or resized: `rect` in points, `scale` pixels per point.
+/// The page pane moved or resized: `rect` in points, `scale` pixels per point. When the page
+/// pane is hidden (writing only), keep the view's last size and park it fully outside the window
+/// instead of unmapping it, so WebKit repaints when it returns.
 pub fn page_laid_out(s: &mut State, rect: [f32; 4], scale: f32) {
     let px = |v: f32| (v * scale).round();
     let b = if s.split >= 1.0 || rect[2] < 1.0 || rect[3] < 1.0 {
-        (0, 0, 0, 0)
+        let (w, h) = s.bounds.map_or((1, 1), |(_, _, w, h)| (w.max(1), h.max(1)));
+        let off_x = px(s.width.max(rect[0])) as i32 + 64;
+        let off_y = px(s.height.max(rect[1] + rect[3])) as i32 + 64;
+        (off_x, off_y, w, h)
     } else {
         (px(rect[0]) as i32, px(rect[1]) as i32, px(rect[2]) as u32, px(rect[3]) as u32)
     };
@@ -641,6 +718,21 @@ pub fn page_attached(s: &mut State, page: crate::page::Page) {
         page.send(crate::page::PageCmd::Load(url.clone()));
     }
     s.page = Some(page);
+}
+
+/// A press landed inside the page: it holds keys until the next press in the app.
+pub fn page_pressed(s: &mut State) {
+    s.page_has_keys = true;
+}
+
+/// A press landed anywhere in the app: if the page held keys, take them back. Answers what was
+/// sent to the page.
+pub fn app_pressed(s: &mut State) -> Vec<crate::page::PageCmd> {
+    if !s.page_has_keys {
+        return Vec::new();
+    }
+    s.page_has_keys = false;
+    send_page(s, vec![crate::page::PageCmd::Keys(false)])
 }
 
 /// The page's process ended. The first time, media goes off and the page loads again; a death
@@ -684,9 +776,13 @@ mod tests {
     use std::path::Path;
 
     #[test]
-    fn the_title_is_the_first_heading_past_the_front_matter() {
+    fn the_title_is_the_front_matter_then_the_first_heading_then_the_file_name() {
         let p = Path::new("/x/walk.md");
-        assert_eq!(title_of(p, "---\ntitle: x\n# not this\n---\n\n```\n# nor this\n```\n## The long walk ##\n# Later"), "The long walk");
+        assert_eq!(title_of(p, "---\ntitle: Three days on the coast path\n---\n# Heading"), "Three days on the coast path");
+        assert_eq!(title_of(p, "---\ntitle: \"The long walk: part \\\"1\\\"\"\n---\n# Heading"), "The long walk: part \"1\"");
+        assert_eq!(title_of(p, "---\ntitle: 'Keeper''s log'\n---\n# Heading"), "Keeper's log");
+        assert_eq!(title_of(p, "---\ndate: 2026-06-12\n# not this\n---\n\n```\n# nor this\n```\n## The long walk ##\n# Later"), "The long walk");
+        assert_eq!(title_of(p, "---\ntitle: \"\"\n---\n# Fallback heading"), "Fallback heading");
         assert_eq!(title_of(p, "no heading\n#tag"), "walk.md");
     }
 
@@ -740,5 +836,18 @@ mod tests {
         assert_eq!(life.died(1_000 + crate::page::AGAIN_MS), crate::page::Death::Restart);
         assert_eq!(life.died(1_000 + crate::page::AGAIN_MS + 9_999), crate::page::Death::Stop);
         assert!(life.media_off);
+    }
+
+    #[test]
+    fn page_press_gives_page_keys_and_next_app_press_takes_them_back_once() {
+        use crate::page::PageCmd;
+        let mut s = State::open(PathBuf::from("/x/walk.md"), "# Walk\n".into());
+        assert!(!s.page_has_keys);
+        assert_eq!(app_pressed(&mut s), []);
+        page_pressed(&mut s);
+        assert!(s.page_has_keys);
+        assert_eq!(app_pressed(&mut s), [PageCmd::Keys(false)]);
+        assert!(!s.page_has_keys);
+        assert_eq!(app_pressed(&mut s), [], "second app press sends nothing");
     }
 }

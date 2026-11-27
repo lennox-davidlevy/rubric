@@ -95,8 +95,13 @@ fn main() {
         scenes: &[("themes", rubric_app::look::show_themes)],
         // Insert part…'s list, asked again a pause after the last key.
         poll: Some(rubric_app::insert::poll),
+        // Window-wide shortcuts and panel keys when the writing pane is hidden (page-only view).
+        on_key: Some(rubric_app::editor::window_key),
         ..AppSpec::new("Rubric", SIZE, init, rubric_app::view)
     });
+    // On Linux, no system frame: the toolbar row moves the window and the edges resize it.
+    #[cfg(target_os = "linux")]
+    let app = app.window_options(rune::WindowOptions { borderless: true, ..Default::default() });
 
     // The server, from a thread of its own, so the first frame never waits on it.
     match site {
@@ -180,7 +185,21 @@ fn main() {
                 state::page_died(s, &reason);
             });
         };
-        let page = Page::attach(id, "about:blank", loaded, |e| eprintln!("page failed: {e}"), died);
+        let press_handle = handle.clone();
+        let pressed = move || {
+            press_handle.update_if(|s, _| {
+                state::page_pressed(s);
+                false
+            });
+        };
+        let key_handle = handle.clone();
+        let on_key = move |ev| {
+            key_handle.update(move |s, tx| {
+                s.page_has_keys = false;
+                tx.send_key(ev);
+            });
+        };
+        let page = Page::attach(id, "about:blank", loaded, |e| eprintln!("page failed: {e}"), died, pressed, on_key);
         handle.update(move |s, _| state::page_attached(s, page));
     })
     // Linux runs `on_close` when the window closes but not `on_quit`, so the server and the page go here.

@@ -216,3 +216,43 @@ test("the SSE relay broadcasts monotonic built revisions and replays the latest 
 
   await leave({ conn, proc, notes: new Map() });
 }, 20_000);
+
+test("rubric/page reports the open page's URL path and updates when front matter changes", async () => {
+  const root = join(tmp, "page-path");
+  newSite(root);
+  const proc = Bun.spawn(["bun", join(repo, "src/cli.ts"), "lsp", "--stub"], { cwd: repo, env, stdin: "pipe", stdout: "pipe", stderr: "pipe" });
+  const { Readable, Writable } = await import("node:stream");
+  const conn = createMessageConnection(
+    new StreamMessageReader(Readable.fromWeb(proc.stdout as never)),
+    new StreamMessageWriter(new Writable({ write: (chunk, _, done) => { proc.stdin.write(chunk); done(); } })),
+  );
+  const pages: { uri: string; url: string }[] = [];
+  conn.onNotification("rubric/page", (p: { uri: string; url: string }) => {
+    pages.push(p);
+  });
+  conn.onNotification(() => {});
+  conn.onRequest(() => null);
+  conn.listen();
+  await conn.sendRequest("initialize", { processId: process.pid, rootUri: pathToFileURL(root).href, capabilities: {} });
+  await conn.sendNotification("initialized", {});
+  pids.push(readServing(root)!.pid!);
+
+  const post = join(root, "pages/posts/coast-path.md");
+  const uri = pathToFileURL(post).href;
+  const text = "---\ntitle: Coast path\n---\n\nWalk.\n";
+  await conn.sendNotification("textDocument/didOpen", { textDocument: { uri, languageId: "markdown", version: 1, text } });
+  await conn.sendNotification("rubric/cursor", { uri, line: 0 });
+  expect(await until(() => pages.some((p) => p.uri === uri && p.url === "/posts/coast-path/"))).toBe(true);
+
+  // Moving on the same page does not repeat the same URL; changing slug sends the new URL.
+  const count = pages.length;
+  await conn.sendNotification("rubric/cursor", { uri, line: 4 });
+  await Bun.sleep(100);
+  expect(pages.length).toBe(count);
+
+  const renamed = "---\ntitle: Coast path\nslug: west-coast\n---\n\nWalk.\n";
+  await conn.sendNotification("textDocument/didChange", { textDocument: { uri, version: 2 }, contentChanges: [{ text: renamed }] });
+  expect(await until(() => pages.some((p) => p.uri === uri && p.url === "/posts/west-coast/"))).toBe(true);
+
+  await leave({ conn, proc, notes: new Map() });
+}, 20_000);

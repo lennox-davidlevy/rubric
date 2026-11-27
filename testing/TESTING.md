@@ -242,6 +242,34 @@ Start the release build natively on the sample post (stub, no Jev key needed): `
 
 **After section E, put the site back:** close the app and run `app/scripts/clean-test.sh`.
 
+## F. The shell, sitting 1: the window and the toolbar (branch `shell`)
+
+Start the release build natively on the sample post (stub, no Jev key needed): `cd app && cargo build --release`, then `app/target/release/rubric-app sites/app-slice/pages/posts/long.md`.
+
+| # | Do | Expect |
+|---|---|---|
+| F1 | Start the app as above | Borderless window with no system title bar; the 40-point toolbar is the top edge (Drawer, View, `The long walk` + `Saved` centered, Open in browser, circular close button). The page attaches in the right pane and draws the post. |
+| F2 | Drag the divider left, right, and resize the window | The page follows the divider and window resize inside its pane with no offset or clipping. |
+| F3 | Float the window in Hyprland, drag an empty spot of the toolbar, and drag from each window edge and corner | Dragging the toolbar moves the window; dragging a button does not. Each 4-point edge and corner shows a resize cursor and resizes the window without blocking toolbar buttons. |
+| F4 | Edit `title:` in the post's front matter (`title: "Three days on the coast path"`) | The centered toolbar title updates live to `Three days on the coast path` (front matter `title:` beats the `#` heading). |
+| F5 | Hover over Drawer, View, Open in browser, and Close window in turn | Drawer stays dimmed with no hover fill (until sitting 3); View, Open in browser, and Close fill on hover. After a brief pause a 26-point tip shows inside the toolbar beside each button (right of Drawer: `Posts and pages` `Ctrl+O`; right of View: `View`; left of Open in browser: `Open in browser` `Ctrl+Shift+B`; left of Close: `Close window` `Ctrl+W`), never below the toolbar. |
+| F6 | Click the View button | A popover hangs right under the View button with `Both panes` (ticked, `Ctrl+1`), `Writing only` (`Ctrl+2`), `Page only` (`Ctrl+3`). |
+| F7 | Drag the divider to an uneven split (~35/65), press `Ctrl+2`, then `Ctrl+1` | `Ctrl+2` hides the page and fills the View button; `Ctrl+1` restores the ~35/65 split and returns focus to the writing. |
+| F8 | Press `Ctrl+2`, then `Ctrl+1` | The page is drawn again immediately (not blank). |
+| F9 | Press `Ctrl+3` (page only), hover Drawer and Close window, then click View | The writing hides and View stays filled; hovering Drawer and Close still shows their tips cleanly inside the toolbar; opening the View popover shifts the page's left edge to 300 points so none of the popover is covered. |
+| F10 | Press Esc (or click outside the View popover), then press `Ctrl+1` | The View popover closes and the page snaps back to the left edge (beside the divider); `Ctrl+1` restores both panes and typing lands in the writing. |
+| F11 | Resize the window to 760 wide or narrower (floating), then click View | The Open in browser button leaves the toolbar and appears as the View popover's last item under a hairline; the centered title truncates with an ellipsis without touching any button. |
+| F12 | Choose Open in browser from the narrow View popover, press `Ctrl+Shift+B`, and click Open in browser at full width | Each opens this post's live URL (`http://127.0.0.1:1415/posts/long/`) in the system browser. |
+| F13 | Click the circular close button (and in a second launch, press `Ctrl+W`) | Both close the window cleanly and leave no `rubric-app` or `WebKitWebProcess` running. |
+| F14 | With both panes showing, rest the pointer over the page (without clicking it) and type a word | The word lands in the writing. |
+| F15 | Press `Ctrl+3` (page only), keep the pointer over the page, and press `Ctrl+1` | Both panes return. |
+| F16 | Click in the page, select a word, press `Ctrl+C`, click in the writing, and press `Ctrl+V` | The selected word is pasted into the writing. |
+| F17 | Click in the page, then press `Ctrl+2` | The page hides (writing only) without clicking in the app first. |
+| F18 | From writing only after F17, press `Ctrl+1` and type a word (without clicking in the writing) | Both panes return and the word lands in the writing. |
+| F19 | Click in the page, select a word, and press `Ctrl+C` (then click in the writing and press `Ctrl+V`) | `Ctrl+C` still copies from the page and `Ctrl+V` pastes that word into the writing. |
+
+**After section F, put the site back:** run `app/scripts/clean-test.sh`.
+
 ## Notes
 App starts well
 A2 - so there is a bit of a delay in the typing, and if we can get it instant or as close to that woudl be a priority.

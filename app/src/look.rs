@@ -231,6 +231,8 @@ pub fn act(s: &mut State, id: &str, taken: Taken, tx: &mut Tx) {
     }
     if id == THEMES {
         themes(s, taken);
+    } else if id == crate::toolbar::VIEW {
+        crate::toolbar::act(s, taken, tx);
     } else {
         crate::draft::act(s, id, taken, tx);
     }
@@ -304,6 +306,7 @@ pub fn close_panels(s: &mut State) {
     // The next panel to open hangs from its own line.
     s.anchor = None;
     s.anchor_wait = false;
+    s.left_cover = 0.0;
     let Some(id) = s.panels.first().map(|p| p.id.clone()) else { return };
     let peeking = s.panels.iter().any(|p| p.id == crate::draft::NEAR);
     let looking = s.panels.iter().any(|p| matches!(p.id.as_str(), crate::insert::LIST | crate::insert::SIMILAR | crate::insert::GROUP));
@@ -313,6 +316,8 @@ pub fn close_panels(s: &mut State) {
     s.held = None;
     if id == THEMES {
         restore(s);
+    } else if id == crate::toolbar::VIEW {
+        // View popover holds no server state.
     } else if crate::insert::owns(&id) {
         crate::insert::closed(s, looking);
         crate::draft::closed(s, false);
@@ -376,7 +381,7 @@ pub fn pressed(s: &mut State, depth: usize, i: usize, segment: Option<usize>, tx
 /// After a press in a panel the keys go where they would after a key: the field that has them,
 /// or the writing.
 fn keys_home(s: &State, tx: &mut Tx) {
-    if !s.field_live {
+    if !s.field_live && s.split > 0.0 {
         tx.focus("editor", false);
     }
 }

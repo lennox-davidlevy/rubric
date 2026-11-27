@@ -227,6 +227,14 @@ export async function openSiteServer(root: string, opts: SiteServerOptions): Pro
       if (serving) void connection.sendNotification("rubric/serving", serving);
     });
 
+    const sentPage = new Map<string, string>();
+    const tellPage = (uri: string, f: string) => {
+      const at = workspace?.cursor(f, 0);
+      if (!at || sentPage.get(uri) === at.url) return;
+      sentPage.set(uri, at.url);
+      void connection.sendNotification("rubric/page", { uri, url: at.url });
+    };
+
     documents.onDidOpen(({ document }) => {
       const f = file(document.uri);
       if (!f) return;
@@ -238,14 +246,19 @@ export async function openSiteServer(root: string, opts: SiteServerOptions): Pro
         opens.set(f, (opens.get(f) ?? 0) + 1);
       }
       void (elsewhere ? workspace.change(f, document.getText()) : workspace.open(f, document.getText()));
+      tellPage(document.uri, f);
     });
     documents.onDidChangeContent(({ document }) => {
       const f = file(document.uri);
-      if (f) void workspace.change(f, document.getText());
+      if (f) {
+        void workspace.change(f, document.getText());
+        tellPage(document.uri, f);
+      }
       // RUBRIC_TRACE=<file> appends every text the server holds, to compare with the editor.
       if (process.env.RUBRIC_TRACE) appendFileSync(process.env.RUBRIC_TRACE, JSON.stringify({ t: Date.now(), v: document.version, text: document.getText() }) + "\n");
     });
     documents.onDidClose(({ document }) => {
+      sentPage.delete(document.uri);
       const f = file(document.uri);
       if (f && me.open.delete(f)) closeFile(f);
     });
@@ -254,7 +267,8 @@ export async function openSiteServer(root: string, opts: SiteServerOptions): Pro
     connection.onNotification("rubric/cursor", (params: { uri: string; line: number }) => {
       const f = file(params.uri);
       const at = f && workspace?.cursor(f, params.line);
-      if (!at || !workspace) return;
+      if (!at || !workspace || !f) return;
+      tellPage(params.uri, f);
       const body = JSON.stringify(at);
       if (body === shared.lastCursor) return;
       shared.lastCursor = body;

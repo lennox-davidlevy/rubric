@@ -97,6 +97,30 @@ pub fn field_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
     }
 }
 
+/// Window-wide key handler (`AppSpec::on_key`): handles open panels and window shortcuts even
+/// when the writing pane is hidden (page-only view) and no field has focus.
+pub fn window_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
+    if crate::look::key(s, ev, tx) != crate::panel::Taken::Passed {
+        crate::state::sync_draft_boxes(s, tx);
+        return true;
+    }
+    if crate::toolbar::key(s, ev, tx) {
+        return true;
+    }
+    if crate::look::themes_key(ev) && s.split > 0.0 {
+        crate::look::open_themes(s, tx);
+        return true;
+    }
+    if crate::draft::status_key(s, ev) {
+        return true;
+    }
+    if ev.is_command('s') && !ev.mods.shift && !ev.mods.alt {
+        crate::state::save(s);
+        return true;
+    }
+    false
+}
+
 /// The field's key handler, before focus navigation and the field's own editing. Tab is
 /// always consumed, so focus never leaves the writing.
 pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
@@ -104,6 +128,9 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
     // An open panel takes its keys first; any other key closes it and is the editor's.
     if crate::look::key(s, ev, tx) != crate::panel::Taken::Passed {
         crate::state::sync_draft_boxes(s, tx);
+        return true;
+    }
+    if crate::toolbar::key(s, ev, tx) {
         return true;
     }
     if crate::look::themes_key(ev) {
@@ -119,7 +146,7 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
         crate::state::sync_draft_boxes(s, tx);
         return true;
     }
-    if ev.is_command('s') {
+    if ev.is_command('s') && !ev.mods.shift && !ev.mods.alt {
         crate::state::save(s);
         return true;
     }
