@@ -177,9 +177,166 @@ fn main() {
     let (m, p, x) = stats(set);
     println!("METRIC case=part_segment_to_line metric=cpu_ms median={m:.4} p95={p:.4} max={x:.4} n={samples}");
 
+    // Sitting 3: drawer with 500 posts (open + Up/Down), post switch (Return to drawn), and
+    // disk-change stat vs read cost.
+    drawer_bench(&text, samples);
+
     if args.iter().any(|a| a == "--server") {
         server(&text, samples);
     }
+}
+
+fn drawer_bench(text: &str, samples: usize) {
+    use rune::{Key, KeyEvent, Mods};
+    use rubric_app::lsp::Incoming;
+    use serde_json::json;
+
+    let dir = std::env::temp_dir().join(format!("rubric-drawer-bench-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("pages/posts")).unwrap();
+    let p1 = dir.join("pages/posts/one.md");
+    let p2 = dir.join("pages/posts/two.md");
+    std::fs::write(&p1, text).unwrap();
+    let text2 = text.replacen("The long walk", "The second walk", 1);
+    std::fs::write(&p2, &text2).unwrap();
+
+    // stat vs read cost on the 20 KB post.
+    let (mut stat_us, mut read_us) = (Vec::new(), Vec::new());
+    for _ in 0..200 {
+        let t = Instant::now();
+        let meta = std::fs::metadata(&p1).unwrap();
+        std::hint::black_box(rubric_app::state::DiskStamp::from_meta(&meta));
+        stat_us.push(t.elapsed().as_secs_f64() * 1e6);
+        let t = Instant::now();
+        let s = std::fs::read_to_string(&p1).unwrap();
+        std::hint::black_box(s);
+        read_us.push(t.elapsed().as_secs_f64() * 1e6);
+    }
+    let (m, p, x) = stats(stat_us);
+    println!("METRIC case=disk_stat metric=wall_us median={m:.2} p95={p:.2} max={x:.2} n=200");
+    let (m, p, x) = stats(read_us);
+    println!("METRIC case=disk_read metric=wall_us median={m:.2} p95={p:.2} max={x:.2} n=200");
+
+    // 500 posts in the drawer: open + key moves.
+    let mut pages = vec![json!({
+        "uri": rubric_app::state::file_uri(&dir.join("pages/_index.md")),
+        "kind": "home",
+        "title": "Bench Site",
+        "draft": false
+    })];
+    pages.push(json!({ "uri": rubric_app::state::file_uri(&p1), "kind": "post", "title": "The long walk", "date": "2026-11-27", "draft": false }));
+    pages.push(json!({ "uri": rubric_app::state::file_uri(&p2), "kind": "post", "title": "The second walk", "date": "2026-11-26", "draft": true }));
+    for i in 0..498 {
+        pages.push(json!({
+            "uri": format!("file:///tmp/bench/post-{i:03}.md"),
+            "kind": "post",
+            "title": format!("Post number {i} along the coast path"),
+            "date": format!("2025-{:02}-{:02}", (i % 12) + 1, (i % 28) + 1),
+            "draft": i % 5 == 0
+        }));
+    }
+    let payload = json!({ "site": "Bench Site", "pages": pages });
+
+    let mut s = State::open(p1.clone(), text.to_string());
+    s.width = 1400.0;
+    s.height = 900.0;
+    let (client, sent) = rubric_app::lsp::Client::recording();
+    rubric_app::state::connected(&mut s, client);
+    let mut rt = Runtime::with_text(s, rubric_app::view, (1400.0, 900.0), Env::new(false, 1.0), rubric_app::fonts::text_system());
+    rt.on_key = Some(rubric_app::editor::window_key);
+    rt.frame(0.0);
+    while sent.try_recv().is_ok() {}
+
+    // Pre-populate 500 posts then measure open and Up/Down.
+    let cmd_o = KeyEvent { key: Key::Command('o'), mods: Mods { cmd: true, ctrl: true, ..Mods::default() } };
+    rt.key(cmd_o.clone());
+    rt.frame(1.0 / 120.0);
+    let req_id = std::iter::from_fn(|| sent.try_recv().ok()).find(|m| m["method"] == "rubric/pages").unwrap()["id"].as_i64().unwrap();
+    rt.update(|s, _| { rubric_app::state::incoming(s, Incoming::Response { id: req_id, result: Ok(payload.clone()) }); });
+    for _ in 0..40 { rt.frame(1.0 / 120.0); }
+    rt.key(KeyEvent { key: Key::Escape, mods: Mods::default() });
+    for _ in 0..40 { rt.frame(1.0 / 120.0); }
+    while sent.try_recv().is_ok() {}
+
+    let (mut open_500, mut key_500) = (Vec::new(), Vec::new());
+    for _ in 0..20 {
+        let c0 = rune::thread_cpu_ms();
+        rt.key(cmd_o.clone());
+        rt.frame(1.0 / 120.0);
+        open_500.push(rune::thread_cpu_ms() - c0);
+        for _ in 0..30 { rt.frame(1.0 / 120.0); }
+        while sent.try_recv().is_ok() {}
+        for k in [Key::Down, Key::Down, Key::Up] {
+            let c0 = rune::thread_cpu_ms();
+            rt.key(KeyEvent { key: k, mods: Mods::default() });
+            rt.frame(1.0 / 120.0);
+            key_500.push(rune::thread_cpu_ms() - c0);
+        }
+        rt.key(KeyEvent { key: Key::Escape, mods: Mods::default() });
+        for _ in 0..30 { rt.frame(1.0 / 120.0); }
+    }
+    let (m, p, x) = stats(open_500);
+    println!("METRIC case=drawer_500_open metric=cpu_ms median={m:.4} p95={p:.4} max={x:.4} n=20");
+    let (m, p, x) = stats(key_500);
+    println!("METRIC case=drawer_500_key metric=cpu_ms median={m:.4} p95={p:.4} max={x:.4} n=60");
+
+    // Return on a row to the new post's text drawn (between two 20 KB posts).
+    let small_payload = json!({
+        "site": "Bench Site",
+        "pages": [
+            { "uri": rubric_app::state::file_uri(&p1), "kind": "post", "title": "The long walk", "date": "2026-11-27", "draft": false },
+            { "uri": rubric_app::state::file_uri(&p2), "kind": "post", "title": "The second walk", "date": "2026-11-26", "draft": false }
+        ]
+    });
+    rt.state.site_pages = rubric_app::state::SitePages::parse(&small_payload);
+    let mut sw_wall = Vec::new();
+    let mut sw_cpu = Vec::new();
+    for i in 0..samples {
+        rt.key(cmd_o.clone());
+        for _ in 0..30 { rt.frame(1.0 / 120.0); }
+        while sent.try_recv().is_ok() {}
+        rt.key(KeyEvent { key: if i % 2 == 0 { Key::Down } else { Key::Up }, mods: Mods::default() });
+        rt.frame(1.0 / 120.0);
+        let (c0, t0) = (rune::thread_cpu_ms(), Instant::now());
+        rt.key(KeyEvent { key: Key::Enter, mods: Mods::default() });
+        rt.frame(1.0 / 120.0);
+        sw_cpu.push(rune::thread_cpu_ms() - c0);
+        sw_wall.push(t0.elapsed().as_secs_f64() * 1000.0);
+        while sent.try_recv().is_ok() {}
+        for _ in 0..30 { rt.frame(1.0 / 120.0); }
+    }
+    let (m, p, x) = stats(sw_cpu);
+    println!("METRIC case=drawer_switch metric=cpu_ms median={m:.4} p95={p:.4} max={x:.4} n={samples}");
+    let (m, p, x) = stats(sw_wall);
+    println!("METRIC case=drawer_switch metric=wall_ms median={m:.4} p95={p:.4} max={x:.4} n={samples}");
+
+    // View switches (all 6 pane transitions + Ctrl+O in page only) on the 20 KB post.
+    let mut switch_frames = Vec::new();
+    for ch in ['3', '1', '3', '2', '3', 'o', 'o', '1', '2', '1'] {
+        rt.key(KeyEvent { key: Key::Command(ch), mods: Mods { cmd: true, ctrl: true, ..Mods::default() } });
+        for _ in 0..120 {
+            let c0 = rune::thread_cpu_ms();
+            let more = rt.frame(1.0 / 60.0);
+            if let Some(slide) = rt.state.view_slide.get()
+                && let Some((rect, _)) = rt.presented("page")
+            {
+                let held = slide.holds_under();
+                rubric_app::state::page_presented(&rt.state, rect, 1.0);
+                if held && rt.state.view_slide.get().is_none() {
+                    rt.update(|_, tx| tx.instant());
+                    rt.frame(1.0 / 60.0);
+                }
+            }
+            switch_frames.push(rune::thread_cpu_ms() - c0);
+            if !more && rt.state.view_slide.get().is_none() {
+                break;
+            }
+        }
+    }
+    let (m, p, x) = stats(switch_frames);
+    println!("METRIC case=view_switch_frame metric=cpu_ms median={m:.4} p95={p:.4} max={x:.4}");
+
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// Against the real server with the stub resolver, on a copy of `sites/app-slice` in a temporary

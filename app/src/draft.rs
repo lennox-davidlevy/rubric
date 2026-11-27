@@ -112,10 +112,10 @@ pub struct Said {
     pub label: String,
     pub tone: Tone,
     pub fact: String,
-    pub action: Option<(String, Chord)>,
+    pub action: Option<(String, Option<Chord>)>,
 }
 
-fn action(id: &str) -> Option<(String, Chord)> {
+fn action(id: &str) -> Option<(String, Option<Chord>)> {
     let (label, key) = match id {
         "build" => ("Draft", Key::Enter),
         "stop" => ("Stop", Key::Command('.')),
@@ -123,7 +123,7 @@ fn action(id: &str) -> Option<(String, Chord)> {
         "reroll" => ("Reroll", Key::Command('r')),
         _ => return None,
     };
-    Some((label.into(), Chord::cmd(key)))
+    Some((label.into(), Some(Chord::cmd(key))))
 }
 
 /// What a `new:` line's status says, and the id of its action.
@@ -430,28 +430,39 @@ fn caret_status(s: &State) -> Option<(u32, String, Said, &'static str)> {
 }
 
 /// What the bottom of the writing pane (or the window's foot in page-only view) says: a failed
-/// save takes precedence over drafts, flashes, and page status.
+/// save or disk conflict takes precedence over drafts, flashes, and page status.
 pub fn line(s: &State) -> Option<Said> {
     if let Some(msg) = &s.save_error {
         return Some(Said {
             label: "Post not saved".into(),
             tone: Tone::Warn,
             fact: msg.clone(),
-            action: Some(("Retry".into(), crate::toolbar::chord(crate::toolbar::Shortcut::Save))),
+            action: Some(("Retry".into(), Some(crate::toolbar::chord(crate::toolbar::Shortcut::Save)))),
+        });
+    }
+    if s.disk_conflict {
+        return Some(Said {
+            label: "Post changed on disk".into(),
+            tone: Tone::Warn,
+            fact: "Another program changed this file.".into(),
+            action: Some(("Reload".into(), None)),
         });
     }
     if let Some((said, _)) = &s.flash {
         return Some(said.clone());
     }
     if s.page_life.stopped {
-        return Some(Said { label: "Page stopped".into(), tone: Tone::Warn, fact: String::new(), action: Some(("Reload".into(), reload_chord())) });
+        return Some(Said { label: "Page stopped".into(), tone: Tone::Warn, fact: String::new(), action: Some(("Reload".into(), Some(reload_chord()))) });
     }
     caret_status(s).map(|(_, _, said, _)| said)
 }
 
 /// Whether the status line claims a full-width strip at the window's foot in page-only view.
 pub fn wide_status(s: &State) -> bool {
-    s.save_error.is_some() || s.page_life.stopped
+    s.save_error.is_some()
+        || s.disk_conflict
+        || s.page_life.stopped
+        || s.flash.as_ref().is_some_and(|(said, _)| said.tone == Tone::Warn)
 }
 
 /// Reload on a stopped page: Cmd+Shift+R (read from `toolbar::SHORTCUTS`).
@@ -622,6 +633,11 @@ pub fn diagnostics(s: &mut State, params: &Value) {
 /// `rubric/drafted`: a draft finished or failed. Said for 4 s unless the caret's line is the
 /// one it is for, whose own status says it.
 pub fn drafted(s: &mut State, params: &Value) {
+    if let Some(uri) = params.get("uri").and_then(Value::as_str)
+        && state::unescaped(uri) != state::unescaped(&s.uri)
+    {
+        return;
+    }
     let words = params.get("words").and_then(Value::as_str).unwrap_or("");
     if new_words(caret_line(s).1) == Some(words) {
         return;
@@ -936,11 +952,11 @@ pub fn status_key(s: &mut State, ev: &KeyEvent) -> bool {
         state::reload_page(s);
         return true;
     }
-    if s.save_error.is_some() || !s.panels.is_empty() {
+    if s.save_error.is_some() || s.disk_conflict || !s.panels.is_empty() {
         return false;
     }
     let Some((line, text, said, id)) = caret_status(s) else { return false };
-    if s.flash.is_some() || !said.action.is_some_and(|(_, k)| k.matches(ev)) {
+    if s.flash.is_some() || !said.action.as_ref().and_then(|(_, k)| k.as_ref()).is_some_and(|k| k.matches(ev)) {
         return false;
     }
     perform(s, id, line, text);
@@ -951,6 +967,10 @@ pub fn status_key(s: &mut State, ev: &KeyEvent) -> bool {
 pub fn status_pressed(s: &mut State) {
     if s.save_error.is_some() {
         state::save(s);
+        return;
+    }
+    if s.disk_conflict {
+        state::reload_from_disk(s);
         return;
     }
     if s.flash.is_some() {

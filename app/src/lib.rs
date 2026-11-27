@@ -1,6 +1,7 @@
 //! Rubric's app: the writing beside the page, on Rune.
 
 pub mod draft;
+pub mod drawer;
 pub mod editor;
 pub mod fonts;
 pub mod ghost;
@@ -18,7 +19,7 @@ pub mod theme;
 pub mod toolbar;
 pub mod trace;
 
-use rune::{Cursor, Cx, Effect, El, Phase, ScrollSpec, Spring, SpringPair, Transition, col, el, row, text, text_input};
+use rune::{Cursor, Curve, Cx, Easing, Effect, El, Phase, ScrollSpec, Spring, SpringPair, Transition, col, el, row, text, text_input};
 use rune_kit::{Kit, PaletteSeed, popover};
 
 use panel::{Item, Panel, Row};
@@ -59,50 +60,77 @@ pub fn view(s: &State, cx: &mut Cx<State>) -> El {
     let p = s.look.palette;
     cx.help_look(toolbar::help_look(&p));
     let scale = cx.env().scale;
+    let slide = s.view_slide.get();
     let room = (s.width - DIVIDER).max(0.0);
     let left = (room * s.split).round();
-    // When page-only yields a left column for the View popover (or drawer), the yielded column
-    // spans from x=0 to `left_cover` in the pane's color with a hairline at its right edge
-    // (picture 93). When both panes are shown, any yielded column sits between divider and page.
+    // Target geometry for the page element itself (drives Rune's spring or 140 ms drawer tween).
     let cover_page_only = left == 0.0 && s.left_cover > 0.0;
     let cover_w = if cover_page_only {
         s.left_cover.min(s.width)
     } else {
         (s.left_cover - left - DIVIDER).max(0.0)
     };
+    let page_x = if cover_page_only { cover_w } else { left + DIVIDER + cover_w };
     let page_w = if cover_page_only {
         (s.width - cover_w).max(0.0)
     } else {
         (room - left - cover_w).max(0.0)
     };
+    // Geometry of what sits under the native web view: held in place while the web view slides
+    // over it (closing writing / drawer / cover), or laid out in its final place from Frame 0
+    // when the web view recedes to uncover it.
+    let shown_left = slide.and_then(|v| v.under_left).unwrap_or(left);
+    let eff_cover = s.left_cover.max(slide.map_or(0.0, |v| v.hold_cover));
+    let shown_cover_page_only = shown_left == 0.0 && eff_cover > 0.0;
+    let shown_cover_w = if shown_cover_page_only {
+        eff_cover.min(s.width)
+    } else {
+        (eff_cover - shown_left - DIVIDER).max(0.0)
+    };
+    let instant_under = slide.is_some_and(|v| v.instant_under);
     // A hairline in the middle of a wider grip.
-    let divider = row().key("divider").w(DIVIDER).h_full().fill(p.bg).justify_center().cursor(Cursor::ResizeColumn)
+    let mut divider = row().key("divider").w(DIVIDER).h_full().fill(p.bg).justify_center().cursor(Cursor::ResizeColumn)
         .child(el().w(1.0).h_full().fill(p.line))
         .on_drag(|s: &mut State, d, tx| {
+            s.view_slide.set(None);
             if d.phase == Phase::Down {
                 d.data = s.split;
             }
             s.split = split::dragged(d.data, d.dx, (s.width - DIVIDER).max(1.0));
-            if s.split > 0.0 && s.split < 1.0 {
-                s.last_split = s.split;
-            }
             // At the left edge the writing is 0 wide and loses focus; when it shows again,
             // typing goes back to it.
             if d.phase == Phase::Up && s.split > 0.0 {
                 tx.focus("editor", false);
             }
         });
-    let page = el().key("page").w(page_w).h_full().fill(p.bg).instant_changes()
-        .on_layout(move |s: &mut State, rect| state::page_laid_out(s, rect, scale));
+    if instant_under {
+        divider = divider.instant_changes();
+    }
+    let mut page = el().key("page").absolute(page_x, 0.0).w(page_w).h_full()
+        .fill(if slide.is_some() { p.bg.alpha(0.0) } else { p.bg })
+        .on_layout(move |s: &mut State, rect| {
+            state::page_laid_out(s, rect, scale);
+        });
+    page = match slide.map(|v| v.curve) {
+        None => page.instant_changes(),
+        Some(state::SlideCurve::Spring) => page,
+        Some(state::SlideCurve::DrawerOpen) => page.frame_motion(Curve::tween(drawer::SLIDE_SECS, Easing::EASE_OUT)),
+        Some(state::SlideCurve::DrawerClose) => page.frame_motion(Curve::tween(drawer::SLIDE_SECS, Easing::EASE_IN)),
+    };
     let wide_status = s.split <= 0.0 && draft::wide_status(s);
+    let mut writing_pane = writing(s, !wide_status).w(shown_left);
+    if instant_under {
+        writing_pane = writing_pane.instant_changes();
+    }
     let mut panes = row().key("panes").w_full().grow(1.0).min_h(0.0)
-        .child(writing(s, !wide_status).w(left));
-    if !cover_page_only {
+        .fill(if slide.is_some() { p.pane } else { p.bg })
+        .child(writing_pane);
+    if !shown_cover_page_only {
         panes = panes.child(divider);
     }
-    if cover_w > 0.0 {
+    if shown_cover_w > 0.0 {
         panes = panes.child(
-            el().key("page-cover").w(cover_w).h_full().fill(p.pane)
+            el().key("page-cover").w(shown_cover_w).h_full().fill(p.pane)
                 .border_sides([0.0, 1.0, 0.0, 0.0], p.line)
                 .instant_changes(),
         );
@@ -113,6 +141,9 @@ pub fn view(s: &State, cx: &mut Cx<State>) -> El {
             state::app_pressed(s);
         })
         .on_layout(|s: &mut State, rect| {
+            if (s.width - rect[2]).abs() > 0.5 || (s.height - rect[3]).abs() > 0.5 {
+                s.view_slide.set(None);
+            }
             s.width = rect[2];
             s.height = rect[3];
             toolbar::sync_cover(s);
@@ -167,10 +198,14 @@ pub fn view(s: &State, cx: &mut Cx<State>) -> El {
         );
     }
     let mut layer = Vec::new();
+    // The drawer sits below the toolbar over the left 300 points, sliding in and out in 140 ms.
+    layer.extend(drawer::view(s));
     // The View popover hangs from its toolbar button, with a scrim so a press elsewhere closes it.
     if toolbar::view_open(s) {
         layer.push(rune_kit::scrim_tx("panel-scrim", |s: &mut State, tx| {
+            let prev_cover = s.left_cover;
             look::close_panels(s);
+            state::begin_cover_slide(s, tx.scale(), false, prev_cover);
             if s.split > 0.0 {
                 tx.focus("editor", false);
             }
@@ -426,13 +461,14 @@ fn status(s: &State) -> Option<El> {
         .child(text(said.fact).key("status-words").font(fonts::caption(400.0)).color(p.ink2).shrink().truncate())
         .child(el().grow(1.0));
     if let Some((name, key)) = said.action {
-        line = line.child(
-            row().key("status-action").gap(6.0).center_y().px(6.0).py(2.0).radius(5.0).cursor(Cursor::Pointer)
-                .preserve_focus_on_press(true)
-                .child(text(name).font(fonts::caption(500.0)).color(p.ink))
-                .child(row().px(5.0).py(2.0).radius(4.0).border(1.0, p.line).child(text(key.label()).font(fonts::key()).color(p.ink2)))
-                .on_press(|s: &mut State| draft::status_pressed(s)),
-        );
+        let mut btn = row().key("status-action").gap(6.0).center_y().px(6.0).py(2.0).radius(5.0).cursor(Cursor::Pointer)
+            .preserve_focus_on_press(true)
+            .child(text(name).font(fonts::caption(500.0)).color(p.ink))
+            .on_press(|s: &mut State| draft::status_pressed(s));
+        if let Some(key) = key {
+            btn = btn.child(row().px(5.0).py(2.0).radius(4.0).border(1.0, p.line).child(text(key.label()).font(fonts::key()).color(p.ink2)));
+        }
+        line = line.child(btn);
     }
     Some(line)
 }

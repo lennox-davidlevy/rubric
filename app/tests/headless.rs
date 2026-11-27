@@ -352,6 +352,16 @@ fn top(rt: &Runtime<State>) -> Option<String> {
 fn settle(rt: &mut Runtime<State>) {
     for _ in 0..30 {
         rt.frame(1.0 / 60.0);
+        if let Some(slide) = rt.state.view_slide.get()
+            && let Some((rect, _)) = rt.presented("page")
+        {
+            let held = slide.holds_under();
+            rubric_app::state::page_presented(&rt.state, rect, rt.window_scale());
+            if held && rt.state.view_slide.get().is_none() {
+                rt.update(|_, tx| tx.instant());
+                rt.frame(1.0 / 60.0);
+            }
+        }
     }
 }
 
@@ -2085,10 +2095,36 @@ fn the_toolbar_title_comes_from_front_matter_then_heading_then_file_name() {
     assert_eq!(text_of(&rt, "title").as_deref(), Some("post.md"));
 }
 
+/// Advances frames until motion settles, driving `state::page_presented` after each frame just
+/// as `main.rs`'s `on_frame_drawn` hook does, and returns every `PageCmd` emitted during the slide.
+fn settle_slide(rt: &mut Runtime<State>) -> Vec<rubric_app::page::PageCmd> {
+    let mut cmds = Vec::new();
+    for _ in 0..180 {
+        let more = rt.frame(1.0 / 60.0);
+        if let Some(slide) = rt.state.view_slide.get()
+            && let Some((rect, _)) = rt.presented("page")
+        {
+            let held = slide.holds_under();
+            if let Some(cmd) = rubric_app::state::page_presented(&rt.state, rect, rt.window_scale()) {
+                cmds.push(cmd);
+            }
+            if held && rt.state.view_slide.get().is_none() {
+                rt.update(|_, tx| tx.instant());
+                rt.frame(1.0 / 60.0);
+            }
+        }
+        if !more && rt.state.view_slide.get().is_none() {
+            break;
+        }
+    }
+    cmds
+}
+
 #[test]
-fn ctrl_2_hides_the_page_and_ctrl_1_restores_the_prior_split() {
+fn ctrl_2_hides_the_page_and_ctrl_1_and_both_panes_reset_the_split_to_half() {
     let mut rt = runtime("# Walk\n\nBody.", 0);
     rt.frame(1.0 / 60.0);
+    let half_bounds = rt.state.bounds.get().unwrap();
     // Drag the divider to a custom split first.
     let (dx, dy) = rt.find("divider").unwrap();
     rt.pointer_down(dx, dy);
@@ -2099,32 +2135,200 @@ fn ctrl_2_hides_the_page_and_ctrl_1_restores_the_prior_split() {
     rt.frame(1.0 / 60.0);
     let custom = rt.state.split;
     assert!((custom - 0.5).abs() > 0.05 && custom > 0.1 && custom < 0.9, "custom split: {custom}");
-    let before = rt.state.bounds.unwrap();
+    let before = rt.state.bounds.get().unwrap();
     assert!(before.0 > 0 && before.0 < 1000 && before.2 > 0 && before.3 > 0);
 
-    // Ctrl+2: writing only keeps the view's last size and moves it fully outside the window.
-    cmd_key(&mut rt, '2', false);
-    rt.frame(1.0 / 60.0);
-    assert_eq!(rt.state.split, 1.0);
-    let hidden = rt.state.bounds.unwrap();
-    assert!(hidden.0 >= 1000 && hidden.1 >= 700, "moved outside window: {hidden:?}");
-    assert_eq!((hidden.2, hidden.3), (before.2, before.3), "last size kept while off-window");
-
-    // Ctrl+1: brings back the split and moves the view back to its exact prior bounds.
+    // Ctrl+1 from an uneven split resets the divider to half and half.
     cmd_key(&mut rt, '1', false);
-    rt.frame(1.0 / 60.0);
-    assert!((rt.state.split - custom).abs() < 1e-4, "restored {custom}, got {}", rt.state.split);
-    assert_eq!(rt.state.bounds, Some(before));
+    settle_slide(&mut rt);
+    assert!((rt.state.split - 0.5).abs() < 1e-4, "expected 0.5, got {}", rt.state.split);
+    assert_eq!(rt.state.bounds.get(), Some(half_bounds));
     assert!(editor_focused(&rt));
 
-    // Ctrl+3: page only, then Ctrl+1 still works while writing is hidden and refocuses editor.
-    cmd_key(&mut rt, '3', false);
+    // Drag uneven again, then Ctrl+2 (writing only) slides out and parks off-window keeping old size.
+    let (dx, dy) = rt.find("divider").unwrap();
+    rt.pointer_down(dx, dy);
     rt.frame(1.0 / 60.0);
+    rt.pointer_move(dx - 120.0, dy);
+    rt.frame(1.0 / 60.0);
+    rt.pointer_up(dx - 120.0, dy);
+    rt.frame(1.0 / 60.0);
+    let uneven = rt.state.bounds.get().unwrap();
+    cmd_key(&mut rt, '2', false);
+    settle_slide(&mut rt);
+    assert_eq!(rt.state.split, 1.0);
+    let hidden = rt.state.bounds.get().unwrap();
+    assert!(hidden.0 >= 1000 && hidden.1 >= 700, "moved outside window: {hidden:?}");
+    assert_eq!((hidden.2, hidden.3), (uneven.2, uneven.3), "last size kept while off-window");
+
+    // Ctrl+1 from writing only puts the divider at half and half.
+    cmd_key(&mut rt, '1', false);
+    settle_slide(&mut rt);
+    assert!((rt.state.split - 0.5).abs() < 1e-4, "expected 0.5, got {}", rt.state.split);
+    assert_eq!(rt.state.bounds.get(), Some(half_bounds));
+    assert!(editor_focused(&rt));
+
+    // View popover's "Both panes" from an uneven split also puts the divider at half and half.
+    let (dx, dy) = rt.find("divider").unwrap();
+    rt.pointer_down(dx, dy);
+    rt.frame(1.0 / 60.0);
+    rt.pointer_move(dx + 140.0, dy);
+    rt.frame(1.0 / 60.0);
+    rt.pointer_up(dx + 140.0, dy);
+    rt.frame(1.0 / 60.0);
+    assert!(rt.state.split > 0.6);
+    let (vx, vy) = rt.find("toolbar-view").unwrap();
+    rt.pointer_down(vx, vy);
+    rt.pointer_up(vx, vy);
+    settle(&mut rt);
+    let (bx, by) = rt.find("row-view-both").unwrap();
+    rt.pointer_down(bx, by);
+    rt.pointer_up(bx, by);
+    settle_slide(&mut rt);
+    assert!((rt.state.split - 0.5).abs() < 1e-4, "View Both panes expected 0.5, got {}", rt.state.split);
+    assert_eq!(rt.state.bounds.get(), Some(half_bounds));
+
+    // Ctrl+3: page only, then Ctrl+1 resets to half and half and refocuses editor.
+    cmd_key(&mut rt, '3', false);
+    settle_slide(&mut rt);
     assert_eq!(rt.state.split, 0.0);
     cmd_key(&mut rt, '1', false);
-    rt.frame(1.0 / 60.0);
-    assert!((rt.state.split - custom).abs() < 1e-4);
+    settle_slide(&mut rt);
+    assert!((rt.state.split - 0.5).abs() < 1e-4);
     assert!(editor_focused(&rt));
+}
+
+#[test]
+fn view_switches_glide_writing_and_page_together_with_position_only_moves() {
+    use rubric_app::page::PageCmd;
+    let mut rt = runtime("# Walk\n\nBody.", 0);
+    rt.frame(1.0 / 60.0);
+    let half = rt.state.bounds.get().unwrap();
+    assert_eq!(half, (503, 40, 497, 660));
+
+    // 1. Both -> Writing only (Ctrl+2): writing glides right, page slides out to the right
+    //    keeping its old width (497) and tracking divider with zero gap on every frame.
+    rt.key(KeyEvent { key: Key::Command('2'), mods: Mods { cmd: true, ..Mods::default() } });
+    let mut moves = Vec::new();
+    for _ in 0..120 {
+        let more = rt.frame(1.0 / 60.0);
+        let div = rt.presented("divider").unwrap().0;
+        let pg = rt.presented("page").unwrap().0;
+        assert!((div[0] + div[2] - pg[0]).abs() < 1.0, "gap during Ctrl+2: div={div:?} page={pg:?}");
+        if rt.state.view_slide.get().is_some()
+            && let Some(cmd) = rubric_app::state::page_presented(&rt.state, pg, 1.0)
+        {
+            assert!(matches!(cmd, PageCmd::Move { .. }), "only Move during Ctrl+2, got {cmd:?}");
+            moves.push(cmd);
+        }
+        if !more && rt.state.view_slide.get().is_none() {
+            break;
+        }
+    }
+    assert!(moves.len() >= 5, "expected smooth multi-frame slide on Ctrl+2, got {} moves", moves.len());
+    let parked = rt.state.bounds.get().unwrap();
+    assert!(parked.0 >= 1000 && parked.2 == 497 && parked.3 == 660, "parked keeping old size: {parked:?}");
+
+    // 2. Writing only -> Both (Ctrl+1): page slides in from the right to x=503 keeping width 497.
+    rt.key(KeyEvent { key: Key::Command('1'), mods: Mods { cmd: true, ..Mods::default() } });
+    let mut moves = Vec::new();
+    for _ in 0..120 {
+        let more = rt.frame(1.0 / 60.0);
+        let div = rt.presented("divider").unwrap().0;
+        let pg = rt.presented("page").unwrap().0;
+        assert!((div[0] + div[2] - pg[0]).abs() < 1.0, "gap during Ctrl+1: div={div:?} page={pg:?}");
+        if rt.state.view_slide.get().is_some()
+            && let Some(cmd) = rubric_app::state::page_presented(&rt.state, pg, 1.0)
+        {
+            assert!(matches!(cmd, PageCmd::Move { .. }), "only Move during Ctrl+1, got {cmd:?}");
+            moves.push(cmd);
+        }
+        if !more && rt.state.view_slide.get().is_none() {
+            break;
+        }
+    }
+    assert!(moves.len() >= 5, "expected smooth multi-frame slide on Ctrl+1, got {} moves", moves.len());
+    assert_eq!(rt.state.bounds.get(), Some(half));
+
+    // 3. Both -> Page only (Ctrl+3): growing (497 -> 994) resizes ONCE at start, writing stays at
+    //    497 underneath while page slides left 503 -> 6 with Move-only updates, then writing drops to 0.
+    rt.key(KeyEvent { key: Key::Command('3'), mods: Mods { cmd: true, ..Mods::default() } });
+    let mut moves = Vec::new();
+    for i in 0..120 {
+        let more = rt.frame(1.0 / 60.0);
+        let pg = rt.presented("page").unwrap().0;
+        if let Some(slide) = rt.state.view_slide.get() {
+            if i == 0 {
+                let b = rt.state.bounds.get().unwrap();
+                assert_eq!((b.2, b.3), (994, 660), "larger width set once at start of Ctrl+3: {b:?}");
+            }
+            let wp = rt.presented("writing-pane").unwrap().0;
+            assert!((wp[2] - 497.0).abs() < 1.0, "writing stays at 497 underneath during Ctrl+3: {wp:?}");
+            let held = slide.holds_under();
+            if let Some(cmd) = rubric_app::state::page_presented(&rt.state, pg, 1.0) {
+                assert!(matches!(cmd, PageCmd::Move { .. }), "only Move during Ctrl+3, got {cmd:?}");
+                moves.push(cmd);
+            }
+            if held && rt.state.view_slide.get().is_none() {
+                rt.update(|_, tx| tx.instant());
+                rt.frame(1.0 / 60.0);
+            }
+        }
+        if !more && rt.state.view_slide.get().is_none() {
+            break;
+        }
+    }
+    assert!(moves.len() >= 5, "expected smooth multi-frame slide on Ctrl+3, got {} moves", moves.len());
+    assert_eq!(rt.state.bounds.get(), Some((6, 40, 994, 660)));
+    assert_eq!(rt.presented("writing-pane").unwrap().0[2], 0.0, "writing unmounted to 0 at rest");
+    assert_eq!(rt.presented("divider").unwrap().0[0], 0.0, "divider at left edge at rest");
+
+    // 4. Page only -> Both (Ctrl+1): shrinking (994 -> 497) lays writing out at final 497 from
+    //    Frame 0, slides page right 6 -> 503 at larger width 994 (zero ground on right!), and
+    //    resizes ONCE to 497 at rest.
+    rt.key(KeyEvent { key: Key::Command('1'), mods: Mods { cmd: true, ..Mods::default() } });
+    let mut cmds = Vec::new();
+    for _ in 0..120 {
+        let more = rt.frame(1.0 / 60.0);
+        let wp = rt.presented("writing-pane").unwrap().0;
+        assert!((wp[2] - 497.0).abs() < 1.0, "writing already at final 497 from Frame 0: {wp:?}");
+        let pg = rt.presented("page").unwrap().0;
+        if rt.state.view_slide.get().is_some() {
+            let b = rt.state.bounds.get().unwrap();
+            assert_eq!(b.2, 994, "keeps larger width 994 while sliding right: {b:?}");
+            assert!(b.0 + b.2 as i32 >= 1000, "covers right edge throughout slide: {b:?}");
+            if let Some(cmd) = rubric_app::state::page_presented(&rt.state, pg, 1.0) {
+                cmds.push(cmd);
+            }
+        }
+        if !more && rt.state.view_slide.get().is_none() {
+            break;
+        }
+    }
+    assert!(cmds.len() >= 5, "expected multi-frame slide on Ctrl+3->Ctrl+1, got {}", cmds.len());
+    let bounds_cmds: Vec<_> = cmds.iter().filter(|c| matches!(c, PageCmd::Bounds { .. })).collect();
+    assert_eq!(bounds_cmds, vec![&PageCmd::Bounds { x: 503, y: 40, w: 497, h: 660 }], "resized once at rest");
+    assert_eq!(rt.state.bounds.get(), Some(half));
+
+    // 5. Page only -> Writing only (Ctrl+3 -> Ctrl+2): writing at final 994 from Frame 0, page
+    //    slides right at 994 with Move-only updates; Writing only -> Page only (Ctrl+2 -> Ctrl+3):
+    //    writing stays at 994 underneath while page slides left 1000 -> 6.
+    cmd_key(&mut rt, '3', false);
+    settle_slide(&mut rt);
+    rt.key(KeyEvent { key: Key::Command('2'), mods: Mods { cmd: true, ..Mods::default() } });
+    rt.frame(1.0 / 60.0);
+    assert!((rt.presented("writing-pane").unwrap().0[2] - 994.0).abs() < 1.0, "Ctrl+3->Ctrl+2 writing at 994 from Frame 0");
+    let cmds = settle_slide(&mut rt);
+    assert!(cmds.iter().all(|c| matches!(c, PageCmd::Move { .. })), "Ctrl+3->Ctrl+2 uses Move only: {cmds:?}");
+    assert_eq!(rt.state.bounds.get().unwrap().2, 994);
+
+    rt.key(KeyEvent { key: Key::Command('3'), mods: Mods { cmd: true, ..Mods::default() } });
+    rt.frame(1.0 / 60.0);
+    assert!((rt.presented("writing-pane").unwrap().0[2] - 994.0).abs() < 1.0, "Ctrl+2->Ctrl+3 keeps writing at 994 underneath");
+    let cmds = settle_slide(&mut rt);
+    assert!(cmds.iter().all(|c| matches!(c, PageCmd::Move { .. })), "Ctrl+2->Ctrl+3 already 994 uses Move only: {cmds:?}");
+    assert_eq!(rt.state.bounds.get(), Some((6, 40, 994, 660)));
+    assert_eq!(rt.presented("writing-pane").unwrap().0[2], 0.0);
 }
 
 #[test]
@@ -2194,7 +2398,7 @@ fn in_page_only_view_the_page_gives_way_to_the_view_popover_and_returns_when_clo
         let (tip_text, tip_rect) = rt.help_tooltip().unwrap_or_else(|| panic!("no tooltip for {key}"));
         assert!(tip_text.starts_with(prefix), "{key}: got {tip_text:?}");
         if key == "toolbar-drawer" {
-            assert_eq!(rt.state.toolbar_hover, None, "drawer button has no hover fill until sitting 3");
+            assert_eq!(rt.state.toolbar_hover, Some(rubric_app::toolbar::Hover::Drawer), "drawer button fills on hover");
         }
         assert!(tip_rect[1] >= 0.0 && tip_rect[1] + tip_rect[3] <= rubric_app::TITLE + 0.5, "{key}: tip {tip_rect:?} left the toolbar");
         if right_side {
@@ -2206,7 +2410,7 @@ fn in_page_only_view_the_page_gives_way_to_the_view_popover_and_returns_when_clo
 
     // Page only: toolbar tips still show inside the toolbar; page rests right after the divider.
     cmd_key(&mut rt, '3', false);
-    rt.frame(1.0 / 60.0);
+    settle_slide(&mut rt);
     assert_eq!(rt.state.split, 0.0);
     let (dx, dy) = rt.find("toolbar-drawer").unwrap();
     rt.pointer_move(dx, dy);
@@ -2230,7 +2434,7 @@ fn in_page_only_view_the_page_gives_way_to_the_view_popover_and_returns_when_clo
     assert_eq!(fill_of(&rt, "page-cover"), rt.state.look.palette.pane, "yielded column uses pane color");
     assert!((shifted[0] - 300.0).abs() < 0.5, "page left {} != 300.0", shifted[0]);
     assert!(shifted[0] >= pop[0] + pop[2], "page left {} < popover right {}", shifted[0], pop[0] + pop[2]);
-    assert_eq!(rt.state.bounds.unwrap().0, 300);
+    assert_eq!(rt.state.bounds.get().unwrap().0, 300);
 
     // Close with Esc: page goes back to its resting edge.
     press(&mut rt, Key::Escape);
@@ -2487,20 +2691,20 @@ fn a_failed_save_shows_status_overrides_new_line_and_retry_clears_both() {
     let fail_line = rubric_app::draft::line(&rt.state).expect("failed save status");
     assert_eq!(fail_line.tone, rubric_app::draft::Tone::Warn);
     let (_, chord) = fail_line.action.expect("Retry action");
-    assert_eq!(chord, rubric_app::toolbar::chord(rubric_app::toolbar::Shortcut::Save));
+    assert_eq!(chord, Some(rubric_app::toolbar::chord(rubric_app::toolbar::Shortcut::Save)));
     assert!(rt.find("status-action").is_some());
 
     // In page-only view, the failed save status takes a 34-point strip at the window's foot and
     // the page yields 34 points at the bottom.
     cmd_key(&mut rt, '3', false);
-    rt.frame(1.0 / 60.0);
+    settle_slide(&mut rt);
     let status_rect = rect_of(&rt, "status");
     let page_rect = rect_of(&rt, "page");
     assert!((status_rect[2] - 1000.0).abs() < 1.0, "wide status strip: {status_rect:?}");
     assert!((status_rect[3] - rubric_app::STATUS).abs() < 1.0);
     assert!((page_rect[1] + page_rect[3] - status_rect[1]).abs() < 1.0, "page yields foot strip: {page_rect:?} vs {status_rect:?}");
     cmd_key(&mut rt, '1', false);
-    rt.frame(1.0 / 60.0);
+    settle_slide(&mut rt);
 
     // Make the folder exist, then click Retry: file writes, failed state clears, and `new:` line
     // status returns.
@@ -2579,4 +2783,348 @@ fn closing_saves_unsaved_writing_and_folder_startup_opens_newest_post_or_home() 
     assert_eq!(s2.path, home);
     assert_eq!(s2.title, "Harbour");
     std::fs::remove_dir_all(&site).unwrap();
+}
+
+// Sitting 3: the drawer, switching posts, and disk-change detection.
+
+fn site_runtime(name: &str) -> (Runtime<State>, std::sync::mpsc::Receiver<Value>, PathBuf, PathBuf, PathBuf, PathBuf) {
+    let dir = std::env::temp_dir().join(format!("rubric-app-s3-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("pages/posts")).unwrap();
+    let home = dir.join("pages/_index.md");
+    let first = dir.join("pages/posts/first.md");
+    let second = dir.join("pages/posts/second.md");
+    std::fs::write(&home, "---\ntitle: Low Tide\n---\n\nHome body.\n").unwrap();
+    std::fs::write(&first, "---\ntitle: First walk\ndate: 2026-06-12\ndraft: true\n---\n\nFirst body.\n").unwrap();
+    std::fs::write(&second, "---\ntitle: Second walk\ndate: 2025-11-04\n---\n\nSecond body.\n").unwrap();
+
+    let (client, sent) = rubric_app::lsp::Client::recording();
+    let mut s = State::open(first.clone(), std::fs::read_to_string(&first).unwrap());
+    s.width = 1000.0;
+    s.height = 700.0;
+    rubric_app::state::connected(&mut s, client);
+    let mut rt = Runtime::with_text(s, rubric_app::view, (1000.0, 700.0), Env::new(false, 1.0), rubric_app::fonts::text_system());
+    rt.poll = Some(rubric_app::state::poll);
+    rt.on_key = Some(rubric_app::editor::window_key);
+    rt.frame(0.0);
+    // Drain initial didOpen + rubric/cursor.
+    while sent.try_recv().is_ok() {}
+    (rt, sent, dir, home, first, second)
+}
+
+fn pages_reply(home: &PathBuf, first: &PathBuf, second: &PathBuf) -> Value {
+    json!({
+        "site": "Low Tide",
+        "pages": [
+            { "uri": rubric_app::state::file_uri(home), "kind": "home", "title": "Low Tide", "draft": false },
+            { "uri": rubric_app::state::file_uri(first), "kind": "post", "title": "First walk", "date": "2026-06-12", "draft": true },
+            { "uri": rubric_app::state::file_uri(second), "kind": "post", "title": "Second walk", "date": "2025-11-04", "draft": false }
+        ]
+    })
+}
+
+#[test]
+fn ctrl_o_opens_drawer_asks_pages_draws_rows_in_order_and_marks_open_row() {
+    let (mut rt, sent, dir, home, first, second) = site_runtime("open");
+
+    cmd_key(&mut rt, 'o', false);
+    settle(&mut rt);
+    assert!(rt.state.drawer.open);
+    let req = sent.try_recv().expect("Ctrl+O asks rubric/pages");
+    assert_eq!(req["method"], "rubric/pages");
+    let req_id = req["id"].as_i64().unwrap();
+
+    tell(&mut rt, Incoming::Response { id: req_id, result: Ok(pages_reply(&home, &first, &second)) });
+    settle(&mut rt);
+
+    // Rows are drawn in server order (Home, First walk, Second walk), and the open one (index 1)
+    // has the keyboard focus and the accent edge bar.
+    assert_eq!(rt.state.drawer.selected, 1);
+    let r0 = rect_of(&rt, "drawer-row-0");
+    let r1 = rect_of(&rt, "drawer-row-1");
+    let r2 = rect_of(&rt, "drawer-row-2");
+    assert!(r0[1] < r1[1] && r1[1] < r2[1], "order: {r0:?} {r1:?} {r2:?}");
+    assert_eq!(fill_of(&rt, "drawer-open-1"), rt.state.look.palette.accent);
+    assert_eq!(fill_of(&rt, "drawer-open-0").a, 0.0);
+    assert_eq!(fill_of(&rt, "drawer-open-2").a, 0.0);
+
+    // Typing while the drawer is open does nothing to the writing.
+    let before = rt.state.edit.text.clone();
+    rt.key(KeyEvent { key: Key::Text("z".into()), mods: Mods::default() });
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.edit.text, before);
+
+    // Esc closes the drawer and returns keys to the writing.
+    press(&mut rt, Key::Escape);
+    settle(&mut rt);
+    assert!(!rt.state.drawer.open);
+    assert!(editor_focused(&rt));
+    rt.ime(Ime::Commit("X".into()));
+    rt.frame(1.0 / 60.0);
+    assert!(rt.state.edit.text.starts_with("X"), "next letter goes into writing: {:?}", rt.state.edit.text);
+
+    // Pressing the toolbar drawer button opens it; pressing outside closes it.
+    let (bx, by) = rt.find("toolbar-drawer").unwrap();
+    rt.pointer_down(bx, by);
+    rt.pointer_up(bx, by);
+    settle(&mut rt);
+    assert!(rt.state.drawer.open);
+    rt.pointer_down(500.0, 300.0);
+    rt.pointer_up(500.0, 300.0);
+    settle(&mut rt);
+    assert!(!rt.state.drawer.open);
+    assert!(editor_focused(&rt));
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn down_and_return_saves_first_switches_posts_resets_state_and_drops_stale_answers() {
+    let (mut rt, sent, dir, home, first, second) = site_runtime("switch");
+
+    // Put an unsaved edit and an in-flight request (inlineCompletion + draft) on the first post.
+    rt.ime(Ime::Commit("Unsaved line.\n".into()));
+    rt.frame(1.0 / 60.0);
+    assert!(rt.state.version > 1);
+    assert!(!std::fs::read_to_string(&first).unwrap().contains("Unsaved line."));
+    let stale_draft_id = rubric_app::draft::send(
+        &mut rt.state,
+        "rubric/draft",
+        rubric_app::draft::What::Look,
+        0,
+        "::: new: a clock".into(),
+        json!({}),
+    ).unwrap();
+    rt.state.asked = Some((999_999, rt.state.version, 0));
+    while sent.try_recv().is_ok() {}
+
+    // Open drawer, feed pages, move Down to Second walk (index 2), press Return.
+    cmd_key(&mut rt, 'o', false);
+    settle(&mut rt);
+    let req = sent.try_recv().expect("rubric/pages");
+    tell(&mut rt, Incoming::Response { id: req["id"].as_i64().unwrap(), result: Ok(pages_reply(&home, &first, &second)) });
+    settle(&mut rt);
+
+    press(&mut rt, Key::Down);
+    assert_eq!(rt.state.drawer.selected, 2);
+    press(&mut rt, Key::Enter);
+    settle(&mut rt);
+
+    // Drawer closed, first post was saved on disk before switching, second post is open.
+    assert!(!rt.state.drawer.open);
+    assert!(std::fs::read_to_string(&first).unwrap().contains("Unsaved line."), "unsaved edit written before switch");
+    assert_eq!(rt.state.path, second);
+    assert_eq!(rt.state.title, "Second walk");
+    assert_eq!(text_of(&rt, "title").as_deref(), Some("Second walk"));
+    assert_eq!(rt.state.version, 1);
+    assert_eq!(rt.state.edit.text, "---\ntitle: Second walk\ndate: 2025-11-04\n---\n\nSecond body.\n");
+    assert!(editor_focused(&rt));
+
+    // Sent didClose for first, then didOpen and rubric/cursor for second.
+    let msgs: Vec<Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+    let close_i = msgs.iter().position(|m| m["method"] == "textDocument/didClose" && m["params"]["textDocument"]["uri"] == rubric_app::state::file_uri(&first))
+        .expect("didClose for first post");
+    let open_i = msgs.iter().position(|m| m["method"] == "textDocument/didOpen" && m["params"]["textDocument"]["uri"] == rubric_app::state::file_uri(&second) && m["params"]["textDocument"]["version"] == 1)
+        .expect("didOpen for second post");
+    let cursor_i = msgs.iter().position(|m| m["method"] == "rubric/cursor" && m["params"]["uri"] == rubric_app::state::file_uri(&second))
+        .expect("rubric/cursor for second post");
+    assert!(close_i < open_i && open_i < cursor_i, "order: close={close_i} open={open_i} cursor={cursor_i}");
+
+    // Undo does not bring back the first post's text.
+    rt.update(|s, _| { s.edit.undo(); });
+    assert_eq!(rt.state.edit.text, "---\ntitle: Second walk\ndate: 2025-11-04\n---\n\nSecond body.\n");
+
+    // Late answers for the first post change nothing.
+    assert!(!rubric_app::state::incoming(&mut rt.state, Incoming::Response {
+        id: stale_draft_id,
+        result: Ok(json!({ "words": "a clock", "status": "ready", "name": "clock" })),
+    }));
+    assert!(!rubric_app::state::incoming(&mut rt.state, Incoming::Response {
+        id: 999_999,
+        result: Ok(json!({ "items": [{ "insertText": "::: quote" }] })),
+    }));
+    assert!(rt.state.panels.is_empty());
+    assert!(rt.state.ghost.is_none());
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn failed_save_or_unreadable_target_keeps_first_post_open() {
+    let (mut rt, sent, dir, home, first, second) = site_runtime("blocked");
+
+    // 1. First post cannot be written: remove its parent dir path (or point path to a missing dir).
+    rt.update(|s, _| {
+        s.path = dir.join("missing/first.md");
+        s.uri = rubric_app::state::file_uri(&s.path);
+        s.disk = None;
+    });
+    rt.ime(Ime::Commit("Unsaved!\n".into()));
+    rt.frame(1.0 / 60.0);
+    while sent.try_recv().is_ok() {}
+
+    cmd_key(&mut rt, 'o', false);
+    settle(&mut rt);
+    let req = sent.try_recv().expect("rubric/pages");
+    let first_uri = rt.state.uri.clone();
+    tell(&mut rt, Incoming::Response {
+        id: req["id"].as_i64().unwrap(),
+        result: Ok(json!({
+            "site": "Low Tide",
+            "pages": [
+                { "uri": rubric_app::state::file_uri(&home), "kind": "home", "title": "Low Tide", "draft": false },
+                { "uri": first_uri, "kind": "post", "title": "First walk", "date": "2026-06-12", "draft": false },
+                { "uri": rubric_app::state::file_uri(&second), "kind": "post", "title": "Second walk", "date": "2025-11-04", "draft": false }
+            ]
+        })),
+    });
+    settle(&mut rt);
+
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Enter);
+    settle(&mut rt);
+
+    // Switch was refused: first post stays open with its unsaved text and failed-save status.
+    assert_eq!(rt.state.path, dir.join("missing/first.md"));
+    assert!(rt.state.edit.text.contains("Unsaved!"));
+    assert!(rt.state.save_error.is_some());
+    let msgs: Vec<Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+    assert!(!msgs.iter().any(|m| m["method"] == "textDocument/didClose"), "no didClose on failed save");
+
+    // 2. Clean first post, but second post is gone on disk: stays on first and shows Post not opened.
+    rt.update(|s, _| {
+        s.path = first.clone();
+        s.uri = rubric_app::state::file_uri(&first);
+        s.saved = s.edit.text.clone();
+        s.save_error = None;
+        s.disk = rubric_app::state::DiskStamp::of(&first);
+    });
+    std::fs::remove_file(&second).unwrap();
+    cmd_key(&mut rt, 'o', false);
+    settle(&mut rt);
+    let req = sent.try_recv().expect("rubric/pages");
+    tell(&mut rt, Incoming::Response { id: req["id"].as_i64().unwrap(), result: Ok(pages_reply(&home, &first, &second)) });
+    settle(&mut rt);
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Enter);
+    settle(&mut rt);
+
+    assert_eq!(rt.state.path, first, "first post stays open when target cannot be read");
+    let said = rubric_app::draft::line(&rt.state).expect("status says Post not opened");
+    assert_eq!(said.tone, rubric_app::draft::Tone::Warn);
+    let msgs: Vec<Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+    assert!(!msgs.iter().any(|m| m["method"] == "textDocument/didClose"), "no didClose on read error");
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn in_page_only_view_the_page_gives_way_to_the_drawer_and_returns_on_close() {
+    use rubric_app::page::PageCmd;
+    let (mut rt, sent, dir, home, first, second) = site_runtime("page-only");
+
+    cmd_key(&mut rt, '3', false);
+    settle_slide(&mut rt);
+    assert_eq!(rt.state.split, 0.0);
+    let resting = rect_of(&rt, "page");
+    assert_eq!(resting[0], rubric_app::DIVIDER);
+    assert_eq!(rt.state.bounds.get(), Some((6, 40, 994, 660)));
+
+    // Open drawer in page-only view: drawer sits in its final place [0..300] from Frame 0, while
+    // page slides smoothly right over 140 ms at its larger width (994) and resizes ONCE to 700 at rest.
+    rt.key(KeyEvent { key: Key::Command('o'), mods: Mods { cmd: true, ..Mods::default() } });
+    rt.frame(1.0 / 60.0);
+    let drawer_f0 = rt.presented("drawer").unwrap().0;
+    assert_eq!(drawer_f0[0], 0.0, "drawer laid out at final x=0 from Frame 0");
+    assert_eq!(drawer_f0[2], 300.0, "drawer laid out at final width 300 from Frame 0");
+    let mid_x = rt.presented("page").unwrap().0[0];
+    assert!(mid_x > 6.0 && mid_x < 300.0, "page slides over 140 ms (not one step), frame 1 x={mid_x}");
+    assert_eq!(rt.state.bounds.get().unwrap().2, 994, "keeps larger width 994 during open slide");
+    let open_cmds = settle_slide(&mut rt);
+    assert!(open_cmds.len() >= 4, "multi-frame 140 ms open slide: {open_cmds:?}");
+    let open_bounds: Vec<_> = open_cmds.iter().filter(|c| matches!(c, PageCmd::Bounds { .. })).collect();
+    assert_eq!(open_bounds, vec![&PageCmd::Bounds { x: 300, y: 40, w: 700, h: 660 }], "resized once at rest");
+
+    let req = sent.try_recv().expect("rubric/pages");
+    tell(&mut rt, Incoming::Response { id: req["id"].as_i64().unwrap(), result: Ok(pages_reply(&home, &first, &second)) });
+    settle(&mut rt);
+
+    let shifted = rect_of(&rt, "page");
+    assert!((shifted[0] - 300.0).abs() < 0.5, "page left {} != 300", shifted[0]);
+    assert_eq!(rt.state.bounds.get(), Some((300, 40, 700, 660)));
+
+    // Esc closes drawer: page resizes ONCE to 994 at start, drawer stays underneath at [0..300]
+    // while page slides smoothly back to x=6 over 140 ms with Move-only updates, then unmounts.
+    rt.key(KeyEvent { key: Key::Escape, mods: Mods::default() });
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.bounds.get(), Some((300, 40, 994, 660)), "grows once to 994 before sliding back");
+    assert!(rt.presented("drawer").is_some(), "drawer stays underneath while page slides back over it");
+    let close_x = rt.presented("page").unwrap().0[0];
+    assert!(close_x < 300.0 && close_x > 6.0, "page slides back over 140 ms, frame 1 x={close_x}");
+    let close_cmds = settle_slide(&mut rt);
+    assert!(close_cmds.len() >= 4, "multi-frame 140 ms close slide: {close_cmds:?}");
+    assert!(close_cmds.iter().all(|c| matches!(c, PageCmd::Move { .. })), "Move-only during close slide: {close_cmds:?}");
+    assert!(!rt.state.drawer.open);
+    assert_eq!(rt.state.left_cover, 0.0);
+    assert!(rt.presented("drawer").is_none(), "held drawer unmounted at rest");
+    assert_eq!(rect_of(&rt, "page")[0], resting[0]);
+    assert_eq!(rt.state.bounds.get(), Some((6, 40, 994, 660)));
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn a_post_changed_on_disk_by_another_program_is_not_overwritten_and_reload_takes_its_text() {
+    use rubric_app::state::{SaveState, save_state};
+    let (mut rt, sent, dir, _home, first, _second) = site_runtime("disk-conflict");
+    let external = "---\ntitle: Edited outside\ndate: 2026-06-12\n---\n\nWritten by another editor.\n";
+
+    // Another program writes to the file on disk while the app has it open.
+    std::fs::write(&first, external).unwrap();
+
+    // User types in the app and waits past autosave's 1 s window: must NOT overwrite disk!
+    rt.ime(Ime::Commit("Local edit.\n".into()));
+    rt.frame(1.0 / 60.0);
+    rt.frame(1.1);
+
+    assert_eq!(std::fs::read_to_string(&first).unwrap(), external, "external edit is not overwritten");
+    assert!(rt.state.disk_conflict);
+    assert_eq!(save_state(&rt.state), SaveState::Failed);
+    let said = rubric_app::draft::line(&rt.state).expect("status line shows conflict");
+    assert_eq!(said.tone, rubric_app::draft::Tone::Warn);
+    assert!(said.action.is_some());
+
+    // Ctrl+S also refuses to overwrite.
+    cmd_key(&mut rt, 's', false);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(std::fs::read_to_string(&first).unwrap(), external);
+    assert!(rt.state.disk_conflict);
+
+    // Clicking Reload replaces the writing with the file's text, clears the conflict, and notifies server.
+    while sent.try_recv().is_ok() {}
+    let (ax, ay) = rt.find("status-action").unwrap();
+    rt.pointer_down(ax, ay);
+    rt.pointer_up(ax, ay);
+    rt.frame(1.0 / 60.0);
+
+    assert!(!rt.state.disk_conflict);
+    assert_eq!(save_state(&rt.state), SaveState::Saved);
+    assert_eq!(rt.state.edit.text, external);
+    assert_eq!(rt.state.title, "Edited outside");
+    let msgs: Vec<Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+    assert!(msgs.iter().any(|m| m["method"] == "textDocument/didChange" && m["params"]["contentChanges"][0]["text"] == external));
+
+    // Rewriting the exact same contents on disk (new mtime/inode, identical text) does NOT trigger
+    // a false conflict when the user edits and saves.
+    let same_via_tmp = dir.join("pages/posts/.first.tmp");
+    std::fs::write(&same_via_tmp, external).unwrap();
+    std::fs::rename(&same_via_tmp, &first).unwrap();
+    rt.ime(Ime::Commit("More.\n".into()));
+    rt.frame(1.0 / 60.0);
+    rt.frame(1.1);
+    assert!(!rt.state.disk_conflict, "unchanged disk content must not trigger conflict");
+    assert_eq!(save_state(&rt.state), SaveState::Saved);
+    assert!(std::fs::read_to_string(&first).unwrap().starts_with("More.\n"));
+
+    std::fs::remove_dir_all(&dir).unwrap();
 }
