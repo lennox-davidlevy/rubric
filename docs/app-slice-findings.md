@@ -514,3 +514,41 @@ Debug headless snapshots (`rubric-app sites/app-slice/pages/posts/long.md [--sce
 - **Pre-existing slice-3 bug reproduced during D (`⇒ change quote` + Tab):** on `::: quote cite=a : <something>` with ghost pick `⇒ change quote`, Tab opened the panel at the top-left of the pane and sprang it horizontally to the middle-top. Diagnosed (not changed here): `part::answered` (`app/src/part.rs:240-248`) clears `s.anchor = None`, pushes both `part` and `change`, and sets `s.focus_field = true` (the only place in `app/` that sets it), so `state::follow_up` calls `tx.focus("panel-field", false)` in the same turn. Rune's `commit()` (`commit.rs:550-555`) moves focus to `"panel-field"` and discards Pass 1 before `panel-anchor`'s `on_layout` runs; Pass 2 then sees `s.anchor == None` and `cx.caret("editor") == None`, falling back to `[s.pane[0] + PAD, s.pane[1] + TOP]` (`x = 24, y = 96`), which Frame 1 locks into `s.anchor` and Frame 2 then springs rightward to `ed[0]` while keeping `y = 96`.
 - **Still unseen:** macOS build and runtime.
 
+## Slice 4: the right-click and a draft's line
+
+Built 2026-11-26 on branch `slice-4` off `main`, from [app-slice-4.md](app-slice-4.md). No Jev calls, no real drafts, no window opened on David's display.
+
+### What the slice found out
+
+- **Panel placement on a right-click (Task 1).** Inside `Tx::text_offset_at`'s callback (`run_pick_reads`, before the frame's commit), moving the caret with `s.edit.set_caret(byte)` does not update `Cx::caret("editor")` until after that frame paints. A synchronous menu opened immediately (empty line or writing line) would therefore read the previous caret's line and lock it into `s.anchor`. Queuing `Tx::text_line("editor", s.edit.focus, ...)` and holding panel rendering behind `s.anchor_wait` for that one frame (which Rune advances automatically because `pending.pick_reads` keeps `needs_commit()` true) anchors the panel to the pressed line on its very first drawn frame.
+- **Panel jump on `⇒ change quote` + Tab (Task 2).** Reproduced headless (`frame 0: panel x 26.5625 != line x 78.5`, matching the `x = 24` fallback plus the 0.98 insertion scale). Fixed by calling `Tx::text_line("editor", s.edit.focus, ...)` in `part::tab` (runs in the same frame before commit, while the editor still has focus) and preserving `s.anchor` across `close_panels` when `Anchor::holds` still matches the caret's line and editor width.
+- **`rubric/draft` with no action on a line of words (Task 3).** Checked `src/server/main.ts:335` and `src/server/workspace.ts:701-740, 820-847, 983-990`: `workspace.look` returns `undefined` (`null`) immediately on a line of words (`#newLine` requires `d.kind === "new"`; `#draftLine` -> `#ownPart` requires `d.plain`), with zero disk writes, zero disk reads, and zero Jev calls. Sending `rubric/part` and `rubric/draft` together in `part::tab` is therefore free on words lines and cuts a part line's menu to one round trip.
+- **Why an answer sometimes waited a frame or two (Task 3).** Checked Rune `ac6b482` (`window/surface.rs:177`, `window/host/events.rs:188,631`, `window/host/draw.rs:512`, `window/host/lifecycle.rs:548`). On Linux X11/XWayland, Rune configures `PresentMode::AutoVsync` (FIFO). Server answers arrive on `lsp-read` and post `WakeEvent::App`, which waits on the UI thread until any in-flight `RedrawRequested` finishes `surface.get_current_texture()` (blocked on vsync, ~16.7 ms at 60 Hz). Previously, `part::tab` made two sequential round trips across the UI thread, and `main.rs` used `AppHandle::update` (requesting a redraw unconditionally on every incoming message, including unhandled notifications such as `rubric/picks` and intermediate answers). Sending both requests together removes the second round trip, and switching `main.rs` to `AppHandle::update_if` with `state::incoming -> bool` skips redundant redraws for unhandled notifications, stale answers, and the first half of a paired `rubric/part` + `rubric/draft` response. (Tab's own handled `KeyboardInput` still calls `request_redraw()` inside Rune, so an answer arriving while that frame is mid-present can still wait for one vsync.)
+- **Where Rune draws `LineFill::left_bar` against field padding (Task 4).** Checked `crates/rune/src/runtime/paint/content.rs:325-394` and `crates/rune/src/runtime/paint/helpers.rs:238-249`. `emit_line_fills` receives `(x0, x1)` where `x0 = zr[0] + ins[0]` (inside the element's left padding and border) — the exact same `x` where left-aligned text starts (`origin[0] = text_x(spec, x0, ...)`). `LineFill::left_bar` therefore always paints directly under the first character with no gap, regardless of field padding. The app draws the 2-point bar as its own element at `editor_rect[0] - 18.0` from `TextLine` instead, using the design's dotted (`Not started`, `ink3`), dashed (`Drafting`, `accent`), and solid (`Ready` in `accent`, `Failed` in `fail`) bars.
+- **Whether the view can read `text_line` while it builds, and idle CPU (Task 4).** Checked `crates/rune/src/runtime/cx.rs` whole: `Cx` has `caret` only, no `text_line`; only `Tx::text_line` and `Runtime::text_line` exist. The app stores each draft line's box relative to `editor_rect[1]` (`state::DraftBox { dy, h, wrapped, text_w }`), re-querying `Tx::text_line` only when `(version, editor_w, editor_h, marks_sig)` changes (edits, diagnostics, resizes, or wrap-induced height changes). Plain scrolling moves `editor_rect[1]` via `El::on_layout_tx` without re-querying `text_line` or re-measuring text, lines outside the writing viewport draw nothing, long or wrapped lines hide the label, and a settled `Ready` line asks for no frames and schedules no timers (`a_new_line_has_its_edge_and_label_for_every_state_and_no_other_line_does`).
+
+### Numbers
+
+Release build (`cargo run --release --features bench --bin typing -- --server`, post `sites/app-slice/pages/posts/long.md`, 19,937 bytes, 3,933 words, 218 lines):
+
+| Metric | Budget | Move (`ac6b4825`) | Slice 4 | Status |
+|---|---|---|---|---|
+| `cargo test` / `-- --ignored` | all pass | 160 passed / 3 passed | 174 passed (89 unit + 85 headless) / 3 passed | met |
+| `markdown::spans` (100 runs, wall) | median 1 ms | median 0.0066 ms, p95 0.0069 ms | median 0.0069 ms, p95 0.0071 ms | met |
+| One typed char at start (`type_start`, CPU) | p95 4 ms | median 0.15 ms, p95 0.16 ms | median 0.16 ms, p95 0.21 ms | met |
+| One typed char in middle (`type_mid`, CPU) | p95 4 ms | median 0.25 ms, p95 0.26 ms | median 0.26 ms, p95 0.28 ms | met |
+| One typed char at end (`type_end`, CPU) | p95 4 ms | median 0.13 ms, p95 0.14 ms | median 0.13 ms, p95 0.14 ms | met |
+| One typed char on `new:` line (`type_new_line`, CPU, edge + label drawn) | p95 4 ms | median 0.17 ms, p95 0.18 ms | median 0.21 ms, p95 0.27 ms | met (~15× under) |
+| `new:` menu: answer to frame (`menu_open`, CPU) | recorded | median 0.33 ms, p95 0.35 ms | median 0.34 ms, p95 0.36 ms | unchanged |
+| Key in open menu to frame (`menu_key`, CPU) | one frame | median 0.11 ms, p95 0.14 ms | median 0.11 ms, p95 0.13 ms | met |
+| Part menu: both answers to frame (`part_menu_open`, CPU) | recorded | median 0.54 ms, p95 0.55 ms | median 0.48 ms, p95 0.50 ms | faster |
+| Segment key → server line → frame (`part_segment_to_line`, CPU) | one frame | median 0.55 ms, p95 0.59 ms | median 0.55 ms, p95 0.58 ms | met |
+| Tab to menu: stub server's two answers (`server_tab_to_answers`, wall) | 50 ms | median 0.17 ms, p95 0.46 ms (max 5.09 ms) | median 0.13 ms, p95 0.45 ms (max 4.21 ms) | met (parallel) |
+| Stub server `set` answer (`server_set`, wall) | recorded | median 0.06 ms, p95 0.27 ms | median 0.06 ms, p95 0.27 ms | unchanged |
+
+### What no one saw
+
+- Everything in a real window: right-click on each line kind (writing, empty, part, words, `new:`), right-click inside a selection followed by Copy, right-click with a pick showing, Tab on `⇒ change quote` opening in place with no jump, ten Tabs on a part's line printing real `menu drawn` timings in a live window, the dotted/dashed/solid draft edges and right-end labels through all four states, smooth scroll tracking and off-screen clipping, long-line label hiding, and idle CPU on screen. Those are section E of `testing/TESTING.md`.
+- macOS build and runtime.
+
+

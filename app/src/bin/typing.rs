@@ -107,7 +107,9 @@ fn main() {
         let id = std::iter::from_fn(|| sent.try_recv().ok()).find(|m| m["method"] == "rubric/draft").expect("Tab asks")["id"].as_i64().unwrap();
         let view = serde_json::json!({ "words": "a tide clock", "status": "ready", "name": "tide-clock" });
         let c0 = rune::thread_cpu_ms();
-        rt.update(|s, _| rubric_app::state::incoming(s, Incoming::Response { id, result: Ok(view) }));
+        rt.update(|s, _| {
+            rubric_app::state::incoming(s, Incoming::Response { id, result: Ok(view) });
+        });
         rt.frame(1.0 / 120.0);
         open.push(rune::thread_cpu_ms() - c0);
         assert!(rt.find("panel-0").is_some(), "the menu is drawn");
@@ -142,13 +144,15 @@ fn main() {
         while sent.try_recv().is_ok() {}
         rt.key(KeyEvent { key: Key::Tab, mods: Mods::default() });
         rt.frame(1.0 / 120.0);
-        let id = |method: &str, step: &str| std::iter::from_fn(|| sent.try_recv().ok()).find(|m| m["method"] == method).unwrap_or_else(|| panic!("{step}: no {method}"))["id"].as_i64().unwrap();
-        let asked = id("rubric/part", "Tab");
+        let reqs: Vec<serde_json::Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+        let asked = reqs.iter().find(|m| m["method"] == "rubric/part").expect("Tab asks part")["id"].as_i64().unwrap();
+        let look = reqs.iter().find(|m| m["method"] == "rubric/draft").expect("Tab asks draft")["id"].as_i64().unwrap();
         let c0 = rune::thread_cpu_ms();
         let answer = part.clone();
-        rt.update(|s, _| rubric_app::state::incoming(s, Incoming::Response { id: asked, result: Ok(answer) }));
-        let look = id("rubric/draft", "the part answered");
-        rt.update(|s, _| rubric_app::state::incoming(s, Incoming::Response { id: look, result: Ok(serde_json::json!({ "words": "A quote", "of": "quote", "catalog": true })) }));
+        rt.update(|s, _| {
+            rubric_app::state::incoming(s, Incoming::Response { id: asked, result: Ok(answer) });
+            rubric_app::state::incoming(s, Incoming::Response { id: look, result: Ok(serde_json::json!({ "words": "A quote", "of": "quote", "catalog": true })) });
+        });
         rt.frame(1.0 / 120.0);
         open.push(rune::thread_cpu_ms() - c0);
         assert!(rt.find("panel-0").is_some(), "the part's menu is drawn");
@@ -159,9 +163,11 @@ fn main() {
         let c0 = rune::thread_cpu_ms();
         rt.key(KeyEvent { key: Key::Right, mods: Mods::default() });
         rt.frame(1.0 / 120.0);
-        let asked = id("rubric/part", "Right");
+        let asked = std::iter::from_fn(|| sent.try_recv().ok()).find(|m| m["method"] == "rubric/part").expect("Right")["id"].as_i64().unwrap();
         let line = "::: quote size=large";
-        rt.update(|s, _| rubric_app::state::incoming(s, Incoming::Response { id: asked, result: Ok(serde_json::json!({ "replace": line })) }));
+        rt.update(|s, _| {
+            rubric_app::state::incoming(s, Incoming::Response { id: asked, result: Ok(serde_json::json!({ "replace": line })) });
+        });
         rt.frame(1.0 / 120.0);
         set.push(rune::thread_cpu_ms() - c0);
         assert!(rt.state.edit.text.contains(line), "the line changed");
@@ -212,8 +218,20 @@ fn server(text: &str, samples: usize) {
     let (mut tab, mut set) = (Vec::new(), Vec::new());
     for i in 0..samples {
         let t = Instant::now();
-        call("rubric/part", json!({ "uri": uri, "line": line }));
-        call("rubric/draft", json!({ "uri": uri, "line": line }));
+        let p_id = client.request("rubric/part", json!({ "uri": uri, "line": line }));
+        let d_id = client.request("rubric/draft", json!({ "uri": uri, "line": line }));
+        let (mut got_p, mut got_d) = (false, false);
+        while !(got_p && got_d) {
+            if let Incoming::Response { id, result } = rx.recv_timeout(std::time::Duration::from_secs(20)).expect("an answer") {
+                if id == p_id {
+                    result.unwrap();
+                    got_p = true;
+                } else if id == d_id {
+                    result.unwrap();
+                    got_d = true;
+                }
+            }
+        }
         tab.push(t.elapsed().as_secs_f64() * 1000.0);
         let t = Instant::now();
         let value = if i % 2 == 0 { "large" } else { "normal" };

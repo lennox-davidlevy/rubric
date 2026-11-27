@@ -201,50 +201,79 @@ pub fn unwrap(edit: &mut TextEdit, at: u32, close: Option<u32>) {
     });
 }
 
-/// Tab on a `:::` line that names something: asks the server what part it places. `change`
-/// when Tab took a pick that asks for a change. False on any other line.
-pub fn tab(s: &mut State, change: bool) -> bool {
+/// Both requests sent together for a `:::` line that names something: whichever answers first
+/// waits for the other; if `rubric/part` says there is no part, the words menu opens and the
+/// draft's answer is dropped.
+#[derive(Clone, Debug)]
+pub struct Pending {
+    pub line: u32,
+    pub text: String,
+    pub change: bool,
+    pub part_id: i64,
+    pub draft_id: i64,
+    pub part: Option<Part>,
+    pub view: Option<View>,
+}
+
+/// Tab or right-click on a `:::` line that names something: asks `rubric/part` and `rubric/draft`
+/// together. `change` when Tab took a pick that asks for a change. False on any other line.
+pub fn tab(s: &mut State, change: bool, tx: &mut Tx) -> bool {
     let (line, text) = draft::caret_line(s);
     if !names_something(text) {
         return false;
     }
     let text = text.to_string();
     state::start_look(s);
-    let p = json!({ "uri": s.uri, "line": line });
-    draft::send(s, "rubric/part", What::Part(change), line, text, p);
+    let part_id = draft::send(s, "rubric/part", What::Part(change), line, text.clone(), json!({ "uri": s.uri, "line": line }));
+    let draft_id = draft::send(s, "rubric/draft", What::PartLook(change), line, text.clone(), draft::params(None, &s.uri, line));
+    s.part_wait = part_id.zip(draft_id).map(|(part_id, draft_id)| Pending {
+        line, text, change, part_id, draft_id, part: None, view: None,
+    });
+    tx.text_line("editor", s.edit.focus, |s: &mut State, line, _| state::anchor_from_line(s, line));
     true
 }
 
 /// The answers to `rubric/part` and the line's drafts, and to a setting's change.
-pub fn answered(s: &mut State, asked: Asked, answer: Value) {
+pub fn answered(s: &mut State, id: i64, asked: Asked, answer: Value) {
     match asked.what {
-        What::Part(change) => {
+        What::Part(_) => {
+            if !s.part_wait.as_ref().is_some_and(|w| w.part_id == id) {
+                return;
+            }
             if !still_there(s, &asked) {
+                s.part_wait = None;
                 return;
             }
             let Some(part) = Part::parse(&answer) else {
                 // No part: words the catalog has no part for, or a part the site lacks.
+                s.part_wait = None;
                 return crate::insert::words_menu(s, asked);
             };
-            s.part_wait = Some(part);
-            let p = draft::params(None, &s.uri, asked.line);
-            draft::send(s, "rubric/draft", What::PartLook(change), asked.line, asked.text, p);
+            let ready = {
+                let w = s.part_wait.as_mut().unwrap();
+                w.part = Some(part);
+                w.view.is_some()
+            };
+            if ready && let Some(w) = s.part_wait.take() {
+                open_part_menu(s, w, asked);
+            }
         }
-        What::PartLook(change) => {
-            let Some(part) = s.part_wait.take() else { return };
+        What::PartLook(_) => {
+            if !s.part_wait.as_ref().is_some_and(|w| w.draft_id == id) {
+                return;
+            }
             if !still_there(s, &asked) {
+                s.part_wait = None;
                 return;
             }
             let view = View::parse(&answer).unwrap_or_default();
-            let open = Open { view, asked: Asked { what: What::Look, ..asked }, take_before: None, tools: None, offer: None, part: Some(part) };
-            crate::look::close_panels(s);
-            let Some(p) = panel(s, &open) else { return };
-            let changes = open.view.of.is_some();
-            s.panels = vec![p];
-            s.view = Some(open);
-            if change && changes {
-                open_change(s);
-                s.focus_field = true;
+            let ready = {
+                let w = s.part_wait.as_mut().unwrap();
+                w.view = Some(view);
+                w.part.is_some()
+            };
+            if ready && let Some(w) = s.part_wait.take() {
+                open_part_menu(s, w, asked);
             }
         }
         What::Set => {
@@ -269,6 +298,23 @@ pub fn answered(s: &mut State, asked: Asked, answer: Value) {
 fn still_there(s: &State, asked: &Asked) -> bool {
     let (line, text) = draft::caret_line(s);
     text == asked.text && find(&s.edit.text, asked.line, &asked.text) == Some(line)
+}
+
+fn open_part_menu(s: &mut State, w: Pending, asked: Asked) {
+    let (Some(part), Some(view)) = (w.part, w.view) else { return };
+    s.drafter = view.drafter.clone().or(s.drafter.take());
+    let open = Open { view, asked: Asked { what: What::Look, ..asked }, take_before: None, tools: None, offer: None, part: Some(part) };
+    let anchor = state::keep_anchor(s);
+    crate::look::close_panels(s);
+    s.anchor = anchor;
+    let Some(p) = panel(s, &open) else { return };
+    let changes = open.view.of.is_some();
+    s.panels = vec![p];
+    s.view = Some(open);
+    if w.change && changes {
+        open_change(s);
+        s.focus_field = true;
+    }
 }
 
 /// The part's menu, by where its drafts are.

@@ -87,9 +87,13 @@ pub fn field_key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
         // The panel closed; the key is not typed into a field that is gone.
         Taken::Passed => {
             tx.focus("editor", false);
+            crate::state::sync_draft_boxes(s, tx);
             true
         }
-        _ => true,
+        _ => {
+            crate::state::sync_draft_boxes(s, tx);
+            true
+        }
     }
 }
 
@@ -99,6 +103,7 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
     crate::trace::say(|| format!("key    editor {:?} {:?}", ev.key, ev.mods));
     // An open panel takes its keys first; any other key closes it and is the editor's.
     if crate::look::key(s, ev, tx) != crate::panel::Taken::Passed {
+        crate::state::sync_draft_boxes(s, tx);
         return true;
     }
     if crate::look::themes_key(ev) {
@@ -111,6 +116,7 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
     }
     if ev.key == Key::Tab {
         crate::state::tab(s, tx);
+        crate::state::sync_draft_boxes(s, tx);
         return true;
     }
     if ev.is_command('s') {
@@ -119,6 +125,7 @@ pub fn key(s: &mut State, ev: &KeyEvent, tx: &mut Tx) -> bool {
     }
     if !ev.mods.cmd && !ev.mods.ctrl && matches!(&ev.key, Key::Text(t) if t == " ") && closer(&mut s.edit) {
         crate::state::changed(s);
+        crate::state::sync_draft_boxes(s, tx);
         return true;
     }
     false

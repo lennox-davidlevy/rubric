@@ -218,6 +218,30 @@ D2 and D3 matter most: measured without a window, a typed letter costs about 5 m
 
 **After section D, put the site back:** close the app, `rm -f ~/.config/rubric/app.json`, and run `app/scripts/clean-test.sh`.
 
+## E. Right-click, in-place panels, and draft lines
+
+Start the release build natively on the sample post (stub, no Jev key needed): `app/target/release/rubric-app sites/app-slice/pages/posts/long.md`.
+
+| # | Do | Expect |
+|---|---|---|
+| E1 | Right-click on a plain line of writing (nothing selected) | The caret moves there; a menu opens under that line with Cut (dim), Copy (dim), Paste. |
+| E2 | Right-click on an empty line | The caret moves there; the Insert menu opens under that line (`Insert part…`, `New part…`, Cut, Copy, Paste). |
+| E3 | Right-click on a `::: quote` line | The caret moves there; the Quote part menu opens under that line. |
+| E4 | Type `::: three steps` on a new line, move the caret to another line, then right-click on `::: three steps` | The caret moves to `::: three steps`; the words menu opens under it. |
+| E5 | Type `::: new: a brass clock` on a new line, move the caret elsewhere, then right-click on `::: new: a brass clock` | The caret moves there; the draft menu (`Draft`) opens under that line. |
+| E6 | Select a few words in a paragraph, right-click inside the selection, and click Copy; click an empty line and press Ctrl+V | The selection stays on right-click, Cut and Copy are not dim, and Ctrl+V pastes the selected words. |
+| E7 | Type `::: a quote` on a new line and wait for the dimmed pick to show, then right-click on that line | The line stays `::: a quote` (the pick is not taken) and the words menu opens under it. |
+| E8 | On `::: quote`, add ` cite=a : torn edge`, wait for `⇒ change quote`, and press Tab | The part menu and `Change quote` open directly under the `::: quote` line from the first frame, with no jump from the top left; the `Change quote` field has the keys. |
+| E9 | On `::: quote`, press Tab then Esc ten times | Ten `menu drawn …: part, server …` lines in the terminal, none over 50 ms. |
+| E10 | On `::: new: a brass clock` (before drafting) | A dotted gray 2-point bar 18 points left of the line and `Not started` in gray at the line's right end. |
+| E11 | Press Tab and Return on `Draft` | While drafting, a dashed accent bar on the left and `Drafting 0:XX` at the right; once finished, a solid accent bar and `Ready` at the right. |
+| E12 | Press Ctrl+Enter to keep the draft | The line becomes the part's; the bar and `Ready` label disappear. |
+| E13 | Type `::: new: a failing bell`, press Tab and Return on `Draft` | Once failed, a solid red/warn bar on the left and `Failed` at the right end. |
+| E14 | Scroll the writing pane down and back up past `::: new: a failing bell` | The bar and `Failed` label move with the line and disappear once scrolled out of the writing pane. |
+| E15 | On `::: new: a failing bell`, type enough words to reach the right edge of the column | The `Failed` label disappears before the text touches it; the bar on the left stays. |
+
+**After section E, put the site back:** close the app and run `app/scripts/clean-test.sh`.
+
 ## Notes
 App starts well
 A2 - so there is a bit of a delay in the typing, and if we can get it instant or as close to that woudl be a priority.

@@ -319,7 +319,10 @@ fn answer(rt: &mut Runtime<State>, request: &Value, result: Value) {
 
 /// A message from the server, as the app takes it: in an update, so the view runs again.
 fn tell(rt: &mut Runtime<State>, m: Incoming) {
-    rt.update(|s, _| rubric_app::state::incoming(s, m));
+    rt.update(|s, tx| {
+        rubric_app::state::incoming(s, m);
+        rubric_app::state::follow_up(s, tx);
+    });
     rt.frame(1.0 / 60.0);
 }
 
@@ -1123,12 +1126,11 @@ fn quote(kind: &str) -> Value {
 fn part_menu(text: &str, line: u32, part: Value, view: Value) -> (Runtime<State>, std::sync::mpsc::Receiver<Value>) {
     let (mut rt, sent) = on_line(text, line);
     press(&mut rt, Key::Tab);
-    let asked = sent_to(&sent, "rubric/part");
-    assert_eq!(asked.len(), 1, "Tab asks what the part is");
-    answer(&mut rt, &asked[0], part);
-    let look = drafts(&sent);
-    assert_eq!(look.len(), 1, "then what its drafts are");
-    answer(&mut rt, &look[0], view);
+    let all: Vec<Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+    let asked = all.iter().find(|m| m["method"] == "rubric/part").expect("Tab asks what the part is");
+    let look = all.iter().find(|m| m["method"] == "rubric/draft").expect("and its drafts together");
+    answer(&mut rt, asked, part);
+    answer(&mut rt, look, view);
     assert_eq!(top(&rt).as_deref(), Some("part"));
     (rt, sent)
 }
@@ -1543,4 +1545,431 @@ fn a_line_of_words_that_is_no_part_offers_the_best_part_and_a_new_one() {
     assert_eq!(rows(&rt), ["part:steps", "similar", "draft"]);
     press(&mut rt, Key::Enter);
     assert_eq!(rt.state.edit.text, "::: steps\n:::");
+}
+
+/// Right-click on the middle of visual line `line` of `"editor"` (using `Runtime::text_line`).
+fn right_click_line(rt: &mut Runtime<State>, line: u32) -> [f32; 4] {
+    let start = rubric_app::position::line_range(&rt.state.edit.text, line).start;
+    let box_ = rt.text_line("editor", start).expect("line laid out").rect;
+    let (x, y) = (box_[0] + 10.0, box_[1] + box_[3] * 0.5);
+    rt.secondary_down(x, y);
+    rt.secondary_up(x, y);
+    rt.frame(1.0 / 60.0);
+    rt.frame(1.0 / 60.0);
+    box_
+}
+
+#[test]
+fn right_click_on_a_part_line_moves_the_caret_sends_part_and_hangs_from_that_line() {
+    let text = "first line\nsecond line\nthird line\n::: quote\nBody.\n:::";
+    let (mut rt, sent) = on_line(text, 0);
+    let box_ = right_click_line(&mut rt, 3);
+    assert_eq!(rubric_app::position::line_char(&rt.state.edit.text, rt.state.edit.focus).0, 3);
+    let all: Vec<Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+    let asked = all.iter().find(|m| m["method"] == "rubric/part").expect("rubric/part");
+    let draft_asked = all.iter().find(|m| m["method"] == "rubric/draft").expect("rubric/draft");
+    assert_eq!(asked["params"]["line"], 3);
+    assert_eq!(draft_asked["params"]["line"], 3);
+    answer(&mut rt, asked, json!({ "name": "quote", "kind": "catalog", "uses": { "blocks": 1, "pages": 1 }, "close": 5, "settings": [], "look": [] }));
+    answer(&mut rt, draft_asked, json!({ "words": "quote", "of": "quote", "catalog": true }));
+    settle(&mut rt);
+    let panel = rect_of(&rt, "panel-0");
+    assert!((panel[0] - box_[0]).abs() < 1.5, "panel x {} != line x {}", panel[0], box_[0]);
+    assert!((panel[1] - (box_[1] + box_[3] + rubric_app::panel::GAP)).abs() < 1.5, "panel y {} != under line {}", panel[1], box_[1] + box_[3]);
+}
+
+#[test]
+fn right_click_on_a_new_line_opens_the_draft_menu_at_that_line() {
+    let text = "first\nsecond\n::: new: a tide clock\n:::";
+    let (mut rt, sent) = on_line(text, 0);
+    let box_ = right_click_line(&mut rt, 2);
+    assert_eq!(rubric_app::position::line_char(&rt.state.edit.text, rt.state.edit.focus).0, 2);
+    let asked = sent_to(&sent, "rubric/draft");
+    assert_eq!(asked.len(), 1);
+    assert_eq!(asked[0]["params"]["line"], 2);
+    answer(&mut rt, &asked[0], json!({ "words": "a tide clock" }));
+    settle(&mut rt);
+    assert_eq!(top(&rt).as_deref(), Some("draft"));
+    assert_eq!(rows(&rt), ["build"]);
+    let panel = rect_of(&rt, "panel-0");
+    assert!((panel[1] - (box_[1] + box_[3] + rubric_app::panel::GAP)).abs() < 1.5, "panel y {} != under line {}", panel[1], box_[1] + box_[3]);
+}
+
+#[test]
+fn right_click_on_an_empty_line_opens_insert_menu_at_that_line() {
+    let text = "first\nsecond\nthird\n\nfourth";
+    let (mut rt, sent) = on_line(text, 0);
+    let line0 = rt.text_line("editor", 0).unwrap().rect;
+    let box_ = right_click_line(&mut rt, 3);
+    assert!(box_[1] > line0[1] + 40.0);
+    assert_eq!(rubric_app::position::line_char(&rt.state.edit.text, rt.state.edit.focus).0, 3);
+    assert_eq!(top(&rt).as_deref(), Some("insert-menu"));
+    let all_ids: Vec<&str> = rt.state.panels[0].rows.iter().filter_map(|r| r.id()).collect();
+    assert_eq!(all_ids, ["insert", "new", "cut", "copy", "paste"]);
+    assert!(sent_to(&sent, "rubric/part").is_empty());
+    assert!(sent_to(&sent, "rubric/draft").is_empty());
+    settle(&mut rt);
+    let panel = rect_of(&rt, "panel-0");
+    assert!((panel[0] - box_[0]).abs() < 1.5, "panel x {} != line x {}", panel[0], box_[0]);
+    assert!((panel[1] - (box_[1] + box_[3] + rubric_app::panel::GAP)).abs() < 1.5, "panel y {} != under line {} (line0 was {})", panel[1], box_[1] + box_[3], line0[1]);
+}
+
+#[test]
+fn right_click_on_writing_opens_cut_copy_paste_at_that_line_and_sends_nothing() {
+    let text = "first line\nsecond line\nthird line\nfourth line";
+    let (mut rt, sent) = on_line(text, 0);
+    let box_ = right_click_line(&mut rt, 3);
+    assert_eq!(rubric_app::position::line_char(&rt.state.edit.text, rt.state.edit.focus).0, 3);
+    assert_eq!(top(&rt).as_deref(), Some("insert-menu"));
+    let all_ids: Vec<&str> = rt.state.panels[0].rows.iter().filter_map(|r| r.id()).collect();
+    assert_eq!(all_ids, ["cut", "copy", "paste"]);
+    // Cut and Copy are dimmed when nothing is selected; Paste takes focus.
+    assert_eq!(rows(&rt), ["paste"]);
+    assert!(sent_to(&sent, "rubric/part").is_empty());
+    assert!(sent_to(&sent, "rubric/draft").is_empty());
+    assert!(sent_to(&sent, "rubric/parts").is_empty());
+    settle(&mut rt);
+    let panel = rect_of(&rt, "panel-0");
+    assert!((panel[1] - (box_[1] + box_[3] + rubric_app::panel::GAP)).abs() < 1.5, "panel y {} != under line {}", panel[1], box_[1] + box_[3]);
+}
+
+#[test]
+fn right_click_with_a_pick_showing_keeps_the_text_and_opens_the_menu() {
+    let (mut rt, sent) = with_ghost("a\n::: a quote\n:::", 1, json!({ "line": 1, "text": "::: quote" }));
+    assert!(rt.find("ghost").is_some());
+    right_click_line(&mut rt, 1);
+    assert_eq!(rt.state.edit.text, "a\n::: a quote\n:::", "right-click must not accept the pick");
+    let asked = sent_to(&sent, "rubric/part");
+    assert_eq!(asked.len(), 1);
+    assert_eq!(asked[0]["params"]["line"], 1);
+    answer(&mut rt, &asked[0], Value::Null);
+    let parts = sent_to(&sent, "rubric/parts");
+    assert_eq!(parts[0]["params"]["words"], "a quote");
+    answer(&mut rt, &parts[0], json!({ "parts": [{ "name": "quote", "description": "Quote" }] }));
+    assert_eq!(top(&rt).as_deref(), Some("words-menu"));
+    assert_eq!(rt.state.edit.text, "a\n::: a quote\n:::");
+}
+
+#[test]
+fn right_click_inside_a_selection_keeps_it_and_enables_copy() {
+    let text = "Hello world here\nsecond line";
+    let mut rt = runtime(text, 0);
+    rt.update(|s, _| {
+        s.edit.set_selection(0, 11);
+        s.last_range = (0, 11);
+    });
+    rt.frame(1.0 / 60.0);
+    let box_ = rt.text_line("editor", 0).unwrap().rect;
+    // Click near the middle of "Hello world" (inside bytes 0..11).
+    let (x, y) = (box_[0] + 24.0, box_[1] + box_[3] * 0.5);
+    rt.secondary_down(x, y);
+    rt.secondary_up(x, y);
+    rt.frame(1.0 / 60.0);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.edit.range(), (0, 11), "selection stays");
+    assert_eq!(top(&rt).as_deref(), Some("insert-menu"));
+    assert_eq!(rows(&rt), ["cut", "copy", "paste"], "Cut and Copy are not dimmed");
+}
+
+#[test]
+fn right_click_with_a_panel_open_on_another_line_replaces_it_with_the_pressed_lines_panel() {
+    let text = "\nsecond line\nthird line\nfourth line";
+    let (mut rt, _sent) = on_line(text, 0);
+    press(&mut rt, Key::Tab);
+    assert_eq!(rt.state.panels.len(), 1);
+    assert_eq!(rt.state.panels[0].rows.iter().filter_map(|r| r.id()).collect::<Vec<_>>(), ["insert", "new", "cut", "copy", "paste"]);
+    let box_ = right_click_line(&mut rt, 3);
+    assert_eq!(rt.state.panels.len(), 1);
+    assert_eq!(rt.state.panels[0].rows.iter().filter_map(|r| r.id()).collect::<Vec<_>>(), ["cut", "copy", "paste"]);
+    settle(&mut rt);
+    let panel = rect_of(&rt, "panel-0");
+    assert!((panel[1] - (box_[1] + box_[3] + rubric_app::panel::GAP)).abs() < 1.5, "panel y {} != under line 3 {}", panel[1], box_[1] + box_[3]);
+}
+
+#[test]
+fn tab_on_a_change_pick_opens_the_panel_at_the_line_from_the_first_frame() {
+    let text = "line zero\nline one\nline two\nline three\n::: quote cite=a : torn edge\nWords.\n:::";
+    let line = 4u32;
+    let end = rubric_app::position::line_range(text, line).end;
+    let mut s = State::open(PathBuf::from("/nonexistent/post.md"), text.to_string());
+    s.edit.set_caret(end);
+    s.width = 1400.0;
+    let mut rt = Runtime::with_text(s, rubric_app::view, (1400.0, 900.0), Env::new(false, 1.0), rubric_app::fonts::text_system());
+    rt.frame(0.0);
+    let (client, sent) = rubric_app::lsp::Client::recording();
+    rt.update(|s, _| rubric_app::state::connected(s, client));
+    rt.frame(1.0 / 60.0);
+    let asked = std::iter::from_fn(|| sent.try_recv().ok()).find(|m| m["method"] == "textDocument/inlineCompletion").expect("asked");
+    let ch = rubric_app::position::line_char(text, end).1;
+    let pick = json!([{
+        "insertText": " ⇒ change quote",
+        "range": { "start": { "line": line, "character": ch }, "end": { "line": line, "character": ch } },
+        "command": { "title": "Pin", "command": "rubric.pin", "arguments": [{ "line": line, "text": "::: quote cite=a : torn edge", "change": true }] }
+    }]);
+    rt.update(|s, tx| {
+        rubric_app::state::incoming(s, Incoming::Response { id: asked["id"].as_i64().unwrap(), result: Ok(pick) });
+        rubric_app::state::follow_up(s, tx);
+    });
+    rt.frame(1.0 / 60.0);
+    let box_ = rt.text_line("editor", rubric_app::position::line_range(text, line).start).unwrap().rect;
+    while sent.try_recv().is_ok() {}
+
+    press(&mut rt, Key::Tab);
+    let reqs: Vec<Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+    let part_req = reqs.iter().find(|m| m["method"] == "rubric/part").expect("rubric/part");
+    let draft_req = reqs.iter().find(|m| m["method"] == "rubric/draft").expect("rubric/draft");
+    let part_ans = json!({ "name": "quote", "kind": "catalog", "uses": { "blocks": 1, "pages": 1 }, "close": 6, "settings": [], "look": [] });
+    rt.update(|s, tx| {
+        rubric_app::state::incoming(s, Incoming::Response { id: part_req["id"].as_i64().unwrap(), result: Ok(part_ans) });
+        rubric_app::state::follow_up(s, tx);
+    });
+    let draft_ans = json!({ "words": "quote", "of": "quote", "catalog": true, "change": { "words": "torn edge", "colon": 17 } });
+    rt.update(|s, tx| {
+        rubric_app::state::incoming(s, Incoming::Response { id: draft_req["id"].as_i64().unwrap(), result: Ok(draft_ans) });
+        rubric_app::state::follow_up(s, tx);
+    });
+
+    // Check the very first frame the panel is drawn and every frame after while settling.
+    // The insertion transition scales from 0.98 around the panel's center (~2.8 pt inset on frame 0).
+    let expected_x = box_[0];
+    let expected_y = box_[1] + box_[3] + rubric_app::panel::GAP;
+    for f in 0..20 {
+        rt.frame(1.0 / 60.0);
+        let anchor = rect_of(&rt, "panel-anchor");
+        assert!((anchor[0] - box_[0]).abs() < 0.5, "frame {f}: anchor x {} != line x {}", anchor[0], box_[0]);
+        assert!((anchor[1] - box_[1]).abs() < 0.5, "frame {f}: anchor y {} != line y {}", anchor[1], box_[1]);
+        let panel = rect_of(&rt, "panel-0");
+        assert!((panel[0] - expected_x).abs() < 4.0, "frame {f}: panel x {} != line x {expected_x}", panel[0]);
+        assert!((panel[1] - expected_y).abs() < 4.0, "frame {f}: panel y {} != under line {expected_y}", panel[1]);
+    }
+    settle(&mut rt);
+    let panel = rect_of(&rt, "panel-0");
+    assert!((panel[0] - expected_x).abs() < 0.5, "settled panel x {} != line x {expected_x}", panel[0]);
+    assert!((panel[1] - expected_y).abs() < 0.5, "settled panel y {} != under line {expected_y}", panel[1]);
+    assert!(field_focused(&rt), "Change… field has the keys");
+}
+
+#[test]
+fn tab_on_a_part_sends_both_requests_together_and_opens_whichever_answers_first() {
+    for draft_first in [false, true] {
+        let (mut rt, sent) = on_line(QUOTE, 1);
+        press(&mut rt, Key::Tab);
+        let reqs: Vec<Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+        let part_req = reqs.iter().find(|m| m["method"] == "rubric/part").expect("rubric/part sent");
+        let draft_req = reqs.iter().find(|m| m["method"] == "rubric/draft").expect("rubric/draft sent");
+        assert!(draft_req["params"].get("action").is_none());
+        let part_ans = quote("catalog");
+        let draft_ans = json!({ "words": "A quote", "of": "quote", "catalog": true });
+        if draft_first {
+            answer(&mut rt, draft_req, draft_ans);
+            assert!(rt.state.panels.is_empty(), "waits for rubric/part");
+            answer(&mut rt, part_req, part_ans);
+        } else {
+            answer(&mut rt, part_req, part_ans);
+            assert!(rt.state.panels.is_empty(), "waits for rubric/draft");
+            answer(&mut rt, draft_req, draft_ans);
+        }
+        assert_eq!(top(&rt).as_deref(), Some("part"), "draft_first={draft_first}");
+    }
+}
+
+#[test]
+fn no_part_and_a_draft_answer_opens_the_words_menu_once() {
+    for draft_first in [false, true] {
+        let (mut rt, sent) = on_line("::: three steps\n:::", 0);
+        rt.update(|s, _| s.edit.set_caret(3));
+        press(&mut rt, Key::Tab);
+        let reqs: Vec<Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+        let part_req = reqs.iter().find(|m| m["method"] == "rubric/part").expect("rubric/part");
+        let draft_req = reqs.iter().find(|m| m["method"] == "rubric/draft").expect("rubric/draft");
+        if draft_first {
+            answer(&mut rt, draft_req, Value::Null);
+            assert!(rt.state.panels.is_empty());
+            assert!(sent_to(&sent, "rubric/parts").is_empty());
+            answer(&mut rt, part_req, Value::Null);
+        } else {
+            answer(&mut rt, part_req, Value::Null);
+            answer(&mut rt, draft_req, Value::Null);
+        }
+        let parts = sent_to(&sent, "rubric/parts");
+        assert_eq!(parts.len(), 1, "rubric/parts asked once (draft_first={draft_first})");
+        answer(&mut rt, &parts[0], json!({ "parts": [{ "name": "steps", "description": "Steps" }] }));
+        assert_eq!(top(&rt).as_deref(), Some("words-menu"));
+        assert_eq!(rt.state.panels.len(), 1);
+    }
+}
+
+#[test]
+fn text_changed_between_the_two_answers_opens_nothing() {
+    let (mut rt, sent) = on_line(QUOTE, 1);
+    press(&mut rt, Key::Tab);
+    let reqs: Vec<Value> = std::iter::from_fn(|| sent.try_recv().ok()).collect();
+    let part_req = reqs.iter().find(|m| m["method"] == "rubric/part").expect("rubric/part");
+    let draft_req = reqs.iter().find(|m| m["method"] == "rubric/draft").expect("rubric/draft");
+    answer(&mut rt, part_req, quote("catalog"));
+    assert!(rt.state.panels.is_empty());
+    // Text changes on that line before the second answer arrives.
+    rt.ime(Ime::Commit("x".into()));
+    rt.frame(1.0 / 60.0);
+    answer(&mut rt, draft_req, json!({ "words": "A quote", "of": "quote", "catalog": true }));
+    assert!(rt.state.panels.is_empty(), "changed line opens nothing");
+}
+
+fn diag(uri: &str, list: Value) -> Incoming {
+    Incoming::Notification { method: "textDocument/publishDiagnostics".into(), params: json!({ "uri": uri, "diagnostics": list }) }
+}
+
+fn note(code: &str, line: u32, data: Value) -> Value {
+    json!({ "source": "rubric", "code": code, "range": { "start": { "line": line, "character": 0 }, "end": { "line": line, "character": 10 } }, "message": "m", "data": data })
+}
+
+/// Checks that at least one painted rect instance sits inside `edge_rect` with `want` color.
+fn has_bar_color(rt: &Runtime<State>, edge_rect: [f32; 4], want: rune::Color) -> bool {
+    let eps = 0.02;
+    let srgb = rt.srgb_blend();
+    let enc = |v: f32| if srgb { if v <= 0.0031308 { v * 12.92 } else { 1.055 * v.powf(1.0 / 2.4) - 0.055 } } else { v };
+    let target = [enc(want.r) * want.a, enc(want.g) * want.a, enc(want.b) * want.a];
+    let scale = rt.window_scale();
+    let [ex, ey, ew, eh] = edge_rect.map(|v| v * scale);
+    rt.instances.iter().any(|inst| {
+        let r = inst.rect;
+        let inside = r[0] >= ex - 1.5 && r[0] + r[2] <= ex + ew + 1.5 && r[1] >= ey - 1.5 && r[1] + r[3] <= ey + eh + 1.5;
+        let c = inst.fill;
+        let same = (c[0] - target[0]).abs() < eps && (c[1] - target[1]).abs() < eps && (c[2] - target[2]).abs() < eps;
+        inside && same
+    })
+}
+
+#[test]
+fn a_new_line_has_its_edge_and_label_for_every_state_and_no_other_line_does() {
+    let text = "plain line\n::: new: a tide clock\n:::\nanother line";
+    let mut rt = runtime(text, 0);
+    // Layout runs on frame 0; editor_laid_out measures draft line on frame 1; drawn on frame 2.
+    rt.frame(1.0 / 60.0);
+    rt.frame(1.0 / 60.0);
+    let p = rt.state.look.palette;
+    let ed = rect_of(&rt, "editor");
+    let line_box = rt.text_line("editor", rubric_app::position::line_range(text, 1).start).unwrap().rect;
+    let edge = rect_of(&rt, "draft-edge-1");
+    assert!(rt.find("draft-edge-0").is_none() && rt.find("draft-edge-2").is_none() && rt.find("draft-edge-3").is_none(), "no other line has a bar");
+    assert!(edge[0] + edge[2] < ed[0] - 10.0, "bar sits left of the writing, never under the first letter: {edge:?} vs {ed:?}");
+    assert!(edge[1] >= line_box[1] && edge[1] + edge[3] <= line_box[1] + line_box[3] + 0.5, "bar sits over line 1: {edge:?} vs {line_box:?}");
+    assert!(has_bar_color(&rt, edge, p.ink3), "not started bar is ink3");
+    let label = rect_of(&rt, "draft-label-1");
+    let pane = rt.state.pane;
+    assert!((label[1] - line_box[1]).abs() < 1.0, "label at line y: {label:?} vs {line_box:?}");
+    assert!(label[0] >= pane[0] && label[0] + label[2] <= pane[0] + pane[2] + 0.5, "label inside writing pane: {label:?} in {pane:?}");
+
+    let uri = rt.state.uri.clone();
+    // Drafting: accent color.
+    tell(&mut rt, diag(&uri, json!([note("drafting", 1, json!({ "status": "drafting", "started": 0 }))])));
+    settle(&mut rt);
+    assert!(has_bar_color(&rt, rect_of(&rt, "draft-edge-1"), p.accent), "drafting bar is accent");
+    assert!(rt.find("draft-label-1").is_some());
+
+    // Ready: accent color, and stays completely idle once settled.
+    tell(&mut rt, diag(&uri, json!([note("draft-ready", 1, json!({ "status": "ready", "name": "tide-clock", "settings": [] }))])));
+    let mut frames = 0;
+    while frames < 240 && rt.frame(1.0 / 60.0) {
+        frames += 1;
+    }
+    assert!(frames < 240, "ready line settled without looping forever (frames={frames})");
+    assert!(has_bar_color(&rt, rect_of(&rt, "draft-edge-1"), p.accent), "ready bar is accent");
+    assert!(rt.find("draft-label-1").is_some());
+    assert!(!rt.frame(1.0 / 60.0), "ready line asks for no frame while untouched");
+    // No app-scheduled wake (note: focused text_input keeps its own caret blink timer if any).
+    let before_boxes = rt.state.draft_boxes_for;
+    assert!(!rt.frame(1.0 / 60.0), "still idle on the next frame");
+    assert_eq!(rt.state.draft_boxes_for, before_boxes);
+
+    // Failed: fail color.
+    tell(&mut rt, diag(&uri, json!([note("draft-failed", 1, json!({ "status": "failed", "message": "oops" }))])));
+    settle(&mut rt);
+    assert!(has_bar_color(&rt, rect_of(&rt, "draft-edge-1"), p.fail), "failed bar is fail");
+    assert!(rt.find("draft-label-1").is_some());
+}
+
+#[test]
+fn a_part_line_has_a_bar_and_label_while_its_variant_drafts_and_none_once_kept() {
+    let text = "before\n::: quote : torn edge\nWords.\n:::";
+    let mut rt = runtime(text, 0);
+    rt.frame(1.0 / 60.0);
+    assert!(rt.find("draft-edge-1").is_none() && rt.find("draft-label-1").is_none());
+    let uri = rt.state.uri.clone();
+    let p = rt.state.look.palette;
+    tell(&mut rt, diag(&uri, json!([note("drafting", 1, json!({ "status": "drafting", "started": 0 }))])));
+    rt.frame(1.0 / 60.0);
+    assert!(has_bar_color(&rt, rect_of(&rt, "draft-edge-1"), p.accent));
+    assert!(rt.find("draft-label-1").is_some());
+    // Kept: diagnostic leaves, line becomes the variant.
+    tell(&mut rt, diag(&uri, json!([])));
+    rt.frame(1.0 / 60.0);
+    assert!(rt.find("draft-edge-1").is_none() && rt.find("draft-label-1").is_none(), "gone once kept");
+}
+
+#[test]
+fn a_draft_label_follows_scrolling_hides_offscreen_and_on_overlap_and_goes_on_cancel() {
+    let text = format!("{}::: new: a tide clock\n:::\n{}", "Line before.\n\n".repeat(4), "Line after.\n\n".repeat(30));
+    let at = 8u32;
+    let (mut rt, sent) = on_line(&text, at);
+    rt.frame(1.0 / 60.0);
+    rt.frame(1.0 / 60.0);
+    let before_ed = rect_of(&rt, "editor");
+    let before_label = rect_of(&rt, "draft-label-8");
+    let before_edge = rect_of(&rt, "draft-edge-8");
+    let pane = rect_of(&rt, "writing");
+    rt.wheel(pane[0] + 4.0, pane[1] + pane[3] - 10.0, -60.0);
+    settle(&mut rt);
+    let delta = rect_of(&rt, "editor")[1] - before_ed[1];
+    assert!(delta < -1.0, "scrolled: {delta}");
+    let after_label = rect_of(&rt, "draft-label-8");
+    let after_edge = rect_of(&rt, "draft-edge-8");
+    assert!((after_label[1] - (before_label[1] + delta)).abs() < 1.0, "label followed scroll: {after_label:?} vs {before_label:?} + {delta}");
+    assert!((after_edge[1] - (before_edge[1] + delta)).abs() < 1.0, "edge followed scroll");
+
+    // Scroll far enough down that line 8 is out of the pane: draws nothing.
+    for _ in 0..10 {
+        rt.wheel(pane[0] + 4.0, pane[1] + pane[3] - 10.0, -200.0);
+        settle(&mut rt);
+    }
+    assert!(rt.find("draft-label-8").is_none() && rt.find("draft-edge-8").is_none(), "scrolled out of pane draws nothing");
+
+    // Scroll back up to top.
+    for _ in 0..15 {
+        rt.wheel(pane[0] + 4.0, pane[1] + pane[3] - 10.0, 200.0);
+        settle(&mut rt);
+    }
+    assert!(rt.find("draft-label-8").is_some());
+
+    // Long line reaching the label: label is hidden, edge stays.
+    let long = "::: new: a very long description of a tide table that reaches all the way across the writing column to the right edge";
+    rt.update(|s, tx| {
+        rubric_app::part::set_line(&mut s.edit, at, long);
+        rubric_app::state::changed(s);
+        rubric_app::state::sync_draft_boxes(s, tx);
+    });
+    settle(&mut rt);
+    assert!(rt.find("draft-edge-8").is_some(), "edge still shows on a long line");
+    assert!(rt.find("draft-label-8").is_none(), "label is hidden when text reaches it");
+
+    // Back to short, then canceled via server replace: both edge and label are gone.
+    rt.update(|s, tx| {
+        rubric_app::part::set_line(&mut s.edit, at, "::: new: a tide clock");
+        rubric_app::state::changed(s);
+        rubric_app::state::sync_draft_boxes(s, tx);
+    });
+    settle(&mut rt);
+    assert!(rt.find("draft-label-8").is_some());
+    press(&mut rt, Key::Tab);
+    let look = drafts(&sent);
+    answer(&mut rt, &look[0], json!({ "words": "a tide clock", "status": "ready", "name": "tide-clock" }));
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Down);
+    press(&mut rt, Key::Enter);
+    let cancel = drafts(&sent);
+    assert_eq!(cancel[0]["params"]["action"], "cancel");
+    answer(&mut rt, &cancel[0], json!({ "replace": "::: a tide clock" }));
+    settle(&mut rt);
+    assert!(rt.find("draft-edge-8").is_none() && rt.find("draft-label-8").is_none(), "gone when canceled");
 }

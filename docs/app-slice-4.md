@@ -100,8 +100,15 @@ The panel's place is taken from the line before the field takes the keys: either
 
 ## After this slice
 
-The Mac: the app has never been built there, and the page beside the writing is attached on Linux only. Then problems, the first run, and the package (`docs/app-slice-3.md`, "After this slice").
+The shell: the toolbar, the drawer, Sites, then zoom. The whole app is built on Linux before the Mac (David, 2026-11-26); `docs/plan.md`, step 9, "The order from here", has the order.
 
 ## Decisions the build made
 
 One line each: what was chosen, and why the plan did not settle it.
+
+- A right-click menu holds drawing for one frame (`anchor_wait`) until `Tx::text_line` returns the pressed line's box, so synchronous menus never flash at the old caret's line before moving.
+- `LineFill::left_bar` paints at `x0` directly under the first glyph regardless of field padding (`content.rs:325`, `helpers.rs:238`), so the edge bar is drawn as the app's own element 18 points left of `editor_rect[0]` from `TextLine`, using the design's dotted (`Not started`), dashed (`Drafting`), and solid (`Ready`, `Failed`) bars.
+- A right-click on a bare `:::` closer or `::: theme` line moves the caret and opens no menu, keeping Cut, Copy, Paste strictly on non-empty, non-`:::` lines of writing.
+- `main.rs` uses `AppHandle::update_if` with `state::incoming -> bool` so unhandled notifications, stale answers, and the first half of a paired `rubric/part` + `rubric/draft` response do not trigger an extra redraw.
+- A `::: new:` line with no words yet gets no edge bar or label, matching the status line and the server's diagnostics.
+- Draft line boxes cache vertical offsets (`dy`) relative to `editor_rect[1]` and re-query `Tx::text_line` only when `(version, editor_w, editor_h, marks_sig)` changes, so scrolling tracks via `editor_rect[1]` with zero `text_line` calls and idle lines ask for no frames.

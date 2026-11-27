@@ -371,6 +371,17 @@ Where each step stands, 2026-11-06: step 0 is built and merged to `main`. Step 1
 
    **What it has to reach first** (David, 2026-11-22): a real app that works on the Mac and on Linux, where all the writer needs beside it is a harness (Claude Code or OpenCode) and a Jev key. That comes before deep testing of any slice, and before polish. A model on the writer's own machine doing Jev's work would take the key away; it stays where it is, under Stretch.
 
+   **The order from here** (David, 2026-11-26): the whole app on Linux first, every screen and everything it does, and only then the Mac, so the Mac gets a finished app to carry over and not a moving one. The design has all of it (`reference/rubric-design/`); until now each slice listed the rest as "not in this slice" and nothing said when. In order, each a slice with its own plan in `docs/`:
+   1. [app-slice-4.md](app-slice-4.md): the right-click menu, a draft's line marked at its edge, two fixes. Being built.
+   2. **The shell**: the toolbar, the drawer with the site's posts, opening, switching and making a post, autosave, Sites. Until this the app opens one file named on the command line.
+   3. **Zoom**, for the writing and for the page, with the page's widths for a phone and a desktop, and the page opened in the writer's own browser (`app-slice-3.md`, "After this slice").
+   4. **Problems** (the underline and the message with its one fix), an image setting's row, and the menu from a right-click on a part in the page.
+   5. **Parts** (the catalog and the writer's own, with the writer's parts in the catalog), the site's theme picker, the Appearance window, Publish.
+   6. **The first run**: the Jev key and the drafting tool as an introduction, not an error.
+   7. **The package for Linux**, bringing what the app needs (the GStreamer plugins).
+   8. **The Mac**: the build, the page beside the writing (attached on Linux only today), its package.
+   Rune stays on the fork (`lennox-davidlevy/rune`, one line put back for typing) until the fix is in Rune's own `dev`.
+
    **A faster page, to consider** (found 2026-11-22, not built). On the first native run the editor was instant (a key to its frame in about 1 ms) and the page lagged: it shows a change 150 to 600 ms after typing pauses, and nothing while typing goes on. The server waits 100 ms for a pause before it writes `content/` (`drawMs`), and Hugo's file watcher acts on a 500 ms tick that no flag changes; Hugo's rebuild itself is 2 to 3 ms. Neovim's preview has the same delay. It does not change how the app is built, so it waits its turn. The way thought best: when an edit only changes the words of a paragraph or heading already on the page, the server sends that text to the page at once through the relay, and Hugo's render replaces it when it comes; anything that changes the page's structure still waits for Hugo. Its cost is a second, small Markdown renderer for the words in between, which may show bold or a link slightly off for half a second. The lesser way: draw on the first key instead of after a pause, which saves the 100 ms and leaves Hugo's tick. The numbers are in [app-slice-findings.md](app-slice-findings.md), "The native run on Omarchy".
 
 ### Stretch
