@@ -474,6 +474,101 @@ pub fn tick(s: &mut State) -> bool {
     drafting || had
 }
 
+/// A line in the writing with a draft state: its edge bar and right-end label.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Mark {
+    pub line: u32,
+    pub start: usize,
+    pub end: usize,
+    pub status: Status,
+}
+
+/// Every line in the writing that gets a draft edge and label: `new:` lines with words, and a
+/// placed part's line while its take or variant drafts, is ready or failed. Skips code fences.
+pub fn marks(s: &State) -> Vec<Mark> {
+    let mut out = Vec::new();
+    let mut fence: Option<(u8, usize)> = None;
+    let mut start = 0;
+    for (n, line) in s.edit.text.split('\n').enumerate() {
+        let end = start + line.len();
+        let rest = line.trim_start_matches([' ', '\t']);
+        let fmark = fence_of(rest);
+        if let Some((ch, m)) = fence {
+            if let Some((c, k)) = fmark && c == ch && k >= m && rest.trim_end().bytes().all(|b| b == ch) {
+                fence = None;
+            }
+        } else if let Some(f) = fmark {
+            fence = Some(f);
+        } else {
+            let n = n as u32;
+            if new_words(line).is_some_and(|w| !w.is_empty()) {
+                out.push(Mark { line: n, start, end, status: status_of(s, n) });
+            } else if crate::part::names_something(line)
+                && let Some((_, st)) = s.drafts.iter().find(|(l, st)| *l == n && !matches!(st, Status::None { .. }))
+            {
+                out.push(Mark { line: n, start, end, status: st.clone() });
+            }
+        }
+        start = end + 1;
+    }
+    out
+}
+
+fn fence_of(rest: &str) -> Option<(u8, usize)> {
+    let ch = *rest.as_bytes().first()?;
+    if ch != b'`' && ch != b'~' {
+        return None;
+    }
+    let n = rest.bytes().take_while(|&b| b == ch).count();
+    (n >= 3).then_some((ch, n))
+}
+
+/// The state word at the right end of a draft's line: shares the status line's clock.
+pub fn mark_label(status: &Status, now_ms: u64) -> String {
+    match status {
+        Status::None { .. } => "Not started".into(),
+        Status::Drafting { started_ms, .. } => format!("Drafting {}", clock(now_ms.saturating_sub(*started_ms))),
+        Status::Ready { .. } => "Ready".into(),
+        Status::Failed { .. } => "Failed".into(),
+    }
+}
+
+/// The color of a draft line's edge bar and right-end label.
+pub fn mark_color(status: &Status, p: &crate::theme::Palette) -> rune::Color {
+    match status {
+        Status::None { .. } => p.ink3,
+        Status::Drafting { .. } | Status::Ready { .. } => p.accent,
+        Status::Failed { .. } => p.fail,
+    }
+}
+
+/// Width of a line of writing in points, measured with the compiled-in Literata face.
+pub fn writing_width(line: &str) -> f32 {
+    thread_local! {
+        static TEXT: std::cell::RefCell<rune::text::TextSystem> = std::cell::RefCell::new(crate::fonts::text_system());
+    }
+    TEXT.with(|t| t.borrow_mut().measure(line, crate::fonts::writing(), 1.0).0)
+}
+
+/// Width of a 12-point caption label, cached by string so idle/scrolling views measure nothing.
+pub fn caption_width(label: &str) -> f32 {
+    thread_local! {
+        static CACHE: std::cell::RefCell<(rune::text::TextSystem, std::collections::HashMap<String, f32>)> =
+            std::cell::RefCell::new((crate::fonts::text_system(), std::collections::HashMap::new()));
+    }
+    CACHE.with(|c| {
+        let mut c = c.borrow_mut();
+        if let Some(&w) = c.1.get(label) {
+            return w;
+        }
+        let w = c.0.measure(label, crate::fonts::caption(500.0), 1.0).0;
+        if c.1.len() < 128 {
+            c.1.insert(label.to_string(), w);
+        }
+        w
+    })
+}
+
 /// The server's notes for a document: the `new:` lines' statuses and their colors.
 pub fn diagnostics(s: &mut State, params: &Value) {
     // The server escapes fewer characters in a path than the app does: compared unescaped.
@@ -483,6 +578,7 @@ pub fn diagnostics(s: &mut State, params: &Value) {
     s.drafts = statuses(params);
     s.now_ms = now_ms();
     s.spans = state::spans(s);
+    s.draft_marks = marks(s);
     // The open menu follows its line: a draft that finished shows Keep, not Stop.
     if let Some(open) = &mut s.view
         && let Some(line) = find(&s.edit.text, open.asked.line, &open.asked.text)
@@ -528,8 +624,12 @@ pub fn drafted(s: &mut State, params: &Value) {
 pub fn send(s: &mut State, method: &str, what: What, line: u32, text: String, params: Value) -> Option<i64> {
     let c = s.client.as_ref()?;
     let id = c.request(method, params);
+    let now = std::time::Instant::now();
     s.pending.insert(id, Asked { line, text, what });
-    s.sent_at.insert(id, std::time::Instant::now());
+    s.sent_at.insert(id, now);
+    if s.looked.get().is_some() && s.looked_sent.is_none() {
+        s.looked_sent = Some(now);
+    }
     Some(id)
 }
 
@@ -654,22 +754,30 @@ pub fn refresh_menu(s: &mut State) {
 pub fn answered(s: &mut State, id: i64, asked: Asked, result: Result<Value, String>) {
     let said = s.said_on.remove(&id);
     let done = result.as_ref().is_ok_and(|v| v.get("error").is_none());
-    answer(s, asked, result);
+    answer(s, id, asked, result);
     if let (Some((label, fact)), true) = (said, done) {
         flash(s, label, Tone::Ink, fact);
     }
     crate::look::sync_field(s);
 }
 
-fn answer(s: &mut State, asked: Asked, result: Result<Value, String>) {
+fn answer(s: &mut State, id: i64, asked: Asked, result: Result<Value, String>) {
     if asked.what == What::Set {
         s.setting = false;
     }
     let answer = match result {
         Ok(v) => v,
-        Err(e) => return failed(s, e),
+        Err(e) => {
+            if s.part_wait.as_ref().is_some_and(|w| w.part_id == id || w.draft_id == id) {
+                s.part_wait = None;
+            }
+            return failed(s, e);
+        }
     };
     if let Some(e) = answer.get("error").and_then(Value::as_str) {
+        if s.part_wait.as_ref().is_some_and(|w| w.part_id == id || w.draft_id == id) {
+            s.part_wait = None;
+        }
         return failed(s, e);
     }
     match asked.what {
@@ -682,7 +790,9 @@ fn answer(s: &mut State, asked: Asked, result: Result<Value, String>) {
             let Some(view) = View::parse(&answer) else { return };
             s.drafter = view.drafter.clone().or(s.drafter.take());
             let open = Open { view, asked, take_before: None, tools: None, offer: None, part: None };
+            let anchor = state::keep_anchor(s);
             crate::look::close_panels(s);
+            s.anchor = anchor;
             if let Some(p) = menu_panel(s, &open) {
                 s.panels = vec![p];
                 s.view = Some(open);
@@ -700,7 +810,7 @@ fn answer(s: &mut State, asked: Asked, result: Result<Value, String>) {
                 flash(s, "Kept", Tone::Ink, format!("{}, added to {CUSTOM} parts", readable(name)));
             }
         }
-        What::Part(_) | What::PartLook(_) | What::Set | What::Parts => crate::part::answered(s, asked, answer),
+        What::Part(_) | What::PartLook(_) | What::Set | What::Parts => crate::part::answered(s, id, asked, answer),
         What::Take => {
             let Some(open) = s.view.as_mut().filter(|o| o.asked.text == asked.text) else { return };
             let Some(view) = View::parse(&answer) else { return };

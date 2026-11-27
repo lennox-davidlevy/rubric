@@ -60,7 +60,9 @@ pub struct State {
     pub pending: HashMap<i64, draft::Asked>,
     /// When Tab asked for a line's menu, until the frame that draws it: the time is printed.
     pub looked: std::cell::Cell<Option<std::time::Instant>>,
-    /// Of that time, how long the server took to answer, in ms.
+    /// When the first request of that menu ask was sent.
+    pub looked_sent: Option<std::time::Instant>,
+    /// Of that time, how long the server took to answer (from sending to the later answer), in ms.
     pub looked_server_ms: f64,
     /// When each request not answered yet was sent, by its id.
     pub sent_at: HashMap<i64, std::time::Instant>,
@@ -78,8 +80,8 @@ pub struct State {
     pub field: TextEdit,
     /// Whose text `field` holds: the panel's id and the row's.
     pub field_of: Option<(String, String)>,
-    /// The part a line places, while its drafts are asked about, before its menu opens.
-    pub part_wait: Option<crate::part::Part>,
+    /// The in-flight `rubric/part` + `rubric/draft` pair for a `:::` line before its menu opens.
+    pub part_wait: Option<crate::part::Pending>,
     /// A setting changed while another change was on its way: sent once that one is answered.
     pub set_next: Option<(String, String)>,
     /// A setting's change is on its way.
@@ -97,8 +99,16 @@ pub struct State {
     pub held: Option<TextEdit>,
     /// Where the panels hang: the line they opened on, from the writing field's top.
     pub anchor: Option<Anchor>,
+    /// Waiting for `Tx::text_line` to place a panel opened by a secondary press before drawing it.
+    pub anchor_wait: bool,
     /// The writing field's rectangle in window points, after scrolling.
     pub editor_rect: [f32; 4],
+    /// Draft lines in the writing, rebuilt when text or `drafts` changes.
+    pub draft_marks: Vec<crate::draft::Mark>,
+    /// Each draft line's vertical box relative to `"editor"`'s top, keyed by line number.
+    pub draft_boxes: HashMap<u32, DraftBox>,
+    /// `(version, editor_w_tenths, editor_h_tenths, marks_sig)` for which `draft_boxes` were asked.
+    pub draft_boxes_for: (i32, i32, i32, u64),
     /// What to say once the server has answered a request, by its id: a label and a fact.
     pub said_on: HashMap<i64, (String, String)>,
     /// The theme and mode drawn when the list of themes opened, to go back to.
@@ -124,6 +134,19 @@ impl Anchor {
     pub fn holds(&self, line: u32, start: usize, width: f32) -> bool {
         self.line == line && self.start == start && (self.width - width).abs() < 0.5
     }
+}
+
+/// A draft line's measured box relative to `"editor"`'s top, so scrolling moves its edge and
+/// label with `editor_rect[1]` without re-querying `text_line`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DraftBox {
+    pub dy: f32,
+    pub h: f32,
+    pub wrapped: bool,
+    pub text_w: f32,
+    /// Byte length of the line when `text_w` was measured.
+    pub start: usize,
+    pub end: usize,
 }
 
 /// The caret's line and the byte it starts at.
@@ -161,13 +184,15 @@ impl State {
         let look = crate::theme::Look::load(None, None, None);
         let spans = markdown::spans(&text, &marks(&look.palette), &[]);
         let title = title_of(&path, &text);
-        State {
+        let mut s = State {
             path, edit, version: 1, saved: text, split: 0.5, last_range: (0, 0), uri, spans, problem: None, page: None, width: 0.0,
             bounds: None, client: None, cursor_line: None, page_url: None, ghost: None, asked: None, height: 0.0,
             view: None, choice: None, drafts: Vec::new(), flash: None, now_ms: draft::now_ms(),
-            pending: HashMap::new(), looked: std::cell::Cell::new(None), looked_server_ms: 0.0, sent_at: HashMap::new(), ticker: None, look, title, pane: [0.0; 4],
-            panels: Vec::new(), field: TextEdit::new(""), field_of: None, part_wait: None, set_next: None, setting: false, insert: None, drafter: None, focus_field: false, field_live: false, held: None, anchor: None, editor_rect: [0.0; 4], said_on: HashMap::new(), theme_before: None, page_life: crate::page::Life::default(),
-        }
+            pending: HashMap::new(), looked: std::cell::Cell::new(None), looked_sent: None, looked_server_ms: 0.0, sent_at: HashMap::new(), ticker: None, look, title, pane: [0.0; 4],
+            panels: Vec::new(), field: TextEdit::new(""), field_of: None, part_wait: None, set_next: None, setting: false, insert: None, drafter: None, focus_field: false, field_live: false, held: None, anchor: None, anchor_wait: false, editor_rect: [0.0; 4], draft_marks: Vec::new(), draft_boxes: HashMap::new(), draft_boxes_for: (0, 0, 0, 0), said_on: HashMap::new(), theme_before: None, page_life: crate::page::Life::default(),
+        };
+        s.draft_marks = draft::marks(&s);
+        s
     }
 }
 
@@ -236,6 +261,7 @@ pub fn clean(s: &State) -> bool {
 pub fn changed(s: &mut State) {
     // Typing is not the panels': they go (a choice that changed the text closed them already).
     crate::look::close_panels(s);
+    s.part_wait = None;
     sent(s);
     moved(s);
     ask(s);
@@ -252,6 +278,7 @@ fn sent(s: &mut State) {
     s.version += 1;
     s.ghost = None;
     s.spans = spans(s);
+    s.draft_marks = draft::marks(s);
     s.title = title_of(&s.path, &s.edit.text);
     if let Some(c) = &s.client {
         c.notify("textDocument/didChange", json!({
@@ -261,11 +288,69 @@ fn sent(s: &mut State) {
     }
 }
 
-/// After a message from the server: a field a panel opened with takes the keys.
+/// `"editor"` moved, scrolled or resized: records its rect and refreshes draft line boxes only
+/// when the text, draft set, or editor dimensions changed (never during plain scrolling).
+pub fn editor_laid_out(s: &mut State, rect: [f32; 4], tx: &mut Tx) {
+    s.editor_rect = rect;
+    sync_draft_boxes(s, tx);
+}
+
+/// Refreshes `s.draft_boxes` via `Tx::text_line` when the text, draft lines, or editor size
+/// changed since the last query. Does nothing while idle or scrolling.
+pub fn sync_draft_boxes(s: &mut State, tx: &mut Tx) {
+    let sig = marks_sig(&s.draft_marks);
+    let stamp = (s.version, (s.editor_rect[2] * 10.0).round() as i32, (s.editor_rect[3] * 10.0).round() as i32, sig);
+    if s.draft_marks.is_empty() {
+        s.draft_boxes.clear();
+        s.draft_boxes_for = stamp;
+        return;
+    }
+    if s.editor_rect[2] <= 0.0 || s.draft_boxes_for == stamp {
+        return;
+    }
+    s.draft_boxes_for = stamp;
+    let keep: Vec<u32> = s.draft_marks.iter().map(|m| m.line).collect();
+    s.draft_boxes.retain(|l, _| keep.contains(l));
+    for m in s.draft_marks.clone() {
+        let text_w = draft::writing_width(&s.edit.text[m.start..m.end]);
+        let (line_no, m_start, m_end) = (m.line, m.start, m.end);
+        tx.text_line("editor", m_start, move |s: &mut State, box_, _| {
+            if s.draft_boxes_for != stamp {
+                return;
+            }
+            if let Some(box_) = box_ {
+                let wrapped = box_.next.is_some_and(|next| next <= m_end);
+                s.draft_boxes.insert(line_no, DraftBox {
+                    dy: box_.rect[1] - s.editor_rect[1],
+                    h: box_.rect[3],
+                    wrapped,
+                    text_w,
+                    start: m_start,
+                    end: m_end,
+                });
+            }
+        });
+    }
+}
+
+fn marks_sig(marks: &[draft::Mark]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for m in marks {
+        m.line.hash(&mut h);
+        m.start.hash(&mut h);
+        m.end.hash(&mut h);
+    }
+    h.finish()
+}
+
+/// After a message from the server: a field a panel opened with takes the keys, and any new or
+/// removed draft line updates its box.
 pub fn follow_up(s: &mut State, tx: &mut Tx) {
     if std::mem::take(&mut s.focus_field) {
         crate::look::give_field(s, tx);
     }
+    sync_draft_boxes(s, tx);
 }
 
 /// Run after each drawn frame (`App::on_frame_drawn`) and after each change: a caret that
@@ -328,8 +413,10 @@ pub fn connected(s: &mut State, client: crate::lsp::Client) {
     ask(s);
 }
 
-/// What the server sent that the slice acts on.
-pub fn incoming(s: &mut State, m: crate::lsp::Incoming) {
+/// What the server sent that the slice acts on. Returns whether anything the view reads may
+/// have changed, so `AppHandle::update_if` skips an idle redraw for dropped messages or the
+/// first half of a paired part+draft answer.
+pub fn incoming(s: &mut State, m: crate::lsp::Incoming) -> bool {
     use crate::lsp::Incoming;
     match m {
         // Only the answer to the last question, for the version and line it was asked about.
@@ -337,21 +424,25 @@ pub fn incoming(s: &mut State, m: crate::lsp::Incoming) {
             if let Some(sent) = s.sent_at.remove(&id)
                 && s.looked.get().is_some()
             {
-                s.looked_server_ms += sent.elapsed().as_secs_f64() * 1000.0;
+                let start = s.looked_sent.unwrap_or(sent);
+                s.looked_server_ms = start.elapsed().as_secs_f64() * 1000.0;
             }
             if let Some(about) = s.pending.remove(&id) {
-                return draft::answered(s, id, about, result);
+                let pair = matches!(about.what, draft::What::Part(_) | draft::What::PartLook(_));
+                draft::answered(s, id, about, result);
+                return !(pair && s.part_wait.is_some() && s.flash.is_none());
             }
-            let Some((asked, version, line)) = s.asked else { return };
+            let Some((asked, version, line)) = s.asked else { return false };
             if id != asked {
-                return;
+                return false;
             }
             // Answered: a caret that leaves the line and comes back asks again.
             s.asked = None;
             if version != s.version || ghost::wants(&s.edit.text, s.edit.focus) != Some(line) {
-                return;
+                return false;
             }
             s.ghost = result.ok().and_then(|r| ghost::parse(&r, line, version));
+            true
         }
         Incoming::Notification { method, params } if method == "rubric/serving" => {
             if let Some(url) = params.get("url").and_then(|u| u.as_str()) {
@@ -359,10 +450,17 @@ pub fn incoming(s: &mut State, m: crate::lsp::Incoming) {
             } else if let Some(p) = params.get("problem").and_then(|p| p.as_str()) {
                 eprintln!("page: {p}");
             }
+            true
         }
-        Incoming::Notification { method, params } if method == "textDocument/publishDiagnostics" => draft::diagnostics(s, &params),
-        Incoming::Notification { method, params } if method == "rubric/drafted" => draft::drafted(s, &params),
-        _ => {}
+        Incoming::Notification { method, params } if method == "textDocument/publishDiagnostics" => {
+            draft::diagnostics(s, &params);
+            true
+        }
+        Incoming::Notification { method, params } if method == "rubric/drafted" => {
+            draft::drafted(s, &params);
+            true
+        }
+        _ => false,
     }
 }
 
@@ -380,6 +478,7 @@ pub fn serving(s: &mut State, url: String) {
 /// Tab asked for a line's menu: the time to its drawing starts now.
 pub fn start_look(s: &mut State) {
     s.looked.set(Some(std::time::Instant::now()));
+    s.looked_sent = None;
     s.looked_server_ms = 0.0;
 }
 
@@ -406,12 +505,12 @@ pub fn shut(s: &mut State) {
 /// a `new:` line; on a `new:` line it asks for the line's menu, on a part's line for the
 /// part's, on a line of words for theirs, and on an empty line it offers to put a part there.
 /// Always consumed.
-pub fn tab(s: &mut State, _tx: &mut Tx) {
+pub fn tab(s: &mut State, tx: &mut Tx) {
     if let Some(g) = showing(s).filter(|g| g.pick.pin.is_some()).cloned() {
         let pin = g.pick.pin.clone().unwrap();
         // Words after a part's ":" that set nothing: its Change….
         if pin.change {
-            crate::part::tab(s, true);
+            crate::part::tab(s, true, tx);
             return;
         }
         if pin.acts || pin.build {
@@ -422,7 +521,52 @@ pub fn tab(s: &mut State, _tx: &mut Tx) {
             }
         }
     }
-    let _ = draft::tab(s) || crate::part::tab(s, false) || crate::insert::tab(s);
+    open_line_menu(s, false, tx);
+}
+
+/// Opens the caret's line's menu, past any pick: a `new:` line's draft menu, a part's or words'
+/// menu, an empty line's insert menu, or (when `writing` is true, from a right-click) Cut, Copy,
+/// Paste on a line of writing.
+pub fn open_line_menu(s: &mut State, writing: bool, tx: &mut Tx) -> bool {
+    draft::tab(s) || crate::part::tab(s, false, tx) || crate::insert::tab(s) || (writing && crate::insert::writing_menu(s))
+}
+
+/// Right-click in the writing at UTF-8 byte `byte`: closes any open panels, places the caret
+/// unless `byte` lies inside the selection, and opens that line's menu past any pick, anchored
+/// from the pressed line's box.
+pub fn secondary_press(s: &mut State, byte: usize, tx: &mut Tx) {
+    let was_field = s.field_live;
+    crate::look::close_panels(s);
+    if was_field {
+        tx.focus("editor", false);
+    }
+    let (a, b) = s.edit.range();
+    if !(a < b && byte >= a && byte <= b) {
+        s.edit.set_caret(byte);
+    }
+    moved(s);
+    if open_line_menu(s, true, tx) {
+        s.anchor_wait = true;
+        tx.text_line("editor", s.edit.focus, |s: &mut State, line, _| anchor_from_line(s, line));
+    }
+}
+
+/// Locks a panel's anchor from a `TextLine` box so it hangs from that line on its first frame.
+pub fn anchor_from_line(s: &mut State, line: Option<rune::TextLine>) {
+    s.anchor_wait = false;
+    let Some(line) = line else { return };
+    let width = s.editor_rect[2];
+    if width <= 0.0 || (s.panels.is_empty() && s.pending.is_empty()) {
+        return;
+    }
+    let (at, start) = caret_line_start(s);
+    s.anchor = Some(Anchor { line: at, start, width, dy: line.rect[1] - s.editor_rect[1], h: line.rect[3] });
+}
+
+/// The kept anchor if it still holds for the caret's line and the field's width.
+pub fn keep_anchor(s: &State) -> Option<Anchor> {
+    let (at, start) = caret_line_start(s);
+    s.anchor.filter(|a| a.holds(at, start, s.editor_rect[2]))
 }
 
 /// Ctrl+S writes the file whole.

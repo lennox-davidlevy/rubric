@@ -86,6 +86,34 @@ pub fn view(s: &State, cx: &mut Cx<State>) -> El {
         })
         .child(title_row(s))
         .child(panes);
+    // Draft lines: a 2-point bar 18 points left of the writing, and the state's word at the
+    // line's right end when the line's text does not reach it. Lines scrolled out of the writing
+    // viewport draw nothing.
+    let ed = s.editor_rect;
+    if ed[2] > 0.0 && s.pane[2] > 0.0 && !s.draft_marks.is_empty() {
+        let pane_top = s.pane[1];
+        let pane_bottom = s.pane[1] + s.pane[3] - if draft::line(s).is_some() { STATUS } else { 0.0 };
+        let bar_x = (ed[0] - 18.0).max(s.pane[0] + 2.0);
+        for m in &s.draft_marks {
+            let Some(b) = s.draft_boxes.get(&m.line) else { continue };
+            let y = ed[1] + b.dy;
+            let h = b.h;
+            if y < pane_top || y + h > pane_bottom {
+                continue;
+            }
+            window = window.child(draft_edge(m.line, &m.status, &p, bar_x, y, h));
+            let label = draft::mark_label(&m.status, s.now_ms);
+            let label_w = draft::caption_width(&label);
+            if !b.wrapped && b.text_w + 12.0 + label_w <= ed[2] {
+                let lx = (ed[0] + ed[2] - label_w).max(ed[0]);
+                let color = draft::mark_color(&m.status, &p);
+                window = window.child(
+                    row().key(format!("draft-label-{}", m.line)).absolute(lx, y).h(h).center_y()
+                        .child(text(label).font(fonts::caption(500.0)).color(color)),
+                );
+            }
+        }
+    }
     // The pick, dimmed, right after the caret; the caret is read only while there is one, so
     // the view does not re-run on every caret move.
     if let Some(g) = state::showing(s)
@@ -99,7 +127,7 @@ pub fn view(s: &State, cx: &mut Cx<State>) -> El {
     // The panels, in the layer above the window's, hang from the left edge of their line's
     // text and its bottom, taken when they open: a caret moving along the line (a setting
     // written) leaves them where they are; scrolling and a resize move them with the line.
-    if !s.panels.is_empty() {
+    if !s.panels.is_empty() && !s.anchor_wait {
         let ed = s.editor_rect;
         let (at, start) = state::caret_line_start(s);
         let kept = s.anchor.filter(|a| a.holds(at, start, ed[2]));
@@ -297,6 +325,36 @@ fn item_view(c: &Palette, item: &Item, depth: usize, i: usize) -> El {
     r
 }
 
+/// The 2-point bar 18 points left of a draft line: dotted in `ink3` before a draft, dashed in
+/// `accent` while drafting, solid in `accent` when ready, solid in `fail` when failed.
+fn draft_edge(line: u32, status: &draft::Status, p: &Palette, x: f32, y: f32, h: f32) -> El {
+    let color = draft::mark_color(status, p);
+    let top = y + 3.0;
+    let bar_h = (h - 6.0).max(4.0);
+    let key = format!("draft-edge-{line}");
+    match status {
+        draft::Status::None { .. } => {
+            let n = ((bar_h + 3.0) / 5.0).floor().max(1.0) as usize;
+            let mut c = col().key(key).absolute(x, top).w(2.0).h(bar_h).gap(3.0).justify_center();
+            for i in 0..n {
+                c = c.child(el().key(format!("dot-{i}")).w(2.0).h(2.0).radius(1.0).fill(color));
+            }
+            c
+        }
+        draft::Status::Drafting { .. } => {
+            let n = ((bar_h + 3.0) / 8.0).floor().max(1.0) as usize;
+            let mut c = col().key(key).absolute(x, top).w(2.0).h(bar_h).gap(3.0).justify_center();
+            for i in 0..n {
+                c = c.child(el().key(format!("dash-{i}")).w(2.0).h(5.0).radius(1.0).fill(color));
+            }
+            c
+        }
+        draft::Status::Ready { .. } | draft::Status::Failed { .. } => {
+            el().key(key).absolute(x, top).w(2.0).h(bar_h).radius(1.0).fill(color)
+        }
+    }
+}
+
 /// The row over both panes: the post's title, and "Saved" when the text is as written.
 fn title_row(s: &State) -> El {
     let p = s.look.palette;
@@ -342,7 +400,7 @@ fn writing(s: &State) -> El {
     let p = s.look.palette;
     let field = text_input(&s.edit, fonts::writing())
         .key("editor")
-        .on_layout(|s: &mut State, rect| s.editor_rect = rect)
+        .on_layout_tx(|s: &mut State, rect, tx| state::editor_laid_out(s, rect, tx))
         .label("Writing")
         .w_full()
         .color(p.ink)
@@ -351,16 +409,25 @@ fn writing(s: &State) -> El {
         .on_edit(|s: &mut State| &mut s.edit)
         // Return types a newline; without this it goes to the default button. A submit is not
         // reported as a change, so it records its own.
-        .on_submit(|s: &mut State, _| {
+        .on_submit(|s: &mut State, tx| {
             s.edit.insert("\n");
             state::changed(s);
+            state::sync_draft_boxes(s, tx);
         })
         .on_input_change(|s: &mut State, tx| {
             // Typed on a field row of a panel: the field's.
             trace::say(|| format!("change editor len {} caret {:?} held {}", s.edit.text.len(), s.edit.range(), s.held.is_some()));
             if !look::typed_on_field(s, tx) {
                 state::changed(s);
+                state::sync_draft_boxes(s, tx);
             }
+        })
+        .on_secondary_press(|_: &mut State, p, tx| {
+            tx.text_offset_at("editor", p.x, p.y, |s: &mut State, at, tx| {
+                if let Some(byte) = at {
+                    state::secondary_press(s, byte, tx);
+                }
+            });
         })
         .on_input_key(editor::key);
     let scroll = col().key("writing").w_full().grow(1.0).min_h(0.0).fill(p.pane).scroll(ScrollSpec { stick_bottom: false }).child(

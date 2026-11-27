@@ -72,6 +72,18 @@ pub struct Insert {
     pub due: Option<f64>,
 }
 
+fn clip_rows(selected: bool) -> Vec<Row> {
+    let clip = |id: &str, label: &str, c: char, off: bool| {
+        let i = Item::new(id, label).key(Key::Command(c));
+        Row::Item(if off { i.off() } else { i })
+    };
+    vec![
+        clip("cut", "Cut", 'x', !selected),
+        clip("copy", "Copy", 'c', !selected),
+        clip("paste", "Paste", 'v', false),
+    ]
+}
+
 /// Tab on an empty line: the menu to put a part there. False on any other line.
 pub fn tab(s: &mut State) -> bool {
     let (line, text) = draft::caret_line(s);
@@ -80,22 +92,30 @@ pub fn tab(s: &mut State) -> bool {
     }
     let text = text.to_string();
     let selected = s.edit.range().0 != s.edit.range().1;
-    let cmd = |c: char| Key::Command(c);
-    let clip = |id: &str, label: &str, c: char, off: bool| {
-        let i = Item::new(id, label).key(cmd(c));
-        Row::Item(if off { i.off() } else { i })
-    };
-    let rows = vec![
+    let mut rows = vec![
         Row::Item(Item::new("insert", "Insert part…").more()),
         Row::Item(Item::new("new", "New part…").more()),
         Row::Sep,
-        clip("cut", "Cut", 'x', !selected),
-        clip("copy", "Copy", 'c', !selected),
-        clip("paste", "Paste", 'v', false),
     ];
+    rows.extend(clip_rows(selected));
     crate::look::close_panels(s);
     s.insert = Some(Insert { line, text, ..Insert::default() });
     s.panels = vec![Panel::new(MENU, "Insert", 196.0, rows)];
+    true
+}
+
+/// Right-click on a line of writing (not empty, not a `:::` line): Cut, Copy, Paste.
+pub fn writing_menu(s: &mut State) -> bool {
+    let (line, text) = draft::caret_line(s);
+    if text.trim().is_empty() || text.trim_start().starts_with(":::") {
+        return false;
+    }
+    let text = text.to_string();
+    let selected = s.edit.range().0 != s.edit.range().1;
+    let rows = clip_rows(selected);
+    crate::look::close_panels(s);
+    s.insert = Some(Insert { line, text, ..Insert::default() });
+    s.panels = vec![Panel::new(MENU, "Edit", 196.0, rows)];
     true
 }
 
@@ -164,7 +184,7 @@ pub fn parts_answered(s: &mut State, asked: Asked, answer: Value) {
                 Some(c) => draft.chip(c),
                 None => draft,
             }));
-            s.anchor = None;
+            s.anchor = state::keep_anchor(s);
             s.panels = vec![Panel::new(WORDS, readable(&ins.words), 300.0, rows)];
         }
         _ => {}

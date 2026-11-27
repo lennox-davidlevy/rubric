@@ -303,6 +303,7 @@ fn restore(s: &mut State) {
 pub fn close_panels(s: &mut State) {
     // The next panel to open hangs from its own line.
     s.anchor = None;
+    s.anchor_wait = false;
     let Some(id) = s.panels.first().map(|p| p.id.clone()) else { return };
     let peeking = s.panels.iter().any(|p| p.id == crate::draft::NEAR);
     let looking = s.panels.iter().any(|p| matches!(p.id.as_str(), crate::insert::LIST | crate::insert::SIMILAR | crate::insert::GROUP));
@@ -369,6 +370,7 @@ pub fn pressed(s: &mut State, depth: usize, i: usize, segment: Option<usize>, tx
     sync_field(s);
     follow(s, was_field, tx);
     keys_home(s, tx);
+    state::sync_draft_boxes(s, tx);
 }
 
 /// After a press in a panel the keys go where they would after a key: the field that has them,
