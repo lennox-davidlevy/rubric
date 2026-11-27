@@ -5,13 +5,19 @@ use std::path::PathBuf;
 use rune::{Env, Ime, Key, KeyEvent, Mods, Runtime};
 use rubric_app::state::State;
 
-pub fn runtime(text: &str, caret: usize) -> Runtime<State> {
+pub fn runtime_sized(text: &str, caret: usize, size: (f32, f32)) -> Runtime<State> {
     let mut s = State::open(PathBuf::from("/nonexistent/post.md"), text.to_string());
     s.edit.set_caret(caret);
-    s.width = 1000.0;
-    let mut rt = Runtime::with_text(s, rubric_app::view, (1000.0, 700.0), Env::new(false, 1.0), rubric_app::fonts::text_system());
+    s.width = size.0;
+    s.height = size.1;
+    let mut rt = Runtime::with_text(s, rubric_app::view, size, Env::new(false, 1.0), rubric_app::fonts::text_system());
+    rt.on_key = Some(rubric_app::editor::window_key);
     rt.frame(0.0);
     rt
+}
+
+pub fn runtime(text: &str, caret: usize) -> Runtime<State> {
+    runtime_sized(text, caret, (1000.0, 700.0))
 }
 
 fn press(rt: &mut Runtime<State>, key: Key) {
@@ -782,7 +788,7 @@ fn text_of(rt: &Runtime<State>, key: &str) -> Option<String> {
 }
 
 #[test]
-fn the_title_row_says_saved_only_while_the_text_is_as_written() {
+fn the_title_row_tracks_saved_and_edited_states() {
     let dir = std::env::temp_dir().join(format!("rubric-app-title-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("walk.md");
@@ -793,13 +799,17 @@ fn the_title_row_says_saved_only_while_the_text_is_as_written() {
     let mut rt = Runtime::with_text(s, rubric_app::view, (1000.0, 700.0), Env::new(false, 1.0), rubric_app::fonts::text_system());
     rt.frame(0.0);
     assert_eq!(text_of(&rt, "title").as_deref(), Some("The long walk"));
-    assert!(rt.find("saved").is_some());
+    assert_eq!(rubric_app::state::save_state(&rt.state), rubric_app::state::SaveState::Saved);
+    let saved_text = text_of(&rt, "saved").expect("saved state drawn");
     rt.ime(Ime::Commit("x".into()));
     rt.frame(1.0 / 60.0);
-    assert!(rt.find("saved").is_none(), "changed since it was written");
+    assert_eq!(rubric_app::state::save_state(&rt.state), rubric_app::state::SaveState::Edited);
+    let edited_text = text_of(&rt, "saved").expect("edited state drawn");
+    assert_ne!(edited_text, saved_text, "changed since it was written");
     rt.key(KeyEvent { key: Key::Command('s'), mods: Mods { cmd: true, ..Mods::default() } });
     rt.frame(1.0 / 60.0);
-    assert!(rt.find("saved").is_some(), "written again");
+    assert_eq!(rubric_app::state::save_state(&rt.state), rubric_app::state::SaveState::Saved);
+    assert_eq!(text_of(&rt, "saved"), Some(saved_text), "written again");
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "# The long walk\n\nbodyx");
     std::fs::remove_dir_all(&dir).unwrap();
 }
@@ -2058,4 +2068,515 @@ fn a_draft_edge_stays_on_its_line_through_edits_around_it() {
     press(&mut rt, Key::Backspace);
     idle(&mut rt);
     on_line(&rt, "a line taken away above");
+}
+
+fn cmd_key(rt: &mut Runtime<State>, ch: char, shift: bool) {
+    rt.key(KeyEvent { key: Key::Command(ch), mods: Mods { cmd: true, shift, ..Mods::default() } });
+    rt.frame(1.0 / 60.0);
+}
+
+#[test]
+fn the_toolbar_title_comes_from_front_matter_then_heading_then_file_name() {
+    let rt = runtime("---\ntitle: \"Three days on the coast path\"\n---\n\n# Different heading\n", 0);
+    assert_eq!(text_of(&rt, "title").as_deref(), Some("Three days on the coast path"));
+    let rt = runtime("---\ndate: 2026-06-12\n---\n\n# Only heading\n", 0);
+    assert_eq!(text_of(&rt, "title").as_deref(), Some("Only heading"));
+    let rt = runtime("Just prose.", 0);
+    assert_eq!(text_of(&rt, "title").as_deref(), Some("post.md"));
+}
+
+#[test]
+fn ctrl_2_hides_the_page_and_ctrl_1_restores_the_prior_split() {
+    let mut rt = runtime("# Walk\n\nBody.", 0);
+    rt.frame(1.0 / 60.0);
+    // Drag the divider to a custom split first.
+    let (dx, dy) = rt.find("divider").unwrap();
+    rt.pointer_down(dx, dy);
+    rt.frame(1.0 / 60.0);
+    rt.pointer_move(dx - 120.0, dy);
+    rt.frame(1.0 / 60.0);
+    rt.pointer_up(dx - 120.0, dy);
+    rt.frame(1.0 / 60.0);
+    let custom = rt.state.split;
+    assert!((custom - 0.5).abs() > 0.05 && custom > 0.1 && custom < 0.9, "custom split: {custom}");
+    let before = rt.state.bounds.unwrap();
+    assert!(before.0 > 0 && before.0 < 1000 && before.2 > 0 && before.3 > 0);
+
+    // Ctrl+2: writing only keeps the view's last size and moves it fully outside the window.
+    cmd_key(&mut rt, '2', false);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.split, 1.0);
+    let hidden = rt.state.bounds.unwrap();
+    assert!(hidden.0 >= 1000 && hidden.1 >= 700, "moved outside window: {hidden:?}");
+    assert_eq!((hidden.2, hidden.3), (before.2, before.3), "last size kept while off-window");
+
+    // Ctrl+1: brings back the split and moves the view back to its exact prior bounds.
+    cmd_key(&mut rt, '1', false);
+    rt.frame(1.0 / 60.0);
+    assert!((rt.state.split - custom).abs() < 1e-4, "restored {custom}, got {}", rt.state.split);
+    assert_eq!(rt.state.bounds, Some(before));
+    assert!(editor_focused(&rt));
+
+    // Ctrl+3: page only, then Ctrl+1 still works while writing is hidden and refocuses editor.
+    cmd_key(&mut rt, '3', false);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.split, 0.0);
+    cmd_key(&mut rt, '1', false);
+    rt.frame(1.0 / 60.0);
+    assert!((rt.state.split - custom).abs() < 1e-4);
+    assert!(editor_focused(&rt));
+}
+
+#[test]
+fn the_view_popover_opens_from_the_button_ticks_the_shown_pane_and_changes_the_split() {
+    let mut rt = runtime("# Walk\n\nBody.", 0);
+    rt.frame(1.0 / 60.0);
+    let btn = rect_of(&rt, "toolbar-view");
+    let (bx, by) = rt.find("toolbar-view").unwrap();
+    rt.pointer_down(bx, by);
+    rt.pointer_up(bx, by);
+    settle(&mut rt);
+
+    assert!(rubric_app::toolbar::view_open(&rt.state));
+    let pop = rect_of(&rt, "panel-0");
+    assert!((pop[0] - btn[0]).abs() < 1.0, "hung from button x: {pop:?} vs {btn:?}");
+    assert!((pop[1] - (rubric_app::TITLE + 4.0)).abs() < 1.0, "hung under toolbar: {pop:?}");
+    let checked = |rt: &Runtime<State>, id: &str| {
+        rt.state.panels[0].rows.iter().any(|r| matches!(r, rubric_app::panel::Row::Item(i) if i.id == id && i.check))
+    };
+    assert!(checked(&rt, "both") && !checked(&rt, "write") && !checked(&rt, "page"));
+
+    // Choosing "Writing only" closes the popover and sets split to 1.0.
+    let (wx, wy) = rt.find("row-view-write").unwrap();
+    rt.pointer_down(wx, wy);
+    rt.pointer_up(wx, wy);
+    rt.frame(1.0 / 60.0);
+    assert!(!rubric_app::toolbar::view_open(&rt.state));
+    assert_eq!(rt.state.split, 1.0);
+
+    // Reopen: "Writing only" is ticked; Esc closes it.
+    rt.pointer_down(bx, by);
+    rt.pointer_up(bx, by);
+    rt.frame(1.0 / 60.0);
+    assert!(checked(&rt, "write") && !checked(&rt, "both"));
+    press(&mut rt, Key::Escape);
+    assert!(!rubric_app::toolbar::view_open(&rt.state));
+
+    // Reopen and press elsewhere: scrim closes it.
+    rt.pointer_down(bx, by);
+    rt.pointer_up(bx, by);
+    rt.frame(1.0 / 60.0);
+    assert!(rubric_app::toolbar::view_open(&rt.state));
+    rt.pointer_down(600.0, 300.0);
+    rt.pointer_up(600.0, 300.0);
+    rt.frame(1.0 / 60.0);
+    assert!(!rubric_app::toolbar::view_open(&rt.state));
+}
+
+#[test]
+fn in_page_only_view_the_page_gives_way_to_the_view_popover_and_returns_when_closed() {
+    let mut rt = runtime("# Walk\n\nBody.", 0);
+    rt.frame(1.0 / 60.0);
+
+    // All four toolbar tips sit inside the toolbar beside their control (right for left controls,
+    // left for right controls), never beneath the toolbar over the page.
+    for (key, prefix, right_side) in [
+        ("toolbar-drawer", "Posts and pages", true),
+        ("toolbar-view", "View", true),
+        ("toolbar-open", "Open in browser", false),
+        ("toolbar-close", "Close window", false),
+    ] {
+        let btn = rect_of(&rt, key);
+        let (x, y) = rt.find(key).unwrap();
+        rt.pointer_move(x, y);
+        rt.frame(1.0 / 60.0);
+        rt.frame(0.5);
+        let (tip_text, tip_rect) = rt.help_tooltip().unwrap_or_else(|| panic!("no tooltip for {key}"));
+        assert!(tip_text.starts_with(prefix), "{key}: got {tip_text:?}");
+        if key == "toolbar-drawer" {
+            assert_eq!(rt.state.toolbar_hover, None, "drawer button has no hover fill until sitting 3");
+        }
+        assert!(tip_rect[1] >= 0.0 && tip_rect[1] + tip_rect[3] <= rubric_app::TITLE + 0.5, "{key}: tip {tip_rect:?} left the toolbar");
+        if right_side {
+            assert!(tip_rect[0] >= btn[0] + btn[2], "{key}: tip {tip_rect:?} not right of {btn:?}");
+        } else {
+            assert!(tip_rect[0] + tip_rect[2] <= btn[0] + 0.5, "{key}: tip {tip_rect:?} not left of {btn:?}");
+        }
+    }
+
+    // Page only: toolbar tips still show inside the toolbar; page rests right after the divider.
+    cmd_key(&mut rt, '3', false);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.split, 0.0);
+    let (dx, dy) = rt.find("toolbar-drawer").unwrap();
+    rt.pointer_move(dx, dy);
+    rt.frame(1.0 / 60.0);
+    rt.frame(0.5);
+    assert!(rt.help_tooltip().is_some_and(|(t, r)| t.starts_with("Posts and pages") && r[1] + r[3] <= rubric_app::TITLE + 0.5));
+    let resting = rect_of(&rt, "page");
+    assert_eq!(resting[0], rubric_app::DIVIDER);
+
+    // Open View popover: page gives way so its left edge is at 300 points (and right of popover),
+    // and the yielded column is filled in the pane's color from x=0 to x=300.
+    let (bx, by) = rt.find("toolbar-view").unwrap();
+    rt.pointer_down(bx, by);
+    rt.pointer_up(bx, by);
+    settle(&mut rt);
+    let pop = rect_of(&rt, "panel-0");
+    let cover = rect_of(&rt, "page-cover");
+    let shifted = rect_of(&rt, "page");
+    assert_eq!(cover[0], 0.0, "yielded column starts at left edge in page-only view");
+    assert!((cover[2] - 300.0).abs() < 0.5, "yielded column width {} != 300.0", cover[2]);
+    assert_eq!(fill_of(&rt, "page-cover"), rt.state.look.palette.pane, "yielded column uses pane color");
+    assert!((shifted[0] - 300.0).abs() < 0.5, "page left {} != 300.0", shifted[0]);
+    assert!(shifted[0] >= pop[0] + pop[2], "page left {} < popover right {}", shifted[0], pop[0] + pop[2]);
+    assert_eq!(rt.state.bounds.unwrap().0, 300);
+
+    // Close with Esc: page goes back to its resting edge.
+    press(&mut rt, Key::Escape);
+    settle(&mut rt);
+    assert_eq!(rt.state.left_cover, 0.0);
+    assert_eq!(rect_of(&rt, "page")[0], resting[0]);
+}
+
+#[test]
+fn at_760_wide_open_in_browser_moves_to_view_popover_and_title_does_not_cross_any_button() {
+    let long_title = "---\ntitle: A very long post title about walking the entire coast path from north to south in the rain\n---\n\nBody.";
+    let mut rt = runtime_sized(long_title, 0, (760.0, 700.0));
+    rt.frame(1.0 / 60.0);
+    assert!(rt.find("toolbar-open").is_none(), "Open in browser is not drawn in the row at 760 wide");
+    let left_group = rect_of(&rt, "toolbar-left");
+    let title_group = rect_of(&rt, "title-group");
+    let right_group = rect_of(&rt, "toolbar-right");
+    assert!(title_group[0] >= left_group[0] + left_group[2], "title {title_group:?} crosses left buttons {left_group:?}");
+    assert!(title_group[0] + title_group[2] <= right_group[0] + 0.5, "title {title_group:?} crosses right buttons {right_group:?}");
+
+    // With a serving address and page path, Open in browser is the View panel's last item under
+    // a hairline, and choosing it opens the URL and closes the popover.
+    let uri = rt.state.uri.clone();
+    tell(&mut rt, Incoming::Notification { method: "rubric/serving".into(), params: json!({ "url": "http://127.0.0.1:1415/" }) });
+    tell(&mut rt, Incoming::Notification { method: "rubric/page".into(), params: json!({ "uri": uri, "url": "/posts/coast/" }) });
+    rt.frame(1.0 / 60.0);
+
+    let (vx, vy) = rt.find("toolbar-view").unwrap();
+    rt.pointer_down(vx, vy);
+    rt.pointer_up(vx, vy);
+    settle(&mut rt);
+    let rows = &rt.state.panels[0].rows;
+    assert_eq!(rows.len(), 5, "3 pane items + separator + Open in browser");
+    assert!(matches!(rows[3], rubric_app::panel::Row::Sep));
+    assert_eq!(rows[4].id(), Some("open"));
+
+    let (ox, oy) = rt.find("row-view-open").unwrap();
+    rt.pointer_down(ox, oy);
+    rt.pointer_up(ox, oy);
+    rt.frame(1.0 / 60.0);
+    assert!(!rubric_app::toolbar::view_open(&rt.state));
+    assert_eq!(rt.take_url_requests(), vec!["http://127.0.0.1:1415/posts/coast/"]);
+
+    // And Ctrl+Shift+B still opens the page with the popover closed.
+    cmd_key(&mut rt, 'b', true);
+    assert_eq!(rt.take_url_requests(), vec!["http://127.0.0.1:1415/posts/coast/"]);
+}
+
+#[test]
+fn open_in_browser_asks_to_open_only_when_an_address_is_known() {
+    let mut rt = runtime("# Walk\n", 0);
+    rt.frame(1.0 / 60.0);
+    assert!(rt.find("toolbar-open").is_some());
+
+    // Without a server address: neither Ctrl+Shift+B nor clicking the button opens anything.
+    cmd_key(&mut rt, 'b', true);
+    assert!(rt.take_url_requests().is_empty());
+    let (ox, oy) = rt.find("toolbar-open").unwrap();
+    rt.pointer_down(ox, oy);
+    rt.pointer_up(ox, oy);
+    rt.frame(1.0 / 60.0);
+    assert!(rt.take_url_requests().is_empty());
+
+    // With rubric/serving and rubric/page: both Ctrl+Shift+B and the button ask to open the post's URL.
+    let uri = rt.state.uri.clone();
+    tell(&mut rt, Incoming::Notification { method: "rubric/serving".into(), params: json!({ "url": "http://127.0.0.1:1415/" }) });
+    tell(&mut rt, Incoming::Notification { method: "rubric/page".into(), params: json!({ "uri": uri, "url": "/posts/long/" }) });
+    rt.frame(1.0 / 60.0);
+
+    cmd_key(&mut rt, 'b', true);
+    assert_eq!(rt.take_url_requests(), vec!["http://127.0.0.1:1415/posts/long/"]);
+
+    rt.pointer_down(ox, oy);
+    rt.pointer_up(ox, oy);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.take_url_requests(), vec!["http://127.0.0.1:1415/posts/long/"]);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn close_button_asks_window_to_close_and_edges_resize_without_blocking_controls() {
+    use rune::{ResizeEdge, Shell};
+    let mut rt = runtime("# Walk\n", 0);
+    rt.frame(1.0 / 60.0);
+
+    // Edge and corner resize strips emit their ResizeEdge.
+    for (x, y, want) in [
+        (1.0, 1.0, ResizeEdge::NorthWest),
+        (500.0, 1.0, ResizeEdge::North),
+        (999.0, 1.0, ResizeEdge::NorthEast),
+        (1.0, 300.0, ResizeEdge::West),
+        (999.0, 300.0, ResizeEdge::East),
+        (1.0, 699.0, ResizeEdge::SouthWest),
+        (500.0, 699.0, ResizeEdge::South),
+        (999.0, 699.0, ResizeEdge::SouthEast),
+    ] {
+        rt.pointer_down(x, y);
+        assert_eq!(rt.take_resize_action(), Some(want), "at ({x}, {y})");
+        rt.pointer_up(x, y);
+        rt.frame(1.0 / 60.0);
+    }
+
+    // Pressing the close button requests Shell::Close and no resize.
+    let (cx, cy) = rt.find("toolbar-close").unwrap();
+    rt.pointer_down(cx, cy);
+    assert_eq!(rt.take_resize_action(), None);
+    rt.pointer_up(cx, cy);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.shell_request, Some(Shell::Close));
+}
+
+#[test]
+fn ctrl_w_asks_the_window_to_close() {
+    let mut rt = runtime("# Walk\n", 0);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.shell_request, None);
+    cmd_key(&mut rt, 'w', false);
+    assert_eq!(rt.shell_request, Some(rune::Shell::Close));
+
+    // Also works in page-only view when the writing field has no focus.
+    let mut rt = runtime("# Walk\n", 0);
+    cmd_key(&mut rt, '3', false);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.split, 0.0);
+    cmd_key(&mut rt, 'w', false);
+    assert_eq!(rt.shell_request, Some(rune::Shell::Close));
+}
+
+#[test]
+fn keys_forwarded_via_send_key_type_and_switch_panes_and_app_press_takes_keys_back_from_page() {
+    let mut rt = runtime("hello ", 6);
+    rt.frame(1.0 / 60.0);
+
+    // Forwarded typing via Tx::send_key lands in the writing.
+    for ch in "world".chars() {
+        rt.update(move |_, tx| {
+            tx.send_key(KeyEvent { key: Key::Text(ch.to_string()), mods: Mods::default() });
+        });
+        rt.frame(1.0 / 60.0);
+    }
+    assert_eq!(rt.state.edit.text, "hello world");
+
+    // In page-only view, a forwarded Ctrl+1 restores both panes and refocuses the writing.
+    cmd_key(&mut rt, '3', false);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.split, 0.0);
+    rt.update(|_, tx| {
+        tx.send_key(KeyEvent { key: Key::Command('1'), mods: Mods { cmd: true, ctrl: true, ..Mods::default() } });
+    });
+    rt.frame(1.0 / 60.0);
+    assert!((rt.state.split - 0.5).abs() < 1e-4);
+    assert!(editor_focused(&rt));
+
+    // A press inside the page hands it keys; clicking in the editor or toolbar takes them back.
+    rt.update(|s, _| rubric_app::state::page_pressed(s));
+    assert!(rt.state.page_has_keys);
+    let (ex, ey) = rt.find("editor").unwrap();
+    rt.pointer_down(ex, ey);
+    rt.pointer_up(ex, ey);
+    rt.frame(1.0 / 60.0);
+    assert!(!rt.state.page_has_keys, "press in editor takes keys back from the page");
+
+    rt.update(|s, _| rubric_app::state::page_pressed(s));
+    assert!(rt.state.page_has_keys);
+    let (vx, vy) = rt.find("toolbar-view").unwrap();
+    rt.pointer_down(vx, vy);
+    rt.pointer_up(vx, vy);
+    rt.frame(1.0 / 60.0);
+    assert!(!rt.state.page_has_keys, "press on toolbar takes keys back from the page");
+}
+
+// Sitting 2: autosave, failed save status, save on close, and folder startup.
+
+fn temp_runtime(name: &str, text: &str, caret: usize) -> (Runtime<State>, PathBuf, PathBuf) {
+    let dir = std::env::temp_dir().join(format!("rubric-app-s2-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("post.md");
+    std::fs::write(&path, text).unwrap();
+    let mut s = State::open(path.clone(), text.into());
+    s.edit.set_caret(caret);
+    s.width = 1000.0;
+    s.height = 700.0;
+    let mut rt = Runtime::with_text(s, rubric_app::view, (1000.0, 700.0), Env::new(false, 1.0), rubric_app::fonts::text_system());
+    rt.poll = Some(rubric_app::state::poll);
+    rt.on_key = Some(rubric_app::editor::window_key);
+    rt.frame(0.0);
+    (rt, dir, path)
+}
+
+#[test]
+fn autosave_writes_after_one_second_and_a_second_change_resets_the_timer() {
+    use rubric_app::state::{SaveState, save_state};
+    let (mut rt, dir, path) = temp_runtime("autosave", "# Walk\n\nStart", 13);
+    assert_eq!(save_state(&rt.state), SaveState::Saved);
+
+    // First edit: not written before 1 s.
+    rt.ime(Ime::Commit(" one".into()));
+    rt.frame(1.0 / 60.0);
+    assert_eq!(save_state(&rt.state), SaveState::Edited);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Walk\n\nStart");
+
+    rt.frame(0.6);
+    assert_eq!(save_state(&rt.state), SaveState::Edited);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Walk\n\nStart", "not written at 0.6 s");
+
+    // Second edit before 1 s moves the write deadline forward by another second.
+    rt.ime(Ime::Commit(" two".into()));
+    rt.frame(1.0 / 60.0);
+    rt.frame(0.6);
+    assert_eq!(save_state(&rt.state), SaveState::Edited);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Walk\n\nStart", "still not written 0.6 s after second edit");
+
+    // Past 1 s from the second edit: written, toolbar returns to Saved, no timer left.
+    rt.frame(0.5);
+    assert_eq!(save_state(&rt.state), SaveState::Saved);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Walk\n\nStart one two");
+    assert_eq!(rt.state.save_due, None);
+    assert!(!rt.state.save_arm);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn a_failed_save_shows_status_overrides_new_line_and_retry_clears_both() {
+    use rubric_app::state::{SaveState, save_state};
+    let dir = std::env::temp_dir().join(format!("rubric-app-s2-fail-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let missing_dir = dir.join("missing");
+    let path = missing_dir.join("post.md");
+    let initial = "# Walk\n\n::: new: a tide clock\n:::\n";
+    let mut s = State::open(path.clone(), initial.into());
+    let line_end = initial.find("clock").unwrap() + 5;
+    s.edit.set_caret(line_end);
+    s.width = 1000.0;
+    s.height = 700.0;
+    let mut rt = Runtime::with_text(s, rubric_app::view, (1000.0, 700.0), Env::new(false, 1.0), rubric_app::fonts::text_system());
+    rt.poll = Some(rubric_app::state::poll);
+    rt.on_key = Some(rubric_app::editor::window_key);
+    rt.frame(0.0);
+
+    // Caret is on a `new:` line, so its draft status shows first.
+    let draft_line = rubric_app::draft::line(&rt.state).expect("new: line status");
+    assert_eq!(draft_line.tone, rubric_app::draft::Tone::Dim);
+    assert!(rt.find("status-action").is_some());
+
+    // Edit and wait past 1 s: save fails because the folder does not exist.
+    rt.ime(Ime::Commit("!".into()));
+    rt.frame(1.0 / 60.0);
+    rt.frame(1.1);
+    assert_eq!(save_state(&rt.state), SaveState::Failed);
+    assert!(rt.state.save_error.is_some());
+
+    // The `new:` line's status gives way to the failed save status with Retry (Ctrl+S).
+    let fail_line = rubric_app::draft::line(&rt.state).expect("failed save status");
+    assert_eq!(fail_line.tone, rubric_app::draft::Tone::Warn);
+    let (_, chord) = fail_line.action.expect("Retry action");
+    assert_eq!(chord, rubric_app::toolbar::chord(rubric_app::toolbar::Shortcut::Save));
+    assert!(rt.find("status-action").is_some());
+
+    // In page-only view, the failed save status takes a 34-point strip at the window's foot and
+    // the page yields 34 points at the bottom.
+    cmd_key(&mut rt, '3', false);
+    rt.frame(1.0 / 60.0);
+    let status_rect = rect_of(&rt, "status");
+    let page_rect = rect_of(&rt, "page");
+    assert!((status_rect[2] - 1000.0).abs() < 1.0, "wide status strip: {status_rect:?}");
+    assert!((status_rect[3] - rubric_app::STATUS).abs() < 1.0);
+    assert!((page_rect[1] + page_rect[3] - status_rect[1]).abs() < 1.0, "page yields foot strip: {page_rect:?} vs {status_rect:?}");
+    cmd_key(&mut rt, '1', false);
+    rt.frame(1.0 / 60.0);
+
+    // Make the folder exist, then click Retry: file writes, failed state clears, and `new:` line
+    // status returns.
+    std::fs::create_dir_all(&missing_dir).unwrap();
+    let (ax, ay) = rt.find("status-action").unwrap();
+    rt.pointer_down(ax, ay);
+    rt.pointer_up(ax, ay);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(save_state(&rt.state), SaveState::Saved);
+    assert!(rt.state.save_error.is_none());
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Walk\n\n::: new: a tide clock!\n:::\n");
+    let after = rubric_app::draft::line(&rt.state).expect("new: line status returns");
+    assert_eq!(after.tone, rubric_app::draft::Tone::Dim);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn closing_saves_unsaved_writing_and_folder_startup_opens_newest_post_or_home() {
+    let (mut rt, dir, path) = temp_runtime("close", "# Walk\n\nBefore", 14);
+    rt.ime(Ime::Commit(" after".into()));
+    rt.frame(1.0 / 60.0);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Walk\n\nBefore");
+    rubric_app::state::shut(&mut rt.state);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Walk\n\nBefore after");
+    std::fs::remove_dir_all(&dir).unwrap();
+
+    // Folder startup: asks `rubric/pages` on connect, then opens the first post; with no posts,
+    // opens the home page.
+    let site = std::env::temp_dir().join(format!("rubric-app-s2-folder-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&site);
+    std::fs::create_dir_all(site.join("pages/posts")).unwrap();
+    let home = site.join("pages/_index.md");
+    let newest = site.join("pages/posts/new.md");
+    std::fs::write(&home, "---\ntitle: Harbour\n---\nHome.\n").unwrap();
+    std::fs::write(&newest, "---\ntitle: Newest post\ndate: 2026-11-20\n---\nBody.\n").unwrap();
+
+    let (client, rx) = rubric_app::lsp::Client::recording();
+    let mut s = State::open_folder(site.clone());
+    rubric_app::state::connected(&mut s, client);
+    let req = rx.try_recv().expect("rubric/pages request");
+    assert_eq!(req["method"], "rubric/pages");
+    let id = req["id"].as_i64().unwrap();
+    let resp = Incoming::Response {
+        id,
+        result: Ok(json!({
+            "site": "Harbour",
+            "pages": [
+                { "uri": rubric_app::state::file_uri(&home), "kind": "home", "title": "Harbour", "draft": false },
+                { "uri": rubric_app::state::file_uri(&newest), "kind": "post", "title": "Newest post", "date": "2026-11-20", "draft": false }
+            ]
+        })),
+    };
+    assert!(rubric_app::state::incoming(&mut s, resp));
+    assert_eq!(s.path, newest);
+    assert_eq!(s.title, "Newest post");
+    assert!(!s.waiting_for_page);
+    let sent: Vec<_> = std::iter::from_fn(|| rx.try_recv().ok()).collect();
+    assert!(sent.iter().any(|m| m["method"] == "textDocument/didOpen" && m["params"]["textDocument"]["uri"] == rubric_app::state::file_uri(&newest)));
+    assert!(sent.iter().any(|m| m["method"] == "rubric/cursor" && m["params"]["uri"] == rubric_app::state::file_uri(&newest)));
+
+    // Without posts: opens the home page.
+    let (client2, rx2) = rubric_app::lsp::Client::recording();
+    let mut s2 = State::open_folder(site.clone());
+    rubric_app::state::connected(&mut s2, client2);
+    let req2 = rx2.try_recv().expect("rubric/pages request");
+    let resp2 = Incoming::Response {
+        id: req2["id"].as_i64().unwrap(),
+        result: Ok(json!({
+            "site": "Harbour",
+            "pages": [
+                { "uri": rubric_app::state::file_uri(&home), "kind": "home", "title": "Harbour", "draft": false }
+            ]
+        })),
+    };
+    assert!(rubric_app::state::incoming(&mut s2, resp2));
+    assert_eq!(s2.path, home);
+    assert_eq!(s2.title, "Harbour");
+    std::fs::remove_dir_all(&site).unwrap();
 }

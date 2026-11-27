@@ -15,6 +15,7 @@ pub mod position;
 pub mod split;
 pub mod state;
 pub mod theme;
+pub mod toolbar;
 pub mod trace;
 
 use rune::{Cursor, Cx, Effect, El, Phase, ScrollSpec, Spring, SpringPair, Transition, col, el, row, text, text_input};
@@ -56,9 +57,24 @@ pub fn kit(p: &Palette) -> Kit {
 
 pub fn view(s: &State, cx: &mut Cx<State>) -> El {
     let p = s.look.palette;
+    cx.help_look(toolbar::help_look(&p));
     let scale = cx.env().scale;
     let room = (s.width - DIVIDER).max(0.0);
     let left = (room * s.split).round();
+    // When page-only yields a left column for the View popover (or drawer), the yielded column
+    // spans from x=0 to `left_cover` in the pane's color with a hairline at its right edge
+    // (picture 93). When both panes are shown, any yielded column sits between divider and page.
+    let cover_page_only = left == 0.0 && s.left_cover > 0.0;
+    let cover_w = if cover_page_only {
+        s.left_cover.min(s.width)
+    } else {
+        (s.left_cover - left - DIVIDER).max(0.0)
+    };
+    let page_w = if cover_page_only {
+        (s.width - cover_w).max(0.0)
+    } else {
+        (room - left - cover_w).max(0.0)
+    };
     // A hairline in the middle of a wider grip.
     let divider = row().key("divider").w(DIVIDER).h_full().fill(p.bg).justify_center().cursor(Cursor::ResizeColumn)
         .child(el().w(1.0).h_full().fill(p.line))
@@ -67,25 +83,52 @@ pub fn view(s: &State, cx: &mut Cx<State>) -> El {
                 d.data = s.split;
             }
             s.split = split::dragged(d.data, d.dx, (s.width - DIVIDER).max(1.0));
+            if s.split > 0.0 && s.split < 1.0 {
+                s.last_split = s.split;
+            }
             // At the left edge the writing is 0 wide and loses focus; when it shows again,
             // typing goes back to it.
             if d.phase == Phase::Up && s.split > 0.0 {
                 tx.focus("editor", false);
             }
         });
-    let page = el().key("page").w(room - left).h_full().fill(p.bg)
+    let page = el().key("page").w(page_w).h_full().fill(p.bg).instant_changes()
         .on_layout(move |s: &mut State, rect| state::page_laid_out(s, rect, scale));
-    let panes = row().key("panes").w_full().grow(1.0).min_h(0.0)
-        .child(writing(s).w(left))
-        .child(divider)
-        .child(page);
+    let wide_status = s.split <= 0.0 && draft::wide_status(s);
+    let mut panes = row().key("panes").w_full().grow(1.0).min_h(0.0)
+        .child(writing(s, !wide_status).w(left));
+    if !cover_page_only {
+        panes = panes.child(divider);
+    }
+    if cover_w > 0.0 {
+        panes = panes.child(
+            el().key("page-cover").w(cover_w).h_full().fill(p.pane)
+                .border_sides([0.0, 1.0, 0.0, 0.0], p.line)
+                .instant_changes(),
+        );
+    }
+    let panes = panes.child(page);
     let mut window = col().key("window").w_full().h_full().fill(p.bg)
+        .on_any_press(|s: &mut State, _, _, _| {
+            state::app_pressed(s);
+        })
         .on_layout(|s: &mut State, rect| {
             s.width = rect[2];
             s.height = rect[3];
-        })
-        .child(title_row(s))
+            toolbar::sync_cover(s);
+        });
+    for edge in toolbar::window_side_resize_edges(s) {
+        window = window.child(edge);
+    }
+    let mut window = window
+        .child(toolbar::bar(s))
         .child(panes);
+    if wide_status && let Some(line) = status(s) {
+        window = window.child(line.instant_changes());
+    }
+    for edge in toolbar::window_bottom_resize_edges(s) {
+        window = window.child(edge);
+    }
     // Draft lines: a 2-point bar 18 points left of the writing, and the state's word at the
     // line's right end when the line's text does not reach it. Lines scrolled out of the writing
     // viewport draw nothing.
@@ -124,10 +167,20 @@ pub fn view(s: &State, cx: &mut Cx<State>) -> El {
         );
     }
     let mut layer = Vec::new();
-    // The panels, in the layer above the window's, hang from the left edge of their line's
-    // text and its bottom, taken when they open: a caret moving along the line (a setting
-    // written) leaves them where they are; scrolling and a resize move them with the line.
-    if !s.panels.is_empty() && !s.anchor_wait {
+    // The View popover hangs from its toolbar button, with a scrim so a press elsewhere closes it.
+    if toolbar::view_open(s) {
+        layer.push(rune_kit::scrim_tx("panel-scrim", |s: &mut State, tx| {
+            look::close_panels(s);
+            if s.split > 0.0 {
+                tx.focus("editor", false);
+            }
+        }));
+        let rect = toolbar::view_rect(s);
+        layer.push(panel_view(s, &s.panels[0], 0, rect, None));
+    } else if !s.panels.is_empty() && !s.anchor_wait {
+        // The editor panels, in the layer above the window's, hang from the left edge of their
+        // line's text and its bottom, taken when they open: a caret moving along the line (a
+        // setting written) leaves them where they are; scrolling and a resize move them with it.
         let ed = s.editor_rect;
         let (at, start) = state::caret_line_start(s);
         let kept = s.anchor.filter(|a| a.holds(at, start, ed[2]));
@@ -355,19 +408,6 @@ fn draft_edge(line: u32, status: &draft::Status, p: &Palette, x: f32, y: f32, h:
     }
 }
 
-/// The row over both panes: the post's title, and "Saved" when the text is as written.
-fn title_row(s: &State) -> El {
-    let p = s.look.palette;
-    let mut words = row().gap(10.0).items_end()
-        .child(text(s.title.clone()).key("title").font(fonts::ui(500.0)).color(p.ink).truncate().shrink());
-    if state::clean(s) {
-        words = words.child(text("Saved").key("saved").font(fonts::caption(400.0)).color(p.ink2));
-    }
-    row().key("title-row").w_full().h(TITLE).px(12.0).center().fill(p.bg)
-        .border_sides([0.0, 0.0, 1.0, 0.0], p.line)
-        .child(words)
-}
-
 /// The line under the writing: a label in the state's color, one fact, and at most one action
 /// with its key, for the caret's `new:` line or what just happened. Not drawn when there is
 /// nothing to say.
@@ -388,6 +428,7 @@ fn status(s: &State) -> Option<El> {
     if let Some((name, key)) = said.action {
         line = line.child(
             row().key("status-action").gap(6.0).center_y().px(6.0).py(2.0).radius(5.0).cursor(Cursor::Pointer)
+                .preserve_focus_on_press(true)
                 .child(text(name).font(fonts::caption(500.0)).color(p.ink))
                 .child(row().px(5.0).py(2.0).radius(4.0).border(1.0, p.line).child(text(key.label()).font(fonts::key()).color(p.ink2)))
                 .on_press(|s: &mut State| draft::status_pressed(s)),
@@ -396,7 +437,7 @@ fn status(s: &State) -> Option<El> {
     Some(line)
 }
 
-fn writing(s: &State) -> El {
+fn writing(s: &State, show_status: bool) -> El {
     let p = s.look.palette;
     let field = text_input(&s.edit, fonts::writing())
         .key("editor")
@@ -412,6 +453,7 @@ fn writing(s: &State) -> El {
         .on_submit(|s: &mut State, tx| {
             s.edit.insert("\n");
             state::changed(s);
+            state::schedule_save(s, tx);
             state::sync_draft_boxes(s, tx);
         })
         .on_input_change(|s: &mut State, tx| {
@@ -419,6 +461,7 @@ fn writing(s: &State) -> El {
             trace::say(|| format!("change editor len {} caret {:?} held {}", s.edit.text.len(), s.edit.range(), s.held.is_some()));
             if !look::typed_on_field(s, tx) {
                 state::changed(s);
+                state::schedule_save(s, tx);
                 state::sync_draft_boxes(s, tx);
             }
         })
@@ -436,7 +479,7 @@ fn writing(s: &State) -> El {
     let mut pane = col().key("writing-pane").h_full().fill(p.pane)
         .on_layout(|s: &mut State, rect| s.pane = rect)
         .child(scroll);
-    if let Some(line) = status(s) {
+    if show_status && let Some(line) = status(s) {
         pane = pane.child(line);
     }
     pane

@@ -10,8 +10,60 @@ use std::collections::HashMap;
 
 use crate::{draft, ghost, markdown, position};
 
+/// How long after the last change the post saves by itself, in seconds.
+pub const AUTOSAVE_SECS: f64 = 1.0;
+
+/// What the top row shows beside the post's title.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SaveState {
+    Saved,
+    Edited,
+    Failed,
+}
+
+/// One page returned by `rubric/pages`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PageEntry {
+    pub uri: String,
+    pub kind: String,
+    pub title: String,
+    pub date: Option<String>,
+    pub draft: bool,
+}
+
+/// The site's name and its pages from `rubric/pages`.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SitePages {
+    pub site: String,
+    pub pages: Vec<PageEntry>,
+}
+
+impl SitePages {
+    pub fn parse(v: &serde_json::Value) -> Option<SitePages> {
+        let site = v.get("site")?.as_str()?.to_string();
+        let pages = v.get("pages")?.as_array()?.iter().filter_map(|p| {
+            Some(PageEntry {
+                uri: p.get("uri")?.as_str()?.to_string(),
+                kind: p.get("kind")?.as_str()?.to_string(),
+                title: p.get("title")?.as_str()?.to_string(),
+                date: p.get("date").and_then(|d| d.as_str()).map(str::to_string),
+                draft: p.get("draft").and_then(|d| d.as_bool()).unwrap_or(false),
+            })
+        }).collect();
+        Some(SitePages { site, pages })
+    }
+}
+
+/// The page opened when the app starts on a site's folder: its newest post (the first post in
+/// `rubric/pages`), else its home page, else the first page listed.
+pub fn pick_initial(pages: &[PageEntry]) -> Option<&PageEntry> {
+    pages.iter().find(|p| p.kind == "post")
+        .or_else(|| pages.iter().find(|p| p.kind == "home"))
+        .or_else(|| pages.first())
+}
+
 pub struct State {
-    /// The Markdown file.
+    /// The Markdown file (or the site folder while `waiting_for_page` is true).
     pub path: PathBuf,
     pub edit: TextEdit,
     /// LSP document version, starts at 1.
@@ -20,14 +72,31 @@ pub struct State {
     pub saved: String,
     /// 0.0 = page only, 1.0 = writing only; starts 0.5.
     pub split: f32,
+    /// Last non-edge split remembered before hiding a pane (starts 0.5).
+    pub last_split: f32,
+    /// Right edge of what is open at the left (the View popover, or the drawer in sitting 3),
+    /// in window points: the page starts past this edge plus the divider.
+    pub left_cover: f32,
     /// To notice caret moves after each drawn frame.
     pub last_range: (usize, usize),
     /// file:// of `path`.
     pub uri: String,
     /// The Markdown styles, made again on each change rather than in every view.
     pub spans: Vec<Span>,
-    /// The last save's error, printed once.
-    pub problem: Option<String>,
+    /// Writer-facing sentence for the last failed save; stays until a save succeeds.
+    pub save_error: Option<String>,
+    /// A change needs an autosave deadline armed on the window's clock.
+    pub save_arm: bool,
+    /// Window clock time (seconds) when the pending autosave writes.
+    pub save_due: Option<f64>,
+    /// Whether `shut` has already run, so `on_close` + `on_quit` never double-save or double-log.
+    pub shut_done: bool,
+    /// Started on a site folder: waiting for `rubric/pages` to open the newest post or home page.
+    pub waiting_for_page: bool,
+    /// In-flight `rubric/pages` request id.
+    pub pages_req: Option<i64>,
+    /// Last `rubric/pages` response from the server.
+    pub site_pages: Option<SitePages>,
     /// The web view, once the window exists (task 2).
     pub page: Option<crate::page::Page>,
     /// The window's width in points, for the divider.
@@ -40,6 +109,8 @@ pub struct State {
     pub cursor_line: Option<u32>,
     /// The page's address from rubric/serving, loaded once.
     pub page_url: Option<String>,
+    /// The open post's URL path from rubric/page (e.g. "/posts/long/").
+    pub page_path: Option<String>,
     /// The pick shown after the caret (task 4).
     pub ghost: Option<crate::ghost::Ghost>,
     /// The inlineCompletion asked last: its id, the document version and the line.
@@ -115,6 +186,13 @@ pub struct State {
     pub theme_before: Option<(String, crate::theme::Mode)>,
     /// The page's process over the run: media off, restarted, stopped.
     pub page_life: crate::page::Life,
+    /// Whether the page currently holds keyboard input (after a press inside it, until the next
+    /// press in the app).
+    pub page_has_keys: bool,
+    /// The View toolbar button's rectangle in window points, for hanging its popover.
+    pub view_btn_rect: [f32; 4],
+    /// Which toolbar button the pointer is currently over.
+    pub toolbar_hover: Option<crate::toolbar::Hover>,
 }
 
 /// The line a panel hangs from, taken when it opens: which line, where it starts in the text,
@@ -185,15 +263,62 @@ impl State {
         let spans = markdown::spans(&text, &marks(&look.palette), &[]);
         let title = title_of(&path, &text);
         let mut s = State {
-            path, edit, version: 1, saved: text, split: 0.5, last_range: (0, 0), uri, spans, problem: None, page: None, width: 0.0,
-            bounds: None, client: None, cursor_line: None, page_url: None, ghost: None, asked: None, height: 0.0,
+            path, edit, version: 1, saved: text, split: 0.5, last_split: 0.5, left_cover: 0.0, last_range: (0, 0), uri, spans,
+            save_error: None, save_arm: false, save_due: None, shut_done: false, waiting_for_page: false, pages_req: None, site_pages: None,
+            page: None, width: 0.0,
+            bounds: None, client: None, cursor_line: None, page_url: None, page_path: None, ghost: None, asked: None, height: 0.0,
             view: None, choice: None, drafts: Vec::new(), flash: None, now_ms: draft::now_ms(),
             pending: HashMap::new(), looked: std::cell::Cell::new(None), looked_sent: None, looked_server_ms: 0.0, sent_at: HashMap::new(), ticker: None, look, title, pane: [0.0; 4],
-            panels: Vec::new(), field: TextEdit::new(""), field_of: None, part_wait: None, set_next: None, setting: false, insert: None, drafter: None, focus_field: false, field_live: false, held: None, anchor: None, anchor_wait: false, editor_rect: [0.0; 4], draft_marks: Vec::new(), draft_boxes: HashMap::new(), draft_boxes_for: (0, 0, 0, 0), said_on: HashMap::new(), theme_before: None, page_life: crate::page::Life::default(),
+            panels: Vec::new(), field: TextEdit::new(""), field_of: None, part_wait: None, set_next: None, setting: false, insert: None, drafter: None, focus_field: false, field_live: false, held: None, anchor: None, anchor_wait: false, editor_rect: [0.0; 4], draft_marks: Vec::new(), draft_boxes: HashMap::new(), draft_boxes_for: (0, 0, 0, 0), said_on: HashMap::new(), theme_before: None, page_life: crate::page::Life::default(), page_has_keys: false,
+            view_btn_rect: [0.0; 4], toolbar_hover: None,
         };
         s.draft_marks = draft::marks(&s);
         s
     }
+
+    /// Started on a site's folder: waits for `rubric/pages` after the server connects, then opens
+    /// the site's newest post or its home page.
+    pub fn open_folder(site: PathBuf) -> State {
+        let mut s = State::open(site, String::new());
+        s.uri.clear();
+        s.waiting_for_page = true;
+        s
+    }
+}
+
+/// Loads `path` and `text` as the open document, resetting document state while keeping the
+/// window, server, page, look, and split. Opens it on the server when connected.
+pub fn open_document(s: &mut State, path: PathBuf, text: String) {
+    let mut edit = TextEdit::new(text.clone());
+    edit.focused = true;
+    edit.set_caret(0);
+    s.path = path;
+    s.uri = file_uri(&s.path);
+    s.edit = edit;
+    s.version = 1;
+    s.saved = text;
+    s.last_range = (0, 0);
+    s.cursor_line = None;
+    s.page_path = None;
+    s.ghost = None;
+    s.asked = None;
+    s.save_error = None;
+    s.save_arm = false;
+    s.save_due = None;
+    s.waiting_for_page = false;
+    s.spans = spans(s);
+    s.draft_marks = draft::marks(s);
+    s.draft_boxes.clear();
+    s.draft_boxes_for = (0, 0, 0, 0);
+    s.title = title_of(&s.path, &s.edit.text);
+    if let Some(c) = &s.client {
+        c.notify("textDocument/didOpen", json!({
+            "textDocument": { "uri": s.uri, "languageId": "markdown", "version": s.version, "text": s.edit.text },
+        }));
+        c.notify("rubric/cursor", json!({ "uri": s.uri, "line": 0 }));
+        s.cursor_line = Some(0);
+    }
+    ask(s);
 }
 
 /// The Markdown's colors from the app's theme.
@@ -220,14 +345,30 @@ pub fn show_theme(s: &mut State, name: &str) -> bool {
     shown
 }
 
-/// The post's first ATX heading, outside front matter and code fences, or its file's name.
+/// The post's title: front matter `title:` (plain or quoted), else the first ATX heading outside
+/// front matter and code fences, else its file's name.
 pub fn title_of(path: &std::path::Path, text: &str) -> String {
     let mut lines = text.split('\n').peekable();
     if lines.peek().is_some_and(|l| l.trim_end() == "---") {
         lines.next();
+        let mut fm = Vec::new();
+        let mut closed = false;
         for l in lines.by_ref() {
-            if l.trim_end() == "---" {
+            let trimmed = l.trim_end();
+            if trimmed == "---" || trimmed == "..." {
+                closed = true;
                 break;
+            }
+            fm.push(trimmed);
+        }
+        if closed {
+            for l in fm {
+                if let Some(rest) = l.strip_prefix("title:") {
+                    let val = unquote_yaml(rest.trim());
+                    if !val.is_empty() {
+                        return val;
+                    }
+                }
             }
         }
     }
@@ -252,9 +393,81 @@ pub fn title_of(path: &std::path::Path, text: &str) -> String {
     path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
 }
 
+fn unquote_yaml(v: &str) -> String {
+    if v.len() >= 2 && v.starts_with('"') && v.ends_with('"') {
+        let inner = &v[1..v.len() - 1];
+        let mut out = String::with_capacity(inner.len());
+        let mut chars = inner.chars();
+        while let Some(c) = chars.next() {
+            if c == '\\' {
+                match chars.next() {
+                    Some('"') => out.push('"'),
+                    Some('\\') => out.push('\\'),
+                    Some('n') => out.push('\n'),
+                    Some('t') => out.push('\t'),
+                    Some(other) => {
+                        out.push('\\');
+                        out.push(other);
+                    }
+                    None => out.push('\\'),
+                }
+            } else {
+                out.push(c);
+            }
+        }
+        out.trim().to_string()
+    } else if v.len() >= 2 && v.starts_with('\'') && v.ends_with('\'') {
+        v[1..v.len() - 1].replace("''", "'").trim().to_string()
+    } else {
+        v.trim().to_string()
+    }
+}
+
 /// Whether the text is as last written.
 pub fn clean(s: &State) -> bool {
     s.edit.text == s.saved
+}
+
+/// The saved state shown in the top row.
+pub fn save_state(s: &State) -> SaveState {
+    if s.save_error.is_some() {
+        SaveState::Failed
+    } else if clean(s) {
+        SaveState::Saved
+    } else {
+        SaveState::Edited
+    }
+}
+
+/// Arms the autosave timer on the window's clock whenever a change queued one.
+pub fn schedule_save(s: &mut State, tx: &mut Tx) {
+    if s.save_arm {
+        s.save_arm = false;
+        s.save_due = Some(tx.clock() + AUTOSAVE_SECS);
+        tx.wake_after(std::time::Duration::from_secs_f64(AUTOSAVE_SECS));
+    }
+}
+
+/// App-level poll hook (`AppSpec::poll`): drives Insert part…'s search pause and autosave.
+/// Does nothing and schedules no wakes while neither is due.
+pub fn poll(s: &mut State, clock: f64, tx: &mut Tx) -> bool {
+    let mut changed = crate::insert::poll(s, clock, tx);
+    if s.save_arm {
+        s.save_arm = false;
+        s.save_due = Some(clock + AUTOSAVE_SECS);
+        tx.wake_after(std::time::Duration::from_secs_f64(AUTOSAVE_SECS));
+    } else if let Some(due) = s.save_due {
+        if clock < due {
+            tx.wake_after(std::time::Duration::from_secs_f64(due - clock));
+        } else {
+            s.save_due = None;
+            if !s.waiting_for_page && (!clean(s) || s.save_error.is_some()) {
+                save(s);
+                changed = true;
+            }
+        }
+    }
+    changed
 }
 
 /// The text changed: a new version, new styles, and the whole text to the server.
@@ -280,7 +493,15 @@ fn sent(s: &mut State) {
     s.spans = spans(s);
     s.draft_marks = draft::marks(s);
     s.title = title_of(&s.path, &s.edit.text);
-    if let Some(c) = &s.client {
+    if !s.waiting_for_page {
+        if clean(s) && s.save_error.is_none() {
+            s.save_arm = false;
+            s.save_due = None;
+        } else {
+            s.save_arm = true;
+        }
+    }
+    if let Some(c) = &s.client && !s.waiting_for_page {
         c.notify("textDocument/didChange", json!({
             "textDocument": { "uri": s.uri, "version": s.version },
             "contentChanges": [{ "text": s.edit.text }],
@@ -344,12 +565,13 @@ fn marks_sig(marks: &[draft::Mark]) -> u64 {
     h.finish()
 }
 
-/// After a message from the server: a field a panel opened with takes the keys, and any new or
-/// removed draft line updates its box.
+/// After a message from the server: a field a panel opened with takes the keys, any queued
+/// autosave is armed on the window's clock, and any new or removed draft line updates its box.
 pub fn follow_up(s: &mut State, tx: &mut Tx) {
     if std::mem::take(&mut s.focus_field) {
         crate::look::give_field(s, tx);
     }
+    schedule_save(s, tx);
     sync_draft_boxes(s, tx);
 }
 
@@ -400,8 +622,15 @@ pub fn showing(s: &State) -> Option<&ghost::Ghost> {
     s.ghost.as_ref().filter(|g| g.version == s.version && ghost::wants(&s.edit.text, s.edit.focus) == Some(g.line))
 }
 
-/// The server answered initialize: open the document as it is now, and say where the caret is.
+/// The server answered initialize: open the document as it is now (or ask `rubric/pages` when
+/// started on a site folder), and say where the caret is.
 pub fn connected(s: &mut State, client: crate::lsp::Client) {
+    if s.waiting_for_page {
+        let id = client.request("rubric/pages", json!({}));
+        s.pages_req = Some(id);
+        s.client = Some(client);
+        return;
+    }
     client.notify("textDocument/didOpen", json!({
         "textDocument": { "uri": s.uri, "languageId": "markdown", "version": s.version, "text": s.edit.text },
     }));
@@ -421,6 +650,36 @@ pub fn incoming(s: &mut State, m: crate::lsp::Incoming) -> bool {
     match m {
         // Only the answer to the last question, for the version and line it was asked about.
         Incoming::Response { id, result } => {
+            if s.pages_req == Some(id) {
+                s.pages_req = None;
+                match result {
+                    Ok(v) => {
+                        if let Some(pages) = SitePages::parse(&v) {
+                            let initial = pick_initial(&pages.pages).and_then(|e| uri_path(&e.uri));
+                            s.site_pages = Some(pages);
+                            if s.waiting_for_page {
+                                if let Some(path) = initial {
+                                    match std::fs::read_to_string(&path) {
+                                        Ok(text) => open_document(s, path, text),
+                                        Err(e) => {
+                                            eprintln!("open {}: {e}", path.display());
+                                            s.waiting_for_page = false;
+                                        }
+                                    }
+                                } else {
+                                    s.waiting_for_page = false;
+                                }
+                            }
+                            return true;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("rubric/pages failed: {e}");
+                        s.waiting_for_page = false;
+                    }
+                }
+                return false;
+            }
             if let Some(sent) = s.sent_at.remove(&id)
                 && s.looked.get().is_some()
             {
@@ -451,6 +710,17 @@ pub fn incoming(s: &mut State, m: crate::lsp::Incoming) -> bool {
                 eprintln!("page: {p}");
             }
             true
+        }
+        Incoming::Notification { method, params } if method == "rubric/page" => {
+            let for_me = params.get("uri").and_then(|u| u.as_str()).is_none_or(|u| unescaped(u) == unescaped(&s.uri));
+            if for_me && let Some(url) = params.get("url").and_then(|u| u.as_str()) {
+                let next = Some(url.to_string());
+                if s.page_path != next {
+                    s.page_path = next;
+                    return true;
+                }
+            }
+            false
         }
         Incoming::Notification { method, params } if method == "textDocument/publishDiagnostics" => {
             draft::diagnostics(s, &params);
@@ -490,10 +760,20 @@ pub fn menu_drawn(s: &State) -> Option<String> {
     Some(format!("menu drawn {:.1} ms: {id}, server {:.1} ms", asked.elapsed().as_secs_f64() * 1000.0, s.looked_server_ms))
 }
 
-/// The window is going: the document and the server close, then the web view.
+/// The window is going: unsaved writing saves first (a failure is printed and closing still
+/// completes), then the document and server close, then the web view.
 pub fn shut(s: &mut State) {
+    if s.shut_done {
+        return;
+    }
+    s.shut_done = true;
+    if !s.waiting_for_page && (!clean(s) || s.save_error.is_some()) {
+        save(s);
+    }
     if let Some(c) = s.client.take() {
-        c.notify("textDocument/didClose", json!({ "textDocument": { "uri": s.uri } }));
+        if !s.waiting_for_page && !s.uri.is_empty() {
+            c.notify("textDocument/didClose", json!({ "textDocument": { "uri": s.uri } }));
+        }
         c.stop();
     }
     if let Some(page) = s.page.take() {
@@ -569,14 +849,64 @@ pub fn keep_anchor(s: &State) -> Option<Anchor> {
     s.anchor.filter(|a| a.holds(at, start, s.editor_rect[2]))
 }
 
-/// Ctrl+S writes the file whole.
-pub fn save(s: &mut State) {
+/// Writes the file whole; clears any failed-save state on success, or records a short
+/// writer-facing sentence and prints the error on failure. Returns whether the file is saved.
+pub fn save(s: &mut State) -> bool {
+    if s.waiting_for_page {
+        return true;
+    }
+    s.save_arm = false;
+    s.save_due = None;
     match markdown::save(&s.path, &s.edit.text) {
-        Ok(()) => s.saved = s.edit.text.clone(),
+        Ok(()) => {
+            s.saved = s.edit.text.clone();
+            s.save_error = None;
+            true
+        }
         Err(e) => {
             eprintln!("save failed: {e}");
-            s.problem = Some(e.to_string());
+            s.save_error = Some(save_error_sentence(&e));
+            false
         }
+    }
+}
+
+/// Short writer-facing sentence for an I/O save error.
+pub fn save_error_sentence(e: &std::io::Error) -> String {
+    use std::io::ErrorKind;
+    match e.kind() {
+        ErrorKind::PermissionDenied | ErrorKind::ReadOnlyFilesystem => "The site folder could not be written.".into(),
+        ErrorKind::NotFound => "The post's folder is gone.".into(),
+        ErrorKind::StorageFull => "The disk is full.".into(),
+        _ => {
+            let raw = e.to_string();
+            let clean = raw.split(" (os error ").next().unwrap_or(&raw).trim();
+            if clean.is_empty() {
+                "The file could not be written.".into()
+            } else {
+                let mut c = clean.chars();
+                let mut out: String = c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default();
+                if !out.ends_with('.') {
+                    out.push('.');
+                }
+                out
+            }
+        }
+    }
+}
+
+/// Converts a `file://` URI back to a filesystem path.
+pub fn uri_path(uri: &str) -> Option<PathBuf> {
+    let rest = uri.strip_prefix("file://")?;
+    let bytes = unescaped(rest);
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStringExt;
+        Some(PathBuf::from(std::ffi::OsString::from_vec(bytes)))
+    }
+    #[cfg(not(unix))]
+    {
+        String::from_utf8(bytes).ok().map(PathBuf::from)
     }
 }
 
@@ -614,11 +944,16 @@ pub fn unescaped(uri: &str) -> Vec<u8> {
     out
 }
 
-/// The page pane moved or resized: `rect` in points, `scale` pixels per point.
+/// The page pane moved or resized: `rect` in points, `scale` pixels per point. When the page
+/// pane is hidden (writing only), keep the view's last size and park it fully outside the window
+/// instead of unmapping it, so WebKit repaints when it returns.
 pub fn page_laid_out(s: &mut State, rect: [f32; 4], scale: f32) {
     let px = |v: f32| (v * scale).round();
     let b = if s.split >= 1.0 || rect[2] < 1.0 || rect[3] < 1.0 {
-        (0, 0, 0, 0)
+        let (w, h) = s.bounds.map_or((1, 1), |(_, _, w, h)| (w.max(1), h.max(1)));
+        let off_x = px(s.width.max(rect[0])) as i32 + 64;
+        let off_y = px(s.height.max(rect[1] + rect[3])) as i32 + 64;
+        (off_x, off_y, w, h)
     } else {
         (px(rect[0]) as i32, px(rect[1]) as i32, px(rect[2]) as u32, px(rect[3]) as u32)
     };
@@ -641,6 +976,21 @@ pub fn page_attached(s: &mut State, page: crate::page::Page) {
         page.send(crate::page::PageCmd::Load(url.clone()));
     }
     s.page = Some(page);
+}
+
+/// A press landed inside the page: it holds keys until the next press in the app.
+pub fn page_pressed(s: &mut State) {
+    s.page_has_keys = true;
+}
+
+/// A press landed anywhere in the app: if the page held keys, take them back. Answers what was
+/// sent to the page.
+pub fn app_pressed(s: &mut State) -> Vec<crate::page::PageCmd> {
+    if !s.page_has_keys {
+        return Vec::new();
+    }
+    s.page_has_keys = false;
+    send_page(s, vec![crate::page::PageCmd::Keys(false)])
 }
 
 /// The page's process ended. The first time, media goes off and the page loads again; a death
@@ -684,9 +1034,13 @@ mod tests {
     use std::path::Path;
 
     #[test]
-    fn the_title_is_the_first_heading_past_the_front_matter() {
+    fn the_title_is_the_front_matter_then_the_first_heading_then_the_file_name() {
         let p = Path::new("/x/walk.md");
-        assert_eq!(title_of(p, "---\ntitle: x\n# not this\n---\n\n```\n# nor this\n```\n## The long walk ##\n# Later"), "The long walk");
+        assert_eq!(title_of(p, "---\ntitle: Three days on the coast path\n---\n# Heading"), "Three days on the coast path");
+        assert_eq!(title_of(p, "---\ntitle: \"The long walk: part \\\"1\\\"\"\n---\n# Heading"), "The long walk: part \"1\"");
+        assert_eq!(title_of(p, "---\ntitle: 'Keeper''s log'\n---\n# Heading"), "Keeper's log");
+        assert_eq!(title_of(p, "---\ndate: 2026-06-12\n# not this\n---\n\n```\n# nor this\n```\n## The long walk ##\n# Later"), "The long walk");
+        assert_eq!(title_of(p, "---\ntitle: \"\"\n---\n# Fallback heading"), "Fallback heading");
         assert_eq!(title_of(p, "no heading\n#tag"), "walk.md");
     }
 
@@ -740,5 +1094,26 @@ mod tests {
         assert_eq!(life.died(1_000 + crate::page::AGAIN_MS), crate::page::Death::Restart);
         assert_eq!(life.died(1_000 + crate::page::AGAIN_MS + 9_999), crate::page::Death::Stop);
         assert!(life.media_off);
+    }
+
+    #[test]
+    fn page_press_gives_page_keys_and_next_app_press_takes_them_back_once() {
+        use crate::page::PageCmd;
+        let mut s = State::open(PathBuf::from("/x/walk.md"), "# Walk\n".into());
+        assert!(!s.page_has_keys);
+        assert_eq!(app_pressed(&mut s), []);
+        page_pressed(&mut s);
+        assert!(s.page_has_keys);
+        assert_eq!(app_pressed(&mut s), [PageCmd::Keys(false)]);
+        assert!(!s.page_has_keys);
+        assert_eq!(app_pressed(&mut s), [], "second app press sends nothing");
+    }
+
+    #[test]
+    fn uri_path_round_trips_spaces_and_symbols_and_save_error_sentence_is_concise() {
+        let p = PathBuf::from("/tmp/Blog (old)/café walk.md");
+        assert_eq!(uri_path(&file_uri(&p)), Some(p));
+        let perm = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "permission denied");
+        assert_eq!(save_error_sentence(&perm), "The site folder could not be written.");
     }
 }

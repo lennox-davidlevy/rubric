@@ -4,7 +4,7 @@ What changed in the plan's "Before the app" list (docs/plan.md, under step 8), i
 
 Write what you find in **Notes** at the bottom, by test number.
 
-Last updated: 2026-11-26 (section D, move to Rune `41cfc07`).
+Last updated: 2026-11-27 (section F cleanup and section G, shell sitting 2).
 
 ## Set up
 
@@ -241,6 +241,75 @@ Start the release build natively on the sample post (stub, no Jev key needed): `
 | E15 | On `::: new: a failing bell`, type enough words to reach the right edge of the column | The `Failed` label disappears before the text touches it; the bar on the left stays. |
 
 **After section E, put the site back:** close the app and run `app/scripts/clean-test.sh`.
+
+## F. The shell, sitting 1: the window and the toolbar (branch `shell`)
+
+Start the release build natively from the repo's root (stub, no Jev key needed): `cargo build --release --manifest-path app/Cargo.toml`, then `app/target/release/rubric-app sites/app-slice/pages/posts/long.md`.
+
+| # | Do | Expect |
+|---|---|---|
+| F1 | Start the app as above | Borderless window with no system title bar; the 40-point top row of the window holds Drawer, View, `The long walk` + `Saved` centered, Open in browser, and the circular close button. The page attaches in the right pane and draws the post. |
+| F2 | Drag the divider left and right | The page follows the divider inside its pane with no offset or clipping. |
+| F3 | Resize the window | Both panes and the page resize cleanly with no offset or clipping. |
+| F4 | Float the window in Hyprland and drag an empty spot of the top row | The window moves; dragging a button does not move the window. |
+| F5 | Drag from each of the 4-point window edges and corners | Each edge and corner shows a resize cursor and resizes the window without blocking the top row's controls. |
+| F6 | Edit `title:` in the post's front matter (`title: "Three days on the coast path"`) | The centered title in the top row updates live to `Three days on the coast path` (front matter `title:` beats the `#` heading). |
+| F7 | Hover over the Drawer button | Drawer stays dimmed with no hover fill; after a brief pause a 26-point tip reads `Posts and pages` `Ctrl+O` inside the top row to its right. |
+| F8 | Hover over the View button | View fills on hover; after a brief pause a tip reads `View` inside the top row to its right. |
+| F9 | Hover over Open in browser | Open in browser fills on hover; after a brief pause a tip reads `Open in browser` `Ctrl+Shift+B` inside the top row to its left. |
+| F10 | Hover over the circular close button | Close fills on hover; after a brief pause a tip reads `Close window` `Ctrl+W` inside the top row to its left. |
+| F11 | Click the View button | A popover hangs right under the View button with `Both panes` (ticked, `Ctrl+1`), `Writing only` (`Ctrl+2`), `Page only` (`Ctrl+3`). |
+| F12 | Press Esc | The View popover closes. |
+| F13 | Drag the divider to an uneven split (~35/65) | Both panes hold the ~35/65 split. |
+| F14 | Press `Ctrl+2` (writing only) | The page hides and the View button stays filled. |
+| F15 | Press `Ctrl+1` (both panes) | The ~35/65 split returns, the page draws immediately (not blank), and typing lands in the writing. |
+| F16 | Press `Ctrl+3` (page only) | The writing hides and View stays filled. |
+| F17 | Hover Drawer and Close while in page-only view | Their tips still show cleanly inside the top row without overlapping the page. |
+| F18 | Click View while in page-only view | The page yields a 300-point column at the left in the pane's color with a hairline at its right edge, so none of the View popover is covered. |
+| F19 | Press Esc | The View popover closes and the page snaps back to the left edge beside the divider. |
+| F20 | Press `Ctrl+1` | Both panes return and typing lands in the writing. |
+| F21 | Resize the window slowly down through 760 points wide (floating) | The title's max width shrinks smoothly with no jump at 760 points; at 760 wide or narrower Open in browser leaves the top row without the title touching any button. |
+| F22 | Click View while 760 wide or narrower | Open in browser appears as the View popover's last item under a hairline. |
+| F23 | Click Open in browser in the narrow View popover | Opens this post's live URL (`http://127.0.0.1:1415/posts/long/`) in the system browser and closes the popover. |
+| F24 | Resize back to full width and press `Ctrl+Shift+B` | Opens this post's live URL in the system browser. |
+| F25 | Click Open in browser in the top row | Opens this post's live URL in the system browser. |
+| F26 | Rest the pointer over the page (without clicking it) and type a word | The word lands in the writing. |
+| F27 | Press `Ctrl+3` (page only) with the pointer over the page | Page-only view opens. |
+| F28 | Press `Ctrl+1` with the pointer still over the page | Both panes return. |
+| F29 | Click in the page, select a word, and press `Ctrl+C` | The word is copied from the page. |
+| F30 | Click in the writing and press `Ctrl+V` | The copied word pastes into the writing. |
+| F31 | Click in the page, then press `Ctrl+2` | The page hides (writing only) without clicking in the app first. |
+| F32 | Press `Ctrl+1` | Both panes return. |
+| F33 | Type a word without clicking in the writing first | The word lands in the writing. |
+| F34 | Click the circular close button | The window closes cleanly with no `rubric-app` or `WebKitWebProcess` left running. |
+| F35 | Start the app again and press `Ctrl+W` | The window closes cleanly with no `rubric-app` or `WebKitWebProcess` left running. |
+
+**After section F, put the site back:** run `app/scripts/clean-test.sh`.
+
+## G. The shell, sitting 2: saving, and the site's pages (branch `shell`)
+
+Start the release build natively from the repo's root (stub, no Jev key needed): `cargo build --release --manifest-path app/Cargo.toml`, then `app/target/release/rubric-app sites/app-slice/pages/posts/long.md`.
+
+| # | Do | Expect |
+|---|---|---|
+| G1 | Start the app as above | The top row of the window reads `The long walk` and `Saved`. |
+| G2 | Type a word at the end of a paragraph | The top row reads `Edited` right away; `cat sites/app-slice/pages/posts/long.md` does not hold the word yet. |
+| G3 | Wait just over a second without typing | The top row reads `Saved`; `cat sites/app-slice/pages/posts/long.md` holds the word. |
+| G4 | Type a letter, wait half a second, then type another letter | The top row stays `Edited` until about a second after the second letter, then reads `Saved`. |
+| G5 | Leave the window untouched for 10 s and watch `top` for `rubric-app` | Under 1% CPU. |
+| G6 | In another terminal, run `chmod 555 sites/app-slice/pages/posts` | The folder is read-only; the top row still reads `Saved`. |
+| G7 | Type a word in the writing and wait just over a second | The top row reads `Not saved` in red; a status line under the writing reads `Post not saved`, `The site folder could not be written.`, with `Retry` and `Ctrl+S`. |
+| G8 | Type `::: new: a brass clock` on a new line and leave the caret on it | `Post not saved` stays in the status line in place of the `new:` line's status. |
+| G9 | Press `Ctrl+3` (page only) | The `Post not saved` status line spans a 34-point strip across the bottom of the window below the page. |
+| G10 | Press `Ctrl+1` (both panes) | Both panes return; `Post not saved` is under the writing again. |
+| G11 | In the other terminal, run `chmod 755 sites/app-slice/pages/posts` | The folder is writable again; `Not saved` stays until saved. |
+| G12 | Click `Retry` in the status line | The file is written on disk, `Post not saved` disappears, and the top row reads `Saved`. |
+| G13 | Run `chmod 555 sites/app-slice/pages/posts` in the other terminal and press `Ctrl+S` | `Not saved` and the `Post not saved` status line show at once. |
+| G14 | Run `chmod 755 sites/app-slice/pages/posts` in the other terminal, type one letter, and wait just over a second | Autosave tries again on its own after the change, writes the file, and clears both `Not saved` and the status line. |
+| G15 | Type a word and immediately press `Ctrl+W` (within a second) | The window closes cleanly and `cat sites/app-slice/pages/posts/long.md` holds the word. |
+| G16 | Start the app on the site's folder: `app/target/release/rubric-app sites/app-slice` | Opens the site's newest post (`The long walk`) with its page drawn on the right. |
+
+**After section G, put the site back:** run `chmod 755 sites/app-slice/pages/posts`, close the app, and run `app/scripts/clean-test.sh`.
 
 ## Notes
 App starts well
